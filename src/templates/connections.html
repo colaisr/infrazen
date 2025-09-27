@@ -8,7 +8,7 @@
 {% block header_actions %}
     <div class="header-actions">
         <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
-        <button class="btn btn-primary"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
+        <button class="btn btn-primary" onclick="showProviderModal()"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
     </div>
 {% endblock %}
 
@@ -104,15 +104,15 @@
             </div>
             
             <div class="provider-actions">
-                <button class="btn btn-secondary btn-sm" title="Настройки">
+                <button class="btn btn-secondary btn-sm" title="Настройки" onclick="editConnection('{{ provider.id }}')">
                     <i class="fa-solid fa-gear"></i>
                     <span>Настройки</span>
                 </button>
-                <button class="btn btn-primary btn-sm" title="Синхронизировать">
+                <button class="btn btn-primary btn-sm" title="Синхронизировать" onclick="syncConnection('{{ provider.id }}')">
                     <i class="fa-solid fa-sync"></i>
                     <span>Синхронизировать</span>
                 </button>
-                <button class="btn btn-danger btn-sm" title="Удалить">
+                <button class="btn btn-danger btn-sm" title="Удалить" onclick="deleteConnection('{{ provider.id }}')">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
@@ -140,7 +140,11 @@
                     <span class="provider-name">Amazon Web Services</span>
                     <span class="provider-description">AWS API Integration</span>
                 </div>
-                <button class="btn btn-outline btn-sm">Добавить</button>
+                {% if not is_demo_user %}
+                <button class="btn btn-outline btn-sm" onclick="showProviderModal('aws')">Добавить</button>
+                {% else %}
+                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
+                {% endif %}
             </div>
             <div class="provider-option">
                 <div class="provider-logo">
@@ -152,7 +156,11 @@
                     <span class="provider-name">Microsoft Azure</span>
                     <span class="provider-description">Azure Resource Manager</span>
                 </div>
-                <button class="btn btn-outline btn-sm">Добавить</button>
+                {% if not is_demo_user %}
+                <button class="btn btn-outline btn-sm" onclick="showProviderModal('azure')">Добавить</button>
+                {% else %}
+                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
+                {% endif %}
             </div>
             <div class="provider-option">
                 <div class="provider-logo">
@@ -164,7 +172,11 @@
                     <span class="provider-name">Google Cloud Platform</span>
                     <span class="provider-description">GCP API Integration</span>
                 </div>
-                <button class="btn btn-outline btn-sm">Добавить</button>
+                {% if not is_demo_user %}
+                <button class="btn btn-outline btn-sm" onclick="showProviderModal('gcp')">Добавить</button>
+                {% else %}
+                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
+                {% endif %}
             </div>
             <div class="provider-option">
                 <div class="provider-logo">
@@ -176,7 +188,11 @@
                     <span class="provider-name">VK Cloud</span>
                     <span class="provider-description">VK Cloud API</span>
                 </div>
-                <button class="btn btn-outline btn-sm">Добавить</button>
+                {% if not is_demo_user %}
+                <button class="btn btn-outline btn-sm" onclick="showProviderModal('vk-cloud')">Добавить</button>
+                {% else %}
+                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
+                {% endif %}
             </div>
             <div class="provider-option">
                 <div class="provider-logo">
@@ -189,7 +205,7 @@
                     <span class="provider-description">Хостинг и домены</span>
                 </div>
                 {% if not is_demo_user %}
-                <button class="btn btn-outline btn-sm" onclick="showBegetForm()">Добавить</button>
+                <button class="btn btn-outline btn-sm" onclick="showProviderModal('beget')">Добавить</button>
                 {% else %}
                 <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
                 {% endif %}
@@ -696,49 +712,53 @@
 }
 </style>
 
-<!-- Beget Connection Modal -->
-<div id="begetModal" class="modal">
+<!-- Provider Connection Modal -->
+<div id="providerModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
             <h3 class="modal-title">
-                <i class="fa-solid fa-server" style="color: #8b4513; margin-right: 0.5rem;"></i>
-                Подключение Beget
+                <i class="fa-solid fa-cloud" style="color: #1E40AF; margin-right: 0.5rem;"></i>
+                Подключение облачного провайдера
             </h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" onclick="closeProviderModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="provider-info-card">
+            <!-- Provider Selection -->
+            <div class="form-group">
+                <label class="form-label" for="provider_select">Выберите провайдера *</label>
+                <select class="form-select" id="provider_select" onchange="changeProvider()" required>
+                    <option value="">-- Выберите провайдера --</option>
+                    <option value="yandex">Yandex Cloud</option>
+                    <option value="selectel">Selectel</option>
+                    <option value="beget">Beget</option>
+                    <option value="aws">Amazon Web Services</option>
+                    <option value="azure">Microsoft Azure</option>
+                    <option value="gcp">Google Cloud Platform</option>
+                    <option value="vk-cloud">VK Cloud</option>
+                </select>
+            </div>
+
+            <div class="provider-info-card" id="providerInfo" style="display: none;">
                 <h4>Информация о провайдере</h4>
-                <p>Beget — российский хостинг-провайдер, предоставляющий услуги веб-хостинга, регистрации доменов и виртуальных серверов. Для подключения потребуются данные для входа в панель управления.</p>
+                <p id="providerDescription"></p>
             </div>
             
-            <div class="connection-test" id="connectionTest"></div>
+            <div class="connection-test" id="connectionTest" style="display: none;"></div>
             
-            <form id="begetForm" method="POST" action="/connections/beget/add">
+            <form id="providerForm" method="POST" action="/connections/add">
+                <input type="hidden" id="selected_provider" name="provider" value="">
+                
+                <!-- Common fields -->
                 <div class="form-group">
                     <label class="form-label" for="connection_name">Название подключения *</label>
                     <input type="text" class="form-control" id="connection_name" name="connection_name" 
-                           placeholder="Мой Beget аккаунт" required>
+                           placeholder="Мой аккаунт" required>
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="username">Имя пользователя *</label>
-                    <input type="text" class="form-control" id="username" name="username" 
-                           placeholder="your_beget_username" required>
-                </div>
+                <!-- Dynamic provider-specific fields -->
+                <div id="providerFields"></div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="password">Пароль *</label>
-                    <input type="password" class="form-control" id="password" name="password" 
-                           placeholder="••••••••" required>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="api_url">API URL</label>
-                    <input type="url" class="form-control" id="api_url" name="api_url" 
-                           value="https://api.beget.com">
-                </div>
-                
+                <!-- Common settings -->
                 <div class="form-group">
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" id="auto_sync" name="auto_sync" checked>
@@ -771,51 +791,303 @@
             </form>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-            <button type="button" class="btn btn-outline-secondary" onclick="testConnection()">Тест подключения</button>
-            <button type="submit" form="begetForm" class="btn btn-primary btn-lg">Подключить Beget</button>
+            <button type="button" class="btn btn-secondary" onclick="closeProviderModal()">Отмена</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="testConnection()" style="display: none;" id="testBtn">Тест подключения</button>
+            <button type="submit" form="providerForm" class="btn btn-primary btn-lg" style="display: none;" id="connectBtn">Подключить</button>
         </div>
     </div>
 </div>
 
 <script>
-function showBegetForm() {
-    document.getElementById('begetModal').style.display = 'block';
+// Provider configurations
+const providers = {
+    yandex: {
+        name: 'Yandex Cloud',
+        description: 'Yandex Cloud — российская облачная платформа, предоставляющая услуги виртуальных машин, баз данных, хранилищ и других облачных сервисов.',
+        fields: [
+            { name: 'access_key', label: 'Access Key ID *', type: 'text', placeholder: 'AQVN...', required: true },
+            { name: 'secret_key', label: 'Secret Access Key *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'organization_id', label: 'Organization ID *', type: 'text', placeholder: 'org-1234567890', required: true },
+            { name: 'cloud_id', label: 'Cloud ID *', type: 'text', placeholder: 'b1g1234567890', required: true }
+        ]
+    },
+    selectel: {
+        name: 'Selectel',
+        description: 'Selectel — российский провайдер облачных услуг, специализирующийся на виртуальных серверах, облачных вычислениях и хостинге.',
+        fields: [
+            { name: 'api_key', label: 'API Key *', type: 'text', placeholder: 'sk_...', required: true },
+            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'proj_1234567890', required: true }
+        ]
+    },
+    beget: {
+        name: 'Beget',
+        description: 'Beget — российский хостинг-провайдер, предоставляющий услуги веб-хостинга, регистрации доменов и виртуальных серверов.',
+        fields: [
+            { name: 'username', label: 'Имя пользователя *', type: 'text', placeholder: 'your_beget_username', required: true },
+            { name: 'password', label: 'Пароль *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'api_url', label: 'API URL', type: 'url', placeholder: 'https://api.beget.com', required: false, default: 'https://api.beget.com' }
+        ]
+    },
+    aws: {
+        name: 'Amazon Web Services',
+        description: 'Amazon Web Services — ведущая облачная платформа, предоставляющая широкий спектр облачных сервисов и решений.',
+        fields: [
+            { name: 'access_key_id', label: 'Access Key ID *', type: 'text', placeholder: 'AKIA...', required: true },
+            { name: 'secret_access_key', label: 'Secret Access Key *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'region', label: 'Region *', type: 'text', placeholder: 'us-east-1', required: true }
+        ]
+    },
+    azure: {
+        name: 'Microsoft Azure',
+        description: 'Microsoft Azure — облачная платформа Microsoft, предоставляющая услуги для разработки, тестирования, развертывания и управления приложениями.',
+        fields: [
+            { name: 'client_id', label: 'Client ID *', type: 'text', placeholder: '12345678-1234-1234-1234-123456789012', required: true },
+            { name: 'client_secret', label: 'Client Secret *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'tenant_id', label: 'Tenant ID *', type: 'text', placeholder: '12345678-1234-1234-1234-123456789012', required: true },
+            { name: 'subscription_id', label: 'Subscription ID *', type: 'text', placeholder: '12345678-1234-1234-1234-123456789012', required: true }
+        ]
+    },
+    gcp: {
+        name: 'Google Cloud Platform',
+        description: 'Google Cloud Platform — облачная платформа Google, предоставляющая услуги вычислений, хранения данных и машинного обучения.',
+        fields: [
+            { name: 'service_account_key', label: 'Service Account Key *', type: 'textarea', placeholder: 'JSON ключ сервисного аккаунта', required: true },
+            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'my-gcp-project', required: true }
+        ]
+    },
+    'vk-cloud': {
+        name: 'VK Cloud',
+        description: 'VK Cloud — российская облачная платформа, предоставляющая услуги виртуальных машин, баз данных и других облачных сервисов.',
+        fields: [
+            { name: 'access_key', label: 'Access Key *', type: 'text', placeholder: 'vk_access_key', required: true },
+            { name: 'secret_key', label: 'Secret Key *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'vk_project_id', required: true }
+        ]
+    }
+};
+
+function showProviderModal(selectedProvider = null) {
+    document.getElementById('providerModal').style.display = 'block';
+    
+    // Reset modal to add mode
+    resetModalToAddMode();
+    
+    // If a provider is specified, pre-select it
+    if (selectedProvider) {
+        const providerSelect = document.getElementById('provider_select');
+        providerSelect.value = selectedProvider;
+        changeProvider(); // Trigger the change to show provider-specific fields
+    }
 }
 
-function showProviderForm() {
-    // Generic provider form - can be extended for other providers
-    showBegetForm();
+function showProviderModalForEdit(connectionData) {
+    document.getElementById('providerModal').style.display = 'block';
+    
+    // Set modal to edit mode
+    setModalToEditMode(connectionData);
+    
+    // Pre-select provider and fill fields
+    const providerSelect = document.getElementById('provider_select');
+    providerSelect.value = connectionData.provider;
+    changeProvider(); // Trigger the change to show provider-specific fields
+    
+    // Fill in the existing data
+    setTimeout(() => {
+        fillEditForm(connectionData);
+    }, 100);
 }
 
-function closeModal() {
-    document.getElementById('begetModal').style.display = 'none';
+function resetModalToAddMode() {
+    // Reset form fields
+    document.getElementById('providerForm').reset();
+    
+    // Update modal title and button text
+    document.querySelector('.modal-title').innerHTML = 
+        '<i class="fa-solid fa-cloud" style="color: #1E40AF; margin-right: 0.5rem;"></i>Подключение облачного провайдера';
+    
+    const connectBtn = document.getElementById('connectBtn');
+    connectBtn.innerHTML = 'Подключить';
+    connectBtn.style.display = 'none';
+    
+    const testBtn = document.getElementById('testBtn');
+    testBtn.style.display = 'none';
+    
+    // Hide provider info and connection test sections
+    document.getElementById('providerInfo').style.display = 'none';
     document.getElementById('connectionTest').style.display = 'none';
+    
+    // Remove hidden edit ID field if it exists
+    const existingEditId = document.getElementById('edit_connection_id');
+    if (existingEditId) {
+        existingEditId.remove();
+    }
+}
+
+function setModalToEditMode(connectionData) {
+    // Update modal title
+    document.querySelector('.modal-title').innerHTML = 
+        '<i class="fa-solid fa-edit" style="color: #1E40AF; margin-right: 0.5rem;"></i>Редактирование подключения';
+    
+    // Update button text
+    const connectBtn = document.getElementById('connectBtn');
+    connectBtn.innerHTML = 'Сохранить изменения';
+    connectBtn.style.display = 'none';
+    
+    // Add hidden field for edit ID
+    const form = document.getElementById('providerForm');
+    let editIdField = document.getElementById('edit_connection_id');
+    if (!editIdField) {
+        editIdField = document.createElement('input');
+        editIdField.type = 'hidden';
+        editIdField.id = 'edit_connection_id';
+        editIdField.name = 'edit_connection_id';
+        form.appendChild(editIdField);
+    }
+    editIdField.value = connectionData.id;
+}
+
+function fillEditForm(connectionData) {
+    // Fill basic fields
+    document.getElementById('connection_name').value = connectionData.connection_name || '';
+    document.getElementById('description').value = connectionData.description || '';
+    
+    // Fill provider-specific fields
+    const provider = connectionData.provider;
+    if (provider === 'beget') {
+        const usernameField = document.querySelector('input[name="username"]');
+        const apiUrlField = document.querySelector('input[name="api_url"]');
+        
+        if (usernameField) usernameField.value = connectionData.username || '';
+        if (apiUrlField) apiUrlField.value = connectionData.api_url || 'https://api.beget.com';
+        
+        // Don't fill password for security
+        const passwordField = document.querySelector('input[name="password"]');
+        if (passwordField) passwordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
+    }
+    
+    // Show provider info and connection test sections
+    document.getElementById('providerInfo').style.display = 'block';
+    document.getElementById('connectionTest').style.display = 'block';
+    
+    // Show buttons
+    document.getElementById('testBtn').style.display = 'inline-block';
+    document.getElementById('connectBtn').style.display = 'inline-block';
+}
+
+function closeProviderModal() {
+    document.getElementById('providerModal').style.display = 'none';
+    document.getElementById('connectionTest').style.display = 'none';
+    document.getElementById('providerInfo').style.display = 'none';
+    document.getElementById('testBtn').style.display = 'none';
+    document.getElementById('connectBtn').style.display = 'none';
+    // Reset form
+    document.getElementById('provider_select').value = '';
+    document.getElementById('providerFields').innerHTML = '';
+}
+
+function changeProvider() {
+    const selectedProvider = document.getElementById('provider_select').value;
+    const providerInfo = document.getElementById('providerInfo');
+    const providerDescription = document.getElementById('providerDescription');
+    const providerFields = document.getElementById('providerFields');
+    const testBtn = document.getElementById('testBtn');
+    const connectBtn = document.getElementById('connectBtn');
+    const selectedProviderInput = document.getElementById('selected_provider');
+    
+    if (selectedProvider && providers[selectedProvider]) {
+        const provider = providers[selectedProvider];
+        
+        // Show provider info
+        providerDescription.textContent = provider.description;
+        providerInfo.style.display = 'block';
+        
+        // Set hidden field
+        selectedProviderInput.value = selectedProvider;
+        
+        // Generate dynamic fields
+        providerFields.innerHTML = '';
+        provider.fields.forEach(field => {
+            const fieldHtml = createFieldHtml(field);
+            providerFields.innerHTML += fieldHtml;
+        });
+        
+        // Show buttons
+        testBtn.style.display = 'inline-block';
+        connectBtn.style.display = 'inline-block';
+        connectBtn.textContent = `Подключить ${provider.name}`;
+        
+    } else {
+        // Hide everything
+        providerInfo.style.display = 'none';
+        providerFields.innerHTML = '';
+        testBtn.style.display = 'none';
+        connectBtn.style.display = 'none';
+    }
+}
+
+function createFieldHtml(field) {
+    const required = field.required ? 'required' : '';
+    const placeholder = field.placeholder || '';
+    const defaultValue = field.default ? `value="${field.default}"` : '';
+    
+    if (field.type === 'textarea') {
+        return `
+            <div class="form-group">
+                <label class="form-label" for="${field.name}">${field.label}</label>
+                <textarea class="form-control form-textarea" id="${field.name}" name="${field.name}" 
+                          placeholder="${placeholder}" ${required}>${field.default || ''}</textarea>
+            </div>
+        `;
+    } else {
+        return `
+            <div class="form-group">
+                <label class="form-label" for="${field.name}">${field.label}</label>
+                <input type="${field.type}" class="form-control" id="${field.name}" name="${field.name}" 
+                       placeholder="${placeholder}" ${defaultValue} ${required}>
+            </div>
+        `;
+    }
 }
 
 function testConnection() {
+    const selectedProvider = document.getElementById('provider_select').value;
     const testDiv = document.getElementById('connectionTest');
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const apiUrl = document.getElementById('api_url').value;
     
-    if (!username || !password) {
-        showTestResult('Заполните имя пользователя и пароль', 'error');
+    if (!selectedProvider) {
+        showTestResult('Выберите провайдера', 'error');
         return;
+    }
+    
+    // Collect form data
+    const formData = {};
+    const provider = providers[selectedProvider];
+    
+    provider.fields.forEach(field => {
+        const element = document.getElementById(field.name);
+        if (element) {
+            formData[field.name] = element.value;
+        }
+    });
+    
+    // Validate required fields
+    for (const field of provider.fields) {
+        if (field.required && !formData[field.name]) {
+            showTestResult(`Заполните поле: ${field.label}`, 'error');
+            return;
+        }
     }
     
     showTestResult('Тестирование подключения...', 'info');
     
-    // Simulate API test (replace with actual API call)
-    fetch('/api/beget/test', {
+    // Test connection based on provider
+    fetch(`/api/connections/test`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            username: username,
-            password: password,
-            api_url: apiUrl
+            provider: selectedProvider,
+            credentials: formData
         })
     })
     .then(response => response.json())
@@ -848,10 +1120,155 @@ function showTestResult(message, type) {
 
 // Close modal when clicking outside
 window.onclick = function(event) {
-    const modal = document.getElementById('begetModal');
+    const modal = document.getElementById('providerModal');
     if (event.target === modal) {
-        closeModal();
+        closeProviderModal();
     }
+}
+
+// Connection management functions
+function editConnection(connectionId) {
+    // Extract numeric ID from string like "beget-2" -> "2"
+    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    
+    // Show loading state
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Загрузка...</span>';
+    button.disabled = true;
+    
+    // Fetch connection details
+    fetch(`/api/connections/${numericId}/edit`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Open modal in edit mode
+                showProviderModalForEdit(data.data);
+            } else {
+                showFlashMessage('❌ Ошибка загрузки данных: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showFlashMessage('❌ Ошибка загрузки данных', 'error');
+            console.error('Edit error:', error);
+        })
+        .finally(() => {
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+}
+
+function syncConnection(connectionId) {
+    // Extract numeric ID from string like "beget-2" -> "2"
+    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    
+    // Show loading state
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Синхронизация...</span>';
+    button.disabled = true;
+    
+    // Make sync request
+    fetch(`/api/connections/${numericId}/sync`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showFlashMessage('✅ Синхронизация завершена успешно!', 'success');
+            // Reload page to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showFlashMessage('❌ Ошибка синхронизации: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showFlashMessage('❌ Ошибка синхронизации', 'error');
+        console.error('Sync error:', error);
+    })
+    .finally(() => {
+        // Restore button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function deleteConnection(connectionId) {
+    if (confirm('Вы уверены, что хотите удалить это подключение?\n\nЭто действие нельзя отменить.')) {
+        // Extract numeric ID from string like "beget-2" -> "2"
+        const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+        
+        // Show loading state
+        const button = event.target.closest('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        button.disabled = true;
+        
+        // Make delete request
+        fetch(`/api/connections/${numericId}/delete`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showFlashMessage('✅ Подключение удалено успешно!', 'success');
+                // Remove the card from DOM
+                const card = button.closest('.provider-card');
+                card.style.opacity = '0.5';
+                setTimeout(() => {
+                    card.remove();
+                }, 500);
+            } else {
+                showFlashMessage('❌ Ошибка удаления: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showFlashMessage('❌ Ошибка удаления', 'error');
+            console.error('Delete error:', error);
+        })
+        .finally(() => {
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+}
+
+function showFlashMessage(message, type) {
+    // Create flash message element
+    const flashDiv = document.createElement('div');
+    flashDiv.className = `flash-message flash-${type}`;
+    flashDiv.innerHTML = `
+        <i class="fa-solid fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+        <span>${message}</span>
+        <button class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    
+    // Add to flash messages container
+    let container = document.querySelector('.flash-messages');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'flash-messages';
+        document.body.appendChild(container);
+    }
+    
+    container.appendChild(flashDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (flashDiv.parentElement) {
+            flashDiv.remove();
+        }
+    }, 5000);
 }
 </script>
 {% endblock %}

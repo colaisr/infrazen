@@ -1,8 +1,6 @@
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
-
-db = SQLAlchemy()
+from src.models.user import db
 
 class BegetConnection(db.Model):
     """Model for storing Beget provider connections"""
