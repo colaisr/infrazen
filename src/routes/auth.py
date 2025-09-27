@@ -12,7 +12,7 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
 @auth_bp.route('/login')
 def login():
     """Display login page"""
-    return render_template('login.html')
+    return render_template('login.html', google_client_id=GOOGLE_CLIENT_ID)
 
 @auth_bp.route('/auth/google', methods=['POST'])
 def google_auth():
@@ -20,9 +20,27 @@ def google_auth():
     try:
         # Get the ID token from the request
         token = request.json.get('credential')
+        is_demo = request.json.get('demo', False)
+        
+        # Handle demo login
+        if is_demo or token == 'demo-token':
+            session['user'] = {
+                'id': 'demo-user-123',
+                'email': 'demo@infrazen.com',
+                'name': 'Demo User',
+                'picture': ''
+            }
+            return jsonify({
+                'success': True,
+                'redirect': url_for('main.dashboard')
+            })
         
         if not token:
             return jsonify({'error': 'No credential provided'}), 400
+        
+        # Check if Google OAuth is properly configured
+        if GOOGLE_CLIENT_ID == 'your-google-client-id':
+            return jsonify({'error': 'Google OAuth not configured. Please set GOOGLE_CLIENT_ID environment variable.'}), 400
         
         # Verify the token
         idinfo = id_token.verify_oauth2_token(
@@ -49,9 +67,9 @@ def google_auth():
         })
         
     except ValueError as e:
-        return jsonify({'error': 'Invalid token'}), 400
+        return jsonify({'error': f'Invalid token: {str(e)}'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Authentication error: {str(e)}'}), 500
 
 @auth_bp.route('/logout')
 def logout():

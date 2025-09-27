@@ -9,6 +9,15 @@ from src.routes.user import user_bp
 from src.routes.auth import auth_bp
 from src.routes.main import main_bp
 
+# Load environment variables from config.env if it exists
+config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.env')
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        for line in f:
+            if line.strip() and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value
+
 app = Flask(__name__, 
            static_folder=os.path.join(os.path.dirname(__file__), 'static'),
            template_folder=os.path.join(os.path.dirname(__file__), 'templates'))

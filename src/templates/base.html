@@ -76,8 +76,9 @@
             <div class="sidebar-footer">
                 <div class="user-profile">
                     <div class="user-avatar">
-                        {% if user.picture %}
-                            <img src="{{ user.picture }}" alt="{{ user.name }}">
+                        {% if user.picture and user.picture != '' %}
+                            <img src="{{ user.picture }}" alt="{{ user.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; font-weight: 600; font-size: 0.875rem;">{{ user.name[0].upper() if user.name else "U" }}</div>
                         {% else %}
                             {{ user.name[0].upper() if user.name else "U" }}
                         {% endif %}
