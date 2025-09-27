@@ -1,15 +1,11 @@
 """
-Beget API Client using the official OpenAPI Python SDK
+Beget API Client for InfraZen
 """
 import logging
 from typing import Dict, Optional, List
 from datetime import datetime, date
-
-# Import the official Beget OpenAPI client
-import beget_openapi_auth
-from beget_openapi_auth.apis.tags import auth_service_api
-from beget_openapi_auth.model.auth_auth_request import AuthAuthRequest
-from beget_openapi_auth.model.auth_auth_response import AuthAuthResponse
+import requests
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +14,7 @@ class BegetAPIError(Exception):
     pass
 
 class BegetAPIClient:
-    """Client for interacting with Beget hosting API using official OpenAPI SDK"""
+    """Client for interacting with Beget hosting API"""
     
     def __init__(self, username: str, password: str, api_url: str = "https://api.beget.com"):
         self.username = username
@@ -26,51 +22,57 @@ class BegetAPIClient:
         self.api_url = api_url.rstrip('/')
         self.access_token = None
         self.refresh_token = None
-        self.api_client = None
-        self.auth_api = None
-        
-        # Initialize the configuration
-        self.configuration = beget_openapi_auth.Configuration(
-            host=self.api_url
-        )
     
     def authenticate(self) -> bool:
         """Authenticate with Beget API and get access token"""
         try:
-            # Create API client with configuration
-            self.api_client = beget_openapi_auth.ApiClient(self.configuration)
-            self.auth_api = auth_service_api.AuthServiceApi(self.api_client)
-            
-            # Create authentication request
-            auth_request = AuthAuthRequest(
-                login=self.username,
-                password=self.password
-            )
-            
-            # Make authentication request
-            response = self.auth_api.auth_service_auth(auth_request)
-            
-            # Extract tokens from response
-            if hasattr(response, 'body') and response.body:
-                auth_response = response.body
-                self.access_token = getattr(auth_response, 'access_token', None)
-                self.refresh_token = getattr(auth_response, 'refresh_token', None)
-                
-                if self.access_token:
-                    # Update configuration with the access token
-                    self.configuration.access_token = self.access_token
-                    logger.info("Successfully authenticated with Beget API")
-                    return True
-                else:
-                    logger.error("No access token received from Beget API")
-                    return False
-            else:
-                logger.error("Invalid response format from Beget API")
-                return False
-                
+            return self._authenticate_with_requests()
         except Exception as e:
             logger.error(f"Authentication failed: {e}")
             raise BegetAPIError(f"Authentication failed: {str(e)}")
+    
+    def _authenticate_with_requests(self) -> bool:
+        """Authenticate with Beget API using requests library"""
+        url = f"{self.api_url}/v1/auth"
+        
+        # Prepare authentication data
+        auth_data = {
+            "login": self.username,
+            "password": self.password
+        }
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'InfraZen/1.0'
+        }
+        
+        try:
+            response = requests.post(url, json=auth_data, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            # Parse response
+            result = response.json()
+            
+            # Check if authentication was successful
+            if 'token' in result:
+                self.access_token = result.get('token')
+                self.refresh_token = result.get('refresh_token')
+                logger.info("Successfully authenticated with Beget API")
+                return True
+            elif result.get('error'):
+                error_msg = result.get('error', 'Authentication failed')
+                logger.error(f"Authentication failed: {error_msg}")
+                return False
+            else:
+                logger.error("Authentication failed: Unknown response format")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP request failed: {e}")
+            return False
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON response: {e}")
+            return False
     
     def test_connection(self) -> Dict:
         """Test API connection by authenticating"""
@@ -261,14 +263,6 @@ class BegetAPIClient:
     
     def logout(self):
         """Logout from Beget API"""
-        try:
-            if self.auth_api and self.refresh_token:
-                self.auth_api.auth_service_logout()
-                logger.info("Successfully logged out from Beget API")
-        except Exception as e:
-            logger.warning(f"Logout failed: {e}")
-        finally:
-            self.access_token = None
-            self.refresh_token = None
-            self.api_client = None
-            self.auth_api = None
+        self.access_token = None
+        self.refresh_token = None
+        logger.info("Logged out from Beget API")

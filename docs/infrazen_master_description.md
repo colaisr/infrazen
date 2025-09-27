@@ -52,12 +52,12 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 
 ### 7.1.1 Cloud Connections ✅ IMPLEMENTED
 - **Connection Management:** Full CRUD operations with comprehensive edit functionality, provider pre-selection, and secure credential management
-- **Provider Support:** Beget (fully implemented with official OpenAPI SDK integration), AWS, Azure, GCP, VK Cloud, Yandex Cloud, Selectel (UI ready with dynamic forms)
-- **Connection Testing:** Real-time API validation using official Beget OpenAPI Python SDK with proper token-based authentication
+- **Provider Support:** Beget (fully implemented with direct API integration), AWS, Azure, GCP, VK Cloud, Yandex Cloud, Selectel (UI ready with dynamic forms)
+- **Connection Testing:** Real-time API validation with direct HTTP requests to Beget API using proper token-based authentication
 - **Security:** Encrypted password storage, user ownership validation, authentication checks, secure edit operations
 - **User Experience:** Provider pre-selection from available providers, dynamic forms that adapt to provider type, loading states, comprehensive error handling, pre-filled edit forms
 - **Edit Functionality:** Settings button opens modal with pre-filled connection details, secure password handling, connection validation on updates
-- **API Integration:** Uses official Beget OpenAPI Python SDK (beget-openapi-auth) for robust, maintainable API interactions
+- **API Integration:** Clean, maintainable direct API integration with Beget using requests library for reliable authentication and data retrieval
 
 ### 7.1.2 Dashboard Highlights ✅ IMPLEMENTED
 - **Top Controls:** Date-range selector (7/30/90 days, 1 year), manual refresh, and export actions aligned to the header for fast reporting.
