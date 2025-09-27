@@ -1112,7 +1112,14 @@ function testConnection() {
             
             showTestResult(message, 'success');
         } else {
-            showTestResult('❌ ' + (data.error || 'Ошибка подключения'), 'error');
+            let errorMessage = '❌ ' + (data.error || 'Ошибка подключения');
+            
+            // Add helpful information for authentication errors
+            if (data.error && data.error.includes('Authentication failed')) {
+                errorMessage += '<br><br><strong>Возможные причины:</strong><br>• Проверьте правильность имени пользователя и пароля<br>• Убедитесь, что API доступ включен в панели управления Beget<br>• Используйте пароль API, а не пароль от аккаунта';
+            }
+            
+            showTestResult(errorMessage, 'error');
         }
     })
     .catch(error => {

@@ -43,8 +43,10 @@ class BegetAPIClient:
         
         try:
             if method.upper() == 'GET':
+                # For GET requests, use params (query string)
                 response = self.session.get(url, params=form_data, timeout=30)
             elif method.upper() == 'POST':
+                # For POST requests, use data (form data)
                 response = self.session.post(url, data=form_data, timeout=30)
             elif method.upper() == 'PUT':
                 response = self.session.put(url, data=form_data, timeout=30)
@@ -88,7 +90,8 @@ class BegetAPIClient:
         """Get account information using Beget API getAccountInfo method"""
         try:
             # Use the correct Beget API endpoint for account info
-            response = self._make_request('/api/user/getAccountInfo', method='GET')
+            # Try POST method first, as some APIs require POST for authentication
+            response = self._make_request('/api/user/getAccountInfo', method='POST')
             
             # Check if the response indicates success
             if response.get('status') == 'success':
@@ -116,11 +119,13 @@ class BegetAPIClient:
                 }
             else:
                 # Check for authentication errors
-                error_message = response.get('answer', {}).get('message', 'Unknown error')
-                if 'auth' in error_message.lower() or 'login' in error_message.lower() or 'password' in error_message.lower():
-                    raise BegetAPIError(f"Authentication failed: {error_message}")
+                error_text = response.get('error_text', '')
+                error_code = response.get('error_code', '')
+                
+                if error_code == 'AUTH_ERROR' or 'incorrect' in error_text.lower() or 'auth' in error_text.lower():
+                    raise BegetAPIError(f"Authentication failed: {error_text}")
                 else:
-                    raise BegetAPIError(f"API error: {error_message}")
+                    raise BegetAPIError(f"API error: {error_text}")
                 
         except BegetAPIError as e:
             if use_mock_data:
