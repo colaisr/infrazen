@@ -57,7 +57,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-badge provider-{{ provider.code }}">{{ provider.code|upper }}</span>
-                    <span class="provider-name">{{ provider.name }}</span>
+                    <span class="provider-name">{{ provider.connection_name or provider.name }}</span>
                 </div>
             </header>
             

@@ -79,6 +79,7 @@ def connections():
                 'id': f"beget-{conn.id}",
                 'code': 'beget',
                 'name': 'Beget',
+                'connection_name': conn.connection_name,  # Add connection_name at top level
                 'status': 'connected' if conn.is_active else 'disconnected',
                 'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
                 'details': {

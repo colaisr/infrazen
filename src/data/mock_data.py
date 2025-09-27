@@ -33,6 +33,7 @@ def get_connected_providers() -> List[Dict[str, Any]]:
             'id': 'yandex-cloud',
             'code': 'yc',
             'name': 'Yandex Cloud',
+            'connection_name': 'Основной аккаунт YC',
             'status': 'connected',
             'added_at': (date.today() - timedelta(days=14)).isoformat(),
             'details': {
@@ -46,6 +47,7 @@ def get_connected_providers() -> List[Dict[str, Any]]:
             'id': 'selectel',
             'code': 'sel',
             'name': 'Selectel',
+            'connection_name': 'Продакшн Selectel',
             'status': 'connected',
             'added_at': (date.today() - timedelta(days=10)).isoformat(),
             'details': {

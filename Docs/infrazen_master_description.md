@@ -36,7 +36,7 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
   - `src/routes/` (main.py, auth.py, user.py - modular routing)
   - `src/models/` (user.py - database models)
 - **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
-- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. Google OAuth authentication fully implemented with profile integration. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections.
+- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. Google OAuth authentication fully implemented with profile integration. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management.
 
 ## 7. Navigation & Module Breakdown
 ```
@@ -50,7 +50,15 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 🔄 Settings – user roles, permissions, budgeting policies, integrations
 ```
 
-### 7.1 Dashboard Highlights ✅ IMPLEMENTED
+### 7.1.1 Cloud Connections ✅ IMPLEMENTED
+- **Connection Management:** Full CRUD operations with comprehensive edit functionality, provider pre-selection, and secure credential management
+- **Provider Support:** Beget (fully implemented with real API integration), AWS, Azure, GCP, VK Cloud, Yandex Cloud, Selectel (UI ready with dynamic forms)
+- **Connection Testing:** Real-time API validation before saving connections with detailed error feedback
+- **Security:** Encrypted password storage, user ownership validation, authentication checks, secure edit operations
+- **User Experience:** Provider pre-selection from available providers, dynamic forms that adapt to provider type, loading states, comprehensive error handling, pre-filled edit forms
+- **Edit Functionality:** Settings button opens modal with pre-filled connection details, secure password handling, connection validation on updates
+
+### 7.1.2 Dashboard Highlights ✅ IMPLEMENTED
 - **Top Controls:** Date-range selector (7/30/90 days, 1 year), manual refresh, and export actions aligned to the header for fast reporting.
 - **KPI Cards Row:** ✅ Discrete cards for Total Expenses (117,150 ₽ with -12.5% trend), Potential Savings (10,400 ₽), Active Resources (8 resources), and Connected Providers (2 providers); each card surfaces iconography, primary value, and secondary context at a glance.
 - **Connected Providers Grid:** ✅ Card grid listing each cloud (YC/SEL badges + names, connection status, added dates). Includes persistent "Добавить" tile and "Добавить провайдера" button.
@@ -124,10 +132,12 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 6. ✅ Add JSON API endpoints for demo data access.
 7. ✅ Implement Google OAuth authentication with profile integration.
 8. ✅ Separate demo users (mock data) from real users (database data) with conditional UI.
-9. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
-10. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
-11. 🔄 Integrate Telegram bot and notification hooks (future phase).
-12. 🔄 Deploy demo-ready prototype.
+9. ✅ Implement full CRUD operations for cloud provider connections with edit functionality.
+10. ✅ Add provider pre-selection and comprehensive connection management features.
+11. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
+12. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
+13. 🔄 Integrate Telegram bot and notification hooks (future phase).
+14. 🔄 Deploy demo-ready prototype.
 
 ## 12. Data & Integration Requirements
 - Provider API connectors (Yandex.Cloud, VK Cloud, Selectel, GCP, AWS, Azure for future expansion).
