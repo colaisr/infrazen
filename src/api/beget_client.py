@@ -66,8 +66,8 @@ class BegetAPIClient:
     def test_connection(self) -> Dict:
         """Test API connection and return account info"""
         try:
-            # Try to get account information as a connection test
-            account_info = self.get_account_info()
+            # Try to get account information as a connection test (don't use mock data)
+            account_info = self.get_account_info(use_mock_data=False)
             
             # If we got here, the connection was successful
             return {
@@ -84,7 +84,7 @@ class BegetAPIClient:
                 'api_status': 'failed'
             }
     
-    def get_account_info(self) -> Dict:
+    def get_account_info(self, use_mock_data: bool = False) -> Dict:
         """Get account information using Beget API getAccountInfo method"""
         try:
             # Use the correct Beget API endpoint for account info
@@ -115,25 +115,34 @@ class BegetAPIClient:
                     'api_status': 'connected'
                 }
             else:
-                raise BegetAPIError(f"API returned error status: {response.get('status', 'unknown')}")
+                # Check for authentication errors
+                error_message = response.get('answer', {}).get('message', 'Unknown error')
+                if 'auth' in error_message.lower() or 'login' in error_message.lower() or 'password' in error_message.lower():
+                    raise BegetAPIError(f"Authentication failed: {error_message}")
+                else:
+                    raise BegetAPIError(f"API error: {error_message}")
                 
         except BegetAPIError as e:
-            logger.warning(f"Beget API call failed, using mock data: {e}")
-            # Fallback to mock data if API structure is unknown or fails
-            return {
-                'account_id': f"beget_{self.username}",
-                'username': self.username,
-                'status': 'active',
-                'plan_name': 'Standard',
-                'plan_domain': 10,
-                'plan_db': 5,
-                'plan_ftp': 5,
-                'plan_mail': 10,
-                'plan_price': 150,
-                'plan_currency': 'RUB',
-                'plan_status': 'active',
-                'api_status': 'mock_data'
-            }
+            if use_mock_data:
+                logger.warning(f"Beget API call failed, using mock data: {e}")
+                # Only use mock data when explicitly requested (for development)
+                return {
+                    'account_id': f"beget_{self.username}",
+                    'username': self.username,
+                    'status': 'active',
+                    'plan_name': 'Standard',
+                    'plan_domain': 10,
+                    'plan_db': 5,
+                    'plan_ftp': 5,
+                    'plan_mail': 10,
+                    'plan_price': 150,
+                    'plan_currency': 'RUB',
+                    'plan_status': 'active',
+                    'api_status': 'mock_data'
+                }
+            else:
+                # Re-raise the error for connection testing
+                raise e
     
     def get_domains(self) -> List[Dict]:
         """Get list of domains"""
@@ -280,7 +289,8 @@ class BegetAPIClient:
     def get_all_resources(self) -> Dict:
         """Get all resources in a structured format"""
         try:
-            account_info = self.get_account_info()
+            # Use mock data for resource collection to avoid breaking existing connections
+            account_info = self.get_account_info(use_mock_data=True)
             domains = self.get_domains()
             databases = self.get_databases()
             ftp_accounts = self.get_ftp_accounts()
