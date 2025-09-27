@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Ресурсы - InfraZen FinOps Platform{% endblock %}
+
+{% block page_title %}Ресурсы{% endblock %}
+{% block page_subtitle %}Управление облачными ресурсами{% endblock %}
+
+{% block header_actions %}
+    <div class="header-actions">
+        <input class="form-control" type="text" placeholder="Поиск ресурсов..." style="width: 200px;">
+        <select class="form-control" style="width: 150px;">
+            <option>Все провайдеры</option>
+            {% for provider in providers %}
+            <option>{{ provider.name }}</option>
+            {% endfor %}
+        </select>
+        <select class="form-control" style="width: 120px;">
+            <option>Все типы</option>
+            <option>VM</option>
+            <option>Диск</option>
+            <option>Хранилище</option>
+        </select>
+        <select class="form-control" style="width: 120px;">
+            <option>Все статусы</option>
+            <option>RUNNING</option>
+            <option>STOPPED</option>
+            <option>IN_USE</option>
+            <option>ACTIVE</option>
+        </select>
+        <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить</span></button>
+        <button class="btn btn-primary"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="resources-content">
+    {% if resources %}
+    <div class="resources-summary">
+        <div class="summary-stats">
+            <div class="stat-item">
+                <span class="stat-label">Всего ресурсов</span>
+                <span class="stat-value">{{ resources|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Активных</span>
+                <span class="stat-value">{{ resources|selectattr('status', 'equalto', 'RUNNING')|list|length + resources|selectattr('status', 'equalto', 'ACTIVE')|list|length + resources|selectattr('status', 'equalto', 'IN_USE')|list|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Остановленных</span>
+                <span class="stat-value">{{ resources|selectattr('status', 'equalto', 'STOPPED')|list|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Общая стоимость</span>
+                <span class="stat-value">{{ resources|sum(attribute='monthly_cost_rub') }} ₽/мес</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="resources-table-container">
+        <table class="resources-table">
+            <thead>
+                <tr>
+                    <th>Ресурс</th>
+                    <th>Провайдер</th>
+                    <th>Тип</th>
+                    <th>Регион</th>
+                    <th>Статус</th>
+                    <th>Конфигурация</th>
+                    <th>Теги</th>
+                    <th>Стоимость/мес</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resource in resources %}
+                <tr>
+                    <td>
+                        <div class="resource-name">
+                            <div class="resource-icon">
+                                {% if resource.type == 'vm' %}
+                                    <i class="fa-solid fa-server"></i>
+                                {% elif resource.type == 'disk' or resource.type == 'volume' %}
+                                    <i class="fa-solid fa-hdd"></i>
+                                {% elif resource.type == 'bucket' %}
+                                    <i class="fa-solid fa-database"></i>
+                                {% else %}
+                                    <i class="fa-solid fa-box"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="resource-title">{{ resource.name }}</div>
+                                <div class="resource-id">{{ resource.id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="provider-badge provider-{{ resource.provider|lower|replace(' ', '-') }}">
+                            {% if resource.provider == 'Yandex Cloud' %}YC
+                            {% elif resource.provider == 'Selectel' %}SEL
+                            {% else %}{{ resource.provider[:3]|upper }}{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="resource-type">{{ resource.type|upper }}</span>
+                    </td>
+                    <td>{{ resource.region }}</td>
+                    <td>
+                        <span class="status-badge status-{{ resource.status|lower|replace('_', '-') }}">
+                            {% if resource.status == 'RUNNING' %}
+                                <i class="fa-solid fa-circle"></i> Запущен
+                            {% elif resource.status == 'STOPPED' %}
+                                <i class="fa-solid fa-circle"></i> Остановлен
+                            {% elif resource.status == 'IN_USE' %}
+                                <i class="fa-solid fa-circle"></i> Используется
+                            {% elif resource.status == 'ACTIVE' %}
+                                <i class="fa-solid fa-circle"></i> Активен
+                            {% else %}
+                                <i class="fa-solid fa-circle"></i> {{ resource.status }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if resource.type == 'vm' %}
+                            <div class="config-info">
+                                <span>{{ resource.vcpu }} vCPU, {{ resource.memory_gb }} GB RAM</span>
+                                {% if resource.disks_gb %}<br><span>{{ resource.disks_gb }} GB дисков</span>{% endif %}
+                                {% if resource.platform %}<br><span>{{ resource.platform }}</span>{% endif %}
+                                {% if resource.flavor %}<br><span>{{ resource.flavor }}</span>{% endif %}
+                            </div>
+                        {% elif resource.type == 'disk' or resource.type == 'volume' %}
+                            <div class="config-info">
+                                <span>{{ resource.size_gb }} GB</span>
+                                {% if resource.disk_type %}<br><span>{{ resource.disk_type }}</span>{% endif %}
+                                {% if resource.volume_type %}<br><span>{{ resource.volume_type }}</span>{% endif %}
+                                {% if resource.attached_to %}<br><span>→ {{ resource.attached_to }}</span>{% endif %}
+                            </div>
+                        {% elif resource.type == 'bucket' %}
+                            <div class="config-info">
+                                <span>{{ resource.storage_gb }} GB</span>
+                                {% if resource.class %}<br><span>{{ resource.class }}</span>{% endif %}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if resource.tags %}
+                            {% for tag in resource.tags %}
+                                <span class="tag">{{ tag }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="no-tags">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="cost">{{ resource.monthly_cost_rub|default(0) }} ₽</span>
+                    </td>
+                    <td>
+                        <div class="resource-actions">
+                            <button class="icon-button" title="Настройки"><i class="fa-solid fa-gear"></i></button>
+                            <button class="icon-button" title="Подробнее"><i class="fa-solid fa-info"></i></button>
+                            <button class="icon-button icon-warning" title="Остановить"><i class="fa-solid fa-stop"></i></button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
+        <div class="empty-state-title">Нет ресурсов</div>
+        <div class="empty-state-text">Подключите облачных провайдеров для отображения ресурсов</div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.resources-content {
+    padding: 0;
+}
+
+.resources-summary {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.resources-table-container {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.resources-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.resources-table th {
+    background: var(--background-light);
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.resources-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-light);
+    vertical-align: top;
+}
+
+.resource-name {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.resource-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--background-light);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-blue);
+}
+
+.resource-title {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.resource-id {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.provider-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.provider-yandex-cloud {
+    background: rgba(255, 193, 7, 0.1);
+    color: #b45309;
+}
+
+.provider-selectel {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1e40af;
+}
+
+.resource-type {
+    background: var(--background-light);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.status-running {
+    color: var(--success-green);
+}
+
+.status-stopped {
+    color: var(--warning-orange);
+}
+
+.status-in-use, .status-active {
+    color: var(--primary-blue);
+}
+
+.config-info {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.tag {
+    display: inline-block;
+    background: var(--background-light);
+    color: var(--text-secondary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin: 0.125rem 0.25rem 0.125rem 0;
+}
+
+.no-tags {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.cost {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.resource-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.icon-button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-light);
+    background: var(--background-white);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.icon-button:hover {
+    background: var(--background-light);
+    color: var(--text-primary);
+}
+
+.icon-button.icon-warning {
+    color: var(--warning-orange);
+}
+
+.icon-button.icon-warning:hover {
+    background: rgba(245, 158, 11, 0.1);
+}
+</style>
+{% endblock %}

@@ -24,7 +24,7 @@
             <div class="kpi-card-header">
                 <div>
                     <span class="kpi-label">Общие расходы</span>
-                    <div class="kpi-value">0 ₽</div>
+                    <div class="kpi-value">{{ overview.kpis.total_expenses_rub | default(0) }} ₽</div>
                 </div>
                 <div class="kpi-icon icon-expense"><i class="fa-solid fa-ruble-sign"></i></div>
             </div>
@@ -38,7 +38,7 @@
             <div class="kpi-card-header">
                 <div>
                     <span class="kpi-label">Потенциальная экономия</span>
-                    <div class="kpi-value">0 ₽</div>
+                    <div class="kpi-value">{{ overview.kpis.potential_savings_rub | default(0) }} ₽</div>
                 </div>
                 <div class="kpi-icon icon-savings"><i class="fa-solid fa-piggy-bank"></i></div>
             </div>
@@ -52,7 +52,7 @@
             <div class="kpi-card-header">
                 <div>
                     <span class="kpi-label">Активные ресурсы</span>
-                    <div class="kpi-value">0</div>
+                    <div class="kpi-value">{{ overview.kpis.active_resources | default(0) }}</div>
                 </div>
                 <div class="kpi-icon icon-resources"><i class="fa-solid fa-box-open"></i></div>
             </div>
@@ -66,7 +66,7 @@
             <div class="kpi-card-header">
                 <div>
                     <span class="kpi-label">Облачных провайдеров</span>
-                    <div class="kpi-value">0</div>
+                    <div class="kpi-value">{{ overview.kpis.connected_providers | default(0) }}</div>
                 </div>
                 <div class="kpi-icon icon-providers"><i class="fa-solid fa-cloud"></i></div>
             </div>
@@ -88,7 +88,23 @@
             </div>
         </div>
         <div class="provider-grid">
-            <!-- Provider cards will be rendered dynamically when data is available -->
+            {% for p in overview.providers %}
+            <article class="provider-card">
+                <header class="provider-header">
+                    <span class="provider-badge">{{ p.code | upper }}</span>
+                    <span class="provider-name">{{ p.name }}</span>
+                </header>
+                <div class="provider-connection {% if p.status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
+                    <span class="status-indicator"></span>
+                    {% if p.status == 'connected' %}Подключен{% else %}Отключен{% endif %}
+                </div>
+                <div class="provider-status">Добавлен: {{ p.added_at }}</div>
+                <div class="provider-actions">
+                    <button class="icon-button"><i class="fa-solid fa-gear"></i></button>
+                    <button class="icon-button icon-danger"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </article>
+            {% endfor %}
             <!-- Example card structure retained for reference -->
             <!--
             <article class="provider-card">
@@ -138,15 +154,15 @@
             <div class="summary-metrics">
                 <div>
                     <div class="summary-label">Прошлый месяц</div>
-                    <div class="summary-value">₽0</div>
+                    <div class="summary-value">₽{{ overview.trend[0].amount_rub if overview.trend else 0 }}</div>
                 </div>
                 <div>
                     <div class="summary-label">Текущий месяц</div>
-                    <div class="summary-value text-success">₽0</div>
+                    <div class="summary-value text-success">₽{{ overview.trend[-1].amount_rub if overview.trend else 0 }}</div>
                 </div>
                 <div>
                     <div class="summary-label">Экономия</div>
-                    <div class="summary-value text-primary-blue">₽0</div>
+                    <div class="summary-value text-primary-blue">₽{{ overview.kpis.potential_savings_rub | default(0) }}</div>
                 </div>
             </div>
         </article>
@@ -163,53 +179,53 @@
                 <div class="usage-item">
                     <div class="usage-top">
                         <span>Процессоры (CPU)</span>
-                        <span class="usage-percent">67%</span>
+                        <span class="usage-percent">{{ overview.usage.cpu.percent }}%</span>
                     </div>
                     <div class="usage-bar">
-                        <div class="usage-bar-fill" style="width: 67%"></div>
+                        <div class="usage-bar-fill" style="width: {{ overview.usage.cpu.percent }}%"></div>
                     </div>
                     <div class="usage-meta">
-                        <span>Используется: 234 vCPU</span>
-                        <span>Доступно: 350 vCPU</span>
+                        <span>Используется: {{ overview.usage.cpu.used_vcpu }} vCPU</span>
+                        <span>Доступно: {{ overview.usage.cpu.available_vcpu }} vCPU</span>
                     </div>
                 </div>
                 <div class="usage-item">
                     <div class="usage-top">
                         <span>Память (RAM)</span>
-                        <span class="usage-percent">81%</span>
+                        <span class="usage-percent">{{ overview.usage.ram.percent }}%</span>
                     </div>
                     <div class="usage-bar">
-                        <div class="usage-bar-fill" style="width: 81%"></div>
+                        <div class="usage-bar-fill" style="width: {{ overview.usage.ram.percent }}%"></div>
                     </div>
                     <div class="usage-meta">
-                        <span>Используется: 1.2 TB</span>
-                        <span>Доступно: 1.5 TB</span>
+                        <span>Используется: {{ overview.usage.ram.used_gb }} GB</span>
+                        <span>Доступно: {{ overview.usage.ram.available_gb }} GB</span>
                     </div>
                 </div>
                 <div class="usage-item">
                     <div class="usage-top">
                         <span>Хранилище</span>
-                        <span class="usage-percent">43%</span>
+                        <span class="usage-percent">{{ overview.usage.storage.percent }}%</span>
                     </div>
                     <div class="usage-bar">
-                        <div class="usage-bar-fill" style="width: 43%"></div>
+                        <div class="usage-bar-fill" style="width: {{ overview.usage.storage.percent }}%"></div>
                     </div>
                     <div class="usage-meta">
-                        <span>Используется: 8.6 TB</span>
-                        <span>Доступно: 20 TB</span>
+                        <span>Используется: {{ overview.usage.storage.used_tb }} TB</span>
+                        <span>Доступно: {{ overview.usage.storage.available_tb }} TB</span>
                     </div>
                 </div>
                 <div class="usage-item">
                     <div class="usage-top">
                         <span>Сетевой трафик</span>
-                        <span class="usage-percent">29%</span>
+                        <span class="usage-percent">{{ overview.usage.network.percent }}%</span>
                     </div>
                     <div class="usage-bar">
-                        <div class="usage-bar-fill" style="width: 29%"></div>
+                        <div class="usage-bar-fill" style="width: {{ overview.usage.network.percent }}%"></div>
                     </div>
                     <div class="usage-meta">
-                        <span>Использовано: 2.9 TB</span>
-                        <span>Лимит: 10 TB</span>
+                        <span>Использовано: {{ overview.usage.network.used_tb }} TB</span>
+                        <span>Лимит: {{ overview.usage.network.limit_tb }} TB</span>
                     </div>
                 </div>
             </div>
@@ -227,11 +243,22 @@
                 <button class="icon-button"><i class="fa-solid fa-arrows-rotate"></i></button>
             </div>
         </div>
+        {% if overview.recommendations %}
+        <div class="recommendations-list">
+            {% for r in overview.recommendations %}
+            <div class="recommendation-item">
+                <div class="rec-title">{{ r.title }}</div>
+                <div class="rec-meta">{{ r.provider }} • Экономия: {{ r.estimated_savings_rub }} ₽ • Доверие: {{ (r.confidence * 100)|round(0) }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fa-solid fa-lightbulb"></i></div>
             <div class="empty-state-title">Рекомендации не найдены</div>
             <div class="empty-state-text">Все ваши ресурсы оптимально настроены</div>
         </div>
+        {% endif %}
     </section>
 
     <section class="dashboard-section">
@@ -257,11 +284,34 @@
                 <option>Все статусы</option>
             </select>
         </div>
+        {% if overview.resources %}
+        <div class="resource-table">
+            <div class="resource-table-header">
+                <span>Ресурс</span>
+                <span>Провайдер</span>
+                <span>Тип</span>
+                <span>Регион</span>
+                <span>Статус</span>
+                <span>Месячная стоимость</span>
+            </div>
+            {% for res in overview.resources %}
+            <div class="resource-row">
+                <span>{{ res.name }}</span>
+                <span>{{ res.provider }}</span>
+                <span>{{ res.type }}</span>
+                <span>{{ res.region }}</span>
+                <span>{{ res.status }}</span>
+                <span>{{ res.monthly_cost_rub | default(0) }} ₽</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
         <div class="empty-state">
             <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
             <div class="empty-state-title">Нет ресурсов</div>
             <div class="empty-state-text">Подключите облачных провайдеров для отображения ресурсов</div>
         </div>
+        {% endif %}
     </section>
 </div>
 {% endblock %}

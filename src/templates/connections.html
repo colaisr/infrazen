@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}Подключения облаков - InfraZen FinOps Platform{% endblock %}
+
+{% block page_title %}Подключения облаков{% endblock %}
+{% block page_subtitle %}Управление подключениями к облачным провайдерам{% endblock %}
+
+{% block header_actions %}
+    <div class="header-actions">
+        <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
+        <button class="btn btn-primary"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="connections-content">
+    <div class="connections-summary">
+        <div class="summary-stats">
+            <div class="stat-item">
+                <span class="stat-label">Всего подключений</span>
+                <span class="stat-value">{{ providers|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Активных</span>
+                <span class="stat-value">{{ providers|selectattr('status', 'equalto', 'connected')|list|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Синхронизировано</span>
+                <span class="stat-value">{{ providers|selectattr('status', 'equalto', 'connected')|list|length }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Последняя синхронизация</span>
+                <span class="stat-value">Только что</span>
+            </div>
+        </div>
+    </div>
+
+    {% if providers %}
+    <div class="providers-grid">
+        {% for provider in providers %}
+        <article class="provider-card">
+            <header class="provider-header">
+                <div class="provider-logo">
+                    {% if provider.code == 'yc' %}
+                        <div class="provider-icon yandex-cloud">
+                            <i class="fa-solid fa-cloud"></i>
+                        </div>
+                    {% elif provider.code == 'sel' %}
+                        <div class="provider-icon selectel">
+                            <i class="fa-solid fa-server"></i>
+                        </div>
+                    {% else %}
+                        <div class="provider-icon default">
+                            <i class="fa-solid fa-cloud"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="provider-info">
+                    <span class="provider-badge provider-{{ provider.code }}">{{ provider.code|upper }}</span>
+                    <span class="provider-name">{{ provider.name }}</span>
+                </div>
+            </header>
+            
+            <div class="provider-connection {% if provider.status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
+                <span class="status-indicator"></span>
+                {% if provider.status == 'connected' %}
+                    Подключен • Ожидает синхронизации
+                {% else %}
+                    Отключен
+                {% endif %}
+            </div>
+            
+            <div class="provider-details">
+                <div class="detail-row">
+                    <span class="detail-label">Добавлен:</span>
+                    <span class="detail-value">{{ provider.added_at }}</span>
+                </div>
+                {% if provider.details %}
+                    {% if provider.details.organization_id %}
+                    <div class="detail-row">
+                        <span class="detail-label">Организация:</span>
+                        <span class="detail-value">{{ provider.details.organization_id }}</span>
+                    </div>
+                    {% endif %}
+                    {% if provider.details.cloud_id %}
+                    <div class="detail-row">
+                        <span class="detail-label">Облако:</span>
+                        <span class="detail-value">{{ provider.details.cloud_id }}</span>
+                    </div>
+                    {% endif %}
+                    {% if provider.details.project_id %}
+                    <div class="detail-row">
+                        <span class="detail-label">Проект:</span>
+                        <span class="detail-value">{{ provider.details.project_id }}</span>
+                    </div>
+                    {% endif %}
+                    {% if provider.details.regions %}
+                    <div class="detail-row">
+                        <span class="detail-label">Регионы:</span>
+                        <span class="detail-value">{{ provider.details.regions|join(', ') }}</span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            
+            <div class="provider-actions">
+                <button class="btn btn-secondary btn-sm" title="Настройки">
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Настройки</span>
+                </button>
+                <button class="btn btn-primary btn-sm" title="Синхронизировать">
+                    <i class="fa-solid fa-sync"></i>
+                    <span>Синхронизировать</span>
+                </button>
+                <button class="btn btn-danger btn-sm" title="Удалить">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </article>
+        {% endfor %}
+
+        <article class="provider-card add-card">
+            <div class="add-icon"><i class="fa-solid fa-plus"></i></div>
+            <h3>Добавить провайдера</h3>
+            <p>Настроить подключение нового облачного провайдера</p>
+            <button class="btn btn-primary btn-sm">Настроить подключение</button>
+        </article>
+    </div>
+
+    <div class="available-providers">
+        <h3>Доступные провайдеры</h3>
+        <div class="providers-list">
+            <div class="provider-option">
+                <div class="provider-logo">
+                    <div class="provider-icon aws">
+                        <i class="fa-brands fa-aws"></i>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="provider-name">Amazon Web Services</span>
+                    <span class="provider-description">AWS API Integration</span>
+                </div>
+                <button class="btn btn-outline btn-sm">Добавить</button>
+            </div>
+            <div class="provider-option">
+                <div class="provider-logo">
+                    <div class="provider-icon azure">
+                        <i class="fa-brands fa-microsoft"></i>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="provider-name">Microsoft Azure</span>
+                    <span class="provider-description">Azure Resource Manager</span>
+                </div>
+                <button class="btn btn-outline btn-sm">Добавить</button>
+            </div>
+            <div class="provider-option">
+                <div class="provider-logo">
+                    <div class="provider-icon gcp">
+                        <i class="fa-brands fa-google"></i>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="provider-name">Google Cloud Platform</span>
+                    <span class="provider-description">GCP API Integration</span>
+                </div>
+                <button class="btn btn-outline btn-sm">Добавить</button>
+            </div>
+            <div class="provider-option">
+                <div class="provider-logo">
+                    <div class="provider-icon vk-cloud">
+                        <i class="fa-solid fa-cloud"></i>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="provider-name">VK Cloud</span>
+                    <span class="provider-description">VK Cloud API</span>
+                </div>
+                <button class="btn btn-outline btn-sm">Добавить</button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-cloud"></i></div>
+        <div class="empty-state-title">Нет подключений</div>
+        <div class="empty-state-text">Добавьте облачных провайдеров для начала работы</div>
+        <button class="btn btn-primary">Добавить первого провайдера</button>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.connections-content {
+    padding: 0;
+}
+
+.connections-summary {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.providers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.provider-card {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s;
+}
+
+.provider-card:hover {
+    border-color: var(--primary-blue);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.provider-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.provider-logo {
+    flex-shrink: 0;
+}
+
+.provider-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.provider-icon.yandex-cloud {
+    background: rgba(255, 193, 7, 0.1);
+    color: #b45309;
+}
+
+.provider-icon.selectel {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1e40af;
+}
+
+.provider-icon.aws {
+    background: rgba(255, 153, 0, 0.1);
+    color: #ff9900;
+}
+
+.provider-icon.azure {
+    background: rgba(0, 120, 212, 0.1);
+    color: #0078d4;
+}
+
+.provider-icon.gcp {
+    background: rgba(66, 133, 244, 0.1);
+    color: #4285f4;
+}
+
+.provider-icon.vk-cloud {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.provider-icon.default {
+    background: var(--background-light);
+    color: var(--text-secondary);
+}
+
+.provider-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.provider-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    display: inline-block;
+}
+
+.provider-yc {
+    background: rgba(255, 193, 7, 0.1);
+    color: #b45309;
+}
+
+.provider-sel {
+    background: rgba(59, 130, 246, 0.1);
+    color: #1e40af;
+}
+
+.provider-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1.125rem;
+}
+
+.provider-connection {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-connected .status-indicator {
+    background: var(--success-green);
+}
+
+.status-disconnected .status-indicator {
+    background: var(--error-red);
+}
+
+.status-connected {
+    color: var(--success-green);
+}
+
+.status-disconnected {
+    color: var(--error-red);
+}
+
+.provider-details {
+    margin-bottom: 1rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.detail-label {
+    color: var(--text-secondary);
+}
+
+.detail-value {
+    color: var(--text-primary);
+    font-family: monospace;
+    font-size: 0.75rem;
+}
+
+.provider-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+}
+
+.btn-outline:hover {
+    background: var(--background-light);
+    color: var(--text-primary);
+}
+
+.add-card {
+    border: 2px dashed var(--border-light);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+}
+
+.add-card:hover {
+    border-color: var(--primary-blue);
+    background: rgba(59, 130, 246, 0.02);
+}
+
+.add-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--background-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.add-card h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.add-card p {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.available-providers {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.available-providers h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+}
+
+.providers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.provider-option {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.provider-option:hover {
+    border-color: var(--primary-blue);
+    background: rgba(59, 130, 246, 0.02);
+}
+
+.provider-option .provider-info {
+    flex: 1;
+}
+
+.provider-option .provider-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.provider-option .provider-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.provider-option .provider-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+}
+</style>
+{% endblock %}
