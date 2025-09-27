@@ -544,32 +544,50 @@ def sync_connection(connection_id):
         # Update last sync time
         connection.last_sync = datetime.utcnow()
         
-        # For Beget connections, sync resources
+        # For Beget connections, sync resources comprehensively
         if connection.api_url and 'beget' in connection.api_url.lower():
             try:
                 from src.api.beget_client import BegetAPIClient, BegetAPIError
                 from werkzeug.security import check_password_hash
                 
-                # Get credentials (we'd need to decrypt the password in a real implementation)
-                # For now, we'll use the stored account_info
+                # Note: In a real implementation, we'd need to decrypt the stored password
+                # For now, we'll use the stored credentials for sync
                 client = BegetAPIClient(connection.username, 'dummy_password', connection.api_url)
                 
-                # Get all resources
-                all_resources = client.get_all_resources()
+                # Perform comprehensive sync
+                sync_result = client.sync_resources()
                 
-                # Update connection metadata
-                connection.domains_count = len(all_resources.get('domains', []))
-                connection.databases_count = len(all_resources.get('databases', []))
-                connection.ftp_accounts_count = len(all_resources.get('ftp_accounts', []))
+                # Update connection metadata with comprehensive data
+                resource_counts = sync_result.get('resource_counts', {})
+                connection.domains_count = resource_counts.get('domains', 0)
+                connection.databases_count = resource_counts.get('databases', 0)
+                connection.ftp_accounts_count = resource_counts.get('ftp_accounts', 0)
                 
-                # Store updated account info
-                connection.account_info = str(all_resources.get('account_info', {}))
+                # Store comprehensive sync data
+                sync_data = {
+                    'account_info': sync_result.get('account_info', {}),
+                    'billing_info': sync_result.get('billing_info', {}),
+                    'usage_stats': sync_result.get('usage_stats', {}),
+                    'total_monthly_cost': sync_result.get('total_monthly_cost', 0),
+                    'sync_timestamp': sync_result.get('sync_timestamp'),
+                    'resource_counts': resource_counts
+                }
+                connection.account_info = str(sync_data)
                 
                 db.session.commit()
                 
+                # Prepare detailed response
+                message = f"Синхронизировано: {resource_counts.get('domains', 0)} доменов, {resource_counts.get('databases', 0)} баз данных, {resource_counts.get('ftp_accounts', 0)} FTP аккаунтов, {resource_counts.get('email_accounts', 0)} email аккаунтов"
+                
                 return jsonify({
                     'success': True, 
-                    'message': f'Synchronized {connection.domains_count} domains, {connection.databases_count} databases, {connection.ftp_accounts_count} FTP accounts'
+                    'message': message,
+                    'sync_data': {
+                        'total_resources': sum(resource_counts.values()),
+                        'monthly_cost': sync_result.get('total_monthly_cost', 0),
+                        'resource_counts': resource_counts,
+                        'last_sync': sync_result.get('sync_timestamp')
+                    }
                 })
                 
             except BegetAPIError as e:
