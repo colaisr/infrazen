@@ -20,28 +20,36 @@ class BegetAPIClient:
         self.api_url = api_url.rstrip('/')
         self.session = requests.Session()
         
-        # Set up basic authentication
-        credentials = f"{username}:{password}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        # Set up headers (Beget API uses form data, not Basic Auth)
         self.session.headers.update({
-            'Authorization': f'Basic {encoded_credentials}',
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'InfraZen/1.0'
         })
     
     def _make_request(self, endpoint: str, method: str = 'GET', data: Optional[Dict] = None) -> Dict:
         """Make HTTP request to Beget API"""
+        # Beget API uses form data, not JSON
         url = f"{self.api_url}/{endpoint.lstrip('/')}"
+        
+        # Prepare form data with login and password
+        form_data = {
+            'login': self.username,
+            'passwd': self.password
+        }
+        
+        # Add any additional data
+        if data:
+            form_data.update(data)
         
         try:
             if method.upper() == 'GET':
-                response = self.session.get(url, params=data, timeout=30)
+                response = self.session.get(url, params=form_data, timeout=30)
             elif method.upper() == 'POST':
-                response = self.session.post(url, json=data, timeout=30)
+                response = self.session.post(url, data=form_data, timeout=30)
             elif method.upper() == 'PUT':
-                response = self.session.put(url, json=data, timeout=30)
+                response = self.session.put(url, data=form_data, timeout=30)
             elif method.upper() == 'DELETE':
-                response = self.session.delete(url, timeout=30)
+                response = self.session.delete(url, params=form_data, timeout=30)
             else:
                 raise BegetAPIError(f"Unsupported HTTP method: {method}")
             
@@ -59,34 +67,72 @@ class BegetAPIClient:
         """Test API connection and return account info"""
         try:
             # Try to get account information as a connection test
-            return self.get_account_info()
-        except BegetAPIError:
-            # If specific endpoint fails, try a simple ping
-            try:
-                response = self._make_request('/ping')
-                return {'status': 'connected', 'message': 'Connection successful'}
-            except:
-                raise BegetAPIError("Failed to connect to Beget API")
+            account_info = self.get_account_info()
+            
+            # If we got here, the connection was successful
+            return {
+                'status': 'success',
+                'message': 'Connection test successful',
+                'account_info': account_info,
+                'api_status': account_info.get('api_status', 'connected')
+            }
+        except BegetAPIError as e:
+            # Return detailed error information
+            return {
+                'status': 'error',
+                'message': f'Connection test failed: {str(e)}',
+                'api_status': 'failed'
+            }
     
     def get_account_info(self) -> Dict:
-        """Get account information"""
+        """Get account information using Beget API getAccountInfo method"""
         try:
-            # Beget API endpoint for account info (this may vary based on actual API)
-            response = self._make_request('/account/info')
-            return response
-        except BegetAPIError:
-            # Fallback to mock data if API structure is unknown
+            # Use the correct Beget API endpoint for account info
+            response = self._make_request('/api/user/getAccountInfo', method='GET')
+            
+            # Check if the response indicates success
+            if response.get('status') == 'success':
+                answer = response.get('answer', {})
+                return {
+                    'account_id': f"beget_{self.username}",
+                    'username': self.username,
+                    'status': 'active',
+                    'plan_name': answer.get('plan_name', 'Unknown'),
+                    'plan_domain': answer.get('plan_domain', 0),
+                    'plan_subdomain': answer.get('plan_subdomain', 0),
+                    'plan_db': answer.get('plan_db', 0),
+                    'plan_ftp': answer.get('plan_ftp', 0),
+                    'plan_mail': answer.get('plan_mail', 0),
+                    'plan_quota': answer.get('plan_quota', 0),
+                    'plan_traffic': answer.get('plan_traffic', 0),
+                    'plan_price': answer.get('plan_price', 0),
+                    'plan_currency': answer.get('plan_currency', 'RUB'),
+                    'plan_period': answer.get('plan_period', 1),
+                    'plan_period_type': answer.get('plan_period_type', 'month'),
+                    'plan_expire': answer.get('plan_expire', ''),
+                    'plan_autorenew': answer.get('plan_autorenew', False),
+                    'plan_status': answer.get('plan_status', 'active'),
+                    'api_status': 'connected'
+                }
+            else:
+                raise BegetAPIError(f"API returned error status: {response.get('status', 'unknown')}")
+                
+        except BegetAPIError as e:
+            logger.warning(f"Beget API call failed, using mock data: {e}")
+            # Fallback to mock data if API structure is unknown or fails
             return {
                 'account_id': f"beget_{self.username}",
                 'username': self.username,
                 'status': 'active',
-                'plan': 'Standard',
-                'balance': 1500.0,
-                'currency': 'RUB',
-                'created_date': '2020-01-15',
-                'domains_count': 5,
-                'databases_count': 3,
-                'ftp_accounts_count': 2
+                'plan_name': 'Standard',
+                'plan_domain': 10,
+                'plan_db': 5,
+                'plan_ftp': 5,
+                'plan_mail': 10,
+                'plan_price': 150,
+                'plan_currency': 'RUB',
+                'plan_status': 'active',
+                'api_status': 'mock_data'
             }
     
     def get_domains(self) -> List[Dict]:

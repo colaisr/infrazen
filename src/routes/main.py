@@ -267,13 +267,23 @@ def test_connection():
                 return jsonify({'success': False, 'error': 'Заполните имя пользователя и пароль'})
             
             client = BegetAPIClient(username, password, api_url)
-            account_info = client.test_connection()
+            test_result = client.test_connection()
             
-            return jsonify({
-                'success': True,
-                'message': 'Подключение успешно установлено',
-                'account_info': account_info
-            })
+            # Check if the test was successful
+            if test_result.get('status') == 'success':
+                account_info = test_result.get('account_info', {})
+                return jsonify({
+                    'success': True,
+                    'message': f"✅ Подключение успешно! План: {account_info.get('plan_name', 'Unknown')}",
+                    'account_info': account_info,
+                    'api_status': test_result.get('api_status', 'connected')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': test_result.get('message', 'Ошибка подключения'),
+                    'api_status': test_result.get('api_status', 'failed')
+                })
         
         else:
             # For other providers, simulate test (implement actual API calls later)

@@ -1093,9 +1093,32 @@ function testConnection() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showTestResult('✅ Подключение успешно установлено!', 'success');
+            // Show detailed success message with account info
+            let message = data.message || '✅ Подключение успешно установлено!';
+            
+            // Add account info if available
+            if (data.account_info) {
+                const account = data.account_info;
+                message += `<br><br><strong>Информация об аккаунте:</strong>`;
+                message += `<br>• План: ${account.plan_name || 'Unknown'}`;
+                message += `<br>• Статус: ${account.plan_status || 'Unknown'}`;
+                if (account.plan_price) {
+                    message += `<br>• Стоимость: ${account.plan_price} ${account.plan_currency || 'RUB'}`;
+                }
+                if (account.plan_domain) {
+                    message += `<br>• Доменов: ${account.plan_domain}`;
+                }
+                if (account.plan_db) {
+                    message += `<br>• Баз данных: ${account.plan_db}`;
+                }
+                if (account.api_status) {
+                    message += `<br>• API статус: ${account.api_status}`;
+                }
+            }
+            
+            showTestResult(message, 'success');
         } else {
-            showTestResult('❌ Ошибка подключения: ' + data.error, 'error');
+            showTestResult('❌ ' + (data.error || 'Ошибка подключения'), 'error');
         }
     })
     .catch(error => {
