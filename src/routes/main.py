@@ -274,7 +274,7 @@ def test_connection():
                 account_info = test_result.get('account_info', {})
                 return jsonify({
                     'success': True,
-                    'message': f"✅ Подключение успешно! План: {account_info.get('plan_name', 'Unknown')}",
+                    'message': f"Подключение успешно! План: {account_info.get('plan_name', 'Unknown')}",
                     'account_info': account_info,
                     'api_status': test_result.get('api_status', 'connected')
                 })
