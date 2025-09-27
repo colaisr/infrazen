@@ -175,6 +175,10 @@ body {
     color: var(--error-red);
 }
 
+.kpi-trend.trend-neutral {
+    color: var(--text-secondary);
+}
+
 .dashboard-section {
     background: var(--background-white);
     border: 1px solid var(--border-light);
@@ -1058,3 +1062,4 @@ body {
 .shadow { box-shadow: var(--shadow-sm); }
 .shadow-md { box-shadow: var(--shadow-md); }
 .shadow-lg { box-shadow: var(--shadow-lg); }
+

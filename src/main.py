@@ -5,9 +5,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory, session, jsonify, request
 from src.models.user import db
+from src.models.beget import *  # Import all Beget models
 from src.routes.user import user_bp
 from src.routes.auth import auth_bp
 from src.routes.main import main_bp
+from src.routes.beget import beget_bp
 
 # Load environment variables from config.env if it exists
 config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.env')
@@ -28,6 +30,7 @@ app.config['SECRET_KEY'] = 'infrazen-finops-secret-key-2025'
 app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(auth_bp)
 app.register_blueprint(main_bp)
+app.register_blueprint(beget_bp)
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
@@ -57,6 +60,35 @@ def health_check():
         'service': 'InfraZen FinOps Platform',
         'version': '1.0.0'
     })
+
+# Beget API test endpoint
+@app.route('/api/beget/test', methods=['POST'])
+def test_beget_api():
+    """Test Beget API connection"""
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        api_url = data.get('api_url', 'https://api.beget.com')
+        
+        if not username or not password:
+            return jsonify({'success': False, 'error': 'Заполните имя пользователя и пароль'})
+        
+        # Import here to avoid circular imports
+        from src.api.beget_client import BegetAPIClient, BegetAPIError
+        
+        # Test connection
+        client = BegetAPIClient(username, password, api_url)
+        account_info = client.test_connection()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Подключение успешно установлено',
+            'account_info': account_info
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # Static file serving (fallback for development)
 @app.route('/favicon.ico')

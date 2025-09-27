@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify
-from src.data.mock_data import get_overview, get_connected_providers, get_resources, get_recommendations, generate_expense_trend, get_usage_summary
+from src.data.mock_data import get_overview
+from src.models.beget import BegetConnection, BegetResource, BegetDomain, BegetDatabase, BegetFTPAccount
 
 main_bp = Blueprint('main', __name__)
 
@@ -26,13 +27,22 @@ def dashboard():
             'picture': ''
         }
 
-    overview = get_overview()
+    user = session['user']
+    is_demo_user = user.get('id') == 'demo-user-123'
+    
+    if is_demo_user:
+        # Demo user: show mock data
+        overview = get_overview()
+    else:
+        # Real user: show real database data
+        overview = get_real_user_overview(user['id'])
 
     return render_template(
         'dashboard.html',
-        user=session['user'],
+        user=user,
         active_page='dashboard',
-        overview=overview
+        overview=overview,
+        is_demo_user=is_demo_user
     )
 
 @main_bp.route('/connections')
@@ -46,14 +56,45 @@ def connections():
             'picture': ''
         }
     
-    overview = get_overview()
+    user = session['user']
+    is_demo_user = user.get('id') == 'demo-user-123'
+    
+    if is_demo_user:
+        # Demo user: show mock data (Yandex Cloud + Selectel + mock Beget)
+        overview = get_overview()
+        providers = overview['providers']
+    else:
+        # Real user: show only real database connections
+        from src.models.beget import BegetConnection
+        
+        # Get real connections from database
+        beget_connections = BegetConnection.query.filter_by(user_id=user['id']).all()
+        
+        # Convert to provider format
+        providers = []
+        for conn in beget_connections:
+            providers.append({
+                'id': f"beget-{conn.id}",
+                'code': 'beget',
+                'name': 'Beget',
+                'status': 'connected' if conn.is_active else 'disconnected',
+                'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
+                'details': {
+                    'connection_name': conn.connection_name,
+                    'username': conn.username,
+                    'domains_count': conn.domains_count,
+                    'databases_count': conn.databases_count,
+                    'ftp_accounts_count': conn.ftp_accounts_count
+                }
+            })
     
     return render_template('connections.html', 
-                         user=session['user'],
+                         user=user,
                          active_page='connections',
                          page_title='Подключения облаков',
                          page_subtitle='Управление подключениями к облачным провайдерам',
-                         providers=overview['providers'])
+                         providers=providers,
+                         is_demo_user=is_demo_user)
 
 @main_bp.route('/resources')
 def resources():
@@ -66,15 +107,27 @@ def resources():
             'picture': ''
         }
     
-    overview = get_overview()
+    user = session['user']
+    is_demo_user = user.get('id') == 'demo-user-123'
+    
+    if is_demo_user:
+        # Demo user: show mock data
+        overview = get_overview()
+        resources = overview['resources']
+        providers = overview['providers']
+    else:
+        # Real user: show real database data
+        resources = get_real_user_resources(user['id'])
+        providers = get_real_user_providers(user['id'])
     
     return render_template('resources.html', 
-                         user=session['user'],
+                         user=user,
                          active_page='resources',
                          page_title='Ресурсы',
                          page_subtitle='Управление облачными ресурсами',
-                         resources=overview['resources'],
-                         providers=overview['providers'])
+                         resources=resources,
+                         providers=providers,
+                         is_demo_user=is_demo_user)
 
 @main_bp.route('/analytics')
 def analytics():
@@ -186,3 +239,89 @@ def api_demo_usage():
 @main_bp.route('/api/demo/trend')
 def api_demo_trend():
     return jsonify(generate_expense_trend())
+
+
+
+
+
+
+# Helper functions for real user data
+def get_real_user_overview(user_id):
+    """Get overview data for a real user from database"""
+    # Get user's connections
+    connections = BegetConnection.query.filter_by(user_id=user_id).all()
+    
+    # Calculate totals
+    total_connections = len(connections)
+    active_connections = len([c for c in connections if c.is_active])
+    
+    # Get resources from all connections
+    all_resources = []
+    for conn in connections:
+        all_resources.extend(conn.resources)
+    
+    # Calculate costs (mock for now - in real implementation, get from API)
+    total_cost = sum([conn.domains_count * 150 + conn.databases_count * 50 + conn.ftp_accounts_count * 25 for conn in connections])
+    
+    return {
+        'kpis': {
+            'total_expenses_rub': total_cost,
+            'potential_savings_rub': int(total_cost * 0.1),  # 10% savings estimate
+            'active_resources': len(all_resources),
+            'connected_providers': total_connections
+        },
+        'providers': [{
+            'id': f"beget-{conn.id}",
+            'code': 'beget',
+            'name': 'Beget',
+            'status': 'connected' if conn.is_active else 'disconnected',
+            'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
+            'details': {
+                'connection_name': conn.connection_name,
+                'username': conn.username,
+                'domains_count': conn.domains_count,
+                'databases_count': conn.databases_count,
+                'ftp_accounts_count': conn.ftp_accounts_count
+            }
+        } for conn in connections],
+        'trend': [],  # Empty trend for real users initially
+        'resources': all_resources,
+        'recommendations': [],  # Empty for real users initially
+        'usage': {
+            'cpu': {'used_vcpu': 0, 'available_vcpu': 100, 'percent': 0},
+            'ram': {'used_gb': 0, 'available_gb': 100, 'percent': 0},
+            'storage': {'used_tb': 0, 'available_tb': 10, 'percent': 0},
+            'network': {'used_tb': 0, 'limit_tb': 10, 'percent': 0}
+        }
+    }
+
+
+def get_real_user_resources(user_id):
+    """Get resources for a real user from database"""
+    connections = BegetConnection.query.filter_by(user_id=user_id).all()
+    all_resources = []
+    
+    for conn in connections:
+        all_resources.extend(conn.resources)
+    
+    return all_resources
+
+
+def get_real_user_providers(user_id):
+    """Get providers for a real user from database"""
+    connections = BegetConnection.query.filter_by(user_id=user_id).all()
+    
+    return [{
+        'id': f"beget-{conn.id}",
+        'code': 'beget',
+        'name': 'Beget',
+        'status': 'connected' if conn.is_active else 'disconnected',
+        'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
+        'details': {
+            'connection_name': conn.connection_name,
+            'username': conn.username,
+            'domains_count': conn.domains_count,
+            'databases_count': conn.databases_count,
+            'ftp_accounts_count': conn.ftp_accounts_count
+        }
+    } for conn in connections]

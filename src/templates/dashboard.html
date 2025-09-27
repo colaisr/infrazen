@@ -29,7 +29,11 @@
                 <div class="kpi-icon icon-expense"><i class="fa-solid fa-ruble-sign"></i></div>
             </div>
             <div class="kpi-footer">
+                {% if is_demo_user %}
                 <div class="kpi-trend trend-down"><i class="fa-solid fa-arrow-down"></i> -12.5% за месяц</div>
+                {% else %}
+                <div class="kpi-trend trend-neutral"><i class="fa-solid fa-minus"></i> 0% за месяц</div>
+                {% endif %}
                 <span class="kpi-subtext kpi-subtext-muted">Рублей</span>
             </div>
         </article>

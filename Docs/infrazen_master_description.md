@@ -29,31 +29,46 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 - **Prototype Stack:** Flask SSR application rendering Jinja2 templates; Flask serves static assets (CSS/JS/images) alongside HTML.
 - **Application Layout:** Left sidebar navigation, header with module context/actions, dynamic main content area, user profile section anchored to sidebar footer.
 - **Key Directories (prototype):**
-  - `app.py` (Flask app & routing)
-  - `templates/` (`base.html`, `dashboard.html`, `connections.html`, `landing.html`, reusable partials)
-  - `static/` (`css/style.css`, `js/app.js`, imagery)
-  - `data/mock_data.py` (seed analytics & recommendations)
+  - `src/main.py` (Flask app & routing)
+  - `src/templates/` (`base.html`, `dashboard.html`, `connections.html`, `resources.html`, `page.html`, `index.html`)
+  - `src/static/` (`css/style.css`, favicon, imagery)
+  - `src/data/mock_data.py` (comprehensive demo data for Yandex Cloud & Selectel)
+  - `src/routes/` (main.py, auth.py, user.py - modular routing)
+  - `src/models/` (user.py - database models)
 - **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
+- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. Google OAuth authentication fully implemented with profile integration. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections.
 
 ## 7. Navigation & Module Breakdown
 ```
-Dashboard (primary landing) – focus on spend overview and health
-Cloud Connections – manage provider integrations and statuses
-Resources – inventory and tagging governance
-Cost Analytics / Cost Explorer – granular spend analysis and filtering
-Recommendations – optimization backlog with savings estimates
-Business Context – unit economics, cost-to-value mapping
-Reports – custom/scheduled reports and exports
-Settings – user roles, permissions, budgeting policies, integrations
+✅ Dashboard (primary landing) – focus on spend overview and health
+✅ Cloud Connections – manage provider integrations and statuses  
+✅ Resources – inventory and tagging governance
+🔄 Cost Analytics / Cost Explorer – granular spend analysis and filtering
+🔄 Recommendations – optimization backlog with savings estimates
+🔄 Business Context – unit economics, cost-to-value mapping
+🔄 Reports – custom/scheduled reports and exports
+🔄 Settings – user roles, permissions, budgeting policies, integrations
 ```
 
-### 7.1 Dashboard Highlights
+### 7.1 Dashboard Highlights ✅ IMPLEMENTED
 - **Top Controls:** Date-range selector (7/30/90 days, 1 year), manual refresh, and export actions aligned to the header for fast reporting.
-- **KPI Cards Row:** Discrete cards for Total Expenses (with monthly trend), Potential Savings, Active Resources (flagging unused assets), and Connected Providers; each card surfaces iconography, primary value, and secondary context at a glance.
-- **Connected Providers Grid:** Card grid listing each cloud (badge + name, connection status badge, added date). Includes a persistent "Добавить" tile and a primary "Добавить провайдера" button to launch the connection wizard.
-- **Expense Dynamics vs. Resource Usage Split:** Layout pairs the expense trend chart (30d/90d/1y filter chips) with a resource utilization panel showing progress bars for CPU, RAM, Storage, and Network, including used vs. available capacity labels.
-- **Optimization Recommendations:** Empty-state messaging when all resources optimized.
-- **Resource Inventory:** Search, provider/type/status filters, empty-state fallback.
+- **KPI Cards Row:** ✅ Discrete cards for Total Expenses (117,150 ₽ with -12.5% trend), Potential Savings (10,400 ₽), Active Resources (8 resources), and Connected Providers (2 providers); each card surfaces iconography, primary value, and secondary context at a glance.
+- **Connected Providers Grid:** ✅ Card grid listing each cloud (YC/SEL badges + names, connection status, added dates). Includes persistent "Добавить" tile and "Добавить провайдера" button.
+- **Expense Dynamics vs. Resource Usage Split:** ✅ Layout pairs expense trend summary with resource utilization panel showing progress bars for CPU (67%), RAM (81%), Storage (43%), and Network (29%) with used vs. available capacity labels.
+- **Optimization Recommendations:** ✅ Active recommendations list with 3 optimization suggestions (rightsize, cleanup, storage policy) totaling 10,400 ₽ potential savings.
+- **Resource Inventory:** ✅ Comprehensive table with all 8 resources from both providers, search/filter capabilities, and detailed resource information.
+
+### 7.1.1 Demo Implementation Details ✅ LIVE
+- **Demo User Session:** Automatically enabled for all routes without authentication requirement
+- **Mock Data Sources:** Realistic Yandex Cloud and Selectel infrastructure with proper Russian regions, costs in rubles
+- **Provider Coverage:** 
+  - Yandex Cloud: `ru-central1-a/b` regions, organization/cloud/folder IDs, Intel platforms
+  - Selectel: `msk-a/spb-a` regions, project IDs, standard/memory flavors
+- **Resource Types:** VMs (4), Disks/Volumes (2), Buckets (2) with detailed configurations
+- **API Endpoints:** `/api/demo/*` endpoints for programmatic access to all demo data
+- **Cost Structure:** Total monthly spend ~117,150 ₽ with 10,400 ₽ optimization potential
+- **Authentication:** Google OAuth integration with real user profiles, circular avatar display, and secure session management
+- **User Separation:** Demo users (mock data) vs Real users (database data) with conditional UI and trend displays
 
 ### 7.2 Cost Explorer / Analytics
 - Filterable by provider, account, service, region, tag, time period.
@@ -101,13 +116,18 @@ Settings – user roles, permissions, budgeting policies, integrations
 - **Scalability:** Pricing scales with infrastructure footprint; ARPU grows alongside client expansion.
 
 ## 11. Implementation Roadmap (Prototype Focus)
-1. Set up Flask foundation with base template & sidebar navigation.
-2. Implement dashboard view populated by mock data (Rubles currency).
-3. Build cloud connections interface with provider cards and modal workflow.
-4. Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
-5. Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
-6. Integrate Telegram bot and notification hooks (future phase).
-7. Deploy demo-ready prototype.
+1. ✅ Set up Flask foundation with base template & sidebar navigation.
+2. ✅ Implement dashboard view populated by mock data (Rubles currency).
+3. ✅ Build cloud connections interface with provider cards and modal workflow.
+4. ✅ Create comprehensive resources inventory with detailed resource management.
+5. ✅ Implement demo user session with realistic Yandex Cloud and Selectel data.
+6. ✅ Add JSON API endpoints for demo data access.
+7. ✅ Implement Google OAuth authentication with profile integration.
+8. ✅ Separate demo users (mock data) from real users (database data) with conditional UI.
+9. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
+10. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
+11. 🔄 Integrate Telegram bot and notification hooks (future phase).
+12. 🔄 Deploy demo-ready prototype.
 
 ## 12. Data & Integration Requirements
 - Provider API connectors (Yandex.Cloud, VK Cloud, Selectel, GCP, AWS, Azure for future expansion).

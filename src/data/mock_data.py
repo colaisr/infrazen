@@ -170,4 +170,110 @@ def get_overview() -> Dict[str, Any]:
         'recommendations': get_recommendations()
     }
 
+def get_beget_mock_resources() -> Dict[str, Any]:
+    """Get mock Beget hosting resources"""
+    return {
+        'account_info': {
+            'account_id': 'beget_demo_123',
+            'username': 'demo_user',
+            'status': 'active',
+            'plan': 'Standard',
+            'balance': 1500.0,
+            'currency': 'RUB',
+            'created_date': '2020-01-15',
+            'domains_count': 2,
+            'databases_count': 2,
+            'ftp_accounts_count': 2
+        },
+        'domains': [
+            {
+                'id': 'domain_1',
+                'name': 'example.ru',
+                'status': 'active',
+                'registrar': 'Beget',
+                'registration_date': '2020-01-15',
+                'expiration_date': '2025-01-15',
+                'nameservers': ['ns1.beget.com', 'ns2.beget.com'],
+                'hosting_plan': 'Standard',
+                'monthly_cost': 150.0
+            },
+            {
+                'id': 'domain_2',
+                'name': 'mysite.com',
+                'status': 'active',
+                'registrar': 'Beget',
+                'registration_date': '2021-03-20',
+                'expiration_date': '2026-03-20',
+                'nameservers': ['ns1.beget.com', 'ns2.beget.com'],
+                'hosting_plan': 'Premium',
+                'monthly_cost': 300.0
+            }
+        ],
+        'databases': [
+            {
+                'id': 'db_1',
+                'name': 'myapp_db',
+                'type': 'mysql',
+                'size_mb': 250,
+                'username': 'myapp_user',
+                'host': 'mysql.beget.com',
+                'port': 3306,
+                'monthly_cost': 50.0
+            },
+            {
+                'id': 'db_2',
+                'name': 'blog_db',
+                'type': 'mysql',
+                'size_mb': 120,
+                'username': 'blog_user',
+                'host': 'mysql.beget.com',
+                'port': 3306,
+                'monthly_cost': 30.0
+            }
+        ],
+        'ftp_accounts': [
+            {
+                'id': 'ftp_1',
+                'username': 'main_ftp',
+                'home_directory': '/public_html',
+                'disk_quota_mb': 1024,
+                'disk_used_mb': 450,
+                'server_host': 'ftp.beget.com',
+                'port': 21,
+                'is_active': True,
+                'monthly_cost': 25.0
+            },
+            {
+                'id': 'ftp_2',
+                'username': 'backup_ftp',
+                'home_directory': '/backups',
+                'disk_quota_mb': 512,
+                'disk_used_mb': 200,
+                'server_host': 'ftp.beget.com',
+                'port': 21,
+                'is_active': True,
+                'monthly_cost': 15.0
+            }
+        ],
+        'billing_info': {
+            'current_balance': 1500.0,
+            'currency': 'RUB',
+            'last_payment': '2024-01-15',
+            'next_payment': '2024-02-15',
+            'monthly_cost': 555.0,
+            'payment_method': 'Credit Card',
+            'auto_renewal': True
+        },
+        'usage_stats': {
+            'disk_usage_mb': 670,
+            'disk_limit_mb': 2048,
+            'bandwidth_usage_gb': 45,
+            'bandwidth_limit_gb': 100,
+            'email_accounts_used': 5,
+            'email_accounts_limit': 10,
+            'databases_used': 2,
+            'databases_limit': 5
+        }
+    }
+
 

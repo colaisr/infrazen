@@ -119,11 +119,11 @@
         </article>
         {% endfor %}
 
-        <article class="provider-card add-card">
+        <article class="provider-card add-card" id="add-provider-card">
             <div class="add-icon"><i class="fa-solid fa-plus"></i></div>
             <h3>Добавить провайдера</h3>
             <p>Настроить подключение нового облачного провайдера</p>
-            <button class="btn btn-primary btn-sm">Настроить подключение</button>
+            <button class="btn btn-primary btn-sm" onclick="showProviderForm()">Настроить подключение</button>
         </article>
     </div>
 
@@ -177,6 +177,22 @@
                     <span class="provider-description">VK Cloud API</span>
                 </div>
                 <button class="btn btn-outline btn-sm">Добавить</button>
+            </div>
+            <div class="provider-option">
+                <div class="provider-logo">
+                    <div class="provider-icon beget">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="provider-name">Beget</span>
+                    <span class="provider-description">Хостинг и домены</span>
+                </div>
+                {% if not is_demo_user %}
+                <button class="btn btn-outline btn-sm" onclick="showBegetForm()">Добавить</button>
+                {% else %}
+                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -295,6 +311,11 @@
 .provider-icon.vk-cloud {
     background: rgba(76, 175, 80, 0.1);
     color: #4caf50;
+}
+
+.provider-icon.beget {
+    background: rgba(139, 69, 19, 0.1);
+    color: #8b4513;
 }
 
 .provider-icon.default {
@@ -500,5 +521,337 @@
     height: 40px;
     font-size: 1.25rem;
 }
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: var(--background-white);
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.modal-close:hover {
+    background: var(--background-light);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background-color: var(--background-white);
+    cursor: pointer;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.form-check-input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.form-check-label {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.btn-lg {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+}
+
+.provider-info-card {
+    background: var(--background-light);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.provider-info-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.provider-info-card p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.connection-test {
+    background: var(--success-green);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    display: none;
+}
+
+.connection-test.error {
+    background: var(--error-red);
+}
 </style>
+
+<!-- Beget Connection Modal -->
+<div id="begetModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fa-solid fa-server" style="color: #8b4513; margin-right: 0.5rem;"></i>
+                Подключение Beget
+            </h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="provider-info-card">
+                <h4>Информация о провайдере</h4>
+                <p>Beget — российский хостинг-провайдер, предоставляющий услуги веб-хостинга, регистрации доменов и виртуальных серверов. Для подключения потребуются данные для входа в панель управления.</p>
+            </div>
+            
+            <div class="connection-test" id="connectionTest"></div>
+            
+            <form id="begetForm" method="POST" action="/connections/beget/add">
+                <div class="form-group">
+                    <label class="form-label" for="connection_name">Название подключения *</label>
+                    <input type="text" class="form-control" id="connection_name" name="connection_name" 
+                           placeholder="Мой Beget аккаунт" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="username">Имя пользователя *</label>
+                    <input type="text" class="form-control" id="username" name="username" 
+                           placeholder="your_beget_username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="password">Пароль *</label>
+                    <input type="password" class="form-control" id="password" name="password" 
+                           placeholder="••••••••" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="api_url">API URL</label>
+                    <input type="url" class="form-control" id="api_url" name="api_url" 
+                           value="https://api.beget.com">
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="auto_sync" name="auto_sync" checked>
+                        <label class="form-check-label" for="auto_sync">Автоматическая синхронизация</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="sync_interval">Интервал синхронизации</label>
+                    <select class="form-select" id="sync_interval" name="sync_interval">
+                        <option value="hourly">Каждый час</option>
+                        <option value="daily" selected>Ежедневно</option>
+                        <option value="weekly">Еженедельно</option>
+                        <option value="manual">Только вручную</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="enable_notifications" name="enable_notifications" checked>
+                        <label class="form-check-label" for="enable_notifications">Уведомления о изменениях</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="description">Описание</label>
+                    <textarea class="form-control form-textarea" id="description" name="description" 
+                              placeholder="Дополнительная информация о подключении..."></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+            <button type="button" class="btn btn-outline-secondary" onclick="testConnection()">Тест подключения</button>
+            <button type="submit" form="begetForm" class="btn btn-primary btn-lg">Подключить Beget</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showBegetForm() {
+    document.getElementById('begetModal').style.display = 'block';
+}
+
+function showProviderForm() {
+    // Generic provider form - can be extended for other providers
+    showBegetForm();
+}
+
+function closeModal() {
+    document.getElementById('begetModal').style.display = 'none';
+    document.getElementById('connectionTest').style.display = 'none';
+}
+
+function testConnection() {
+    const testDiv = document.getElementById('connectionTest');
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const apiUrl = document.getElementById('api_url').value;
+    
+    if (!username || !password) {
+        showTestResult('Заполните имя пользователя и пароль', 'error');
+        return;
+    }
+    
+    showTestResult('Тестирование подключения...', 'info');
+    
+    // Simulate API test (replace with actual API call)
+    fetch('/api/beget/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password,
+            api_url: apiUrl
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showTestResult('✅ Подключение успешно установлено!', 'success');
+        } else {
+            showTestResult('❌ Ошибка подключения: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showTestResult('❌ Ошибка тестирования подключения', 'error');
+        console.error('Connection test error:', error);
+    });
+}
+
+function showTestResult(message, type) {
+    const testDiv = document.getElementById('connectionTest');
+    testDiv.textContent = message;
+    testDiv.className = 'connection-test';
+    if (type === 'success') {
+        testDiv.style.background = 'var(--success-green)';
+    } else if (type === 'error') {
+        testDiv.style.background = 'var(--error-red)';
+    } else {
+        testDiv.style.background = 'var(--warning-orange)';
+    }
+    testDiv.style.display = 'block';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('begetModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+</script>
 {% endblock %}
