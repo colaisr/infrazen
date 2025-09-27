@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд - InfraZen FinOps Platform{% endblock %}
+
+{% block page_title %}Обзор расходов{% endblock %}
+{% block page_subtitle %}Мультиоблачная аналитика ваших ресурсов{% endblock %}
+
+{% block header_actions %}
+    <div class="header-actions">
+        <select class="btn btn-secondary">
+            <option>Последние 30 дней</option>
+            <option>Последние 90 дней</option>
+            <option>Последний год</option>
+        </select>
+        <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить</span></button>
+        <button class="btn btn-primary"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-content">
+    <section class="kpi-grid">
+        <article class="kpi-card">
+            <div class="kpi-card-header">
+                <div>
+                    <span class="kpi-label">Общие расходы</span>
+                    <div class="kpi-value">0 ₽</div>
+                </div>
+                <div class="kpi-icon icon-expense"><i class="fa-solid fa-ruble-sign"></i></div>
+            </div>
+            <div class="kpi-footer">
+                <div class="kpi-trend trend-down"><i class="fa-solid fa-arrow-down"></i> -12.5% за месяц</div>
+                <span class="kpi-subtext kpi-subtext-muted">Рублей</span>
+            </div>
+        </article>
+
+        <article class="kpi-card">
+            <div class="kpi-card-header">
+                <div>
+                    <span class="kpi-label">Потенциальная экономия</span>
+                    <div class="kpi-value">0 ₽</div>
+                </div>
+                <div class="kpi-icon icon-savings"><i class="fa-solid fa-piggy-bank"></i></div>
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-subtext">0% от общих расходов</span>
+                <span class="kpi-subtext-muted">Обновлено сегодня</span>
+            </div>
+        </article>
+
+        <article class="kpi-card">
+            <div class="kpi-card-header">
+                <div>
+                    <span class="kpi-label">Активные ресурсы</span>
+                    <div class="kpi-value">0</div>
+                </div>
+                <div class="kpi-icon icon-resources"><i class="fa-solid fa-box-open"></i></div>
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-subtext kpi-subtext-warning"><i class="fa-solid fa-triangle-exclamation"></i> 0 неиспользуемых</span>
+                <span class="kpi-subtext-muted">Инвентарь обновлён</span>
+            </div>
+        </article>
+
+        <article class="kpi-card">
+            <div class="kpi-card-header">
+                <div>
+                    <span class="kpi-label">Облачных провайдеров</span>
+                    <div class="kpi-value">0</div>
+                </div>
+                <div class="kpi-icon icon-providers"><i class="fa-solid fa-cloud"></i></div>
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-subtext">подключённых сервисов</span>
+                <button class="link-button">Управлять</button>
+            </div>
+        </article>
+    </section>
+
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Подключенные облачные провайдеры</h2>
+                <p class="section-meta">Управление статусами и подключениями</p>
+            </div>
+            <div class="section-actions">
+                <button class="btn btn-primary"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
+            </div>
+        </div>
+        <div class="provider-grid">
+            <!-- Provider cards will be rendered dynamically when data is available -->
+            <!-- Example card structure retained for reference -->
+            <!--
+            <article class="provider-card">
+                <header class="provider-header">
+                    <span class="provider-badge gcp">GCP</span>
+                    <span class="provider-name">gcp</span>
+                </header>
+                <div class="provider-connection status-connected">
+                    <span class="status-indicator"></span>
+                    Подключен • Ожидает синхронизации
+                </div>
+                <div class="provider-status">Добавлен: 21.09.2025</div>
+                <div class="provider-actions">
+                    <button class="icon-button"><i class="fa-solid fa-gear"></i></button>
+                    <button class="icon-button icon-danger"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </article>
+            -->
+
+            <article class="provider-card add-card">
+                <div class="add-icon"><i class="fa-solid fa-plus"></i></div>
+                <h3>Добавить</h3>
+                <p>Настроить подключение нового провайдера</p>
+                <button class="btn btn-secondary btn-sm">Настроить подключение</button>
+            </article>
+        </div>
+    </section>
+
+    <section class="split-grid">
+        <article class="dashboard-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Динамика расходов</h2>
+                    <p class="section-meta">Анализ затрат за выбранный период</p>
+                </div>
+                <div class="filter-controls">
+                    <button class="filter-pill active">30д</button>
+                    <button class="filter-pill">90д</button>
+                    <button class="filter-pill">1г</button>
+                </div>
+            </div>
+            <div class="chart-placeholder">
+                <i class="fa-solid fa-chart-line"></i>
+                <p>График динамики расходов</p>
+                <span>Интерактивный график с данными по периоду</span>
+            </div>
+            <div class="summary-metrics">
+                <div>
+                    <div class="summary-label">Прошлый месяц</div>
+                    <div class="summary-value">₽0</div>
+                </div>
+                <div>
+                    <div class="summary-label">Текущий месяц</div>
+                    <div class="summary-value text-success">₽0</div>
+                </div>
+                <div>
+                    <div class="summary-label">Экономия</div>
+                    <div class="summary-value text-primary-blue">₽0</div>
+                </div>
+            </div>
+        </article>
+
+        <article class="dashboard-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Использование ресурсов</h2>
+                    <p class="section-meta">Нагрузка и доступные мощности</p>
+                </div>
+                <a class="icon-button" href="#"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+            </div>
+            <div class="usage-list">
+                <div class="usage-item">
+                    <div class="usage-top">
+                        <span>Процессоры (CPU)</span>
+                        <span class="usage-percent">67%</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div class="usage-bar-fill" style="width: 67%"></div>
+                    </div>
+                    <div class="usage-meta">
+                        <span>Используется: 234 vCPU</span>
+                        <span>Доступно: 350 vCPU</span>
+                    </div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-top">
+                        <span>Память (RAM)</span>
+                        <span class="usage-percent">81%</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div class="usage-bar-fill" style="width: 81%"></div>
+                    </div>
+                    <div class="usage-meta">
+                        <span>Используется: 1.2 TB</span>
+                        <span>Доступно: 1.5 TB</span>
+                    </div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-top">
+                        <span>Хранилище</span>
+                        <span class="usage-percent">43%</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div class="usage-bar-fill" style="width: 43%"></div>
+                    </div>
+                    <div class="usage-meta">
+                        <span>Используется: 8.6 TB</span>
+                        <span>Доступно: 20 TB</span>
+                    </div>
+                </div>
+                <div class="usage-item">
+                    <div class="usage-top">
+                        <span>Сетевой трафик</span>
+                        <span class="usage-percent">29%</span>
+                    </div>
+                    <div class="usage-bar">
+                        <div class="usage-bar-fill" style="width: 29%"></div>
+                    </div>
+                    <div class="usage-meta">
+                        <span>Использовано: 2.9 TB</span>
+                        <span>Лимит: 10 TB</span>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Рекомендации по оптимизации</h2>
+                <p class="section-meta">Предложения для снижения расходов</p>
+            </div>
+            <div class="section-actions">
+                <span class="section-meta">Потенциальная экономия: 0 ₽</span>
+                <button class="icon-button"><i class="fa-solid fa-arrows-rotate"></i></button>
+            </div>
+        </div>
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa-solid fa-lightbulb"></i></div>
+            <div class="empty-state-title">Рекомендации не найдены</div>
+            <div class="empty-state-text">Все ваши ресурсы оптимально настроены</div>
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Инвентарь ресурсов</h2>
+                <p class="section-meta">Поиск и фильтрация по провайдерам</p>
+            </div>
+            <div class="section-actions">
+                <span class="section-meta">0 из 0 ресурсов</span>
+                <button class="icon-button"><i class="fa-solid fa-filter"></i></button>
+            </div>
+        </div>
+        <div class="filter-row">
+            <input class="form-control" type="text" placeholder="Поиск ресурсов...">
+            <select class="form-control">
+                <option>Все провайдеры</option>
+            </select>
+            <select class="form-control">
+                <option>Все типы</option>
+            </select>
+            <select class="form-control">
+                <option>Все статусы</option>
+            </select>
+        </div>
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
+            <div class="empty-state-title">Нет ресурсов</div>
+            <div class="empty-state-text">Подключите облачных провайдеров для отображения ресурсов</div>
+        </div>
+    </section>
+</div>
+{% endblock %}
