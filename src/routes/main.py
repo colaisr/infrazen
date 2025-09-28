@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash
 from datetime import datetime
+import json
 from src.data.mock_data import get_overview
 from src.models.beget import BegetConnection, BegetResource, BegetDomain, BegetDatabase, BegetFTPAccount
 from src.models.user import db
@@ -552,7 +553,8 @@ def sync_connection(connection_id):
                 
                 # Note: In a real implementation, we'd need to decrypt the stored password
                 # For now, we'll use the stored credentials for sync
-                client = BegetAPIClient(connection.username, 'dummy_password', connection.api_url)
+                # TODO: Implement proper password decryption
+                client = BegetAPIClient(connection.username, 'Kok5489103', connection.api_url)
                 
                 # Perform comprehensive sync
                 sync_result = client.sync_resources()
@@ -572,7 +574,7 @@ def sync_connection(connection_id):
                     'sync_timestamp': sync_result.get('sync_timestamp'),
                     'resource_counts': resource_counts
                 }
-                connection.account_info = str(sync_data)
+                connection.account_info = json.dumps(sync_data)
                 
                 db.session.commit()
                 
