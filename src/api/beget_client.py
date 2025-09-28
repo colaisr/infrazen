@@ -127,7 +127,7 @@ class BegetAPIClient:
         except BegetAPIError as e:
             if use_mock_data:
                 logger.warning(f"Beget API call failed, using mock data: {e}")
-                # Only use mock data when explicitly requested (for development)
+                # Only use mock data when explicitly requested (for demo users only)
                 return {
                     'account_id': f"beget_{self.username}",
                     'username': self.username,
@@ -181,13 +181,13 @@ class BegetAPIClient:
                     logger.debug(f"Domain endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data if no real endpoints work
-            logger.warning("No working domain endpoints found, using mock data")
-            return self._get_mock_domains()
+            # No working endpoints found - return empty list for real users
+            logger.warning("No working domain endpoints found - returning empty list")
+            return []
             
         except Exception as e:
             logger.error(f"Failed to get domains: {e}")
-            return self._get_mock_domains()
+            return []
     
     def _process_domains_data(self, domains_data: List[Dict]) -> List[Dict]:
         """Process raw domains data from API"""
@@ -267,13 +267,13 @@ class BegetAPIClient:
                     logger.debug(f"Database endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data
-            logger.warning("No working database endpoints found, using mock data")
-            return self._get_mock_databases()
+            # No working endpoints found - return empty list for real users
+            logger.warning("No working database endpoints found - returning empty list")
+            return []
             
         except Exception as e:
             logger.error(f"Failed to get databases: {e}")
-            return self._get_mock_databases()
+            return []
     
     def _process_databases_data(self, databases_data: List[Dict]) -> List[Dict]:
         """Process raw databases data from API"""
@@ -345,13 +345,13 @@ class BegetAPIClient:
                     logger.debug(f"FTP endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data
-            logger.warning("No working FTP endpoints found, using mock data")
-            return self._get_mock_ftp_accounts()
+            # No working endpoints found - return empty list for real users
+            logger.warning("No working FTP endpoints found - returning empty list")
+            return []
             
         except Exception as e:
             logger.error(f"Failed to get FTP accounts: {e}")
-            return self._get_mock_ftp_accounts()
+            return []
     
     def _process_ftp_accounts_data(self, ftp_accounts_data: List[Dict]) -> List[Dict]:
         """Process raw FTP accounts data from API"""
@@ -425,13 +425,13 @@ class BegetAPIClient:
                     logger.debug(f"Billing endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data
-            logger.warning("No working billing endpoints found, using mock data")
-            return self._get_mock_billing_info()
+            # No working endpoints found - return empty dict for real users
+            logger.warning("No working billing endpoints found - returning empty billing info")
+            return {}
             
         except Exception as e:
             logger.error(f"Failed to get billing info: {e}")
-            return self._get_mock_billing_info()
+            return {}
     
     def _process_billing_data(self, billing_data: Dict) -> Dict:
         """Process raw billing data from API"""
@@ -493,13 +493,13 @@ class BegetAPIClient:
                     logger.debug(f"Usage endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data
-            logger.warning("No working usage endpoints found, using mock data")
-            return self._get_mock_usage_info()
+            # No working endpoints found - return empty dict for real users
+            logger.warning("No working usage endpoints found - returning empty usage info")
+            return {}
             
         except Exception as e:
             logger.error(f"Failed to get usage info: {e}")
-            return self._get_mock_usage_info()
+            return {}
     
     def _process_usage_data(self, usage_data: Dict) -> Dict:
         """Process raw usage data from API"""
@@ -571,13 +571,13 @@ class BegetAPIClient:
                     logger.debug(f"Email endpoint {endpoint} failed: {e}")
                     continue
             
-            # Fallback to mock data
-            logger.warning("No working email endpoints found, using mock data")
-            return self._get_mock_email_accounts()
+            # No working endpoints found - return empty list for real users
+            logger.warning("No working email endpoints found - returning empty list")
+            return []
             
         except Exception as e:
             logger.error(f"Failed to get email accounts: {e}")
-            return self._get_mock_email_accounts()
+            return []
     
     def _process_email_accounts_data(self, email_accounts_data: List[Dict]) -> List[Dict]:
         """Process raw email accounts data from API"""
