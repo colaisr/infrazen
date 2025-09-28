@@ -745,6 +745,7 @@ class BegetAPIClient:
             
             # Calculate sync statistics
             total_resources = (
+                len(resources.get('vps_servers', [])) +  # Include VPS servers
                 len(resources.get('domains', [])) +
                 len(resources.get('databases', [])) +
                 len(resources.get('ftp_accounts', [])) +
@@ -761,6 +762,7 @@ class BegetAPIClient:
                 'billing_info': resources.get('billing_info', {}),
                 'usage_stats': resources.get('usage_stats', {}),
                 'resources': {
+                    'vps_servers': resources.get('vps_servers', []),  # Include VPS servers
                     'domains': resources.get('domains', []),
                     'databases': resources.get('databases', []),
                     'ftp_accounts': resources.get('ftp_accounts', []),
