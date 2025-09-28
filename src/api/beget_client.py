@@ -146,6 +146,78 @@ class BegetAPIClient:
                 # Re-raise the error for connection testing
                 raise e
     
+    def get_vps_servers(self) -> List[Dict]:
+        """Get list of VPS servers from Beget API"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            # Use documented Beget API endpoint for VPS servers
+            url = f"{self.api_url}/v1/vps/server/list"
+            
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved VPS servers from {url}")
+                
+                # Process the VPS servers data
+                if 'vps' in result:
+                    return self._process_vps_servers_data(result['vps'])
+                elif 'servers' in result:
+                    return self._process_vps_servers_data(result['servers'])
+                elif isinstance(result, list):
+                    return self._process_vps_servers_data(result)
+                else:
+                    logger.warning(f"Unexpected VPS servers response format: {result}")
+                    return []
+                    
+            except Exception as e:
+                logger.error(f"VPS servers endpoint failed: {e}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"Failed to get VPS servers: {e}")
+            return []
+    
+    def _process_vps_servers_data(self, servers_data: List[Dict]) -> List[Dict]:
+        """Process raw VPS servers data from API"""
+        processed_servers = []
+        
+        for server in servers_data:
+            config = server.get('configuration', {})
+            processed_servers.append({
+                'id': server.get('id'),
+                'name': server.get('display_name', server.get('hostname')),
+                'status': server.get('status', 'active'),
+                'ip_address': server.get('ip_address'),
+                'hostname': server.get('hostname'),
+                'os': server.get('software', {}).get('display_name', 'Unknown'),
+                'cpu_cores': config.get('cpu_count', 0),
+                'ram_mb': config.get('memory', 0),
+                'disk_gb': config.get('disk_size', 0) / 1024 if config.get('disk_size') else 0,  # Convert MB to GB
+                'disk_used_gb': int(server.get('disk_used', 0)) / 1024 if server.get('disk_used') else 0,
+                'disk_left_gb': int(server.get('disk_left', 0)) / 1024 if server.get('disk_left') else 0,
+                'bandwidth_gb': config.get('bandwidth_public', 0),
+                'location': server.get('region', 'Unknown'),
+                'created_at': server.get('date_create'),
+                'monthly_cost': config.get('price_month', 0),
+                'currency': 'RUB',
+                'type': 'vps',
+                'software': server.get('software', {}).get('name', 'Unknown'),
+                'software_domain': server.get('software_domain', ''),
+                'description': server.get('description', '')
+            })
+        
+        return processed_servers
+
     def get_domains(self) -> List[Dict]:
         """Get list of domains from Beget API"""
         try:
@@ -159,12 +231,11 @@ class BegetAPIClient:
                 'User-Agent': 'InfraZen/1.0'
             }
             
-            # Try different possible endpoints for domains
+            # Use documented Beget API endpoints
             endpoints = [
-                '/api/domains',
-                '/api/domain/list',
-                '/api/user/domains',
-                '/api/domain/getList'
+                '/v1/vps/server/list',  # Documented endpoint for VPS servers
+                '/v1/domain/list',      # Documented endpoint for domains
+                '/v1/hosting/list'      # Documented endpoint for hosting
             ]
             
             for endpoint in endpoints:
@@ -620,6 +691,7 @@ class BegetAPIClient:
         try:
             # Get all available information
             account_info = self.get_account_info(use_mock_data=False)
+            vps_servers = self.get_vps_servers()  # Get VPS servers first
             domains = self.get_domains()
             databases = self.get_databases()
             ftp_accounts = self.get_ftp_accounts()
@@ -629,6 +701,7 @@ class BegetAPIClient:
             
             # Calculate total costs
             total_monthly_cost = sum([
+                sum(v.get('monthly_cost', 0) for v in vps_servers),  # Include VPS costs
                 sum(d.get('monthly_cost', 0) for d in domains),
                 sum(d.get('monthly_cost', 0) for d in databases),
                 sum(f.get('monthly_cost', 0) for f in ftp_accounts),
@@ -637,6 +710,7 @@ class BegetAPIClient:
             
             return {
                 'account_info': account_info,
+                'vps_servers': vps_servers,  # Include VPS servers
                 'domains': domains,
                 'databases': databases,
                 'ftp_accounts': ftp_accounts,
@@ -646,6 +720,7 @@ class BegetAPIClient:
                 'total_monthly_cost': total_monthly_cost,
                 'sync_timestamp': datetime.now().isoformat(),
                 'resource_counts': {
+                    'vps_servers': len(vps_servers),  # Include VPS count
                     'domains': len(domains),
                     'databases': len(databases),
                     'ftp_accounts': len(ftp_accounts),
