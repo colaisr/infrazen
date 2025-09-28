@@ -82,6 +82,7 @@ def connections():
                 'name': 'Beget',
                 'connection_name': conn.connection_name,  # Add connection_name at top level
                 'status': 'connected' if conn.is_active else 'disconnected',
+                'last_sync': conn.last_sync,  # Add last_sync timestamp
                 'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
                 'details': {
                     'connection_name': conn.connection_name,
@@ -542,8 +543,8 @@ def sync_connection(connection_id):
         if not connection:
             return jsonify({'success': False, 'error': 'Connection not found'})
         
-        # Update last sync time
-        connection.last_sync = datetime.utcnow()
+                # Update last sync time (will be updated again with actual sync timestamp)
+                connection.last_sync = datetime.utcnow()
         
         # For Beget connections, sync resources comprehensively
         if connection.api_url and 'beget' in connection.api_url.lower():
@@ -575,6 +576,12 @@ def sync_connection(connection_id):
                     'resource_counts': resource_counts
                 }
                 connection.account_info = json.dumps(sync_data)
+                
+                # Update last sync time with actual sync timestamp
+                if sync_result.get('sync_timestamp'):
+                    from datetime import datetime
+                    sync_dt = datetime.fromisoformat(sync_result['sync_timestamp'].replace('Z', '+00:00'))
+                    connection.last_sync = sync_dt
                 
                 db.session.commit()
                 

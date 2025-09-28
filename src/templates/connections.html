@@ -64,7 +64,12 @@
             <div class="provider-connection {% if provider.status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
                 <span class="status-indicator"></span>
                 {% if provider.status == 'connected' %}
-                    Подключен • Ожидает синхронизации
+                    Подключен • 
+                    {% if provider.last_sync %}
+                        Синхронизирован {{ provider.last_sync.strftime('%d.%m.%Y %H:%M') }}
+                    {% else %}
+                        Ожидает синхронизации
+                    {% endif %}
                 {% else %}
                     Отключен
                 {% endif %}
