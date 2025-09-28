@@ -83,7 +83,7 @@ def connections():
                 'connection_name': conn.connection_name,  # Add connection_name at top level
                 'status': 'connected' if conn.is_active else 'disconnected',
                 'last_sync': conn.last_sync,  # Add last_sync timestamp
-                'added_at': conn.created_at.isoformat() if conn.created_at else '2024-01-01',
+                'added_at': conn.created_at.strftime('%d.%m.%Y в %H:%M') if conn.created_at else '01.01.2024 в 00:00',
                 'details': {
                     'connection_name': conn.connection_name,
                     'username': conn.username,
