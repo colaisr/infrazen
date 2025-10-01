@@ -53,18 +53,21 @@ class BegetAPIClient:
             # Parse response
             result = response.json()
             
+            # DEBUG: Log the full API response
+            logger.info(f"DEBUG: Full Beget API response: {result}")
+            
             # Check if authentication was successful
             if 'token' in result:
                 self.access_token = result.get('token')
                 self.refresh_token = result.get('refresh_token')
-                logger.info("Successfully authenticated with Beget API")
+                logger.info(f"Successfully authenticated with Beget API - Token: {self.access_token[:20]}..." if self.access_token else "No token")
                 return True
             elif result.get('error'):
                 error_msg = result.get('error', 'Authentication failed')
                 logger.error(f"Authentication failed: {error_msg}")
                 return False
             else:
-                logger.error("Authentication failed: Unknown response format")
+                logger.error(f"Authentication failed: Unknown response format - {result}")
                 return False
                 
         except requests.exceptions.RequestException as e:
@@ -100,17 +103,17 @@ class BegetAPIClient:
     
     def _get_account_info_from_token(self) -> Dict:
         """Extract account info from authentication token or make additional API call"""
-        # For now, return basic info based on successful authentication
-        # In a real implementation, you might need to call additional endpoints
+        # Return minimal info based on successful authentication
+        # TODO: Call additional Beget API endpoints to get real account/plan info
+        logger.info(f"DEBUG: Authentication successful for user {self.username}")
+        logger.info(f"DEBUG: Access token received: {self.access_token[:20]}..." if self.access_token else "No access token")
+        
         return {
             'account_id': f"beget_{self.username}",
             'username': self.username,
             'status': 'active',
-            'plan_name': 'Standard',  # This would come from actual API call
-            'plan_price': 150,
-            'plan_currency': 'RUB',
-            'plan_status': 'active',
             'api_status': 'connected'
+            # Removed mock plan data - will be populated from real API calls later
         }
     
     def get_account_info(self, use_mock_data: bool = False) -> Dict:
@@ -125,26 +128,9 @@ class BegetAPIClient:
             return self._get_account_info_from_token()
                 
         except BegetAPIError as e:
-            if use_mock_data:
-                logger.warning(f"Beget API call failed, using mock data: {e}")
-                # Only use mock data when explicitly requested (for demo users only)
-                return {
-                    'account_id': f"beget_{self.username}",
-                    'username': self.username,
-                    'status': 'active',
-                    'plan_name': 'Standard',
-                    'plan_domain': 10,
-                    'plan_db': 5,
-                    'plan_ftp': 5,
-                    'plan_mail': 10,
-                    'plan_price': 150,
-                    'plan_currency': 'RUB',
-                    'plan_status': 'active',
-                    'api_status': 'mock_data'
-                }
-            else:
-                # Re-raise the error for connection testing
-                raise e
+            logger.error(f"DEBUG: Beget API call failed: {e}")
+            # Re-raise the error - no mock data for real users
+            raise e
     
     def get_vps_servers(self) -> List[Dict]:
         """Get list of VPS servers from Beget API"""
