@@ -969,9 +969,12 @@ function fillEditForm(connectionData) {
         if (usernameField) usernameField.value = connectionData.username || '';
         if (apiUrlField) apiUrlField.value = connectionData.api_url || 'https://api.beget.com';
         
-        // Don't fill password for security
+        // Fill password for testing purposes
         const passwordField = document.querySelector('input[name="password"]');
-        if (passwordField) passwordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
+        if (passwordField) {
+            passwordField.value = connectionData.password || '';
+            passwordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
+        }
     }
     
     // Show provider info and connection test sections

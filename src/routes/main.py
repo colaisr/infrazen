@@ -505,13 +505,14 @@ def get_connection_for_edit(connection_id):
         if not connection:
             return jsonify({'success': False, 'error': 'Connection not found'})
         
-        # Return connection data (without password)
+        # Return connection data (including password for testing)
         return jsonify({
             'success': True,
             'data': {
                 'id': connection.id,
                 'connection_name': connection.connection_name,
                 'username': connection.username,
+                'password': connection.password,  # Include password for testing
                 'api_url': connection.api_url,
                 'provider': 'beget',  # For now, we only support Beget
                 'account_info': connection.account_info,
