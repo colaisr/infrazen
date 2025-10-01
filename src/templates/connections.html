@@ -1152,20 +1152,19 @@ function testConnection() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Show concise success message with key account info
-            let message = data.message || '✅ Подключение успешно установлено!';
+            // Show success message with real user info
+            let message = '✅ Подключение успешно установлено!';
             
-            // Add brief account info if available
+            // Use real account info if available
             if (data.account_info) {
                 const account = data.account_info;
-                const planName = account.plan_name || 'Unknown';
-                const planPrice = account.plan_price;
-                const planCurrency = account.plan_currency || 'RUB';
+                const username = account.customer_login || account.username || 'Unknown';
+                const customerId = account.customer_id || '';
                 
-                if (planPrice) {
-                    message = `✅ Подключение успешно! План: ${planName} (${planPrice} ${planCurrency})`;
+                if (customerId) {
+                    message = `✅ Подключение успешно! Пользователь: ${username} (ID: ${customerId})`;
                 } else {
-                    message = `✅ Подключение успешно! План: ${planName}`;
+                    message = `✅ Подключение успешно! Пользователь: ${username}`;
                 }
             }
             

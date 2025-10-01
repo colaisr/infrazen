@@ -6,12 +6,31 @@ from typing import Dict, Optional, List
 from datetime import datetime, date
 import requests
 import json
+import base64
 
 logger = logging.getLogger(__name__)
 
 class BegetAPIError(Exception):
     """Custom exception for Beget API errors"""
     pass
+
+def decode_jwt_payload(token: str) -> Dict:
+    """Decode JWT token payload without verification (for extracting user info)"""
+    try:
+        # Split token into parts
+        parts = token.split('.')
+        if len(parts) != 3:
+            return {}
+        
+        # Decode payload (second part)
+        payload = parts[1]
+        # Add padding if needed
+        payload += '=' * (4 - len(payload) % 4)
+        decoded_bytes = base64.urlsafe_b64decode(payload)
+        return json.loads(decoded_bytes.decode('utf-8'))
+    except Exception as e:
+        logger.error(f"Failed to decode JWT token: {e}")
+        return {}
 
 class BegetAPIClient:
     """Client for interacting with Beget hosting API"""
@@ -104,18 +123,30 @@ class BegetAPIClient:
             }
     
     def _get_account_info_from_token(self) -> Dict:
-        """Extract account info from authentication token or make additional API call"""
-        # Return minimal info based on successful authentication
-        # TODO: Call additional Beget API endpoints to get real account/plan info
+        """Extract account info from authentication token"""
         logger.info(f"DEBUG: Authentication successful for user {self.username}")
         logger.info(f"DEBUG: Access token received: {self.access_token[:20]}..." if self.access_token else "No access token")
+        
+        # Decode JWT token to get user info
+        user_info = {}
+        if self.access_token:
+            jwt_payload = decode_jwt_payload(self.access_token)
+            user_info = {
+                'customer_id': jwt_payload.get('customerId', ''),
+                'customer_login': jwt_payload.get('customerLogin', self.username),
+                'environment': jwt_payload.get('env', 'web'),
+                'ip_address': jwt_payload.get('ip', ''),
+                'token_expires': jwt_payload.get('exp', 0)
+            }
+            logger.info(f"DEBUG: Extracted user info from JWT: {user_info}")
         
         return {
             'account_id': f"beget_{self.username}",
             'username': self.username,
+            'customer_id': user_info.get('customer_id', ''),
+            'customer_login': user_info.get('customer_login', self.username),
             'status': 'active',
             'api_status': 'connected'
-            # Removed mock plan data - will be populated from real API calls later
         }
     
     def get_account_info(self, use_mock_data: bool = False) -> Dict:
