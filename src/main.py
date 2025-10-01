@@ -1,9 +1,13 @@
 import os
 import sys
+import logging
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory, session, jsonify, request
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 from src.models.user import db
 from src.models.beget import *  # Import all Beget models
 from src.routes.user import user_bp

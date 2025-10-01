@@ -33,6 +33,7 @@ class BegetAPIClient:
     
     def _authenticate_with_requests(self) -> bool:
         """Authenticate with Beget API using requests library"""
+        print(f"DEBUG: Authenticating user {self.username} with Beget API at {self.api_url}/v1/auth")
         url = f"{self.api_url}/v1/auth"
         
         # Prepare authentication data
@@ -79,6 +80,7 @@ class BegetAPIClient:
     
     def test_connection(self) -> Dict:
         """Test API connection by authenticating"""
+        print(f"DEBUG: test_connection called for user {self.username}")
         try:
             success = self.authenticate()
             if success:
