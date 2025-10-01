@@ -938,6 +938,10 @@ function setModalToEditMode(connectionData) {
     connectBtn.innerHTML = 'Сохранить изменения';
     connectBtn.style.display = 'none';
     
+    // Ensure test button is visible
+    const testBtn = document.getElementById('testBtn');
+    testBtn.style.display = 'inline-block';
+    
     // Add hidden field for edit ID
     const form = document.getElementById('providerForm');
     let editIdField = document.getElementById('edit_connection_id');
