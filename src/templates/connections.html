@@ -1060,7 +1060,14 @@ function changeProvider() {
         // Show buttons
         testBtn.style.display = 'inline-block';
         connectBtn.style.display = 'inline-block';
-        connectBtn.textContent = `Подключить ${provider.name}`;
+        
+        // Check if we're in edit mode
+        const editIdField = document.getElementById('edit_connection_id');
+        if (editIdField && editIdField.value) {
+            connectBtn.textContent = 'Сохранить изменения';
+        } else {
+            connectBtn.textContent = `Подключить ${provider.name}`;
+        }
         
     } else {
         // Hide everything
