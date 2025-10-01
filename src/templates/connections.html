@@ -951,6 +951,12 @@ function resetModalToAddMode() {
     const testBtn = document.getElementById('testBtn');
     testBtn.style.display = 'none';
     
+    // Re-enable provider dropdown in add mode
+    const providerSelect = document.getElementById('provider_select');
+    providerSelect.disabled = false;
+    providerSelect.style.opacity = '1';
+    providerSelect.style.cursor = 'pointer';
+    
     // Hide provider info and connection test sections
     document.getElementById('providerInfo').style.display = 'none';
     document.getElementById('connectionTest').style.display = 'none';
@@ -975,6 +981,12 @@ function setModalToEditMode(connectionData) {
     // Ensure test button is visible
     const testBtn = document.getElementById('testBtn');
     testBtn.style.display = 'inline-block';
+    
+    // Disable provider dropdown in edit mode
+    const providerSelect = document.getElementById('provider_select');
+    providerSelect.disabled = true;
+    providerSelect.style.opacity = '0.6';
+    providerSelect.style.cursor = 'not-allowed';
     
     // Add hidden field for edit ID
     const form = document.getElementById('providerForm');
