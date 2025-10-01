@@ -261,3 +261,9 @@ class BegetSettingsForm(FlaskForm):
         'Тест подключения',
         render_kw={'class': 'btn btn-outline-secondary'}
     )
+
+
+
+
+
+

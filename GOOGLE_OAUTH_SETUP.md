@@ -112,3 +112,9 @@ If you encounter issues:
 4. Check Google Cloud Console for any error messages
 
 The demo login will always work as a fallback if Google OAuth isn't configured.
+
+
+
+
+
+
