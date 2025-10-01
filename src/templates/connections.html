@@ -715,6 +715,40 @@
 .connection-test.error {
     background: var(--error-red);
 }
+
+/* Password Toggle Styles */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-wrapper .form-control {
+    padding-right: 3rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+    color: var(--primary-blue);
+}
+
+.password-toggle:focus {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
 </style>
 
 <!-- Provider Connection Modal -->
@@ -1050,6 +1084,19 @@ function createFieldHtml(field) {
                           placeholder="${placeholder}" ${required}>${field.default || ''}</textarea>
             </div>
         `;
+    } else if (field.type === 'password') {
+        return `
+            <div class="form-group">
+                <label class="form-label" for="${field.name}">${field.label}</label>
+                <div class="password-input-wrapper">
+                    <input type="password" class="form-control" id="${field.name}" name="${field.name}" 
+                           placeholder="${placeholder}" ${defaultValue} ${required}>
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('${field.name}')">
+                        <i class="fa-solid fa-eye" id="eye-${field.name}"></i>
+                    </button>
+                </div>
+            </div>
+        `;
     } else {
         return `
             <div class="form-group">
@@ -1305,6 +1352,19 @@ function showFlashMessage(message, type) {
             flashDiv.remove();
         }
     }, 5000);
+}
+
+function togglePasswordVisibility(fieldName) {
+    const passwordField = document.getElementById(fieldName);
+    const eyeIcon = document.getElementById(`eye-${fieldName}`);
+    
+    if (passwordField.type === 'password') {
+        passwordField.type = 'text';
+        eyeIcon.className = 'fa-solid fa-eye-slash';
+    } else {
+        passwordField.type = 'password';
+        eyeIcon.className = 'fa-solid fa-eye';
+    }
 }
 </script>
 {% endblock %}
