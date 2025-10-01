@@ -343,7 +343,6 @@ def add_connection():
 def handle_beget_connection(user_id, form_data):
     """Handle Beget connection creation"""
     from src.models.beget import BegetConnection
-    from werkzeug.security import generate_password_hash
     
     username = form_data.get('username')
     password = form_data.get('password')
@@ -377,7 +376,7 @@ def handle_beget_connection(user_id, form_data):
         user_id=user_id,
         connection_name=form_data.get('connection_name'),
         username=username,
-        password=generate_password_hash(password),
+        password=password,  # Store plain text for API calls
         api_url=api_url,
         account_info=str(account_info) if account_info else None,
         domains_count=0,
@@ -412,7 +411,6 @@ def handle_edit_connection(connection_id, provider, connection_name, user_id, fo
 def handle_beget_edit(connection_id, connection_name, user_id, form_data):
     """Handle editing a Beget connection"""
     from src.models.beget import BegetConnection
-    from werkzeug.security import generate_password_hash
     
     # Find the existing connection
     connection = BegetConnection.query.filter_by(id=connection_id, user_id=user_id).first()
@@ -440,12 +438,13 @@ def handle_beget_edit(connection_id, connection_name, user_id, form_data):
     # Update password only if provided
     new_password = form_data.get('password')
     if new_password and new_password.strip():
-        connection.password = generate_password_hash(new_password)
+        connection.password = new_password  # Store plain text for API calls
     
     # Test connection if credentials changed
     try:
         from src.api.beget_client import BegetAPIClient, BegetAPIError
-        client = BegetAPIClient(connection.username, new_password if new_password else 'dummy', connection.api_url)
+        password_for_test = new_password if new_password else connection.password
+        client = BegetAPIClient(connection.username, password_for_test, connection.api_url)
         account_info = client.test_connection()
         connection.account_info = str(account_info) if account_info else connection.account_info
     except BegetAPIError as e:
