@@ -57,7 +57,7 @@
             </div>
             <div class="stat-item">
                 <span class="stat-label">Общая стоимость</span>
-                <span class="stat-value">{{ (all_resources|sum(attribute='daily_cost') * 30)|round(2) }} ₽/мес</span>
+                <span class="stat-value">{{ all_resources|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
             </div>
         </div>
     </div>
