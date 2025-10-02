@@ -253,6 +253,18 @@
                         {% endif %}
                     {% endif %}
                 </div>
+                
+                <!-- Provider Cost Display -->
+                <div class="provider-cost">
+                    <div class="cost-primary">
+                        <div class="cost-amount">{{ "%.1f"|format(provider.total_daily_cost or 0) }} ₽</div>
+                        <div class="cost-period">в день</div>
+                    </div>
+                    <div class="cost-secondary">
+                        <div class="cost-amount-secondary">{{ "%.1f"|format(provider.total_monthly_cost or 0) }} ₽</div>
+                        <div class="cost-period-secondary">в месяц</div>
+                    </div>
+                </div>
             </div>
 
             <div class="card-actions">
@@ -767,6 +779,59 @@
     font-weight: 500;
     font-family: monospace;
     font-size: 0.75rem;
+}
+
+/* Provider Cost Display - Matching Resource Card Style */
+.provider-cost {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-light);
+    background: var(--background-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cost-primary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cost-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+    line-height: 1;
+}
+
+.cost-period {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-top: 0.25rem;
+}
+
+.cost-secondary {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cost-amount-secondary {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    line-height: 1;
+}
+
+.cost-period-secondary {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-top: 0.125rem;
 }
 
 /* Card Actions */

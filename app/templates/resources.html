@@ -57,7 +57,7 @@
             </div>
             <div class="stat-item">
                 <span class="stat-label">Общая стоимость</span>
-                <span class="stat-value">{{ all_resources|sum(attribute='effective_cost')|round(2) }} ₽/мес</span>
+                <span class="stat-value">{{ (all_resources|sum(attribute='daily_cost') * 30)|round(2) }} ₽/мес</span>
             </div>
         </div>
     </div>
@@ -305,7 +305,7 @@
                     <div class="cost-period">в день</div>
                 </div>
                 <div class="cost-secondary">
-                    <div class="cost-amount-secondary">{{ resource.effective_cost|round(2) }} ₽</div>
+                    <div class="cost-amount-secondary">{{ (resource.daily_cost * 30)|round(2) }} ₽</div>
                     <div class="cost-period-secondary">в месяц</div>
                 </div>
             </div>

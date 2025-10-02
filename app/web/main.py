@@ -61,7 +61,7 @@ def connections():
     """Cloud connections page"""
     if 'user' not in session:
         session['user'] = {
-            'id': 'demo-user-123',
+            'id': '106509284268867883869',
             'email': 'demo@infrazen.com',
             'name': 'Demo User',
             'picture': ''
@@ -86,6 +86,11 @@ def connections():
             # Get resource counts for this provider
             resource_count = Resource.query.filter_by(provider_id=provider.id).count()
             
+            # Calculate provider costs
+            provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+            total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
+            total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
+            
             providers.append({
                 'id': f"{provider.provider_type}-{provider.id}",
                 'code': provider.provider_type,
@@ -95,6 +100,8 @@ def connections():
                 'last_sync': provider.last_sync,
                 'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
                 'provider_metadata': provider.provider_metadata,  # Add this line
+                'total_daily_cost': total_daily_cost,
+                'total_monthly_cost': total_monthly_cost,
                 'details': {
                     'connection_name': provider.connection_name,
                     'account_id': provider.account_id,
