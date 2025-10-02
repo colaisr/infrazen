@@ -87,7 +87,7 @@
     <script>
         // Handle Google Sign-In response
         function handleCredentialResponse(response) {
-            fetch('/auth/google', {
+            fetch('/api/auth/google', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -112,7 +112,7 @@
         
         // Demo login function (for testing without Google OAuth setup)
         function demoLogin() {
-            fetch('/auth/google', {
+            fetch('/api/auth/google', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

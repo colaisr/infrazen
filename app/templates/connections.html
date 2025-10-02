@@ -132,6 +132,15 @@
         </article>
     </div>
 
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-cloud"></i></div>
+        <div class="empty-state-title">Нет подключений</div>
+        <div class="empty-state-text">Добавьте облачных провайдеров для начала работы</div>
+        <button class="btn btn-primary" onclick="showProviderModal()">Добавить первого провайдера</button>
+    </div>
+    {% endif %}
+
     <div class="available-providers">
         <h3>Доступные провайдеры</h3>
         <div class="providers-list">
@@ -217,14 +226,6 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-cloud"></i></div>
-        <div class="empty-state-title">Нет подключений</div>
-        <div class="empty-state-text">Добавьте облачных провайдеров для начала работы</div>
-        <button class="btn btn-primary">Добавить первого провайдера</button>
-    </div>
-    {% endif %}
 </div>
 
 <style>
@@ -784,7 +785,7 @@
             
             <div class="connection-test" id="connectionTest" style="display: none;"></div>
             
-            <form id="providerForm" method="POST" action="/connections/add">
+            <form id="providerForm" method="POST" action="/api/providers/beget/add">
                 <input type="hidden" id="selected_provider" name="provider" value="">
                 
                 <!-- Common fields -->
@@ -1158,15 +1159,12 @@ function testConnection() {
     showTestResult('Тестирование подключения...', 'info');
     
     // Test connection based on provider
-    fetch(`/api/connections/test`, {
+    fetch(`/api/providers/beget/test`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            provider: selectedProvider,
-            credentials: formData
-        })
+        body: JSON.stringify(formData)
     })
     .then(response => response.json())
     .then(data => {
@@ -1239,7 +1237,7 @@ function editConnection(connectionId) {
     button.disabled = true;
     
     // Fetch connection details
-    fetch(`/api/connections/${numericId}/edit`)
+    fetch(`/api/providers/beget/${numericId}/edit`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1271,7 +1269,7 @@ function syncConnection(connectionId) {
     button.disabled = true;
     
     // Make sync request
-    fetch(`/api/connections/${numericId}/sync`, {
+    fetch(`/api/providers/beget/${numericId}/sync`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1312,7 +1310,7 @@ function deleteConnection(connectionId) {
         button.disabled = true;
         
         // Make delete request
-        fetch(`/api/connections/${numericId}/delete`, {
+        fetch(`/api/providers/beget/${numericId}/delete`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
