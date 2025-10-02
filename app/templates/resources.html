@@ -68,15 +68,15 @@
     <div class="provider-section">
         <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
             <div class="provider-info">
-                <div class="provider-icon">
+                <div class="provider-icon" style="width: 64px; height: 64px; font-size: 2.5rem;">
                     {% if provider.provider_type == 'beget' %}
-                        <i class="fas fa-server"></i>
+                        <i class="fas fa-server" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% elif provider.provider_type == 'yandex' %}
-                        <i class="fas fa-cloud"></i>
+                        <i class="fas fa-cloud" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% elif provider.provider_type == 'selectel' %}
-                        <i class="fas fa-database"></i>
+                        <i class="fas fa-database" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% else %}
-                        <i class="fas fa-box"></i>
+                        <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% endif %}
                 </div>
                 <div class="provider-details">
