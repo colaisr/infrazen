@@ -3,6 +3,7 @@ InfraZen FinOps Platform
 Flask Application Factory
 """
 import os
+import json
 from flask import Flask
 from flask_migrate import Migrate
 from app.core.database import db
@@ -18,6 +19,17 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
+    
+    # Add custom Jinja2 filters
+    @app.template_filter('from_json')
+    def from_json_filter(json_string):
+        """Convert JSON string to Python object"""
+        if json_string:
+            try:
+                return json.loads(json_string)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+        return {}
     
     # Register blueprints
     from app.web.main import main_bp

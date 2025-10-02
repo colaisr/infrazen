@@ -94,6 +94,7 @@ def connections():
                 'status': 'connected' if provider.is_active else 'disconnected',
                 'last_sync': provider.last_sync,
                 'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
+                'provider_metadata': provider.provider_metadata,  # Add this line
                 'details': {
                     'connection_name': provider.connection_name,
                     'account_id': provider.account_id,

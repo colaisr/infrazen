@@ -748,5 +748,162 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
 - Budget variance analysis
 - Cost anomaly detection
 
+## 6.3. Beget Account Information Integration
+
+### 6.3.1. Overview
+The InfraZen platform now integrates with Beget's Account Information API to provide comprehensive account details and FinOps insights directly in the connections interface.
+
+### 6.3.2. API Integration
+- **Endpoint**: `https://api.beget.com/api/user/getAccountInfo`
+- **Authentication**: Username/password based
+- **Data Collection**: During sync operations
+- **Storage**: JSON metadata in `cloud_providers.provider_metadata`
+
+### 6.3.3. Account Information Properties
+
+#### 6.3.3.1. Basic Account Details
+- **account_id**: User account identifier (e.g., "colaiswv")
+- **account_status**: Account state (active, suspended, blocked)
+- **account_type**: Account category (Cloud, VPS, etc.)
+- **plan_name**: Current subscription plan
+- **balance**: Current account balance in RUB
+- **currency**: Account currency (RUB)
+
+#### 6.3.3.2. Cost Information
+- **daily_rate**: Daily subscription cost (₽/day)
+- **monthly_rate**: Monthly subscription cost (₽/month)
+- **yearly_rate**: Annual subscription cost (₽/year)
+- **is_yearly_plan**: Boolean indicating yearly billing
+- **days_to_block**: Days until account suspension (critical alert)
+
+#### 6.3.3.3. Service Limits
+- **domains**: Domain usage (used/limit)
+- **sites**: Website usage (used/limit)
+- **mysql**: MySQL database usage (used/limit)
+- **ftp**: FTP account usage (used/limit)
+- **mail**: Email account usage (used/limit)
+- **quota**: Storage quota usage (used/limit)
+
+#### 6.3.3.4. Server Information
+- **server_name**: Physical server name (e.g., "gagarin7.beget.com")
+- **cpu**: CPU specifications and count
+- **memory_total_mb**: Total server memory in MB
+- **memory_used_mb**: Currently used memory in MB
+- **load_average**: Server load average
+- **uptime_days**: Server uptime in days
+
+#### 6.3.3.5. Software Versions
+- **apache**: Apache web server version
+- **nginx**: Nginx web server version
+- **mysql**: MySQL database version
+- **php**: PHP runtime version
+- **python**: Python runtime version
+- **perl**: Perl runtime version
+
+#### 6.3.3.6. Security Information
+- **bash_access**: Shell access status
+- **control_panel**: Control panel availability
+- **api_enabled**: API access status
+
+#### 6.3.3.7. FinOps Insights
+- **daily_cost**: Normalized daily cost for FinOps analysis
+- **monthly_cost**: Monthly subscription cost
+- **yearly_cost**: Annual subscription cost
+- **current_balance**: Available account balance
+- **days_until_block**: Critical alert for account suspension
+- **cost_per_day**: Daily cost baseline for FinOps
+
+### 6.3.4. User Interface Implementation
+
+#### 6.3.4.1. Collapsible Account Information Section
+- **Location**: Below "Добавлен:" line in provider cards
+- **Default State**: Collapsed (user can expand)
+- **Header**: "Информация об аккаунте" with chevron icon
+- **Interaction**: Click to toggle expand/collapse
+- **Animation**: Smooth chevron rotation and content reveal
+
+#### 6.3.4.2. Displayed Information
+- **Account ID**: User account identifier
+- **Status**: Active/Suspended with color coding
+- **Balance**: Current balance with currency
+- **Cost Information**: Daily and monthly rates
+- **Critical Alerts**: Days to block warning (if < 30 days)
+- **Service Limits**: Usage vs limits for all services
+- **Plan Information**: Current subscription plan
+- **Server Details**: Physical server information
+
+#### 6.3.4.3. Visual Indicators
+- **Status Colors**: Green (active), Red (suspended), Orange (warning)
+- **Critical Alerts**: Orange warning for days to block
+- **Progress Indicators**: Usage vs limits visualization
+- **Icons**: User, server, and service-specific icons
+
+### 6.3.5. Technical Implementation
+
+#### 6.3.5.1. Backend Changes
+- **Flask Route**: Added `provider_metadata` to connections route
+- **Jinja2 Filter**: Added `from_json` filter for JSON parsing
+- **Data Flow**: Database → Flask → Template → UI
+
+#### 6.3.5.2. Frontend Changes
+- **HTML Structure**: Collapsible section with proper nesting
+- **CSS Styling**: Professional styling with animations
+- **JavaScript**: `toggleAccountInfo()` function for interaction
+- **Responsive Design**: Mobile-friendly collapsible interface
+
+#### 6.3.5.3. Database Schema
+- **Field**: `cloud_providers.provider_metadata` (JSON)
+- **Content**: Complete account information from Beget API
+- **Updates**: Refreshed during each sync operation
+- **Storage**: JSON string with structured account data
+
+### 6.3.6. FinOps Benefits
+
+#### 6.3.6.1. Cost Visibility
+- **Daily Cost Baseline**: Normalized daily costs across all resources
+- **Account Balance**: Real-time balance monitoring
+- **Critical Alerts**: Proactive warnings for account suspension
+- **Cost Trends**: Historical cost analysis capabilities
+
+#### 6.3.6.2. Resource Management
+- **Service Limits**: Usage vs capacity monitoring
+- **Server Performance**: Load and uptime tracking
+- **Software Versions**: Security and compatibility insights
+- **Account Health**: Comprehensive account status overview
+
+#### 6.3.6.3. Operational Insights
+- **Account Status**: Active/suspended state monitoring
+- **Service Usage**: Detailed usage statistics
+- **Server Information**: Infrastructure health monitoring
+- **Security Status**: Access and control panel availability
+
+### 6.3.7. Integration Points
+
+#### 6.3.7.1. Sync Process
+- **Collection**: Account info gathered during sync
+- **Storage**: Metadata stored in provider record
+- **Updates**: Refreshed with each successful sync
+- **Fallback**: Graceful handling of API failures
+
+#### 6.3.7.2. UI Integration
+- **Connections Page**: Primary display location
+- **Provider Cards**: Collapsible account information
+- **Real-time Updates**: Information refreshed on sync
+- **User Experience**: Intuitive expand/collapse interaction
+
+### 6.3.8. Future Enhancements
+
+#### 6.3.8.1. Additional Providers
+- **AWS**: Account information integration
+- **Azure**: Subscription and billing details
+- **GCP**: Project and billing account info
+- **Multi-cloud**: Unified account information view
+
+#### 6.3.8.2. Advanced Features
+- **Cost Forecasting**: Predictive cost analysis
+- **Alert Management**: Custom alert thresholds
+- **Reporting**: Account information reports
+- **API Access**: Programmatic account information access
+
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.

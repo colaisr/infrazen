@@ -67,7 +67,7 @@ class BegetAPIClient:
         }
         
         try:
-            response = requests.post(url, json=auth_data, headers=headers, timeout=30)
+            response = requests.post(url, json=auth_data, headers=headers, timeout=60)
             response.raise_for_status()
             
             # Parse response
@@ -96,6 +96,7 @@ class BegetAPIClient:
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response: {e}")
             return False
+    
     
     def test_connection(self) -> Dict:
         """Test API connection by authenticating"""
@@ -182,11 +183,155 @@ class BegetAPIClient:
             # Re-raise the error - no mock data for real users
             raise e
     
+    def get_detailed_account_info(self) -> Dict:
+        """Get detailed account information using direct API endpoint"""
+        try:
+            url = "https://api.beget.com/api/user/getAccountInfo"
+            params = {
+                'login': self.username,
+                'passwd': self.password,
+                'output_format': 'json'
+            }
+            
+            logger.info(f"Fetching detailed account info from: {url}")
+            
+            try:
+                response = requests.get(url, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Account info API response: {result}")
+                
+                # Check for authentication errors
+                if result.get('status') == 'error':
+                    if result.get('error_code') == 'AUTH_ERROR':
+                        logger.warning("Authentication failed for account info")
+                        return {'error': 'Authentication failed', 'status': 'error'}
+                    else:
+                        logger.error(f"API Error: {result.get('error_text', 'Unknown error')}")
+                        return {'error': result.get('error_text', 'Unknown error'), 'status': 'error'}
+                
+                # Process successful response
+                if 'answer' in result:
+                    account_data = result['answer']
+                    return self._process_account_info(account_data)
+                elif 'result' in result:
+                    return self._process_account_info(result['result'])
+                else:
+                    logger.warning(f"Unexpected account info response format: {result}")
+                    return {'error': 'Unexpected response format', 'status': 'error'}
+                    
+            except Exception as e:
+                logger.error(f"Account info API failed: {e}")
+                return {'error': str(e), 'status': 'error'}
+                
+        except Exception as e:
+            logger.error(f"Failed to get account info: {e}")
+            return {'error': str(e), 'status': 'error'}
+    
+    def _process_account_info(self, account_data: Dict) -> Dict:
+        """Process account information data from Beget API response"""
+        try:
+            # Extract the actual result data from the nested structure
+            result_data = account_data.get('result', account_data)
+            
+            processed_info = {
+                # Account details
+                'account_id': self.username,  # Use the authenticated username
+                'account_status': 'active' if result_data.get('user_balance', 0) > 0 else 'blocked',
+                'account_type': result_data.get('plan_name', 'Unknown'),
+                'plan_name': result_data.get('plan_name', 'Unknown'),
+                
+                # Billing information
+                'balance': result_data.get('user_balance', 0),
+                'currency': 'RUB',
+                'daily_rate': result_data.get('user_rate_current', 0),
+                'monthly_rate': result_data.get('user_rate_month', 0),
+                'yearly_rate': result_data.get('user_rate_year', 0),
+                'is_yearly_plan': result_data.get('user_is_year_plan', '0') == '1',
+                'days_to_block': result_data.get('user_days_to_block', 0),
+                
+                # Service limits and usage
+                'service_limits': {
+                    'domains': {
+                        'used': result_data.get('user_domains', 0),
+                        'limit': result_data.get('plan_domain', 0)
+                    },
+                    'sites': {
+                        'used': result_data.get('user_sites', 0),
+                        'limit': result_data.get('plan_site', 0)
+                    },
+                    'mysql': {
+                        'used': result_data.get('user_mysqlsize', 0),
+                        'limit': result_data.get('plan_mysql', 0)
+                    },
+                    'ftp': {
+                        'used': result_data.get('user_ftp', 0),
+                        'limit': result_data.get('plan_ftp', 0)
+                    },
+                    'mail': {
+                        'used': result_data.get('user_mail', 0),
+                        'limit': result_data.get('plan_mail', 0)
+                    },
+                    'quota': {
+                        'used': result_data.get('user_quota', 0),
+                        'limit': result_data.get('plan_quota', 0)
+                    }
+                },
+                
+                # Server information
+                'server_info': {
+                    'name': result_data.get('server_name', ''),
+                    'cpu': result_data.get('server_cpu_name', ''),
+                    'memory_total_mb': result_data.get('server_memory', 0),
+                    'memory_used_mb': result_data.get('server_memorycurrent', 0),
+                    'load_average': result_data.get('server_loadaverage', 0),
+                    'uptime_days': result_data.get('server_uptime', 0)
+                },
+                
+                # Software versions
+                'software_versions': {
+                    'apache': result_data.get('server_apache_version', ''),
+                    'nginx': result_data.get('server_nginx_version', ''),
+                    'mysql': result_data.get('server_mysql_version', ''),
+                    'php': result_data.get('server_php_version', ''),
+                    'python': result_data.get('server_python_version', ''),
+                    'perl': result_data.get('server_perl_version', '')
+                },
+                
+                # Security and access
+                'security': {
+                    'bash_access': result_data.get('user_bash', ''),
+                    'control_panel': result_data.get('plan_cp', 0) > 0,
+                    'api_enabled': True  # If we can call the API, it's enabled
+                },
+                
+                # FinOps insights
+                'finops_insights': {
+                    'daily_cost': result_data.get('user_rate_current', 0),
+                    'monthly_cost': result_data.get('user_rate_month', 0),
+                    'yearly_cost': result_data.get('user_rate_year', 0),
+                    'current_balance': result_data.get('user_balance', 0),
+                    'days_until_block': result_data.get('user_days_to_block', 0),
+                    'cost_per_day': result_data.get('user_rate_current', 0)
+                },
+                
+                'raw_data': result_data  # Keep original for debugging
+            }
+            
+            logger.info(f"Processed account info: {processed_info}")
+            return processed_info
+            
+        except Exception as e:
+            logger.error(f"Error processing account info: {e}")
+            return {'error': f'Processing error: {str(e)}', 'status': 'error'}
+    
     def get_vps_servers(self) -> List[Dict]:
         """Get list of VPS servers from Beget API"""
         try:
             if not self.access_token:
                 self.authenticate()
+            
             
             headers = {
                 'Authorization': f'Bearer {self.access_token}',
@@ -258,6 +403,7 @@ class BegetAPIClient:
     def get_domains(self) -> List[Dict]:
         """Get list of domains from Beget API using real endpoint"""
         try:
+            
             # Use the real Beget API endpoint with login/password authentication
             url = "https://api.beget.com/api/domain/getList"
             params = {

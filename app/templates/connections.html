@@ -135,6 +135,97 @@
                         <span class="detail-label">Добавлен:</span>
                         <span class="detail-value">{{ provider.added_at }}</span>
                     </div>
+                    
+                    <!-- Account Information (if available) -->
+                    {% if provider.provider_metadata %}
+                        {% set metadata = provider.provider_metadata|from_json %}
+                        {% if metadata.account_info %}
+                            {% set account = metadata.account_info %}
+                            <div class="account-info-collapsible">
+                                <div class="account-info-header" onclick="toggleAccountInfo('{{ provider.id }}')">
+                                    <i class="fa-solid fa-user"></i>
+                                    <span>Информация об аккаунте</span>
+                                    <i class="fa-solid fa-chevron-down account-info-chevron" id="chevron-{{ provider.id }}"></i>
+                                </div>
+                                <div class="account-info-content" id="account-info-{{ provider.id }}" style="display: none;">
+                                
+                                {% if account.account_id %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Аккаунт:</span>
+                                    <span class="detail-value">{{ account.account_id }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.account_status %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Статус:</span>
+                                    <span class="detail-value status-{{ account.account_status|lower }}">
+                                        {% if account.account_status == 'active' %}Активен
+                                        {% elif account.account_status == 'suspended' %}Приостановлен
+                                        {% else %}{{ account.account_status }}{% endif %}
+                                    </span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.balance is defined %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Баланс:</span>
+                                    <span class="detail-value">{{ account.balance|round(2) }} {{ account.currency or 'RUB' }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.finops_insights %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Стоимость:</span>
+                                    <span class="detail-value">
+                                        {{ account.finops_insights.daily_cost|round(2) }} ₽/день
+                                        {% if account.finops_insights.monthly_cost %}({{ account.finops_insights.monthly_cost|round(2) }} ₽/мес){% endif %}
+                                    </span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.days_to_block and account.days_to_block < 30 %}
+                                <div class="detail-item warning">
+                                    <span class="detail-label">⚠️ Блокировка:</span>
+                                    <span class="detail-value">{{ account.days_to_block }} дней</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.service_limits %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Лимиты:</span>
+                                    <span class="detail-value">
+                                        {% if account.service_limits.domains %}
+                                            Доменов: {{ account.service_limits.domains.used }}/{{ account.service_limits.domains.limit if account.service_limits.domains.limit < 999999 else '∞' }}
+                                        {% endif %}
+                                        {% if account.service_limits.sites and account.service_limits.sites.limit > 0 %}
+                                            , Сайтов: {{ account.service_limits.sites.used }}/{{ account.service_limits.sites.limit }}
+                                        {% endif %}
+                                        {% if account.service_limits.mysql and account.service_limits.mysql.limit > 0 %}
+                                            , MySQL: {{ account.service_limits.mysql.used }}/{{ account.service_limits.mysql.limit }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.plan_name %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Тариф:</span>
+                                    <span class="detail-value">{{ account.plan_name }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if account.server_info %}
+                                <div class="detail-item">
+                                    <span class="detail-label">Сервер:</span>
+                                    <span class="detail-value">{{ account.server_info.name }}</span>
+                                </div>
+                                {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                    
                     {% if provider.details %}
                         {% if provider.details.organization_id %}
                         <div class="detail-item">
@@ -498,6 +589,109 @@
 .status-badge.add-status {
     background: rgba(59, 130, 246, 0.1);
     color: var(--primary-blue);
+}
+
+/* Account Information Section */
+.account-info-section {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--background-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+
+/* Collapsible Account Info */
+.account-info-collapsible {
+    margin: 0.75rem 0;
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    background: var(--background-light);
+    overflow: hidden;
+}
+
+.account-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--background-light);
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.account-info-header:hover {
+    background: var(--background-hover);
+}
+
+.account-info-header i:first-child {
+    margin-right: 0.5rem;
+    color: var(--primary-blue);
+}
+
+.account-info-chevron {
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.account-info-chevron.rotated {
+    transform: rotate(180deg);
+}
+
+.account-info-content {
+    padding: 1rem;
+    background: white;
+    border-top: 1px solid var(--border-light);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.section-header i {
+    color: var(--primary-blue);
+    font-size: 1rem;
+}
+
+.status-active {
+    color: var(--success-green);
+    font-weight: 500;
+}
+
+.status-suspended {
+    color: var(--warning-orange);
+    font-weight: 500;
+}
+
+.status-unknown {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.detail-item.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 3px solid var(--warning-orange);
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+}
+
+.detail-item.warning .detail-label {
+    color: var(--warning-orange);
+    font-weight: 600;
+}
+
+.detail-item.warning .detail-value {
+    color: var(--warning-orange);
+    font-weight: 600;
 }
 
 /* Card Body */
@@ -2126,6 +2320,20 @@ function togglePasswordVisibility(fieldName) {
     } else {
         passwordField.type = 'password';
         eyeIcon.className = 'fa-solid fa-eye';
+    }
+}
+
+// Toggle account info collapsible section
+function toggleAccountInfo(providerId) {
+    const content = document.getElementById(`account-info-${providerId}`);
+    const chevron = document.getElementById(`chevron-${providerId}`);
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        chevron.classList.add('rotated');
+    } else {
+        content.style.display = 'none';
+        chevron.classList.remove('rotated');
     }
 }
 </script>

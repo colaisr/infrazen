@@ -70,6 +70,11 @@ class SyncService:
                 db.session.commit()
                 return {'success': False, 'error': 'Authentication failed'}
             
+            # Get account information for connection enrichment
+            account_info = self.client.get_detailed_account_info()
+            if account_info.get('status') != 'error':
+                self._update_provider_metadata(account_info)
+            
             # Get all resources from provider
             resources_data = self.client.get_all_resources()
             
@@ -371,6 +376,41 @@ class SyncService:
         resource_state.set_current_state({'status': 'deleted', 'is_active': False})
         
         db.session.add(resource_state)
+    
+    def _update_provider_metadata(self, account_info: Dict):
+        """Update provider metadata with account information"""
+        try:
+            import json
+            
+            # Get current metadata or create new
+            current_metadata = {}
+            if self.provider.provider_metadata:
+                try:
+                    current_metadata = json.loads(self.provider.provider_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    current_metadata = {}
+            
+            # Update with account information
+            current_metadata.update({
+                'account_info': account_info,
+                'last_account_update': datetime.utcnow().isoformat(),
+                'account_status': account_info.get('account_status', 'unknown'),
+                'balance': account_info.get('balance', 0),
+                'currency': account_info.get('currency', 'RUB'),
+                'service_limits': account_info.get('service_limits', {}),
+                'usage_stats': account_info.get('usage_stats', {}),
+                'security': account_info.get('security', {})
+            })
+            
+            # Store updated metadata
+            self.provider.provider_metadata = json.dumps(current_metadata)
+            db.session.add(self.provider)
+            db.session.commit()
+            
+            logger.info(f"Updated provider metadata for provider {self.provider_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update provider metadata: {e}")
     
     def _update_snapshot_stats(self, snapshot: SyncSnapshot, sync_result: Dict):
         """Update snapshot with sync statistics"""
