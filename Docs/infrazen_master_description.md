@@ -85,7 +85,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - **Provider Config**: JSON storage for provider-specific attributes (IP addresses, hostnames, etc.)
 
 #### **Provider-Specific Data Handling**
-- **Beget**: VPS servers, domains, databases, FTP accounts, email accounts
+- **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex.Cloud**: Compute instances, storage, databases, load balancers, networks
 - **Selectel**: Virtual servers, block storage, object storage, CDN, DNS
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
@@ -142,10 +142,12 @@ All cloud resources are normalized into a unified schema regardless of provider:
 
 #### **Implemented Components**
 - **Sync Models**: `SyncSnapshot` and `ResourceState` models fully implemented with JSON serialization support
-- **Sync Service**: Core `SyncService` class with comprehensive resource processing logic
-- **Beget Integration**: Complete Beget API client with VPS, domains, databases, FTP, and email resource support
+- **Sync Service**: Core `SyncService` class with comprehensive resource processing logic and dual-endpoint support
+- **Beget Integration**: Complete dual-endpoint Beget API client with legacy and modern VPS API integration
+- **VPS Infrastructure**: Modern VPS API with server specifications, admin credentials, and cost tracking
+- **Account Information**: Legacy API integration with account details, service limits, and billing information
 - **Change Detection**: Automated comparison between current and previous resource states
-- **Error Handling**: Comprehensive error logging and graceful failure handling
+- **Error Handling**: Comprehensive error logging with separate error handling for each endpoint
 
 #### **Database Schema**
 ```sql
@@ -201,11 +203,12 @@ CREATE TABLE resource_states (
 #### **Data Flow Implementation**
 1. **User Action**: Click "Синхронизировать" button on connection card
 2. **Route Handler**: `sync_connection()` function in `app/providers/beget/routes.py`
-3. **Service Layer**: `SyncService.sync_resources()` orchestrates the entire process
-4. **Provider Client**: `BegetAPIClient.get_all_resources()` fetches comprehensive resource data
-5. **Data Processing**: Compare, create, update, or delete resources as needed
-6. **State Tracking**: Record `ResourceState` entries for change detection
-7. **Snapshot Completion**: Update `SyncSnapshot` with final statistics and status
+3. **Service Layer**: `SyncService.sync_resources()` orchestrates dual-endpoint sync process
+4. **Provider Client**: `BegetAPIClient.sync_resources()` fetches data from both legacy and modern APIs
+5. **Dual-Endpoint Sync**: Account info, VPS infrastructure, and additional resources with separate error handling
+6. **Data Processing**: Compare, create, update, or delete resources as needed
+7. **State Tracking**: Record `ResourceState` entries for change detection
+8. **Snapshot Completion**: Update `SyncSnapshot` with final statistics and status
 
 #### **JSON Data Handling**
 - **Provider Configuration**: Complex provider-specific data stored as JSON in `Resource.provider_config`
@@ -897,11 +900,136 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **AWS**: Account information integration
 - **Azure**: Subscription and billing details
 - **GCP**: Project and billing account info
-- **Multi-cloud**: Unified account information view
 
-#### 6.3.8.2. Advanced Features
-- **Cost Forecasting**: Predictive cost analysis
-- **Alert Management**: Custom alert thresholds
+## 6.4. Beget Dual-Endpoint Integration
+
+### 6.4.1. Overview
+The InfraZen platform now implements a comprehensive dual-endpoint integration with Beget, combining both legacy and modern API endpoints to provide complete coverage of Beget infrastructure resources. This integration ensures maximum data collection while maintaining reliability through separate error handling for each endpoint.
+
+### 6.4.2. Dual-Endpoint Architecture
+
+#### 6.4.2.1. Endpoint Strategy
+- **Legacy Endpoints**: Account information, domains, databases, FTP, email accounts
+- **Modern VPS API**: VPS server details, infrastructure specifications, admin credentials
+- **Hybrid Authentication**: JWT Bearer tokens for modern endpoints, username/password for legacy
+- **Independent Error Handling**: Each endpoint can fail without affecting others
+
+#### 6.4.2.2. API Endpoints Used
+- **Account Information**: `https://api.beget.com/api/user/getAccountInfo`
+- **Domain Management**: `https://api.beget.com/api/domain/getList`
+- **VPS Infrastructure**: `https://api.beget.com/v1/vps/server/list`
+- **Database Management**: `https://api.beget.com/api/mysql/getList`
+- **FTP Accounts**: `https://api.beget.com/api/ftp/getList`
+- **Email Accounts**: `https://api.beget.com/api/mail/getList`
+
+### 6.4.3. Enhanced Data Collection
+
+#### 6.4.3.1. Account Information (Legacy API)
+- **Account Details**: User ID, status, balance, subscription plans
+- **Service Limits**: Domain, site, database, FTP, email quotas
+- **Server Information**: Physical server details, performance metrics
+- **Cost Information**: Daily, monthly, yearly rates and billing cycles
+
+#### 6.4.3.2. VPS Infrastructure (Modern API)
+- **Server Specifications**: CPU cores, RAM, disk space, IP addresses
+- **Software Information**: Installed applications, versions, configurations
+- **Admin Credentials**: SSH access, application admin details (n8n, etc.)
+- **Cost Breakdown**: Per-VPS daily and monthly costs
+- **Status Monitoring**: Server status, uptime, performance metrics
+
+#### 6.4.3.3. Additional Resources (Legacy API)
+- **Domain Management**: Domain list, DNS configuration, SSL certificates
+- **Database Services**: MySQL databases, users, permissions
+- **FTP Services**: FTP accounts, access permissions, storage quotas
+- **Email Services**: Email accounts, mailboxes, forwarding rules
+
+### 6.4.4. Sync Process Implementation
+
+#### 6.4.4.1. Dual-Endpoint Sync Flow
+1. **Authentication**: JWT Bearer token for modern endpoints, username/password for legacy
+2. **Account Sync**: Fetch account information and domain list
+3. **VPS Sync**: Retrieve VPS server details and specifications
+4. **Additional Resources**: Collect databases, FTP, and email accounts
+5. **Error Handling**: Separate error tracking for each endpoint
+6. **Data Processing**: Normalize and store all collected data
+
+#### 6.4.4.2. Error Handling Strategy
+- **Independent Failures**: One endpoint failure doesn't break others
+- **Detailed Error Reporting**: Specific error messages for each endpoint
+- **Partial Success**: System continues with available data
+- **Graceful Degradation**: Fallback to available endpoints
+
+### 6.4.5. Technical Implementation
+
+#### 6.4.5.1. BegetAPIClient Enhancements
+- **`get_vps_servers_new_api()`**: Modern VPS API integration
+- **`_process_vps_servers_new_api()`**: VPS data processing with admin credentials
+- **`sync_resources()`**: Dual-endpoint orchestration with separate error handling
+- **Hybrid Authentication**: Support for both JWT and legacy authentication
+
+#### 6.4.5.2. SyncService Updates
+- **`_process_dual_endpoint_sync()`**: Dual-endpoint result processing
+- **`_process_vps_servers()`**: VPS-specific resource management
+- **Error Isolation**: Separate error handling for each endpoint
+- **Resource Processing**: Comprehensive resource creation and updates
+
+#### 6.4.5.3. Data Storage
+- **Resource Registry**: Universal resource storage for all Beget services
+- **VPS Resources**: Detailed VPS specifications and admin credentials
+- **Account Metadata**: Complete account information and service limits
+- **Cost Tracking**: Daily and monthly cost baselines for FinOps analysis
+
+### 6.4.6. FinOps Benefits
+
+#### 6.4.6.1. Comprehensive Cost Visibility
+- **VPS Costs**: Per-server daily and monthly costs
+- **Account Costs**: Subscription and service costs
+- **Total Infrastructure**: Complete cost overview across all services
+- **Cost Optimization**: Right-sizing recommendations based on usage
+
+#### 6.4.6.2. Infrastructure Management
+- **VPS Monitoring**: Server specifications and performance
+- **Service Limits**: Usage vs capacity across all services
+- **Admin Access**: SSH and application credentials for management
+- **Resource Lifecycle**: Complete resource tracking and management
+
+#### 6.4.6.3. Operational Insights
+- **Server Health**: Performance metrics and uptime tracking
+- **Software Management**: Application versions and configurations
+- **Access Control**: SSH and admin access management
+- **Cost Analysis**: Detailed cost breakdown and optimization opportunities
+
+### 6.4.7. Integration Results
+
+#### 6.4.7.1. Successful Endpoints
+- **Account Information**: ✅ Complete account details and service limits
+- **Domain Management**: ✅ Domain list and configuration
+- **VPS Infrastructure**: ✅ Server specifications and admin credentials
+
+#### 6.4.7.2. Restricted Endpoints
+- **MySQL Management**: ❌ "Cannot access method mysql" (permissions)
+- **FTP Management**: ❌ "Cannot access method ftp" (permissions)
+
+#### 6.4.7.3. Overall Performance
+- **Status**: Partial success with comprehensive coverage
+- **Resources Processed**: Account info + VPS instances + domains
+- **Error Handling**: Graceful degradation with detailed error reporting
+- **Cost Tracking**: Complete cost visibility across all accessible services
+
+### 6.4.8. Future Enhancements
+
+#### 6.4.8.1. Additional Endpoints
+- **Logs Access**: System and application logs
+- **Monitoring Data**: Performance metrics and alerts
+- **Backup Management**: Backup status and recovery options
+- **Security Monitoring**: Access logs and security events
+
+#### 6.4.8.2. Enhanced Features
+- **Real-time Monitoring**: Live server status and performance
+- **Automated Alerts**: Cost and performance threshold alerts
+- **Resource Optimization**: AI-powered right-sizing recommendations
+- **Cost Forecasting**: Predictive cost analysis and budgeting
+- **Multi-cloud**: Unified account information view
 - **Reporting**: Account information reports
 - **API Access**: Programmatic account information access
 

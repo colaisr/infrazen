@@ -199,7 +199,9 @@ def sync_connection(provider_id):
                 'success': True, 
                 'message': sync_result['message'],
                 'snapshot_id': sync_result['snapshot_id'],
-                'sync_result': sync_result['sync_result']
+                'status': sync_result['status'],
+                'total_resources': sync_result['total_resources'],
+                'errors': sync_result['errors']
             })
         else:
             return jsonify({'success': False, 'error': sync_result['error']}), 500

@@ -57,9 +57,9 @@ class SyncService:
         return snapshot
     
     def sync_resources(self, sync_type: str = 'manual') -> Dict:
-        """Perform comprehensive resource synchronization"""
+        """Perform comprehensive resource synchronization with dual endpoints"""
         try:
-            logger.info(f"Starting sync for provider {self.provider_id}")
+            logger.info(f"Starting dual-endpoint sync for provider {self.provider_id}")
             
             # Create sync snapshot
             snapshot = self.create_sync_snapshot(sync_type)
@@ -70,52 +70,231 @@ class SyncService:
                 db.session.commit()
                 return {'success': False, 'error': 'Authentication failed'}
             
-            # Get account information for connection enrichment
-            account_info = self.client.get_detailed_account_info()
-            if account_info.get('status') != 'error':
-                self._update_provider_metadata(account_info)
+            # Use the new dual-endpoint sync method
+            sync_result = self.client.sync_resources()
             
-            # Get all resources from provider
-            resources_data = self.client.get_all_resources()
-            
-            # Process and store resources
-            sync_result = self._process_resources(snapshot, resources_data)
-            
-            # Update snapshot with results
-            self._update_snapshot_stats(snapshot, sync_result)
-            
-            # Mark sync as completed
-            snapshot.mark_completed('success')
-            
-            # Update provider sync status
-            self.provider.last_sync = datetime.utcnow()
-            self.provider.sync_status = 'success'
-            self.provider.sync_error = None
-            
-            db.session.commit()
-            
-            logger.info(f"Sync completed successfully for provider {self.provider_id}")
-            return {
-                'success': True,
-                'snapshot_id': snapshot.id,
-                'sync_result': sync_result,
-                'message': f'Successfully synced {sync_result["total_resources"]} resources'
-            }
+            # Process the sync result with separate error handling
+            return self._process_dual_endpoint_sync(sync_result, snapshot)
             
         except Exception as e:
             logger.error(f"Sync failed for provider {self.provider_id}: {e}")
-            
-            # Update snapshot with error
             if 'snapshot' in locals():
                 snapshot.mark_completed('error', str(e))
                 db.session.commit()
+            return {'success': False, 'error': str(e)}
+    
+    def _process_dual_endpoint_sync(self, sync_result: Dict, snapshot: SyncSnapshot) -> Dict:
+        """Process sync result from dual endpoints with separate error handling"""
+        try:
+            logger.info("Processing dual-endpoint sync result")
+            
+            sync_errors = []
+            total_resources = 0
+            
+            # Process Account Sync
+            if sync_result.get('account_sync', {}).get('status') == 'success':
+                logger.info("Processing account sync data")
+                account_data = sync_result['account_sync']
+                
+                # Update provider metadata with account info
+                if 'account_info' in account_data:
+                    self._update_provider_metadata(account_data['account_info'])
+                
+                # Process domains
+                if 'domains' in account_data:
+                    domain_count = self._process_domains(snapshot, account_data['domains'])
+                    total_resources += domain_count
+                    logger.info(f"Processed {domain_count} domains from account sync")
+                else:
+                    logger.warning("No domains data in account sync")
+            else:
+                error_msg = sync_result.get('account_sync', {}).get('error', 'Account sync failed')
+                sync_errors.append(f"Account sync: {error_msg}")
+                logger.error(f"Account sync failed: {error_msg}")
+            
+            # Process VPS Sync
+            if sync_result.get('vps_sync', {}).get('status') == 'success':
+                logger.info("Processing VPS sync data")
+                vps_data = sync_result['vps_sync']
+                
+                # Process VPS servers
+                if 'vps_servers' in vps_data:
+                    vps_count = self._process_vps_servers(snapshot, vps_data['vps_servers'])
+                    total_resources += vps_count
+                    logger.info(f"Processed {vps_count} VPS servers from VPS sync")
+                else:
+                    logger.warning("No VPS servers data in VPS sync")
+            else:
+                error_msg = sync_result.get('vps_sync', {}).get('error', 'VPS sync failed')
+                sync_errors.append(f"VPS sync: {error_msg}")
+                logger.error(f"VPS sync failed: {error_msg}")
+            
+            # Process Additional Resources Sync
+            if sync_result.get('domains_sync', {}).get('status') == 'success':
+                logger.info("Processing additional resources sync data")
+                additional_data = sync_result['domains_sync']
+                
+                # Process databases, FTP, email accounts (if available and methods exist)
+                additional_count = 0
+                if 'databases' in additional_data and hasattr(self, '_process_databases'):
+                    try:
+                        additional_count += self._process_databases(snapshot, additional_data['databases'])
+                    except Exception as e:
+                        logger.warning(f"Database processing not available: {e}")
+                elif 'databases' in additional_data:
+                    logger.info("Database processing skipped - method not implemented")
+                
+                if 'ftp_accounts' in additional_data and hasattr(self, '_process_ftp_accounts'):
+                    try:
+                        additional_count += self._process_ftp_accounts(snapshot, additional_data['ftp_accounts'])
+                    except Exception as e:
+                        logger.warning(f"FTP processing not available: {e}")
+                elif 'ftp_accounts' in additional_data:
+                    logger.info("FTP processing skipped - method not implemented")
+                
+                if 'email_accounts' in additional_data and hasattr(self, '_process_email_accounts'):
+                    try:
+                        additional_count += self._process_email_accounts(snapshot, additional_data['email_accounts'])
+                    except Exception as e:
+                        logger.warning(f"Email processing not available: {e}")
+                elif 'email_accounts' in additional_data:
+                    logger.info("Email processing skipped - method not implemented")
+                
+                total_resources += additional_count
+                logger.info(f"Processed {additional_count} additional resources")
+            else:
+                error_msg = sync_result.get('domains_sync', {}).get('error', 'Additional resources sync failed')
+                sync_errors.append(f"Additional resources sync: {error_msg}")
+                logger.error(f"Additional resources sync failed: {error_msg}")
+            
+            # Determine overall sync status
+            if sync_errors:
+                sync_status = 'partial_success' if total_resources > 0 else 'error'
+                sync_message = f'Sync completed with {len(sync_errors)} errors: {total_resources} resources processed'
+            else:
+                sync_status = 'success'
+                sync_message = f'Sync completed successfully: {total_resources} resources processed'
+            
+            # Update snapshot with results
+            snapshot.mark_completed(sync_status, sync_message)
             
             # Update provider sync status
-            self.provider.sync_status = 'error'
-            self.provider.sync_error = str(e)
+            self.provider.last_sync = datetime.utcnow()
+            self.provider.sync_status = sync_status
+            if sync_errors:
+                self.provider.sync_error = '; '.join(sync_errors)
+            else:
+                self.provider.sync_error = None
+            
             db.session.commit()
             
-            return {'success': False, 'error': str(e)}
+            logger.info(f"Sync completed: {sync_status}, {total_resources} resources, {len(sync_errors)} errors")
+            
+            return {
+                'success': sync_status in ['success', 'partial_success'],
+                'status': sync_status,
+                'message': sync_message,
+                'total_resources': total_resources,
+                'errors': sync_errors,
+                'snapshot_id': snapshot.id
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing dual-endpoint sync: {e}")
+            snapshot.mark_completed('error', f'Processing failed: {str(e)}')
+            db.session.commit()
+            return {'success': False, 'error': f'Processing failed: {str(e)}'}
+    
+    def _process_vps_servers(self, snapshot: SyncSnapshot, vps_servers: List[Dict]) -> int:
+        """Process VPS servers from new API"""
+        processed_count = 0
+        
+        for vps in vps_servers:
+            try:
+                # Create or update VPS resource
+                resource = self._create_or_update_resource(
+                    resource_id=vps.get('id'),
+                    resource_name=vps.get('name'),
+                    resource_type='VPS',
+                    service_name='Compute',
+                    region=vps.get('region', 'unknown'),
+                    status=vps.get('status', 'unknown'),
+                    provider_config=vps
+                )
+                
+                # Set cost information
+                if vps.get('daily_cost'):
+                    resource.set_daily_cost_baseline(
+                        original_cost=vps.get('daily_cost'),
+                        period='daily',
+                        frequency='recurring'
+                    )
+                
+                # Add VPS-specific tags
+                self._add_resource_tags(resource, {
+                    'vps_id': vps.get('id'),
+                    'ip_address': vps.get('ip_address'),
+                    'hostname': vps.get('hostname'),
+                    'cpu_cores': str(vps.get('cpu_cores', 0)),
+                    'ram_mb': str(vps.get('ram_mb', 0)),
+                    'disk_gb': str(vps.get('disk_gb', 0)),
+                    'software': vps.get('software', ''),
+                    'software_version': vps.get('software_version', ''),
+                    'ssh_access': str(vps.get('ssh_access_allowed', False))
+                })
+                
+                # Create resource state
+                self._create_resource_state(snapshot, resource, vps)
+                
+                processed_count += 1
+                logger.debug(f"Processed VPS: {vps.get('name')}")
+                
+            except Exception as e:
+                logger.error(f"Error processing VPS {vps.get('name', 'unknown')}: {e}")
+                continue
+        
+        return processed_count
+    
+    def _process_domains(self, snapshot: SyncSnapshot, domains: List[Dict]) -> int:
+        """Process domains from account sync"""
+        processed_count = 0
+        
+        for domain in domains:
+            try:
+                # Get domain name from the correct field
+                domain_name = domain.get('name', domain.get('domain', domain.get('fqdn', 'unknown')))
+                
+                # Create or update domain resource
+                resource = self._create_or_update_resource(
+                    resource_id=domain.get('id', domain_name),
+                    resource_name=domain_name,
+                    resource_type='Domain',
+                    service_name='DNS',
+                    region='global',
+                    status=domain.get('status', 'active'),
+                    provider_config=domain
+                )
+                
+                # Add domain-specific tags
+                self._add_resource_tags(resource, {
+                    'domain_name': domain_name,
+                    'domain_id': domain.get('id'),
+                    'status': domain.get('status', 'active'),
+                    'expiry_date': domain.get('expiry_date', ''),
+                    'auto_renew': str(domain.get('auto_renew', False))
+                })
+                
+                # Create resource state
+                self._create_resource_state(snapshot, resource, domain)
+                
+                processed_count += 1
+                logger.debug(f"Processed domain: {domain.get('domain')}")
+                
+            except Exception as e:
+                logger.error(f"Error processing domain {domain.get('domain', 'unknown')}: {e}")
+                continue
+        
+        return processed_count
     
     def _process_resources(self, snapshot: SyncSnapshot, resources_data: Dict) -> Dict:
         """Process and store resources from provider data"""
@@ -422,6 +601,69 @@ class SyncService:
         snapshot.total_monthly_cost = sync_result['total_monthly_cost']
         snapshot.set_total_resources_by_type(sync_result['resources_by_type'])
         snapshot.set_total_resources_by_status(sync_result['resources_by_status'])
+    
+    def _create_or_update_resource(self, resource_id: str, resource_name: str, resource_type: str, 
+                                  service_name: str, region: str, status: str, provider_config: Dict) -> Resource:
+        """Create or update a resource"""
+        # Serialize provider_config to JSON string
+        import json
+        provider_config_json = json.dumps(provider_config) if provider_config else None
+        
+        # Check if resource already exists
+        existing_resource = Resource.query.filter_by(
+            provider_id=self.provider_id,
+            resource_id=resource_id,
+            resource_type=resource_type
+        ).first()
+        
+        if existing_resource:
+            # Update existing resource
+            existing_resource.resource_name = resource_name
+            existing_resource.service_name = service_name
+            existing_resource.region = region
+            existing_resource.status = status
+            existing_resource.provider_config = provider_config_json
+            existing_resource.updated_at = datetime.utcnow()
+            return existing_resource
+        else:
+            # Create new resource
+            new_resource = Resource(
+                provider_id=self.provider_id,
+                resource_id=resource_id,
+                resource_name=resource_name,
+                resource_type=resource_type,
+                service_name=service_name,
+                region=region,
+                status=status,
+                provider_config=provider_config_json
+            )
+            db.session.add(new_resource)
+            return new_resource
+    
+    def _add_resource_tags(self, resource: Resource, tags: Dict):
+        """Add tags to a resource"""
+        for key, value in tags.items():
+            if value:  # Only add non-empty tags
+                resource.add_tag(key, str(value))
+    
+    def _create_resource_state(self, snapshot: SyncSnapshot, resource: Resource, data: Dict):
+        """Create a resource state for tracking changes"""
+        # Serialize data to JSON string
+        import json
+        data_json = json.dumps(data) if data else None
+        
+        resource_state = ResourceState(
+            sync_snapshot_id=snapshot.id,
+            resource_id=resource.id,
+            provider_resource_id=resource.resource_id,
+            resource_type=resource.resource_type,
+            resource_name=resource.resource_name,
+            state_action='created',
+            status=resource.status,
+            cost=resource.effective_cost,
+            provider_config=data_json
+        )
+        db.session.add(resource_state)
     
     def get_sync_history(self, limit: int = 10) -> List[Dict]:
         """Get sync history for this provider"""

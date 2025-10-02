@@ -990,46 +990,211 @@ class BegetAPIClient:
             'cost_per_domain': total_domain_cost / total_domains if total_domains > 0 else 0
         }
     
-    def sync_resources(self) -> Dict:
-        """Comprehensive sync of all resources with Beget API"""
+    def get_vps_servers_new_api(self) -> List[Dict]:
+        """Get VPS servers using the new VPS API endpoint"""
         try:
-            logger.info("Starting comprehensive Beget resource sync")
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'InfraZen/1.0',
+                'Accept': 'application/json, text/plain, */*'
+            }
+            
+            url = f"{self.api_url}/v1/vps/server/list"
+            
+            logger.info(f"Fetching VPS servers from new API: {url}")
+            
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved VPS servers from new API")
+                
+                if 'vps' in result:
+                    return self._process_vps_servers_new_api(result['vps'])
+                else:
+                    logger.warning(f"Unexpected VPS API response format: {result}")
+                    return []
+                    
+            except Exception as e:
+                logger.error(f"VPS API failed: {e}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"Failed to get VPS servers from new API: {e}")
+            return []
+    
+    def _process_vps_servers_new_api(self, vps_servers: List[Dict]) -> List[Dict]:
+        """Process VPS servers data from new API"""
+        processed_servers = []
+        
+        for vps in vps_servers:
+            config = vps.get('configuration', {})
+            software = vps.get('software', {})
+            
+            # Extract admin credentials if available
+            admin_credentials = {}
+            if 'field_value' in software:
+                for field in software['field_value']:
+                    if field.get('variable') == 'beget_n8n_password':
+                        admin_credentials['admin_password'] = field.get('value', '')
+                    elif field.get('variable') == 'beget_email':
+                        admin_credentials['admin_email'] = field.get('value', '')
+            
+            processed_servers.append({
+                'id': vps.get('id'),
+                'name': vps.get('display_name', vps.get('hostname')),
+                'status': vps.get('status', 'unknown'),
+                'ip_address': vps.get('ip_address'),
+                'hostname': vps.get('hostname'),
+                'region': vps.get('region', 'unknown'),
+                'cpu_cores': config.get('cpu_count', 0),
+                'ram_mb': config.get('memory', 0),
+                'disk_gb': config.get('disk_size', 0) / 1024 if config.get('disk_size') else 0,  # Convert MB to GB
+                'disk_used_gb': int(vps.get('disk_used', 0)) / 1024 if vps.get('disk_used') else 0,
+                'disk_left_gb': int(vps.get('disk_left', 0)) / 1024 if vps.get('disk_left') else 0,
+                'bandwidth_gb': config.get('bandwidth_public', 0),
+                'location': vps.get('region', 'Unknown'),
+                'created_at': vps.get('date_create'),
+                'monthly_cost': config.get('price_month', 0),
+                'daily_cost': config.get('price_day', 0),
+                'currency': 'RUB',
+                'type': 'vps',
+                'software': software.get('display_name', 'Unknown'),
+                'software_version': software.get('version', 'Unknown'),
+                'software_url': software.get('address', ''),
+                'admin_credentials': admin_credentials,
+                'ssh_access_allowed': vps.get('beget_ssh_access_allowed', False),
+                'manage_enabled': vps.get('manage_enabled', False),
+                'description': vps.get('description', ''),
+                'technical_domain': vps.get('technical_domain', ''),
+                'software_domain': vps.get('software_domain', '')
+            })
+        
+        return processed_servers
+
+    def sync_resources(self) -> Dict:
+        """Comprehensive sync of all resources with Beget API using both endpoints"""
+        try:
+            logger.info("Starting comprehensive Beget resource sync with dual endpoints")
             
             # Authenticate first
             if not self.authenticate():
                 raise BegetAPIError("Failed to authenticate for sync")
             
-            # Get comprehensive data
-            resources = self.get_all_resources()
-            
-            # Calculate sync statistics
-            total_resources = (
-                len(resources.get('vps_servers', [])) +  # Include VPS servers
-                len(resources.get('domains', [])) +
-                len(resources.get('databases', [])) +
-                len(resources.get('ftp_accounts', [])) +
-                len(resources.get('email_accounts', []))
-            )
-            
             sync_result = {
                 'status': 'success',
-                'message': f'Successfully synced {total_resources} resources from Beget',
+                'message': 'Successfully synced resources from Beget',
                 'sync_timestamp': datetime.now().isoformat(),
-                'resource_counts': resources.get('resource_counts', {}),
-                'total_monthly_cost': resources.get('total_monthly_cost', 0),
-                'account_info': resources.get('account_info', {}),
-                'billing_info': resources.get('billing_info', {}),
-                'usage_stats': resources.get('usage_stats', {}),
-                'resources': {
-                    'vps_servers': resources.get('vps_servers', []),  # Include VPS servers
-                    'domains': resources.get('domains', []),
-                    'databases': resources.get('databases', []),
-                    'ftp_accounts': resources.get('ftp_accounts', []),
-                    'email_accounts': resources.get('email_accounts', [])
-                }
+                'account_sync': {'status': 'pending'},
+                'vps_sync': {'status': 'pending'},
+                'domains_sync': {'status': 'pending'},
+                'resources': {},
+                'errors': []
             }
             
-            logger.info(f"Sync completed successfully: {total_resources} resources")
+            # Sync 1: Account Information (existing endpoint)
+            try:
+                logger.info("Syncing account information...")
+                account_info = self.get_detailed_account_info()
+                domains = self.get_domains()
+                
+                sync_result['account_sync'] = {
+                    'status': 'success',
+                    'account_info': account_info,
+                    'domains': domains,
+                    'domains_count': len(domains)
+                }
+                sync_result['resources']['account_info'] = account_info
+                sync_result['resources']['domains'] = domains
+                
+                logger.info(f"Account sync successful: {len(domains)} domains")
+                
+            except Exception as e:
+                error_msg = f"Account sync failed: {str(e)}"
+                logger.error(error_msg)
+                sync_result['account_sync'] = {'status': 'error', 'error': error_msg}
+                sync_result['errors'].append(error_msg)
+            
+            # Sync 2: VPS Information (new endpoint)
+            try:
+                logger.info("Syncing VPS information...")
+                vps_servers = self.get_vps_servers_new_api()
+                
+                sync_result['vps_sync'] = {
+                    'status': 'success',
+                    'vps_servers': vps_servers,
+                    'vps_count': len(vps_servers)
+                }
+                sync_result['resources']['vps_servers'] = vps_servers
+                
+                # Calculate VPS costs
+                total_daily_cost = sum(vps.get('daily_cost', 0) for vps in vps_servers)
+                total_monthly_cost = sum(vps.get('monthly_cost', 0) for vps in vps_servers)
+                
+                sync_result['vps_sync']['total_daily_cost'] = total_daily_cost
+                sync_result['vps_sync']['total_monthly_cost'] = total_monthly_cost
+                
+                logger.info(f"VPS sync successful: {len(vps_servers)} VPS instances, {total_daily_cost} RUB/day")
+                
+            except Exception as e:
+                error_msg = f"VPS sync failed: {str(e)}"
+                logger.error(error_msg)
+                sync_result['vps_sync'] = {'status': 'error', 'error': error_msg}
+                sync_result['errors'].append(error_msg)
+            
+            # Sync 3: Additional resources (existing endpoints)
+            try:
+                logger.info("Syncing additional resources...")
+                databases = self.get_databases()
+                ftp_accounts = self.get_ftp_accounts()
+                email_accounts = self.get_email_accounts()
+                
+                sync_result['domains_sync'] = {
+                    'status': 'success',
+                    'databases': databases,
+                    'ftp_accounts': ftp_accounts,
+                    'email_accounts': email_accounts,
+                    'databases_count': len(databases),
+                    'ftp_count': len(ftp_accounts),
+                    'email_count': len(email_accounts)
+                }
+                sync_result['resources']['databases'] = databases
+                sync_result['resources']['ftp_accounts'] = ftp_accounts
+                sync_result['resources']['email_accounts'] = email_accounts
+                
+                logger.info(f"Additional resources sync successful: {len(databases)} databases, {len(ftp_accounts)} FTP, {len(email_accounts)} email")
+                
+            except Exception as e:
+                error_msg = f"Additional resources sync failed: {str(e)}"
+                logger.error(error_msg)
+                sync_result['domains_sync'] = {'status': 'error', 'error': error_msg}
+                sync_result['errors'].append(error_msg)
+            
+            # Calculate overall statistics
+            total_resources = (
+                len(sync_result['resources'].get('vps_servers', [])) +
+                len(sync_result['resources'].get('domains', [])) +
+                len(sync_result['resources'].get('databases', [])) +
+                len(sync_result['resources'].get('ftp_accounts', [])) +
+                len(sync_result['resources'].get('email_accounts', []))
+            )
+            
+            sync_result['total_resources'] = total_resources
+            sync_result['message'] = f'Successfully synced {total_resources} resources from Beget'
+            
+            # Determine overall status
+            if sync_result['errors']:
+                sync_result['status'] = 'partial_success'
+                sync_result['message'] += f' (with {len(sync_result["errors"])} errors)'
+            else:
+                sync_result['status'] = 'success'
+            
+            logger.info(f"Sync completed: {total_resources} resources, {len(sync_result['errors'])} errors")
             return sync_result
             
         except Exception as e:

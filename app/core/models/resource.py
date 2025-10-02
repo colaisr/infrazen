@@ -8,6 +8,7 @@ from .base import BaseModel
 class Resource(BaseModel):
     """Universal resource registry with core properties"""
     __tablename__ = 'resources'
+    __table_args__ = {'extend_existing': True}
     
     # Provider relationship
     provider_id = db.Column(db.Integer, db.ForeignKey('cloud_providers.id'), nullable=False, index=True)
@@ -123,6 +124,28 @@ class Resource(BaseModel):
         self.cost_period = period
         self.cost_frequency = frequency
         self.daily_cost = self.normalize_to_daily_cost(original_cost, period, frequency)
+    
+    def add_tag(self, key: str, value: str):
+        """Add a tag to this resource"""
+        from app.core.models.tags import ResourceTag
+        
+        # Check if tag already exists
+        existing_tag = ResourceTag.query.filter_by(
+            resource_id=self.id,
+            tag_key=key
+        ).first()
+        
+        if existing_tag:
+            # Update existing tag
+            existing_tag.tag_value = value
+        else:
+            # Create new tag
+            new_tag = ResourceTag(
+                resource_id=self.id,
+                tag_key=key,
+                tag_value=value
+            )
+            db.session.add(new_tag)
     
     def to_dict(self):
         """Convert resource to dictionary"""
