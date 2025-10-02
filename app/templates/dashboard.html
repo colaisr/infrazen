@@ -95,17 +95,28 @@
             {% for p in overview.providers %}
             <article class="provider-card">
                 <header class="provider-header">
-                    <span class="provider-badge">{{ p.code | upper }}</span>
+                    <span class="provider-badge {{ p.code | lower }}">{{ p.code | upper }}</span>
                     <span class="provider-name">{{ p.name }}</span>
                 </header>
                 <div class="provider-connection {% if p.status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
                     <span class="status-indicator"></span>
                     {% if p.status == 'connected' %}Подключен{% else %}Отключен{% endif %}
                 </div>
-                <div class="provider-status">Добавлен: {{ p.added_at }}</div>
+                <div class="provider-info">
+                    <div class="provider-date">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <span>Добавлен: {{ p.added_at }}</span>
+                    </div>
+                    <div class="provider-sync">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>Синхронизация: {{ p.last_sync or 'Никогда' }}</span>
+                    </div>
+                </div>
                 <div class="provider-actions">
-                    <button class="icon-button"><i class="fa-solid fa-gear"></i></button>
-                    <button class="icon-button icon-danger"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-outline btn-sm sync-btn" onclick="syncProvider('{{ p.id }}')">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>Синхронизировать</span>
+                    </button>
                 </div>
             </article>
             {% endfor %}
@@ -318,4 +329,172 @@
         {% endif %}
     </section>
 </div>
+
+<style>
+/* Provider Info Layout */
+.provider-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.provider-date,
+.provider-sync {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.provider-date i,
+.provider-sync i {
+    color: var(--primary-blue);
+    width: 14px;
+    text-align: center;
+}
+
+.provider-sync {
+    color: var(--text-primary);
+}
+
+.provider-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+}
+
+.sync-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.sync-btn:hover {
+    background: var(--primary-blue);
+    color: white;
+    border-color: var(--primary-blue);
+}
+
+.sync-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.sync-btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.sync-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Provider badge colors */
+.provider-badge.beget {
+    background: #8B4513;
+    color: white;
+}
+
+.provider-badge.aws {
+    background: #FF9900;
+    color: white;
+}
+
+.provider-badge.azure {
+    background: #0078D4;
+    color: white;
+}
+
+.provider-badge.gcp {
+    background: #4285F4;
+    color: white;
+}
+
+.provider-badge.vk-cloud {
+    background: #4CAF50;
+    color: white;
+}
+</style>
+
+<script>
+function syncProvider(providerId) {
+    const button = event.target.closest('.sync-btn');
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.disabled = true;
+    button.classList.add('loading');
+    button.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i><span>Синхронизация...</span>';
+    
+    // Simulate sync API call
+    fetch(`/api/providers/beget/sync`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider_id: providerId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success state
+            button.innerHTML = '<i class="fa-solid fa-check"></i><span>Синхронизировано</span>';
+            button.style.background = 'var(--success-green)';
+            button.style.border-color = 'var(--success-green)';
+            button.style.color = 'white';
+            
+            // Reset after 2 seconds
+            setTimeout(() => {
+                button.disabled = false;
+                button.classList.remove('loading');
+                button.innerHTML = originalText;
+                button.style.background = '';
+                button.style.border-color = '';
+                button.style.color = '';
+            }, 2000);
+        } else {
+            throw new Error(data.error || 'Sync failed');
+        }
+    })
+    .catch(error => {
+        console.error('Sync error:', error);
+        
+        // Show error state
+        button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span>Ошибка</span>';
+        button.style.background = 'var(--error-red)';
+        button.style.border-color = 'var(--error-red)';
+        button.style.color = 'white';
+        
+        // Reset after 3 seconds
+        setTimeout(() => {
+            button.disabled = false;
+            button.classList.remove('loading');
+            button.innerHTML = originalText;
+            button.style.background = '';
+            button.style.border-color = '';
+            button.style.color = '';
+        }, 3000);
+    });
+}
+</script>
 {% endblock %}

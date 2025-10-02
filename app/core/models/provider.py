@@ -40,7 +40,8 @@ class CloudProvider(BaseModel):
     # Constraints
     __table_args__ = (
         db.UniqueConstraint('user_id', 'connection_name', name='unique_user_connection'),
-        db.UniqueConstraint('user_id', 'provider_type', 'account_id', name='unique_user_provider_account'),
+        # Removed the constraint that prevents multiple connections with same provider/account
+        # This allows multiple Beget connections with different names but same account
     )
     
     def get_credentials(self):

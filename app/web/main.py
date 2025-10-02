@@ -306,6 +306,18 @@ def get_real_user_overview(user_id):
         'network': {'used_tb': 2, 'limit_tb': 10, 'percent': 20}
     }
     
+    # Format providers for dashboard display
+    formatted_providers = []
+    for provider in providers:
+        formatted_providers.append({
+            'id': provider.id,
+            'code': provider.provider_type,
+            'name': provider.connection_name,
+            'status': 'connected' if provider.is_active else 'disconnected',
+            'added_at': provider.created_at.strftime('%d.%m.%Y') if provider.created_at else 'Неизвестно',
+            'last_sync': provider.last_sync.strftime('%d.%m.%Y %H:%M') if provider.last_sync else 'Никогда'
+        })
+    
     return {
         'kpis': {
             'total_expenses_rub': total_expenses_rub,
@@ -313,7 +325,7 @@ def get_real_user_overview(user_id):
             'active_resources': active_resources,
             'connected_providers': total_connections
         },
-        'providers': [p.to_dict() for p in providers], # Convert to dict for template
+        'providers': formatted_providers,
         'trend': trend,
         'resources': [], # Resources are fetched separately
         'recommendations': [], # Recommendations are fetched separately
