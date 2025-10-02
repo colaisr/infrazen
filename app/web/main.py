@@ -135,11 +135,14 @@ def resources():
         try:
             resources = get_real_user_resources(user['id'])
             providers = get_real_user_providers(user['id'])
+            # Get latest snapshot metadata for performance data
+            snapshot_metadata = get_latest_snapshot_metadata(user['id'])
         except Exception as e:
             print(f"Error loading resources: {e}")
             # Fallback to empty data
             resources = []
             providers = []
+            snapshot_metadata = {}
     
     return render_template('resources.html', 
                         user=user,
@@ -148,6 +151,7 @@ def resources():
                         page_subtitle='Обзор всех облачных ресурсов',
                         resources=resources,
                         providers=providers,
+                        snapshot_metadata=snapshot_metadata,
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/analytics')
@@ -338,41 +342,32 @@ def get_real_user_overview(user_id):
     }
 
 def get_real_user_resources(user_id):
-    """Get resources for a real user from database using unified models - only from latest sync"""
+    """Get resources for a real user from database - prioritize resources with performance data"""
     from app.core.models.sync import SyncSnapshot
     
     providers = CloudProvider.query.filter_by(user_id=user_id).all()
     all_resources = []
     
     for provider in providers:
-        if provider.last_sync:
-            # Get the latest successful sync snapshot for this provider
-            latest_snapshot = SyncSnapshot.query.filter(
-                SyncSnapshot.provider_id == provider.id,
-                SyncSnapshot.sync_status == 'success'
-            ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+        # Get all resources for this provider
+        provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+        
+        # Separate resources with and without performance data
+        resources_with_performance = []
+        resources_without_performance = []
+        
+        for resource in provider_resources:
+            tags = resource.get_all_tags()
+            has_performance = 'cpu_avg_usage' in tags or 'memory_avg_usage_mb' in tags
             
-            if latest_snapshot:
-                # Get resources that were part of the latest sync
-                from app.core.models.sync import ResourceState
-                resource_states = ResourceState.query.filter_by(
-                    sync_snapshot_id=latest_snapshot.id
-                ).all()
-                
-                # Get the actual Resource objects, excluding deleted resources
-                resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id and rs.state_action != 'deleted']
-                if resource_ids:
-                    resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
-                    all_resources.extend(resources)
-                else:
-                    # If no resource states found, get all resources directly
-                    all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
+            if has_performance:
+                resources_with_performance.append(resource)
             else:
-                # Fallback: get all resources if no sync snapshot found
-                all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
-        else:
-            # If no sync yet, get all resources (for new providers)
-            all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
+                resources_without_performance.append(resource)
+        
+        # Add performance resources first, then others
+        all_resources.extend(resources_with_performance)
+        all_resources.extend(resources_without_performance)
     
     return all_resources
 
@@ -393,3 +388,33 @@ def get_real_user_providers(user_id):
             'last_sync': provider.last_sync.isoformat() if provider.last_sync else None
         }
     } for provider in providers]
+
+def get_latest_snapshot_metadata(user_id):
+    """Get the latest snapshot metadata for performance data"""
+    from app.core.models.sync import SyncSnapshot
+    import json
+    
+    providers = CloudProvider.query.filter_by(user_id=user_id).all()
+    metadata = {}
+    
+    for provider in providers:
+        if provider.last_sync:
+            # Get the latest successful sync snapshot for this provider
+            latest_snapshot = SyncSnapshot.query.filter(
+                SyncSnapshot.provider_id == provider.id,
+                SyncSnapshot.sync_status == 'success'
+            ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+            
+            if latest_snapshot and latest_snapshot.metadata:
+                # Ensure metadata is JSON serializable by converting to dict
+                try:
+                    # Convert to JSON and back to ensure serialization
+                    json_str = json.dumps(latest_snapshot.metadata, default=str)
+                    clean_metadata = json.loads(json_str)
+                    metadata[provider.id] = clean_metadata
+                except (TypeError, ValueError) as e:
+                    print(f"Warning: Could not serialize metadata for provider {provider.id}: {e}")
+                    # Fallback to empty dict
+                    metadata[provider.id] = {}
+    
+    return metadata

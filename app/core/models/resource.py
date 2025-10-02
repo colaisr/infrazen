@@ -147,6 +147,24 @@ class Resource(BaseModel):
             )
             db.session.add(new_tag)
     
+    def get_tag(self, key: str) -> str:
+        """Get a tag value by key"""
+        from app.core.models.tags import ResourceTag
+        
+        tag = ResourceTag.query.filter_by(
+            resource_id=self.id,
+            tag_key=key
+        ).first()
+        
+        return tag.tag_value if tag else None
+    
+    def get_all_tags(self) -> dict:
+        """Get all tags for this resource as a dictionary"""
+        from app.core.models.tags import ResourceTag
+        
+        tags = ResourceTag.query.filter_by(resource_id=self.id).all()
+        return {tag.tag_key: tag.tag_value for tag in tags}
+    
     def to_dict(self):
         """Convert resource to dictionary"""
         return {
