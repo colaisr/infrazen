@@ -38,6 +38,201 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 - **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
 - **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. Google OAuth authentication fully implemented with profile integration. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management.
 
+## 6.1. Multi-Cloud Sync Architecture
+
+### 6.1.1. Sync System Overview
+The InfraZen platform implements a comprehensive multi-cloud synchronization system designed to provide real-time visibility into cloud resources, costs, and utilization across all connected providers. The sync architecture is built on a snapshot-based approach that enables historical analysis, trend tracking, and AI-powered optimization recommendations.
+
+### 6.1.2. Core Sync Components
+
+#### **Sync Models & Database Schema**
+- **`SyncSnapshot`**: Tracks metadata for each sync operation including timing, status, resource counts, and cost totals
+- **`ResourceState`**: Records the state of individual resources during each sync, enabling change detection and historical tracking
+- **`Resource`**: Universal resource registry storing normalized data from all cloud providers
+- **`CloudProvider`**: Provider connection management with credential storage and sync status tracking
+
+#### **Sync Service Architecture**
+- **`SyncService`**: Core orchestration service that manages the entire sync process
+- **Provider Clients**: Specialized API clients for each cloud provider (Beget, Yandex.Cloud, Selectel, AWS, Azure, GCP)
+- **Change Detection**: Automated comparison between current and previous resource states
+- **State Management**: Tracks resource lifecycle (created, updated, deleted, unchanged)
+
+### 6.1.3. Sync Process Flow
+
+#### **Manual Sync Trigger**
+1. User clicks "Синхронизировать" button on connection card
+2. `SyncService` creates new `SyncSnapshot` with "running" status
+3. Provider-specific client authenticates and fetches all resources
+4. Service compares current resources with existing database records
+5. Creates/updates/deletes `Resource` entries as needed
+6. Records `ResourceState` entries for change tracking
+7. Updates `SyncSnapshot` with completion status and statistics
+8. Updates provider's `last_sync` timestamp
+
+#### **Resource Processing Logic**
+- **New Resources**: Create `Resource` entry with provider-specific configuration stored as JSON
+- **Existing Resources**: Compare fields and update if changes detected
+- **Deleted Resources**: Mark as inactive with "deleted" status
+- **Change Detection**: Track cost changes, status changes, and configuration changes
+
+### 6.1.4. Data Normalization & Storage
+
+#### **Universal Resource Schema**
+All cloud resources are normalized into a unified schema regardless of provider:
+- **Core Fields**: `resource_id`, `resource_name`, `resource_type`, `service_name`, `region`, `status`
+- **Financial Data**: `effective_cost`, `currency`, `billing_period`
+- **Business Context**: `business_unit`, `project`, `environment`, `owner`
+- **Provider Config**: JSON storage for provider-specific attributes (IP addresses, hostnames, etc.)
+
+#### **Provider-Specific Data Handling**
+- **Beget**: VPS servers, domains, databases, FTP accounts, email accounts
+- **Yandex.Cloud**: Compute instances, storage, databases, load balancers, networks
+- **Selectel**: Virtual servers, block storage, object storage, CDN, DNS
+- **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
+
+### 6.1.5. Sync Mechanics & Features
+
+#### **Snapshot-Based Architecture**
+- Each sync creates a complete snapshot of the current cloud state
+- Historical snapshots enable trend analysis and cost forecasting
+- Resource state tracking provides detailed change history
+- Enables rollback capabilities and audit trails
+
+#### **Change Detection & Tracking**
+- **Cost Changes**: Track monthly cost fluctuations per resource
+- **Status Changes**: Monitor resource lifecycle (running, stopped, terminated)
+- **Configuration Changes**: Detect infrastructure modifications
+- **Resource Lifecycle**: Track creation, updates, and deletion events
+
+#### **Error Handling & Recovery**
+- Comprehensive error logging and reporting
+- Graceful handling of API failures and rate limits
+- Retry mechanisms for transient failures
+- Detailed error messages for troubleshooting
+
+### 6.1.6. AI Integration & Analytics
+
+#### **Data Preparation for AI Analysis**
+- Normalized resource data enables cross-provider analysis
+- Historical snapshots provide training data for ML models
+- Cost trends and utilization patterns feed optimization algorithms
+- Resource tagging and business context enhance AI insights
+
+#### **Future AI Capabilities**
+- **Cost Optimization**: AI-powered recommendations for resource right-sizing
+- **Anomaly Detection**: ML models for detecting unusual spending patterns
+- **Predictive Analytics**: Forecasting future costs based on historical trends
+- **Automated Tagging**: AI-assisted resource classification and tagging
+
+### 6.1.7. Performance & Scalability
+
+#### **Efficient Data Processing**
+- Batch processing for large resource inventories
+- Incremental sync capabilities for frequent updates
+- Optimized database queries for fast data retrieval
+- Caching mechanisms for frequently accessed data
+
+#### **Scalability Considerations**
+- Horizontal scaling support for multiple sync workers
+- Database partitioning for large datasets
+- API rate limiting and throttling
+- Background job processing for long-running syncs
+
+### 6.1.8. Current Implementation Status
+
+#### **Implemented Components**
+- **Sync Models**: `SyncSnapshot` and `ResourceState` models fully implemented with JSON serialization support
+- **Sync Service**: Core `SyncService` class with comprehensive resource processing logic
+- **Beget Integration**: Complete Beget API client with VPS, domains, databases, FTP, and email resource support
+- **Change Detection**: Automated comparison between current and previous resource states
+- **Error Handling**: Comprehensive error logging and graceful failure handling
+
+#### **Database Schema**
+```sql
+-- Sync Snapshots Table
+CREATE TABLE sync_snapshots (
+    id INTEGER PRIMARY KEY,
+    provider_id INTEGER NOT NULL,
+    sync_type VARCHAR(20) NOT NULL,  -- manual, scheduled
+    sync_status VARCHAR(20) NOT NULL,  -- running, success, error
+    sync_started_at DATETIME NOT NULL,
+    sync_completed_at DATETIME,
+    sync_duration_seconds INTEGER,
+    total_resources_found INTEGER DEFAULT 0,
+    resources_created INTEGER DEFAULT 0,
+    resources_updated INTEGER DEFAULT 0,
+    resources_deleted INTEGER DEFAULT 0,
+    resources_unchanged INTEGER DEFAULT 0,
+    total_monthly_cost FLOAT DEFAULT 0.0,
+    total_resources_by_type TEXT,  -- JSON
+    total_resources_by_status TEXT,  -- JSON
+    error_message TEXT,
+    error_details TEXT,
+    sync_config TEXT  -- JSON
+);
+
+-- Resource States Table
+CREATE TABLE resource_states (
+    id INTEGER PRIMARY KEY,
+    sync_snapshot_id INTEGER NOT NULL,
+    resource_id INTEGER,
+    provider_resource_id VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(100) NOT NULL,
+    resource_name VARCHAR(255) NOT NULL,
+    state_action VARCHAR(20) NOT NULL,  -- created, updated, deleted, unchanged
+    previous_state TEXT,  -- JSON
+    current_state TEXT,  -- JSON
+    changes_detected TEXT,  -- JSON
+    service_name VARCHAR(100),
+    region VARCHAR(100),
+    status VARCHAR(50),
+    effective_cost FLOAT,
+    has_cost_change BOOLEAN DEFAULT FALSE,
+    has_status_change BOOLEAN DEFAULT FALSE,
+    has_config_change BOOLEAN DEFAULT FALSE
+);
+```
+
+#### **API Endpoints**
+- **`POST /api/providers/beget/<provider_id>/sync`**: Manual sync trigger for Beget connections
+- **`GET /api/providers/<provider_id>/sync/status`**: Check sync status and progress
+- **`GET /api/sync/snapshots`**: Retrieve sync history and statistics
+
+#### **Data Flow Implementation**
+1. **User Action**: Click "Синхронизировать" button on connection card
+2. **Route Handler**: `sync_connection()` function in `app/providers/beget/routes.py`
+3. **Service Layer**: `SyncService.sync_resources()` orchestrates the entire process
+4. **Provider Client**: `BegetAPIClient.get_all_resources()` fetches comprehensive resource data
+5. **Data Processing**: Compare, create, update, or delete resources as needed
+6. **State Tracking**: Record `ResourceState` entries for change detection
+7. **Snapshot Completion**: Update `SyncSnapshot` with final statistics and status
+
+#### **JSON Data Handling**
+- **Provider Configuration**: Complex provider-specific data stored as JSON in `Resource.provider_config`
+- **Resource States**: Previous and current states stored as JSON for efficient comparison
+- **Change Detection**: Detailed change information stored as JSON for analysis
+- **Sync Configuration**: Sync parameters and settings stored as JSON for flexibility
+
+### 6.1.9. Future Enhancements
+
+#### **Scheduled Syncs**
+- Cron-based automatic synchronization
+- Configurable sync intervals per provider
+- Background job processing with Celery/Redis
+- Sync queue management and prioritization
+
+#### **Advanced Analytics**
+- Cost trend analysis across multiple snapshots
+- Resource utilization pattern detection
+- Anomaly detection for unusual spending
+- Predictive cost forecasting
+
+#### **Multi-Provider Support**
+- Yandex.Cloud API integration
+- Selectel API integration
+- AWS/Azure/GCP API clients
+- Unified resource normalization across all providers
+
 ## 7. Navigation & Module Breakdown
 ```
 ✅ Dashboard (primary landing) – focus on spend overview and health
