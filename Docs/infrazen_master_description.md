@@ -240,7 +240,7 @@ CREATE TABLE resource_states (
 ```
 ✅ Dashboard (primary landing) – focus on spend overview and health
 ✅ Cloud Connections – manage provider integrations and statuses  
-✅ Resources – inventory and tagging governance
+✅ Resources – provider-grouped inventory with performance visualization
 🔄 Cost Analytics / Cost Explorer – granular spend analysis and filtering
 🔄 Recommendations – optimization backlog with savings estimates
 🔄 Business Context – unit economics, cost-to-value mapping
@@ -257,7 +257,17 @@ CREATE TABLE resource_states (
 - **Edit Functionality:** Settings button opens modal with pre-filled connection details, secure password handling, connection validation on updates
 - **API Integration:** Clean, maintainable direct API integration with Beget using requests library for reliable authentication and data retrieval
 
-### 7.1.2 Dashboard Highlights ✅ IMPLEMENTED
+### 7.1.2 Resources Page ✅ IMPLEMENTED
+- **Provider-Grouped Organization:** Resources organized by cloud provider in collapsible sections for better navigation and management
+- **Summary Card:** Aggregated statistics at the top showing total resources, active/stopped counts, and total cost across all providers
+- **Collapsible Sections:** Each provider gets its own expandable section with provider details, resource counts, and resource cards
+- **Interactive UI:** Smooth expand/collapse animations with chevron indicators and professional styling
+- **Resource Prioritization:** Resources with performance data displayed first for optimal user experience
+- **Real-time Data:** Live integration with performance graphs, cost tracking, and resource status
+- **Responsive Design:** Mobile-friendly interface that adapts to different screen sizes
+- **SQLite Compatibility:** Fixed floating point precision issues for large user IDs in SQLite database
+
+### 7.1.3 Dashboard Highlights ✅ IMPLEMENTED
 - **Top Controls:** Date-range selector (7/30/90 days, 1 year), manual refresh, and export actions aligned to the header for fast reporting.
 - **KPI Cards Row:** ✅ Discrete cards for Total Expenses (117,150 ₽ with -12.5% trend), Potential Savings (10,400 ₽), Active Resources (8 resources), and Connected Providers (2 providers); each card surfaces iconography, primary value, and secondary context at a glance.
 - **Connected Providers Grid:** ✅ Card grid listing each cloud (YC/SEL badges + names, connection status, added dates). Includes persistent "Добавить" tile and "Добавить провайдера" button.
@@ -265,7 +275,7 @@ CREATE TABLE resource_states (
 - **Optimization Recommendations:** ✅ Active recommendations list with 3 optimization suggestions (rightsize, cleanup, storage policy) totaling 10,400 ₽ potential savings.
 - **Resource Inventory:** ✅ Comprehensive table with all 8 resources from both providers, search/filter capabilities, and detailed resource information.
 
-### 7.1.1 Demo Implementation Details ✅ LIVE
+### 7.1.4 Demo Implementation Details ✅ LIVE
 - **Demo User Session:** Automatically enabled for all routes without authentication requirement
 - **Mock Data Sources:** Realistic Yandex Cloud and Selectel infrastructure with proper Russian regions, costs in rubles
 - **Provider Coverage:** 
@@ -333,10 +343,11 @@ CREATE TABLE resource_states (
 8. ✅ Separate demo users (mock data) from real users (database data) with conditional UI.
 9. ✅ Implement full CRUD operations for cloud provider connections with edit functionality.
 10. ✅ Add provider pre-selection and comprehensive connection management features.
-11. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
-12. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
-13. 🔄 Integrate Telegram bot and notification hooks (future phase).
-14. 🔄 Deploy demo-ready prototype.
+11. ✅ Implement provider-grouped resources page with collapsible sections and performance visualization.
+12. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
+13. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
+14. 🔄 Integrate Telegram bot and notification hooks (future phase).
+15. 🔄 Deploy demo-ready prototype.
 
 ## 12. Data & Integration Requirements
 - Provider API connectors (Yandex.Cloud, VK Cloud, Selectel, GCP, AWS, Azure for future expansion).
@@ -1524,6 +1535,101 @@ The platform now features an interactive "Usage" section within each resource ca
 - **Data-Driven Decisions**: Visual performance data supports optimization choices
 - **Cost-Performance Correlation**: Link resource costs to actual utilization
 - **Capacity Planning**: Historical data supports future resource allocation
+
+### 12.10. Provider-Grouped Resources Page Architecture
+
+#### 12.10.1. Overview
+The InfraZen platform now features a completely reorganized resources page that groups resources by cloud provider in collapsible sections, providing better organization, navigation, and user experience for managing multi-cloud infrastructure.
+
+#### 12.10.2. Page Structure
+**Summary Card at Top**:
+- Aggregated statistics across all providers
+- Total resources count (10 resources)
+- Active resources count (4 active)
+- Stopped resources count (0 stopped)
+- Total monthly cost (0.0 ₽/month)
+- Real-time data from all connected providers
+
+**Provider-Grouped Sections**:
+- Each cloud provider gets its own collapsible section
+- Provider information with icons, names, and resource counts
+- Expandable/collapsible with smooth animations
+- Professional styling with provider-specific branding
+- Resource cards organized within each provider section
+
+#### 12.10.3. Technical Implementation
+**Backend Architecture**:
+- **Resource Grouping**: Resources grouped by `provider.id` in `resources_by_provider` dictionary
+- **Provider Data**: Enhanced provider information with resource counts and status
+- **SQLite Compatibility**: Fixed floating point precision issues for large user IDs
+- **Data Flow**: Database → Flask → Template → UI with proper error handling
+
+**Frontend Implementation**:
+- **Jinja2 Template**: Updated `resources.html` with provider section structure
+- **CSS Styling**: Comprehensive styling for provider sections, animations, and responsive design
+- **JavaScript**: `toggleProviderSection()` function for collapsible behavior
+- **Chart.js Integration**: Performance graphs within resource cards
+
+**Database Integration**:
+- **User ID Handling**: Robust comparison using `int(float(p.user_id)) == int(float(user_id))`
+- **Provider Queries**: All providers fetched and filtered in Python to avoid SQLite precision issues
+- **Resource Prioritization**: Resources with performance data displayed first
+- **Metadata Access**: Latest snapshot metadata for performance visualization
+
+#### 12.10.4. User Experience Features
+**Navigation Benefits**:
+- **Logical Organization**: Resources grouped by cloud provider for easy navigation
+- **Quick Overview**: Summary card provides instant cost and resource visibility
+- **Provider Focus**: Each provider section shows relevant resources and statistics
+- **Expandable Interface**: Users can focus on specific providers as needed
+
+**Visual Design**:
+- **Provider Icons**: Distinctive icons for each cloud provider (Beget, Yandex, Selectel, etc.)
+- **Color Coding**: Provider-specific color schemes and branding
+- **Smooth Animations**: Professional expand/collapse animations with chevron indicators
+- **Responsive Layout**: Mobile-friendly design that adapts to different screen sizes
+
+**Performance Integration**:
+- **Resource Prioritization**: Resources with performance data displayed first
+- **Real-time Graphs**: CPU and Memory usage graphs within resource cards
+- **Cost Tracking**: Detailed cost information per resource and provider
+- **Status Monitoring**: Real-time resource status and health indicators
+
+#### 12.10.5. Implementation Results
+**Successfully Delivered**:
+- ✅ **Provider Grouping**: Resources organized by cloud provider in collapsible sections
+- ✅ **Summary Statistics**: Aggregated cost and resource counts across all providers
+- ✅ **Interactive UI**: Smooth expand/collapse animations with professional styling
+- ✅ **SQLite Compatibility**: Fixed floating point precision issues for large user IDs
+- ✅ **Resource Prioritization**: Performance data resources displayed first
+- ✅ **Real-time Integration**: Live performance graphs and cost tracking
+- ✅ **Responsive Design**: Mobile-friendly interface with proper scaling
+
+**Technical Achievements**:
+- **Database Optimization**: Efficient queries with proper user ID handling
+- **Template Architecture**: Clean separation of summary and provider sections
+- **JavaScript Integration**: Smooth collapsible behavior with proper state management
+- **CSS Styling**: Professional design with provider-specific branding
+- **Error Handling**: Graceful degradation with comprehensive error reporting
+
+#### 12.10.6. Business Value
+**Operational Benefits**:
+- **Multi-Cloud Management**: Unified view of resources across all cloud providers
+- **Cost Visibility**: Complete cost breakdown by provider and resource
+- **Resource Organization**: Logical grouping for efficient resource management
+- **Performance Monitoring**: Real-time performance data with historical context
+
+**User Experience Improvements**:
+- **Intuitive Navigation**: Easy access to resources by cloud provider
+- **Quick Insights**: Summary statistics for immediate cost and resource overview
+- **Focused Management**: Provider-specific sections for targeted resource management
+- **Professional Interface**: Clean, modern design with smooth interactions
+
+**FinOps Capabilities**:
+- **Cost Analysis**: Provider-specific cost breakdown and optimization opportunities
+- **Resource Optimization**: Performance data supports right-sizing decisions
+- **Budget Management**: Clear cost visibility for budget planning and forecasting
+- **Multi-Cloud Strategy**: Unified view supports multi-cloud cost optimization
 
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.
