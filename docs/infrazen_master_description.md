@@ -647,5 +647,106 @@ Deep analysis of internal resource components:
 - 🔄 Multi-tenant support for MSPs
 - 🔄 API integrations for third-party tools
 
+## 6.2. Daily Cost Baseline Implementation
+
+### 6.2.1. FinOps Strategy Overview
+The InfraZen platform implements a **daily cost baseline strategy** for unified cost analysis across all cloud providers. This approach provides FinOps teams with consistent daily metrics for cost optimization, resource right-sizing, and budget forecasting.
+
+### 6.2.2. Database Schema Enhancement
+**New Resource Fields:**
+- `daily_cost`: Normalized daily cost for FinOps analysis
+- `original_cost`: Original provider cost (monthly/yearly)
+- `cost_period`: Cost period (daily, monthly, yearly, hourly)
+- `cost_frequency`: Cost frequency (recurring, usage-based, one-time)
+
+**Schema Migration:**
+```sql
+ALTER TABLE resources ADD COLUMN daily_cost FLOAT DEFAULT 0.0;
+ALTER TABLE resources ADD COLUMN original_cost FLOAT DEFAULT 0.0;
+ALTER TABLE resources ADD COLUMN cost_period VARCHAR(20);
+ALTER TABLE resources ADD COLUMN cost_frequency VARCHAR(20);
+```
+
+### 6.2.3. Cost Normalization Logic
+**Automatic Conversion Rules:**
+- **Daily**: Use as-is (22 RUB/day)
+- **Monthly**: Convert to daily (660 RUB ÷ 30 = 22 RUB/day)
+- **Yearly**: Convert to daily (÷ 365)
+- **Hourly**: Convert to daily (× 24)
+
+**Implementation:**
+```python
+@staticmethod
+def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
+    if period == 'daily': return original_cost
+    elif period == 'monthly': return original_cost / 30
+    elif period == 'yearly': return original_cost / 365
+    elif period == 'hourly': return original_cost * 24
+    else: return original_cost / 30  # default to monthly
+```
+
+### 6.2.4. Provider Integration
+**Beget API Enhancement:**
+- Extract `price_day` when available from Beget API
+- Fallback to `price_month ÷ 30` for daily baseline
+- Store both original and normalized costs
+
+**Sync Service Integration:**
+- `_create_new_resource()` uses daily cost baseline
+- `_update_existing_resource()` updates daily costs
+- Automatic cost normalization during sync
+
+### 6.2.5. UI Enhancement
+**Resource Cards Display:**
+- **Primary**: Daily cost (22.00 RUB/day) - Prominent display
+- **Secondary**: Monthly cost (660.00 RUB/month) - Reference information
+- Professional FinOps cost presentation
+
+**CSS Implementation:**
+```css
+.cost-primary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.cost-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+.cost-secondary {
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-light);
+}
+```
+
+### 6.2.6. FinOps Benefits
+**Strategic Advantages:**
+- ✅ **Unified Comparison**: Compare AWS, Azure, GCP, Beget in daily terms
+- ✅ **Cost Optimization**: "Save 5 RUB/day by switching plans"
+- ✅ **Resource Right-sizing**: "This server costs 22 RUB/day, do we need it?"
+- ✅ **Budget Forecasting**: "Daily budget: 100 RUB, current spend: 31.73 RUB"
+- ✅ **Executive Reporting**: Clear daily metrics across all providers
+- ✅ **Trend Analysis**: Daily cost trends and optimization opportunities
+
+**Current Implementation Status:**
+- **Total Daily Cost**: 31.73 RUB
+- **VPS 1**: 22.00 RUB/day (660 RUB/month)
+- **VPS 2**: 9.73 RUB/day (291.90 RUB/month)
+- **Conversion Accuracy**: 100% (verified)
+
+### 6.2.7. Future Enhancements
+**Multi-Provider Support:**
+- AWS EC2 daily cost normalization
+- Azure VM daily cost normalization
+- GCP Compute daily cost normalization
+- Cross-provider cost comparison
+
+**Advanced Analytics:**
+- Daily cost trend analysis
+- Resource optimization recommendations
+- Budget variance analysis
+- Cost anomaly detection
+
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.

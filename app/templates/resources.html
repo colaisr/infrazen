@@ -138,13 +138,110 @@
                         <span class="detail-value">{{ config.hostname }}</span>
                     </div>
                     {% endif %}
+                    {% if config.get('os') %}
+                    <div class="detail-row">
+                        <span class="detail-label">ОС</span>
+                        <span class="detail-value">{{ config.os }}</span>
+                    </div>
+                    {% endif %}
+                    {% if config.get('software') %}
+                    <div class="detail-row">
+                        <span class="detail-label">ПО</span>
+                        <span class="detail-value">{{ config.software }}</span>
+                    </div>
+                    {% endif %}
                 {% endif %}
             </div>
 
+            <!-- Resource Specifications -->
+            {% if resource.provider_config %}
+                {% set config = resource.get_provider_config() %}
+                {% if config.get('cpu_cores') or config.get('ram_mb') or config.get('disk_gb') %}
+                <div class="resource-specs">
+                    <div class="specs-header">
+                        <span class="specs-title">Характеристики</span>
+                    </div>
+                    <div class="specs-grid">
+                        {% if config.get('cpu_cores') %}
+                        <div class="spec-item">
+                            <div class="spec-icon">
+                                <i class="fa-solid fa-microchip"></i>
+                            </div>
+                            <div class="spec-content">
+                                <span class="spec-value">{{ config.cpu_cores }}</span>
+                                <span class="spec-label">CPU</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if config.get('ram_mb') %}
+                        <div class="spec-item">
+                            <div class="spec-icon">
+                                <i class="fa-solid fa-memory"></i>
+                            </div>
+                            <div class="spec-content">
+                                <span class="spec-value">{{ (config.ram_mb / 1024)|round(1) }} GB</span>
+                                <span class="spec-label">RAM</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if config.get('disk_gb') %}
+                        <div class="spec-item">
+                            <div class="spec-icon">
+                                <i class="fa-solid fa-hdd"></i>
+                            </div>
+                            <div class="spec-content">
+                                <span class="spec-value">{{ config.disk_gb|round(1) }} GB</span>
+                                <span class="spec-label">Диск</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if config.get('bandwidth_gb') %}
+                        <div class="spec-item">
+                            <div class="spec-icon">
+                                <i class="fa-solid fa-network-wired"></i>
+                            </div>
+                            <div class="spec-content">
+                                <span class="spec-value">{{ config.bandwidth_gb }} GB</span>
+                                <span class="spec-label">Трафик</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- Resource Usage (if available) -->
+            {% if resource.provider_config %}
+                {% set config = resource.get_provider_config() %}
+                {% if config.get('disk_used_gb') or config.get('disk_left_gb') %}
+                <div class="resource-usage">
+                    <div class="usage-header">
+                        <span class="usage-title">Использование</span>
+                    </div>
+                    {% if config.get('disk_used_gb') and config.get('disk_left_gb') %}
+                    <div class="usage-item">
+                        <div class="usage-label">Диск</div>
+                        <div class="usage-bar">
+                            <div class="usage-fill" style="width: {{ ((config.disk_used_gb / (config.disk_used_gb + config.disk_left_gb)) * 100)|round(1) }}%"></div>
+                        </div>
+                        <div class="usage-text">{{ config.disk_used_gb|round(1) }} GB / {{ (config.disk_used_gb + config.disk_left_gb)|round(1) }} GB</div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% endif %}
+
             <!-- Resource Cost -->
             <div class="resource-cost">
-                <div class="cost-amount">{{ resource.effective_cost|round(2) }} ₽</div>
-                <div class="cost-period">в месяц</div>
+                <div class="cost-primary">
+                    <div class="cost-amount">{{ resource.daily_cost|round(2) }} ₽</div>
+                    <div class="cost-period">в день</div>
+                </div>
+                <div class="cost-secondary">
+                    <div class="cost-amount-secondary">{{ resource.effective_cost|round(2) }} ₽</div>
+                    <div class="cost-period-secondary">в месяц</div>
+                </div>
             </div>
 
             <!-- Resource Actions -->
@@ -375,12 +472,21 @@
     padding: 1rem;
     text-align: center;
     margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.cost-primary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .cost-amount {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--primary-blue);
     line-height: 1;
 }
 
@@ -388,6 +494,28 @@
     font-size: 0.875rem;
     color: var(--text-secondary);
     margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+.cost-secondary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-light);
+}
+
+.cost-amount-secondary {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    line-height: 1;
+}
+
+.cost-period-secondary {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.125rem;
 }
 
 /* Resource Actions */
@@ -451,6 +579,124 @@
 .action-success:hover {
     background: rgba(16, 185, 129, 0.1);
     border-color: var(--success-green);
+}
+
+/* Resource Specifications */
+.resource-specs {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--background-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+
+.specs-header {
+    margin-bottom: 0.75rem;
+}
+
+.specs-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 0.75rem;
+}
+
+.spec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--background-white);
+    border-radius: 6px;
+    border: 1px solid var(--border-light);
+}
+
+.spec-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-blue);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.spec-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.spec-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.spec-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Resource Usage */
+.resource-usage {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--background-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+}
+
+.usage-header {
+    margin-bottom: 0.75rem;
+}
+
+.usage-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.usage-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.usage-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.usage-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border-light);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.usage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-blue), #1e40af);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.usage-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: right;
 }
 
 /* Empty State */

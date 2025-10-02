@@ -29,6 +29,12 @@ class Resource(BaseModel):
     currency = db.Column(db.String(3), default='RUB')
     billing_period = db.Column(db.String(20))  # monthly, hourly
     
+    # Daily cost baseline for FinOps
+    daily_cost = db.Column(db.Float, default=0.0)  # Normalized daily cost
+    original_cost = db.Column(db.Float, default=0.0)  # Original provider cost
+    cost_period = db.Column(db.String(20))  # daily, monthly, yearly, hourly
+    cost_frequency = db.Column(db.String(20))  # recurring, usage-based, one-time
+    
     # Business context
     business_unit = db.Column(db.String(100))
     project_id = db.Column(db.String(100))
@@ -66,6 +72,57 @@ class Resource(BaseModel):
     def set_provider_config(self, config_dict):
         """Set provider configuration from dictionary"""
         self.provider_config = json.dumps(config_dict)
+    
+    @staticmethod
+    def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
+        """
+        Normalize cost to daily baseline for FinOps analysis
+        
+        Args:
+            original_cost: Original cost from provider
+            period: Cost period (daily, monthly, yearly, hourly)
+            frequency: Cost frequency (recurring, usage-based, one-time)
+        
+        Returns:
+            float: Normalized daily cost
+        """
+        if not original_cost or original_cost <= 0:
+            return 0.0
+        
+        # For one-time costs, spread over 30 days for comparison
+        if frequency == 'one-time':
+            return original_cost / 30
+        
+        # For usage-based costs, assume daily usage
+        if frequency == 'usage-based':
+            return original_cost
+        
+        # Normalize based on period
+        if period == 'daily':
+            return original_cost
+        elif period == 'monthly':
+            return original_cost / 30
+        elif period == 'yearly':
+            return original_cost / 365
+        elif period == 'hourly':
+            return original_cost * 24
+        else:
+            # Default to monthly if period unknown
+            return original_cost / 30
+    
+    def set_daily_cost_baseline(self, original_cost, period, frequency='recurring'):
+        """
+        Set daily cost baseline for FinOps analysis
+        
+        Args:
+            original_cost: Original cost from provider
+            period: Cost period (daily, monthly, yearly, hourly)
+            frequency: Cost frequency (recurring, usage-based, one-time)
+        """
+        self.original_cost = original_cost
+        self.cost_period = period
+        self.cost_frequency = frequency
+        self.daily_cost = self.normalize_to_daily_cost(original_cost, period, frequency)
     
     def to_dict(self):
         """Convert resource to dictionary"""

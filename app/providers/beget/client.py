@@ -245,6 +245,7 @@ class BegetAPIClient:
                 'location': server.get('region', 'Unknown'),
                 'created_at': server.get('date_create'),
                 'monthly_cost': config.get('price_month', 0),
+                'daily_cost': config.get('price_day', 0),
                 'currency': 'RUB',
                 'type': 'vps',
                 'software': server.get('software', {}).get('name', 'Unknown'),
@@ -255,90 +256,210 @@ class BegetAPIClient:
         return processed_servers
 
     def get_domains(self) -> List[Dict]:
-        """Get list of domains from Beget API"""
+        """Get list of domains from Beget API using real endpoint"""
         try:
-            if not self.access_token:
-                self.authenticate()
-            
-            # Use the authenticated session to get domains
-            headers = {
-                'Authorization': f'Bearer {self.access_token}',
-                'Content-Type': 'application/json',
-                'User-Agent': 'InfraZen/1.0'
+            # Use the real Beget API endpoint with login/password authentication
+            url = "https://api.beget.com/api/domain/getList"
+            params = {
+                'login': self.username,
+                'passwd': self.password,
+                'output_format': 'json'
             }
             
-            # Use documented Beget API endpoints
-            endpoints = [
-                '/v1/vps/server/list',  # Documented endpoint for VPS servers
-                '/v1/domain/list',      # Documented endpoint for domains
-                '/v1/hosting/list'      # Documented endpoint for hosting
-            ]
+            logger.info(f"Fetching domains from real Beget API: {url}")
             
-            for endpoint in endpoints:
-                try:
-                    url = f"{self.api_url}{endpoint}"
-                    response = self.session.get(url, headers=headers, timeout=30)
+            try:
+                response = requests.get(url, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"API Response: {result}")
+                
+                # Check for authentication errors
+                if result.get('status') == 'error':
+                    if result.get('error_code') == 'AUTH_ERROR':
+                        logger.warning("Authentication failed - returning empty list")
+                        return []
+                    else:
+                        logger.error(f"API Error: {result.get('error_text', 'Unknown error')}")
+                        return []
+                
+                # Process the domains data based on Beget API response format
+                if 'answer' in result:
+                    domains_data = result['answer']
+                    if isinstance(domains_data, list):
+                        return self._process_domains_data(domains_data)
+                    elif isinstance(domains_data, dict) and 'domains' in domains_data:
+                        return self._process_domains_data(domains_data['domains'])
+                    elif isinstance(domains_data, dict) and 'result' in domains_data:
+                        return self._process_domains_data(domains_data['result'])
+                    else:
+                        logger.warning(f"Unexpected domains response format: {domains_data}")
+                        return []
+                elif 'result' in result:
+                    return self._process_domains_data(result['result'])
+                elif 'domains' in result:
+                    return self._process_domains_data(result['domains'])
+                elif isinstance(result, list):
+                    return self._process_domains_data(result)
+                else:
+                    logger.warning(f"Unexpected API response format: {result}")
+                    return []
                     
-                    if response.status_code == 200:
-                        result = response.json()
-                        if result.get('status') == 'success' or 'domains' in result:
-                            domains = result.get('domains', result.get('answer', []))
-                            return self._process_domains_data(domains)
-                except Exception as e:
-                    logger.debug(f"Domain endpoint {endpoint} failed: {e}")
-                    continue
-            
-            # No working endpoints found - return empty list for real users
-            logger.warning("No working domain endpoints found - returning empty list")
-            return []
+            except Exception as e:
+                logger.error(f"Real domain API failed: {e}")
+                # Return empty list instead of mock data
+                logger.warning("Returning empty list due to API failure")
+                return []
             
         except Exception as e:
             logger.error(f"Failed to get domains: {e}")
             return []
     
     def _process_domains_data(self, domains_data: List[Dict]) -> List[Dict]:
-        """Process raw domains data from API"""
+        """Process raw domains data from API with FinOps-relevant information"""
         processed_domains = []
         
         for domain in domains_data:
+            # Handle real Beget API format
+            domain_name = domain.get('fqdn', domain.get('name', domain.get('domain_name', 'unknown')))
+            registration_date = domain.get('date_register', domain.get('registration_date', domain.get('created_at')))
+            expiration_date = domain.get('date_expire', domain.get('expiration_date', domain.get('expires')))
+            auto_renewal = domain.get('auto_renew', domain.get('auto_renewal', False))
+            is_under_control = domain.get('is_under_control', 0)
+            registrar = domain.get('registrar', 'Beget')
+            
+            # Determine domain status based on real data
+            if expiration_date and expiration_date != 'null':
+                status = 'active'
+            elif is_under_control == 1:
+                status = 'active'
+            else:
+                status = 'inactive'
+            
+            # Calculate costs based on domain type
+            if registrar == 'beget' and expiration_date:
+                # Registered domain
+                monthly_cost = 0.0  # No monthly cost for domains
+                renewal_cost = 50.0  # Estimated renewal cost
+            else:
+                # Subdomain or free domain
+                monthly_cost = 0.0
+                renewal_cost = 0.0
+            
             processed_domains.append({
-                'id': domain.get('id', domain.get('domain_id', f"domain_{len(processed_domains)}")),
-                'name': domain.get('name', domain.get('domain_name', 'unknown')),
-                'status': domain.get('status', 'active'),
-                'registrar': domain.get('registrar', 'Beget'),
-                'registration_date': domain.get('registration_date', domain.get('created_at')),
-                'expiration_date': domain.get('expiration_date', domain.get('expires')),
+                'id': domain.get('id', f"domain_{len(processed_domains)}"),
+                'name': domain_name,
+                'status': status,
+                'registrar': registrar,
+                'registration_date': registration_date,
+                'expiration_date': expiration_date,
                 'nameservers': domain.get('nameservers', []),
                 'dns_records': domain.get('dns_records', []),
                 'hosting_plan': domain.get('hosting_plan', 'Standard'),
-                'registration_cost': domain.get('registration_cost', 50.0),
-                'renewal_cost': domain.get('renewal_cost', 50.0),
-                'monthly_cost': domain.get('monthly_cost', 50.0),
-                'currency': 'RUB'
+                'registration_cost': domain.get('registration_cost', 0.0),
+                'renewal_cost': renewal_cost,
+                'monthly_cost': monthly_cost,
+                'currency': 'RUB',
+                # FinOps-relevant domain metrics
+                'domain_type': 'registered' if expiration_date and expiration_date != 'null' else 'subdomain',
+                'auto_renewal': auto_renewal,
+                'privacy_protection': domain.get('privacy_protection', False),
+                'ssl_certificate': domain.get('ssl_certificate', False),
+                'dns_management': domain.get('dns_management', True),
+                'email_forwarding': domain.get('email_forwarding', False),
+                'subdomains_count': len(domain.get('subdomains', [])),
+                'dns_records_count': len(domain.get('dns_records', [])),
+                'last_updated': domain.get('date_add', domain.get('last_updated', domain.get('updated_at'))),
+                'domain_age_days': self._calculate_domain_age(registration_date),
+                'days_until_expiry': self._calculate_days_until_expiry(expiration_date),
+                'is_under_control': is_under_control,
+                'registrar_status': domain.get('registrar_status', 'unknown'),
+                'register_order_status': domain.get('register_order_status', 'unknown')
             })
         
         return processed_domains
     
-    def _get_mock_domains(self) -> List[Dict]:
-        """Fallback mock domains data"""
-        return [
-            {
-                'id': f'domain_{i}',
-                'name': f'example{i}.com',
-                'status': 'active',
-                'registrar': 'Beget',
-                'registration_date': (date.today().replace(day=1, month=1)).isoformat(),
-                'expiration_date': (date.today().replace(year=date.today().year + 1)).isoformat(),
-                'nameservers': ['ns1.beget.com', 'ns2.beget.com'],
-                'dns_records': [],
-                'hosting_plan': 'Standard',
-                'registration_cost': 50.0,
-                'renewal_cost': 50.0,
-                'monthly_cost': 50.0,
-                'currency': 'RUB'
+    def _calculate_domain_age(self, registration_date: str) -> int:
+        """Calculate domain age in days"""
+        try:
+            if not registration_date:
+                return 0
+            from datetime import datetime
+            reg_date = datetime.fromisoformat(registration_date.replace('Z', '+00:00'))
+            return (datetime.now() - reg_date).days
+        except:
+            return 0
+    
+    def _calculate_days_until_expiry(self, expiration_date: str) -> int:
+        """Calculate days until domain expiry"""
+        try:
+            if not expiration_date:
+                return 0
+            from datetime import datetime
+            exp_date = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+            return (exp_date - datetime.now()).days
+        except:
+            return 0
+    
+    def get_domain_info(self, domain_name: str) -> Dict:
+        """Get detailed domain information using real Beget API"""
+        try:
+            # Use the real Beget API endpoint for domain info
+            url = "https://api.beget.com/api/domain/getInfo"
+            params = {
+                'login': self.username,
+                'passwd': self.password,
+                'output_format': 'json',
+                'domain': domain_name
             }
-            for i in range(1, 4)
-        ]
+            
+            logger.info(f"Fetching domain info for {domain_name} from real API")
+            
+            try:
+                response = requests.get(url, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved domain info for {domain_name}")
+                
+                # Process the domain info based on Beget API response format
+                if 'answer' in result:
+                    return self._process_domain_info(result['answer'])
+                else:
+                    return self._process_domain_info(result)
+                    
+            except Exception as e:
+                logger.error(f"Real domain info API failed: {e}")
+                return {}
+            
+        except Exception as e:
+            logger.error(f"Failed to get domain info: {e}")
+            return {}
+    
+    def _process_domain_info(self, domain_info: Dict) -> Dict:
+        """Process detailed domain information for FinOps analysis"""
+        return {
+            'domain_name': domain_info.get('domain_name', ''),
+            'status': domain_info.get('status', 'unknown'),
+            'registrar': domain_info.get('registrar', 'Beget'),
+            'registration_date': domain_info.get('registration_date', ''),
+            'expiration_date': domain_info.get('expiration_date', ''),
+            'nameservers': domain_info.get('nameservers', []),
+            'dns_records': domain_info.get('dns_records', []),
+            'auto_renewal': domain_info.get('auto_renewal', False),
+            'privacy_protection': domain_info.get('privacy_protection', False),
+            'ssl_certificate': domain_info.get('ssl_certificate', False),
+            'dns_management': domain_info.get('dns_management', False),
+            'email_forwarding': domain_info.get('email_forwarding', False),
+            'subdomains': domain_info.get('subdomains', []),
+            'domain_age_days': self._calculate_domain_age(domain_info.get('registration_date')),
+            'days_until_expiry': self._calculate_days_until_expiry(domain_info.get('expiration_date')),
+            'renewal_cost': domain_info.get('renewal_cost', 0),
+            'monthly_cost': domain_info.get('monthly_cost', 0),
+            'currency': 'RUB'
+        }
+    
     
     def get_databases(self) -> List[Dict]:
         """Get list of databases from Beget API"""
@@ -401,22 +522,6 @@ class BegetAPIClient:
         
         return processed_databases
     
-    def _get_mock_databases(self) -> List[Dict]:
-        """Fallback mock databases data"""
-        return [
-            {
-                'id': f'db_{i}',
-                'name': f'database_{i}',
-                'type': 'MySQL',
-                'size_mb': 100,
-                'username': f'db_user_{i}',
-                'host': 'localhost',
-                'port': 3306,
-                'monthly_cost': 30.0,
-                'currency': 'RUB'
-            }
-            for i in range(1, 3)
-        ]
     
     def get_ftp_accounts(self) -> List[Dict]:
         """Get list of FTP accounts from Beget API"""
@@ -480,23 +585,6 @@ class BegetAPIClient:
         
         return processed_ftp_accounts
     
-    def _get_mock_ftp_accounts(self) -> List[Dict]:
-        """Fallback mock FTP accounts data"""
-        return [
-            {
-                'id': f'ftp_{i}',
-                'username': f'ftp_user_{i}',
-                'home_directory': '/',
-                'disk_quota_mb': 1024,
-                'disk_used_mb': 100,
-                'server_host': 'localhost',
-                'port': 21,
-                'is_active': True,
-                'monthly_cost': 20.0,
-                'currency': 'RUB'
-            }
-            for i in range(1, 3)
-        ]
     
     def get_billing_info(self) -> Dict:
         """Get billing information from Beget API"""
@@ -553,18 +641,6 @@ class BegetAPIClient:
             'monthly_limit': billing_data.get('monthly_limit', 0.0)
         }
     
-    def _get_mock_billing_info(self) -> Dict:
-        """Fallback mock billing data"""
-        return {
-            'current_balance': 1500.00,
-            'currency': 'RUB',
-            'last_payment': (date.today().replace(day=1)).isoformat(),
-            'next_billing': (date.today().replace(day=1, month=date.today().month + 1)).isoformat(),
-            'payment_method': 'Card',
-            'auto_renewal': True,
-            'total_spent': 3000.0,
-            'monthly_limit': 500.0
-        }
     
     def get_resource_usage(self) -> Dict:
         """Get resource usage statistics from Beget API"""
@@ -630,19 +706,6 @@ class BegetAPIClient:
             'daily_requests': usage_data.get('daily_requests', 1000)
         }
     
-    def _get_mock_usage_info(self) -> Dict:
-        """Fallback mock usage data"""
-        return {
-            'disk_usage': {'used': 250, 'total': 1000, 'unit': 'MB'},
-            'bandwidth_usage': {'used': 500, 'total': 5000, 'unit': 'MB'},
-            'domains_count': 3,
-            'databases_count': 2,
-            'ftp_accounts_count': 2,
-            'email_accounts_count': 5,
-            'subdomains_count': 1,
-            'monthly_bandwidth': 5000,
-            'daily_requests': 1000
-        }
     
     def get_email_accounts(self) -> List[Dict]:
         """Get list of email accounts from Beget API"""
@@ -705,55 +768,44 @@ class BegetAPIClient:
         
         return processed_email_accounts
     
-    def _get_mock_email_accounts(self) -> List[Dict]:
-        """Fallback mock email accounts data"""
-        return [
-            {
-                'id': f'email_{i}',
-                'email': f'user{i}@example.com',
-                'domain': 'example.com',
-                'quota_mb': 100,
-                'used_mb': 10,
-                'is_active': True,
-                'forwarding': [],
-                'monthly_cost': 5.0,
-                'currency': 'RUB'
-            }
-            for i in range(1, 6)
-        ]
     
     def get_all_resources(self) -> Dict:
-        """Get all resources in a comprehensive format"""
+        """Get all resources in a comprehensive format with FinOps analysis"""
         try:
             # Get all available information
             account_info = self.get_account_info(use_mock_data=False)
             vps_servers = self.get_vps_servers()  # Get VPS servers first
-            domains = self.get_domains()
+            domains = self.get_domains()  # Enhanced domain data
             databases = self.get_databases()
             ftp_accounts = self.get_ftp_accounts()
             email_accounts = self.get_email_accounts()
             billing_info = self.get_billing_info()
             usage_stats = self.get_resource_usage()
             
-            # Calculate total costs
+            # Calculate total costs with enhanced domain costs
             total_monthly_cost = sum([
                 sum(v.get('monthly_cost', 0) for v in vps_servers),  # Include VPS costs
-                sum(d.get('monthly_cost', 0) for d in domains),
+                sum(d.get('monthly_cost', 0) for d in domains),  # Domain costs
+                sum(d.get('renewal_cost', 0) for d in domains),  # Domain renewal costs
                 sum(d.get('monthly_cost', 0) for d in databases),
                 sum(f.get('monthly_cost', 0) for f in ftp_accounts),
                 sum(e.get('monthly_cost', 0) for e in email_accounts)
             ])
             
+            # Calculate FinOps metrics for domains
+            domain_metrics = self._calculate_domain_metrics(domains)
+            
             return {
                 'account_info': account_info,
                 'vps_servers': vps_servers,  # Include VPS servers
-                'domains': domains,
+                'domains': domains,  # Enhanced domain data
                 'databases': databases,
                 'ftp_accounts': ftp_accounts,
                 'email_accounts': email_accounts,
                 'billing_info': billing_info,
                 'usage_stats': usage_stats,
                 'total_monthly_cost': total_monthly_cost,
+                'domain_metrics': domain_metrics,  # FinOps domain analysis
                 'sync_timestamp': datetime.now().isoformat(),
                 'resource_counts': {
                     'vps_servers': len(vps_servers),  # Include VPS count
@@ -766,6 +818,31 @@ class BegetAPIClient:
         except Exception as e:
             logger.error(f"Failed to get all resources: {e}")
             raise BegetAPIError(f"Failed to retrieve resources: {str(e)}")
+    
+    def _calculate_domain_metrics(self, domains: List[Dict]) -> Dict:
+        """Calculate FinOps metrics for domain analysis"""
+        if not domains:
+            return {}
+        
+        total_domains = len(domains)
+        active_domains = len([d for d in domains if d.get('status') == 'active'])
+        expiring_soon = len([d for d in domains if d.get('days_until_expiry', 0) < 30])
+        auto_renewal_enabled = len([d for d in domains if d.get('auto_renewal', False)])
+        ssl_enabled = len([d for d in domains if d.get('ssl_certificate', False)])
+        
+        total_domain_cost = sum(d.get('monthly_cost', 0) + d.get('renewal_cost', 0) for d in domains)
+        avg_domain_age = sum(d.get('domain_age_days', 0) for d in domains) / total_domains if total_domains > 0 else 0
+        
+        return {
+            'total_domains': total_domains,
+            'active_domains': active_domains,
+            'expiring_soon': expiring_soon,
+            'auto_renewal_enabled': auto_renewal_enabled,
+            'ssl_enabled': ssl_enabled,
+            'total_domain_cost': total_domain_cost,
+            'avg_domain_age_days': avg_domain_age,
+            'cost_per_domain': total_domain_cost / total_domains if total_domains > 0 else 0
+        }
     
     def sync_resources(self) -> Dict:
         """Comprehensive sync of all resources with Beget API"""

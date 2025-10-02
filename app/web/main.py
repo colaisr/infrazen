@@ -333,13 +333,38 @@ def get_real_user_overview(user_id):
     }
 
 def get_real_user_resources(user_id):
-    """Get resources for a real user from database using unified models"""
+    """Get resources for a real user from database using unified models - only from latest sync"""
+    from app.core.models.sync import SyncSnapshot
     
     providers = CloudProvider.query.filter_by(user_id=user_id).all()
     all_resources = []
     
     for provider in providers:
-        all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
+        if provider.last_sync:
+            # Get the latest successful sync snapshot for this provider
+            latest_snapshot = SyncSnapshot.query.filter(
+                SyncSnapshot.provider_id == provider.id,
+                SyncSnapshot.sync_status == 'success'
+            ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+            
+            if latest_snapshot:
+                # Get resources that were part of the latest sync
+                from app.core.models.sync import ResourceState
+                resource_states = ResourceState.query.filter_by(
+                    sync_snapshot_id=latest_snapshot.id
+                ).all()
+                
+                # Get the actual Resource objects, excluding deleted resources
+                resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id and rs.state_action != 'deleted']
+                if resource_ids:
+                    resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
+                    all_resources.extend(resources)
+            else:
+                # Fallback: get all resources if no sync snapshot found
+                all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
+        else:
+            # If no sync yet, get all resources (for new providers)
+            all_resources.extend(Resource.query.filter_by(provider_id=provider.id).all())
     
     return all_resources
 

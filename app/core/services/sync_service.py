@@ -238,6 +238,21 @@ class SyncService:
             is_active=True
         )
         
+        # Set daily cost baseline for FinOps analysis
+        provider_config = unified_resource.get('provider_config', {})
+        daily_cost = provider_config.get('daily_cost', 0)
+        monthly_cost = provider_config.get('monthly_cost', 0)
+        
+        if daily_cost > 0:
+            # Use daily price when available
+            resource.set_daily_cost_baseline(daily_cost, 'daily', 'recurring')
+        elif monthly_cost > 0:
+            # Convert monthly to daily
+            resource.set_daily_cost_baseline(monthly_cost, 'monthly', 'recurring')
+        else:
+            # Use effective_cost as fallback
+            resource.set_daily_cost_baseline(unified_resource['effective_cost'], 'monthly', 'recurring')
+        
         # Set provider-specific configuration
         resource.set_provider_config(unified_resource['provider_config'])
         
@@ -292,6 +307,18 @@ class SyncService:
             existing_resource.region = unified_resource['region']
             existing_resource.last_sync = datetime.utcnow()
             existing_resource.set_provider_config(unified_resource['provider_config'])
+            
+            # Update daily cost baseline
+            provider_config = unified_resource.get('provider_config', {})
+            daily_cost = provider_config.get('daily_cost', 0)
+            monthly_cost = provider_config.get('monthly_cost', 0)
+            
+            if daily_cost > 0:
+                existing_resource.set_daily_cost_baseline(daily_cost, 'daily', 'recurring')
+            elif monthly_cost > 0:
+                existing_resource.set_daily_cost_baseline(monthly_cost, 'monthly', 'recurring')
+            else:
+                existing_resource.set_daily_cost_baseline(unified_resource['effective_cost'], 'monthly', 'recurring')
         
         # Create resource state
         resource_state = ResourceState(
