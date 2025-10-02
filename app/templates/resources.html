@@ -104,11 +104,6 @@
                     {% endif %}
                 </div>
             </div>
-            
-            <!-- Debug: Resource ID -->
-            <div style="font-size: 10px; color: #999; margin: 5px 0; padding: 2px 5px; background: #f0f0f0; border-radius: 3px;">
-                Debug: Resource ID: {{ resource.id }} | Provider Resource ID: {{ resource.resource_id }}
-            </div>
 
             <!-- Resource Details -->
             <div class="resource-details">
@@ -227,12 +222,8 @@
                         <span>Usage</span>
                         <i class="fa-solid fa-chevron-down usage-chevron" id="usage-chevron-{{ resource.id }}"></i>
                     </div>
-                    <div class="usage-content" id="usage-info-{{ resource.id }}" style="display: none;">
-                        <!-- Debug: Resource ID and tags -->
-                        <div style="font-size: 10px; color: #999; margin-bottom: 10px;">
-                            Debug: Resource ID: {{ resource.id }}, Tags: {{ tags.keys()|list }}
-                        </div>
-                        <!-- CPU Usage Graph -->
+            <div class="usage-content" id="usage-info-{{ resource.id }}" style="display: none;">
+                <!-- CPU Usage Graph -->
                         {% if tags.get('cpu_avg_usage') %}
                         <div class="usage-graph">
                             <div class="usage-graph-header">
@@ -242,8 +233,6 @@
                                 <canvas id="cpu-chart-{{ resource.id }}" class="usage-chart" width="300" height="120"></canvas>
                             </div>
                         </div>
-                        <!-- Debug: CPU data available -->
-                        <div style="font-size: 10px; color: #666;">Debug: CPU avg: {{ tags.get('cpu_avg_usage') }}%</div>
                         {% endif %}
                         
                         <!-- Memory Usage Graph -->
@@ -256,8 +245,6 @@
                                 <canvas id="memory-chart-{{ resource.id }}" class="usage-chart" width="300" height="120"></canvas>
                             </div>
                         </div>
-                        <!-- Debug: Memory data available -->
-                        <div style="font-size: 10px; color: #666;">Debug: Memory avg: {{ tags.get('memory_avg_usage_mb') }} MB</div>
                         {% endif %}
                         
                         <!-- HD Usage (moved from original usage section) -->
