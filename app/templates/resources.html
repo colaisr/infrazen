@@ -80,16 +80,18 @@
                     {% endif %}
                 </div>
                 <div class="provider-details">
-                    <div class="provider-name">{{ provider.connection_name or provider.provider_type|title }}</div>
-                    <div class="provider-type">{{ provider.provider_type|upper }}</div>
-                    <div class="provider-last-sync">
-                        Последняя синхронизация: 
-                        {% if provider.details.last_sync %}
-                            {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
-                        {% else %}
-                            Никогда
-                        {% endif %}
+                    <div class="provider-name">
+                        {{ provider.connection_name or provider.provider_type|title }}
+                        <span class="provider-last-sync">
+                            • Последняя синхронизация: 
+                            {% if provider.details.last_sync %}
+                                {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
+                            {% else %}
+                                Никогда
+                            {% endif %}
+                        </span>
                     </div>
+                    <div class="provider-type">{{ provider.provider_type|upper }}</div>
                 </div>
                 <div class="provider-stats">
                     <span class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
@@ -456,8 +458,8 @@
 .provider-last-sync {
     font-size: 0.75rem;
     color: var(--text-secondary);
-    margin-top: 0.25rem;
     font-weight: 400;
+    margin-left: 0.5rem;
 }
 
 .provider-stats {
