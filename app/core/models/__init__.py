@@ -14,6 +14,7 @@ from .tags import ResourceTag
 from .logs import ResourceLog, ResourceComponent
 from .costs import CostAllocation, CostTrend
 from .recommendations import OptimizationRecommendation
+from .sync import SyncSnapshot, ResourceState
 
 __all__ = [
     'db',
@@ -28,5 +29,7 @@ __all__ = [
     'ResourceComponent',
     'CostAllocation',
     'CostTrend',
-    'OptimizationRecommendation'
+    'OptimizationRecommendation',
+    'SyncSnapshot',
+    'ResourceState'
 ]

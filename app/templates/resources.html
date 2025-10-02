@@ -51,119 +51,122 @@
             </div>
             <div class="stat-item">
                 <span class="stat-label">Общая стоимость</span>
-                <span class="stat-value">{{ resources|sum(attribute='monthly_cost_rub') }} ₽/мес</span>
+                <span class="stat-value">{{ resources|sum(attribute='effective_cost')|round(2) }} ₽/мес</span>
             </div>
         </div>
     </div>
 
-    <div class="resources-table-container">
-        <table class="resources-table">
-            <thead>
-                <tr>
-                    <th>Ресурс</th>
-                    <th>Провайдер</th>
-                    <th>Тип</th>
-                    <th>Регион</th>
-                    <th>Статус</th>
-                    <th>Конфигурация</th>
-                    <th>Теги</th>
-                    <th>Стоимость/мес</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for resource in resources %}
-                <tr>
-                    <td>
-                        <div class="resource-name">
-                            <div class="resource-icon">
-                                {% if resource.type == 'vm' %}
-                                    <i class="fa-solid fa-server"></i>
-                                {% elif resource.type == 'disk' or resource.type == 'volume' %}
-                                    <i class="fa-solid fa-hdd"></i>
-                                {% elif resource.type == 'bucket' %}
-                                    <i class="fa-solid fa-database"></i>
-                                {% else %}
-                                    <i class="fa-solid fa-box"></i>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <div class="resource-title">{{ resource.name }}</div>
-                                <div class="resource-id">{{ resource.id }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="provider-badge provider-{{ resource.provider|lower|replace(' ', '-') }}">
-                            {% if resource.provider == 'Yandex Cloud' %}YC
-                            {% elif resource.provider == 'Selectel' %}SEL
-                            {% else %}{{ resource.provider[:3]|upper }}{% endif %}
+    <div class="resources-grid">
+        {% for resource in resources %}
+        <div class="resource-card">
+            <!-- Resource Header -->
+            <div class="resource-header">
+                <div class="resource-icon">
+                    {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
+                        <i class="fa-solid fa-server"></i>
+                    {% elif resource.resource_type == 'disk' or resource.resource_type == 'volume' %}
+                        <i class="fa-solid fa-hdd"></i>
+                    {% elif resource.resource_type == 'database' %}
+                        <i class="fa-solid fa-database"></i>
+                    {% elif resource.resource_type == 'domain' %}
+                        <i class="fa-solid fa-globe"></i>
+                    {% elif resource.resource_type == 'email' %}
+                        <i class="fa-solid fa-envelope"></i>
+                    {% else %}
+                        <i class="fa-solid fa-box"></i>
+                    {% endif %}
+                </div>
+                <div class="resource-info">
+                    <div class="resource-name">{{ resource.resource_name }}</div>
+                    <div class="resource-type">{{ resource.resource_type|upper }}</div>
+                </div>
+                <div class="resource-status">
+                    {% if resource.status == 'RUNNING' %}
+                        <span class="status-badge status-running">
+                            <i class="fa-solid fa-circle"></i> Запущен
                         </span>
-                    </td>
-                    <td>
-                        <span class="resource-type">{{ resource.type|upper }}</span>
-                    </td>
-                    <td>{{ resource.region }}</td>
-                    <td>
-                        <span class="status-badge status-{{ resource.status|lower|replace('_', '-') }}">
-                            {% if resource.status == 'RUNNING' %}
-                                <i class="fa-solid fa-circle"></i> Запущен
-                            {% elif resource.status == 'STOPPED' %}
-                                <i class="fa-solid fa-circle"></i> Остановлен
-                            {% elif resource.status == 'IN_USE' %}
-                                <i class="fa-solid fa-circle"></i> Используется
-                            {% elif resource.status == 'ACTIVE' %}
-                                <i class="fa-solid fa-circle"></i> Активен
-                            {% else %}
-                                <i class="fa-solid fa-circle"></i> {{ resource.status }}
-                            {% endif %}
+                    {% elif resource.status == 'STOPPED' %}
+                        <span class="status-badge status-stopped">
+                            <i class="fa-solid fa-circle"></i> Остановлен
                         </span>
-                    </td>
-                    <td>
-                        {% if resource.type == 'vm' %}
-                            <div class="config-info">
-                                <span>{{ resource.vcpu }} vCPU, {{ resource.memory_gb }} GB RAM</span>
-                                {% if resource.disks_gb %}<br><span>{{ resource.disks_gb }} GB дисков</span>{% endif %}
-                                {% if resource.platform %}<br><span>{{ resource.platform }}</span>{% endif %}
-                                {% if resource.flavor %}<br><span>{{ resource.flavor }}</span>{% endif %}
-                            </div>
-                        {% elif resource.type == 'disk' or resource.type == 'volume' %}
-                            <div class="config-info">
-                                <span>{{ resource.size_gb }} GB</span>
-                                {% if resource.disk_type %}<br><span>{{ resource.disk_type }}</span>{% endif %}
-                                {% if resource.volume_type %}<br><span>{{ resource.volume_type }}</span>{% endif %}
-                                {% if resource.attached_to %}<br><span>→ {{ resource.attached_to }}</span>{% endif %}
-                            </div>
-                        {% elif resource.type == 'bucket' %}
-                            <div class="config-info">
-                                <span>{{ resource.storage_gb }} GB</span>
-                                {% if resource.class %}<br><span>{{ resource.class }}</span>{% endif %}
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if resource.tags %}
-                            {% for tag in resource.tags %}
-                                <span class="tag">{{ tag }}</span>
-                            {% endfor %}
-                        {% else %}
-                            <span class="no-tags">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="cost">{{ resource.monthly_cost_rub|default(0) }} ₽</span>
-                    </td>
-                    <td>
-                        <div class="resource-actions">
-                            <button class="icon-button" title="Настройки"><i class="fa-solid fa-gear"></i></button>
-                            <button class="icon-button" title="Подробнее"><i class="fa-solid fa-info"></i></button>
-                            <button class="icon-button icon-warning" title="Остановить"><i class="fa-solid fa-stop"></i></button>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% elif resource.status == 'IN_USE' %}
+                        <span class="status-badge status-active">
+                            <i class="fa-solid fa-circle"></i> Используется
+                        </span>
+                    {% elif resource.status == 'ACTIVE' %}
+                        <span class="status-badge status-active">
+                            <i class="fa-solid fa-circle"></i> Активен
+                        </span>
+                    {% else %}
+                        <span class="status-badge status-unknown">
+                            <i class="fa-solid fa-circle"></i> {{ resource.status }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Resource Details -->
+            <div class="resource-details">
+                <div class="detail-row">
+                    <span class="detail-label">Провайдер</span>
+                    <span class="provider-badge provider-{{ resource.provider.provider_type|lower }}">
+                        {% if resource.provider.provider_type == 'beget' %}BEGET
+                        {% elif resource.provider.provider_type == 'yandex' %}YC
+                        {% elif resource.provider.provider_type == 'selectel' %}SEL
+                        {% else %}{{ resource.provider.provider_type[:3]|upper }}{% endif %}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Регион</span>
+                    <span class="detail-value">{{ resource.region }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Сервис</span>
+                    <span class="detail-value">{{ resource.service_name }}</span>
+                </div>
+                {% if resource.provider_config %}
+                    {% set config = resource.get_provider_config() %}
+                    {% if config.get('ip_address') %}
+                    <div class="detail-row">
+                        <span class="detail-label">IP адрес</span>
+                        <span class="detail-value">{{ config.ip_address }}</span>
+                    </div>
+                    {% endif %}
+                    {% if config.get('hostname') %}
+                    <div class="detail-row">
+                        <span class="detail-label">Хост</span>
+                        <span class="detail-value">{{ config.hostname }}</span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <!-- Resource Cost -->
+            <div class="resource-cost">
+                <div class="cost-amount">{{ resource.effective_cost|round(2) }} ₽</div>
+                <div class="cost-period">в месяц</div>
+            </div>
+
+            <!-- Resource Actions -->
+            <div class="resource-actions">
+                <button class="action-button action-primary" title="Подробнее">
+                    <i class="fa-solid fa-info"></i>
+                </button>
+                <button class="action-button action-secondary" title="Настройки">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                {% if resource.status == 'RUNNING' %}
+                <button class="action-button action-warning" title="Остановить">
+                    <i class="fa-solid fa-stop"></i>
+                </button>
+                {% else %}
+                <button class="action-button action-success" title="Запустить">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
     </div>
     {% else %}
     <div class="empty-state">
@@ -210,162 +213,297 @@
     color: var(--text-primary);
 }
 
-.resources-table-container {
+/* Resource Cards Grid */
+.resources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.resource-card {
     background: var(--background-white);
     border: 1px solid var(--border-light);
-    border-radius: 8px;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+    position: relative;
     overflow: hidden;
 }
 
-.resources-table {
-    width: 100%;
-    border-collapse: collapse;
+.resource-card:hover {
+    border-color: var(--primary-blue);
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.1);
+    transform: translateY(-2px);
 }
 
-.resources-table th {
-    background: var(--background-light);
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-light);
-}
-
-.resources-table td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-light);
-    vertical-align: top;
-}
-
-.resource-name {
+/* Resource Header */
+.resource-header {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 
 .resource-icon {
-    width: 32px;
-    height: 32px;
-    background: var(--background-light);
-    border-radius: 6px;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.resource-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.resource-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.resource-type {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.resource-status {
+    flex-shrink: 0;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.375rem 0.75rem;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+.status-running {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-green);
+}
+
+.status-stopped {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning-orange);
+}
+
+.status-active {
+    background: rgba(59, 130, 246, 0.1);
     color: var(--primary-blue);
 }
 
-.resource-title {
-    font-weight: 500;
-    color: var(--text-primary);
+.status-unknown {
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--text-secondary);
 }
 
-.resource-id {
-    font-size: 0.75rem;
+/* Resource Details */
+.resource-details {
+    margin-bottom: 1rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-size: 0.875rem;
     color: var(--text-secondary);
-    font-family: monospace;
+    font-weight: 500;
+}
+
+.detail-value {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 500;
 }
 
 .provider-badge {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.provider-yandex-cloud {
+.provider-beget {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-blue);
+}
+
+.provider-yandex {
     background: rgba(255, 193, 7, 0.1);
     color: #b45309;
 }
 
 .provider-selectel {
-    background: rgba(59, 130, 246, 0.1);
-    color: #1e40af;
-}
-
-.resource-type {
-    background: var(--background-light);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.status-badge {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.875rem;
-}
-
-.status-running {
+    background: rgba(16, 185, 129, 0.1);
     color: var(--success-green);
 }
 
-.status-stopped {
-    color: var(--warning-orange);
+/* Resource Cost */
+.resource-cost {
+    background: var(--background-light);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    margin-bottom: 1rem;
 }
 
-.status-in-use, .status-active {
-    color: var(--primary-blue);
+.cost-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
 }
 
-.config-info {
+.cost-period {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    line-height: 1.4;
+    margin-top: 0.25rem;
 }
 
-.tag {
-    display: inline-block;
-    background: var(--background-light);
-    color: var(--text-secondary);
-    padding: 0.125rem 0.375rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    margin: 0.125rem 0.25rem 0.125rem 0;
-}
-
-.no-tags {
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-.cost {
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
+/* Resource Actions */
 .resource-actions {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.5rem;
+    justify-content: center;
 }
 
-.icon-button {
-    width: 28px;
-    height: 28px;
+.action-button {
+    width: 36px;
+    height: 36px;
     border: 1px solid var(--border-light);
     background: var(--background-white);
-    border-radius: 4px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     color: var(--text-secondary);
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    font-size: 0.875rem;
 }
 
-.icon-button:hover {
+.action-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-primary {
+    color: var(--primary-blue);
+}
+
+.action-primary:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: var(--primary-blue);
+}
+
+.action-secondary {
+    color: var(--text-secondary);
+}
+
+.action-secondary:hover {
     background: var(--background-light);
     color: var(--text-primary);
 }
 
-.icon-button.icon-warning {
+.action-warning {
     color: var(--warning-orange);
 }
 
-.icon-button.icon-warning:hover {
+.action-warning:hover {
     background: rgba(245, 158, 11, 0.1);
+    border-color: var(--warning-orange);
+}
+
+.action-success {
+    color: var(--success-green);
+}
+
+.action-success:hover {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: var(--success-green);
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.empty-state-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .resources-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .resource-card {
+        padding: 1rem;
+    }
+    
+    .resource-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .resource-status {
+        align-self: flex-start;
+    }
+    
+    .resource-actions {
+        justify-content: flex-start;
+    }
 }
 </style>
 {% endblock %}

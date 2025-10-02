@@ -174,7 +174,7 @@ def edit_connection(provider_id):
 
 @beget_bp.route('/<int:provider_id>/sync', methods=['POST'])
 def sync_connection(provider_id):
-    """Sync Beget connection"""
+    """Sync Beget connection with comprehensive snapshot system"""
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
@@ -185,28 +185,24 @@ def sync_connection(provider_id):
         if not provider:
             return jsonify({'success': False, 'error': 'Connection not found'}), 404
         
-        # Get credentials
-        credentials = json.loads(provider.credentials) if provider.credentials else {}
-        username = credentials.get('username')
-        password = credentials.get('password')
-        api_url = credentials.get('api_url', 'https://api.beget.com')
+        # Import sync service
+        from app.core.services.sync_service import SyncService
         
-        # Test connection
-        client = BegetAPIClient(username, password, api_url)
-        test_result = client.test_connection()
+        # Initialize sync service
+        sync_service = SyncService(provider_id)
         
-        if test_result['status'] != 'success':
-            return jsonify({'success': False, 'error': test_result['message']}), 400
+        # Perform comprehensive sync
+        sync_result = sync_service.sync_resources(sync_type='manual')
         
-        # Update sync status
-        provider.last_sync = db.func.now()
-        provider.sync_status = 'success'
-        provider.sync_error = None
-        provider.provider_metadata = json.dumps(test_result.get('account_info', {}))
-        
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Connection synced successfully'})
+        if sync_result['success']:
+            return jsonify({
+                'success': True, 
+                'message': sync_result['message'],
+                'snapshot_id': sync_result['snapshot_id'],
+                'sync_result': sync_result['sync_result']
+            })
+        else:
+            return jsonify({'success': False, 'error': sync_result['error']}), 500
         
     except Exception as e:
         db.session.rollback()
