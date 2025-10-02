@@ -94,8 +94,8 @@
                     </div>
                 </div>
                 <div class="provider-stats">
-                    <span class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
                     <span class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
+                    <span class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
                 </div>
             </div>
             <div class="provider-actions">
@@ -483,9 +483,9 @@
 
 .provider-stats {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.25rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .provider-resource-count {
