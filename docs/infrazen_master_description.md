@@ -1469,5 +1469,61 @@ def enrich_existing_resources(sync_result):
 - **Automated Optimization**: Foundation for automated right-sizing recommendations
 - **Cost Intelligence**: Enhanced FinOps capabilities with performance data
 
+### 12.9. Interactive Performance Visualization
+
+#### 12.9.1. Usage Section Implementation
+The platform now features an interactive "Usage" section within each resource card that provides:
+
+**Collapsible Interface**:
+- Expandable/collapsible section with smooth animations
+- Chart-line icon and chevron indicators for intuitive navigation
+- Clean, modern UI design matching the overall platform aesthetic
+
+**Real-Time Performance Graphs**:
+- **CPU Usage Graph**: Interactive Chart.js line chart showing CPU utilization over time
+- **Memory Usage Graph**: Interactive Chart.js line chart showing memory consumption over time
+- **HD Usage Meter**: Traditional progress bar for disk usage (existing functionality)
+
+**Data Integration**:
+- Graphs automatically populate with real performance data from Beget API
+- Time-series data visualization with proper scaling and formatting
+- Fallback to sample data when real data is unavailable
+- Responsive design that works across different screen sizes
+
+#### 12.9.2. Technical Implementation
+**Chart.js Integration**:
+- Professional-grade data visualization library
+- Smooth animations and interactive tooltips
+- Responsive design with automatic scaling
+- Color-coded performance indicators
+
+**Data Flow Architecture**:
+- **Backend**: Performance data collected via Beget API endpoints
+- **Database**: Metrics stored in resource tags and snapshot metadata
+- **Frontend**: JSON serialization for Chart.js consumption
+- **Visualization**: Real-time graphs with historical context
+
+**Resource Prioritization**:
+- Resources with performance data displayed first
+- Debug information for resource identification
+- Seamless integration with existing resource management
+
+#### 12.9.3. User Experience Enhancements
+**Immediate Feedback**:
+- Users can instantly see resource performance without additional clicks
+- Real-time data visualization with historical context
+- Performance trends and patterns clearly displayed
+
+**Visual Clarity**:
+- Color-coded graphs and meters make performance data easily digestible
+- Time-series data provides trend analysis capabilities
+- Mobile responsive design adapts to different screen sizes
+
+**Operational Benefits**:
+- **Proactive Monitoring**: Identify performance issues before they impact costs
+- **Data-Driven Decisions**: Visual performance data supports optimization choices
+- **Cost-Performance Correlation**: Link resource costs to actual utilization
+- **Capacity Planning**: Historical data supports future resource allocation
+
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.
