@@ -41,7 +41,7 @@
                     <i class="fa-solid fa-sync"></i>
                 </div>
                 <div class="stat-content">
-                    <span class="stat-value">{{ providers|selectattr('last_sync', 'defined')|list|length }}</span>
+                    <span class="stat-value">{{ providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list|length }}</span>
                     <span class="stat-label">Синхронизировано</span>
                 </div>
             </div>
@@ -51,10 +51,10 @@
                 </div>
                 <div class="stat-content">
                     <span class="stat-value">
-                        {% set synced_providers = providers|selectattr('last_sync', 'defined')|list %}
+                        {% set synced_providers = providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list %}
                         {% if synced_providers|length > 0 %}
                             {% set latest_sync = synced_providers|first %}
-                            {{ latest_sync.last_sync.strftime('%H:%M') if latest_sync.last_sync else 'Никогда' }}
+                            {{ latest_sync.last_sync.strftime('%H:%M') }}
                         {% else %}
                             Никогда
                         {% endif %}
