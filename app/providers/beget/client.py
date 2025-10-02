@@ -1125,12 +1125,23 @@ class BegetAPIClient:
                 logger.info("Syncing VPS information...")
                 vps_servers = self.get_vps_servers_new_api()
                 
+                # Collect CPU and memory statistics for all VPS servers
+                logger.info("Collecting CPU statistics for VPS servers...")
+                cpu_statistics = self.get_all_vps_cpu_statistics(vps_servers, period='HOUR')
+                
+                logger.info("Collecting memory statistics for VPS servers...")
+                memory_statistics = self.get_all_vps_memory_statistics(vps_servers, period='HOUR')
+                
                 sync_result['vps_sync'] = {
                     'status': 'success',
                     'vps_servers': vps_servers,
-                    'vps_count': len(vps_servers)
+                    'vps_count': len(vps_servers),
+                    'cpu_statistics': cpu_statistics,
+                    'memory_statistics': memory_statistics
                 }
                 sync_result['resources']['vps_servers'] = vps_servers
+                sync_result['resources']['vps_cpu_statistics'] = cpu_statistics
+                sync_result['resources']['vps_memory_statistics'] = memory_statistics
                 
                 # Calculate VPS costs
                 total_daily_cost = sum(vps.get('daily_cost', 0) for vps in vps_servers)
@@ -1140,6 +1151,7 @@ class BegetAPIClient:
                 sync_result['vps_sync']['total_monthly_cost'] = total_monthly_cost
                 
                 logger.info(f"VPS sync successful: {len(vps_servers)} VPS instances, {total_daily_cost} RUB/day")
+                logger.info(f"CPU statistics collected for {cpu_statistics.get('vps_with_cpu_data', 0)} VPS servers")
                 
             except Exception as e:
                 error_msg = f"VPS sync failed: {str(e)}"
@@ -1385,6 +1397,282 @@ class BegetAPIClient:
             
             'provider_config': service
         }
+    
+    def get_vps_cpu_statistics(self, vps_id: str, period: str = 'HOUR') -> Dict:
+        """Get CPU statistics for a specific VPS"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/vps/statistic/cpu/{vps_id}"
+            params = {
+                'id': vps_id,
+                'period': period
+            }
+            
+            logger.info(f"Fetching CPU statistics for VPS {vps_id} with period {period}")
+            
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved CPU statistics for VPS {vps_id}")
+                
+                # Process the CPU statistics data
+                if 'cpu' in result:
+                    return self._process_cpu_statistics_data(result['cpu'], vps_id, period)
+                else:
+                    logger.warning(f"Unexpected CPU statistics response format: {result}")
+                    return {}
+                    
+            except Exception as e:
+                logger.error(f"CPU statistics endpoint failed for VPS {vps_id}: {e}")
+                return {}
+            
+        except Exception as e:
+            logger.error(f"Failed to get CPU statistics for VPS {vps_id}: {e}")
+            return {}
+    
+    def _process_cpu_statistics_data(self, cpu_data: Dict, vps_id: str, period: str) -> Dict:
+        """Process CPU statistics data from API"""
+        try:
+            dates = cpu_data.get('date', [])
+            values = cpu_data.get('value', [])
+            
+            if not dates or not values or len(dates) != len(values):
+                logger.warning(f"Invalid CPU data structure for VPS {vps_id}")
+                return {}
+            
+            # Calculate statistics
+            cpu_values = [float(v) for v in values if v is not None]
+            
+            if not cpu_values:
+                logger.warning(f"No valid CPU values for VPS {vps_id}")
+                return {}
+            
+            # Calculate metrics
+            avg_cpu = sum(cpu_values) / len(cpu_values)
+            max_cpu = max(cpu_values)
+            min_cpu = min(cpu_values)
+            
+            # Calculate trend (simple linear trend)
+            if len(cpu_values) > 1:
+                first_half = cpu_values[:len(cpu_values)//2]
+                second_half = cpu_values[len(cpu_values)//2:]
+                trend = (sum(second_half) / len(second_half)) - (sum(first_half) / len(first_half))
+            else:
+                trend = 0
+            
+            # Determine performance tier
+            if avg_cpu < 20:
+                performance_tier = 'low'
+            elif avg_cpu < 50:
+                performance_tier = 'medium'
+            else:
+                performance_tier = 'high'
+            
+            return {
+                'vps_id': vps_id,
+                'period': period,
+                'data_points': len(cpu_values),
+                'avg_cpu_usage': round(avg_cpu, 2),
+                'max_cpu_usage': round(max_cpu, 2),
+                'min_cpu_usage': round(min_cpu, 2),
+                'trend': round(trend, 2),
+                'performance_tier': performance_tier,
+                'raw_data': {
+                    'dates': dates,
+                    'values': values
+                },
+                'timestamp': dates[-1] if dates else None,  # Last timestamp
+                'collection_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing CPU statistics for VPS {vps_id}: {e}")
+            return {}
+    
+    def get_all_vps_cpu_statistics(self, vps_servers: List[Dict], period: str = 'HOUR') -> Dict:
+        """Get CPU statistics for all VPS servers"""
+        try:
+            cpu_statistics = {}
+            
+            for vps in vps_servers:
+                vps_id = vps.get('id')
+                vps_name = vps.get('name', 'Unknown')
+                
+                if vps_id:
+                    logger.info(f"Collecting CPU statistics for VPS: {vps_name} ({vps_id})")
+                    cpu_data = self.get_vps_cpu_statistics(vps_id, period)
+                    
+                    if cpu_data:
+                        cpu_statistics[vps_id] = {
+                            'vps_name': vps_name,
+                            'cpu_statistics': cpu_data
+                        }
+                    else:
+                        logger.warning(f"No CPU data collected for VPS {vps_name}")
+                else:
+                    logger.warning(f"No VPS ID found for VPS: {vps_name}")
+            
+            return {
+                'total_vps': len(vps_servers),
+                'vps_with_cpu_data': len(cpu_statistics),
+                'period': period,
+                'cpu_statistics': cpu_statistics,
+                'collection_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to collect CPU statistics for all VPS: {e}")
+            return {}
+    
+    def get_vps_memory_statistics(self, vps_id: str, period: str = 'HOUR') -> Dict:
+        """Get memory statistics for a specific VPS"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/vps/statistic/memory/{vps_id}"
+            params = {
+                'id': vps_id,
+                'period': period
+            }
+            
+            logger.info(f"Fetching memory statistics for VPS {vps_id} with period {period}")
+            
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved memory statistics for VPS {vps_id}")
+                
+                # Process the memory statistics data
+                if 'memory' in result:
+                    return self._process_memory_statistics_data(result['memory'], vps_id, period)
+                else:
+                    logger.warning(f"Unexpected memory statistics response format: {result}")
+                    return {}
+                    
+            except Exception as e:
+                logger.error(f"Memory statistics endpoint failed for VPS {vps_id}: {e}")
+                return {}
+            
+        except Exception as e:
+            logger.error(f"Failed to get memory statistics for VPS {vps_id}: {e}")
+            return {}
+    
+    def _process_memory_statistics_data(self, memory_data: Dict, vps_id: str, period: str) -> Dict:
+        """Process memory statistics data from API"""
+        try:
+            dates = memory_data.get('date', [])
+            values = memory_data.get('value', [])
+            
+            if not dates or not values or len(dates) != len(values):
+                logger.warning(f"Invalid memory data structure for VPS {vps_id}")
+                return {}
+            
+            # Calculate statistics
+            memory_values = [float(v) for v in values if v is not None]
+            
+            if not memory_values:
+                logger.warning(f"No valid memory values for VPS {vps_id}")
+                return {}
+            
+            # Calculate metrics
+            avg_memory = sum(memory_values) / len(memory_values)
+            max_memory = max(memory_values)
+            min_memory = min(memory_values)
+            
+            # Calculate trend (simple linear trend)
+            if len(memory_values) > 1:
+                first_half = memory_values[:len(memory_values)//2]
+                second_half = memory_values[len(memory_values)//2:]
+                trend = (sum(second_half) / len(second_half)) - (sum(first_half) / len(first_half))
+            else:
+                trend = 0
+            
+            # Determine memory usage tier (assuming 2GB = 2048MB total)
+            total_memory_mb = 2048  # This should be fetched from VPS config
+            memory_usage_percent = (avg_memory / total_memory_mb) * 100
+            
+            if memory_usage_percent < 30:
+                memory_tier = 'low'
+            elif memory_usage_percent < 70:
+                memory_tier = 'medium'
+            else:
+                memory_tier = 'high'
+            
+            return {
+                'vps_id': vps_id,
+                'period': period,
+                'data_points': len(memory_values),
+                'avg_memory_usage_mb': round(avg_memory, 2),
+                'max_memory_usage_mb': round(max_memory, 2),
+                'min_memory_usage_mb': round(min_memory, 2),
+                'memory_usage_percent': round(memory_usage_percent, 2),
+                'trend': round(trend, 2),
+                'memory_tier': memory_tier,
+                'raw_data': {
+                    'dates': dates,
+                    'values': values
+                },
+                'timestamp': dates[-1] if dates else None,  # Last timestamp
+                'collection_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing memory statistics for VPS {vps_id}: {e}")
+            return {}
+    
+    def get_all_vps_memory_statistics(self, vps_servers: List[Dict], period: str = 'HOUR') -> Dict:
+        """Get memory statistics for all VPS servers"""
+        try:
+            memory_statistics = {}
+            
+            for vps in vps_servers:
+                vps_id = vps.get('id')
+                vps_name = vps.get('name', 'Unknown')
+                
+                if vps_id:
+                    logger.info(f"Collecting memory statistics for VPS: {vps_name} ({vps_id})")
+                    memory_data = self.get_vps_memory_statistics(vps_id, period)
+                    
+                    if memory_data:
+                        memory_statistics[vps_id] = {
+                            'vps_name': vps_name,
+                            'memory_statistics': memory_data
+                        }
+                    else:
+                        logger.warning(f"No memory data collected for VPS {vps_name}")
+                else:
+                    logger.warning(f"No VPS ID found for VPS: {vps_name}")
+            
+            return {
+                'total_vps': len(vps_servers),
+                'vps_with_memory_data': len(memory_statistics),
+                'period': period,
+                'memory_statistics': memory_statistics,
+                'collection_timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to collect memory statistics for all VPS: {e}")
+            return {}
     
     def logout(self):
         """Logout from Beget API"""

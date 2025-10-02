@@ -1364,5 +1364,110 @@ def enrich_existing_resources(sync_result):
 - **Resource Tracking**: Complete audit trail of all resource changes
 - **Admin Access**: Centralized management of admin credentials and access
 
+### 12.8. VPS Performance Statistics Integration
+
+#### 12.8.1. CPU Usage Statistics
+**API Endpoint**: `/v1/vps/statistic/cpu/{VPS_ID}`
+**Data Collection**: Automatic during VPS sync process
+**Metrics Collected**:
+- **Average CPU Usage**: Percentage utilization over time
+- **Maximum CPU Usage**: Peak CPU utilization
+- **Minimum CPU Usage**: Baseline CPU utilization
+- **CPU Trend**: Usage trend analysis over time
+- **Performance Tier**: Low/Medium/High classification
+- **Data Points**: 60-108 data points per hour (1-minute intervals)
+
+**Current VPS CPU Performance**:
+- **runner rus**: 7.66% average CPU, 14.86% max, **LOW** performance tier
+- **Objective Perrin**: 9.19% average CPU, 12.77% max, **LOW** performance tier
+
+#### 12.8.2. Memory Usage Statistics
+**API Endpoint**: `/v1/vps/statistic/memory/{VPS_ID}`
+**Data Collection**: Automatic during VPS sync process
+**Metrics Collected**:
+- **Average Memory Usage**: MB utilization over time
+- **Maximum Memory Usage**: Peak memory utilization
+- **Minimum Memory Usage**: Baseline memory utilization
+- **Memory Usage Percentage**: Percentage of total allocated memory
+- **Memory Trend**: Usage trend analysis over time
+- **Memory Tier**: Low/Medium/High classification
+- **Data Points**: 60-114 data points per hour (1-minute intervals)
+
+**Current VPS Memory Performance**:
+- **runner rus**: 991.38 MB average, 48.41% usage, **MEDIUM** tier
+- **Objective Perrin**: 1145.82 MB average, 55.95% usage, **MEDIUM** tier
+
+#### 12.8.3. Performance Analysis Results
+**Resource Utilization Summary**:
+- **CPU Utilization**: 7-9% average (significantly underutilized)
+- **Memory Utilization**: 48-56% average (moderately utilized)
+- **Optimization Opportunity**: CPU-focused right-sizing potential
+
+**Right-sizing Recommendations**:
+1. **CPU Optimization**: Both VPS show very low CPU usage (7-9%) → potential for smaller CPU configurations
+2. **Memory Optimization**: Current memory allocation appears appropriate (48-56% usage)
+3. **Cost Savings Focus**: CPU right-sizing for maximum cost optimization
+
+#### 12.8.4. Data Storage and Processing
+**Snapshot Storage**:
+- **CPU Statistics**: Stored in `vps_cpu_statistics` snapshot metadata
+- **Memory Statistics**: Stored in `vps_memory_statistics` snapshot metadata
+- **Resource Tags**: Performance metrics added to VPS resources
+- **Historical Data**: Complete time-series data preserved for trend analysis
+
+**Data Structure**:
+```json
+{
+  "vps_cpu_statistics": {
+    "vps_id": {
+      "vps_name": "VPS Name",
+      "cpu_statistics": {
+        "avg_cpu_usage": 7.66,
+        "max_cpu_usage": 14.86,
+        "performance_tier": "low",
+        "data_points": 108
+      }
+    }
+  },
+  "vps_memory_statistics": {
+    "vps_id": {
+      "vps_name": "VPS Name", 
+      "memory_statistics": {
+        "avg_memory_usage_mb": 991.38,
+        "memory_usage_percent": 48.41,
+        "memory_tier": "medium",
+        "data_points": 114
+      }
+    }
+  }
+}
+```
+
+#### 12.8.5. Business Intelligence Capabilities
+**FinOps Analytics**:
+- **Resource Efficiency**: CPU and memory utilization per RUB spent
+- **Right-sizing Analysis**: Identify underutilized resources for cost optimization
+- **Performance Baselines**: Establish normal usage patterns for capacity planning
+- **Trend Analysis**: Long-term performance trends for forecasting
+
+**Operational Insights**:
+- **Anomaly Detection**: Identify unusual CPU or memory spikes
+- **Capacity Planning**: Data-driven resource allocation decisions
+- **Cost Optimization**: Automated recommendations for resource right-sizing
+- **Performance Monitoring**: Real-time resource utilization tracking
+
+#### 12.8.6. Implementation Benefits
+**Zero Breaking Changes**:
+- ✅ **Existing Functionality**: All existing sync and resource management preserved
+- ✅ **Enhanced Data**: VPS resources enriched with performance metrics
+- ✅ **Historical Tracking**: Complete performance history maintained
+- ✅ **API Compatibility**: All existing endpoints and functionality maintained
+
+**Future-Ready Architecture**:
+- **Golden Records**: Prepared for future golden record architecture
+- **Advanced Analytics**: Ready for machine learning and predictive analytics
+- **Automated Optimization**: Foundation for automated right-sizing recommendations
+- **Cost Intelligence**: Enhanced FinOps capabilities with performance data
+
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.

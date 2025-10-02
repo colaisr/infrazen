@@ -124,6 +124,20 @@ class SyncService:
                     logger.info(f"Processed {vps_count} VPS servers from VPS sync")
                 else:
                     logger.warning("No VPS servers data in VPS sync")
+                
+                # Process CPU statistics
+                if 'cpu_statistics' in vps_data:
+                    cpu_count = self._process_vps_cpu_statistics(snapshot, vps_data['cpu_statistics'])
+                    logger.info(f"Processed CPU statistics for {cpu_count} VPS servers")
+                else:
+                    logger.warning("No CPU statistics data in VPS sync")
+                
+                # Process memory statistics
+                if 'memory_statistics' in vps_data:
+                    memory_count = self._process_vps_memory_statistics(snapshot, vps_data['memory_statistics'])
+                    logger.info(f"Processed memory statistics for {memory_count} VPS servers")
+                else:
+                    logger.warning("No memory statistics data in VPS sync")
             else:
                 error_msg = sync_result.get('vps_sync', {}).get('error', 'VPS sync failed')
                 sync_errors.append(f"VPS sync: {error_msg}")
@@ -309,6 +323,163 @@ class SyncService:
             except Exception as e:
                 logger.error(f"Error processing VPS {vps.get('name', 'unknown')}: {e}")
                 continue
+        
+        return processed_count
+    
+    def _process_vps_cpu_statistics(self, snapshot: SyncSnapshot, cpu_statistics: Dict) -> int:
+        """Process CPU statistics for VPS servers"""
+        processed_count = 0
+        
+        try:
+            cpu_data = cpu_statistics.get('cpu_statistics', {})
+            
+            for vps_id, vps_cpu_data in cpu_data.items():
+                try:
+                    vps_name = vps_cpu_data.get('vps_name', 'Unknown')
+                    cpu_stats = vps_cpu_data.get('cpu_statistics', {})
+                    
+                    if not cpu_stats:
+                        logger.warning(f"No CPU statistics for VPS {vps_name}")
+                        continue
+                    
+                    # Find the corresponding VPS resource
+                    vps_resource = Resource.query.filter_by(
+                        resource_id=vps_id,
+                        resource_type='VPS'
+                    ).first()
+                    
+                    if not vps_resource:
+                        logger.warning(f"VPS resource not found for ID {vps_id}")
+                        continue
+                    
+                    # Add CPU performance tags to the VPS resource
+                    self._add_resource_tags(vps_resource, {
+                        'cpu_avg_usage': str(cpu_stats.get('avg_cpu_usage', 0)),
+                        'cpu_max_usage': str(cpu_stats.get('max_cpu_usage', 0)),
+                        'cpu_min_usage': str(cpu_stats.get('min_cpu_usage', 0)),
+                        'cpu_trend': str(cpu_stats.get('trend', 0)),
+                        'cpu_performance_tier': cpu_stats.get('performance_tier', 'unknown'),
+                        'cpu_data_points': str(cpu_stats.get('data_points', 0)),
+                        'cpu_period': cpu_stats.get('period', 'HOUR'),
+                        'cpu_collection_timestamp': cpu_stats.get('collection_timestamp', '')
+                    })
+                    
+                    # Store raw CPU data in the snapshot
+                    snapshot_data = {
+                        'vps_id': vps_id,
+                        'vps_name': vps_name,
+                        'cpu_statistics': cpu_stats,
+                        'collection_timestamp': cpu_stats.get('collection_timestamp', '')
+                    }
+                    
+                    # Store in snapshot metadata
+                    if not snapshot.metadata:
+                        snapshot.metadata = {}
+                    
+                    if 'vps_cpu_statistics' not in snapshot.metadata:
+                        snapshot.metadata['vps_cpu_statistics'] = {}
+                    
+                    snapshot.metadata['vps_cpu_statistics'][vps_id] = snapshot_data
+                    
+                    processed_count += 1
+                    logger.debug(f"Processed CPU statistics for VPS: {vps_name}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing CPU statistics for VPS {vps_id}: {e}")
+                    continue
+            
+            # Update snapshot with CPU statistics summary
+            if not snapshot.metadata:
+                snapshot.metadata = {}
+            
+            snapshot.metadata['cpu_statistics_summary'] = {
+                'total_vps': cpu_statistics.get('total_vps', 0),
+                'vps_with_cpu_data': cpu_statistics.get('vps_with_cpu_data', 0),
+                'period': cpu_statistics.get('period', 'HOUR'),
+                'collection_timestamp': cpu_statistics.get('collection_timestamp', '')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing VPS CPU statistics: {e}")
+        
+        return processed_count
+    
+    def _process_vps_memory_statistics(self, snapshot: SyncSnapshot, memory_statistics: Dict) -> int:
+        """Process memory statistics for VPS servers"""
+        processed_count = 0
+        
+        try:
+            memory_data = memory_statistics.get('memory_statistics', {})
+            
+            for vps_id, vps_memory_data in memory_data.items():
+                try:
+                    vps_name = vps_memory_data.get('vps_name', 'Unknown')
+                    memory_stats = vps_memory_data.get('memory_statistics', {})
+                    
+                    if not memory_stats:
+                        logger.warning(f"No memory statistics for VPS {vps_name}")
+                        continue
+                    
+                    # Find the corresponding VPS resource
+                    vps_resource = Resource.query.filter_by(
+                        resource_id=vps_id,
+                        resource_type='VPS'
+                    ).first()
+                    
+                    if not vps_resource:
+                        logger.warning(f"VPS resource not found for ID {vps_id}")
+                        continue
+                    
+                    # Add memory performance tags to the VPS resource
+                    self._add_resource_tags(vps_resource, {
+                        'memory_avg_usage_mb': str(memory_stats.get('avg_memory_usage_mb', 0)),
+                        'memory_max_usage_mb': str(memory_stats.get('max_memory_usage_mb', 0)),
+                        'memory_min_usage_mb': str(memory_stats.get('min_memory_usage_mb', 0)),
+                        'memory_usage_percent': str(memory_stats.get('memory_usage_percent', 0)),
+                        'memory_trend': str(memory_stats.get('trend', 0)),
+                        'memory_tier': memory_stats.get('memory_tier', 'unknown'),
+                        'memory_data_points': str(memory_stats.get('data_points', 0)),
+                        'memory_period': memory_stats.get('period', 'HOUR'),
+                        'memory_collection_timestamp': memory_stats.get('collection_timestamp', '')
+                    })
+                    
+                    # Store raw memory data in the snapshot
+                    snapshot_data = {
+                        'vps_id': vps_id,
+                        'vps_name': vps_name,
+                        'memory_statistics': memory_stats,
+                        'collection_timestamp': memory_stats.get('collection_timestamp', '')
+                    }
+                    
+                    # Store in snapshot metadata
+                    if not snapshot.metadata:
+                        snapshot.metadata = {}
+                    
+                    if 'vps_memory_statistics' not in snapshot.metadata:
+                        snapshot.metadata['vps_memory_statistics'] = {}
+                    
+                    snapshot.metadata['vps_memory_statistics'][vps_id] = snapshot_data
+                    
+                    processed_count += 1
+                    logger.debug(f"Processed memory statistics for VPS: {vps_name}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing memory statistics for VPS {vps_id}: {e}")
+                    continue
+            
+            # Update snapshot with memory statistics summary
+            if not snapshot.metadata:
+                snapshot.metadata = {}
+            
+            snapshot.metadata['memory_statistics_summary'] = {
+                'total_vps': memory_statistics.get('total_vps', 0),
+                'vps_with_memory_data': memory_statistics.get('vps_with_memory_data', 0),
+                'period': memory_statistics.get('period', 'HOUR'),
+                'collection_timestamp': memory_statistics.get('collection_timestamp', '')
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing VPS memory statistics: {e}")
         
         return processed_count
     
