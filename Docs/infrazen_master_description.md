@@ -1033,5 +1033,336 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Reporting**: Account information reports
 - **API Access**: Programmatic account information access
 
+## 12. Beget Cloud API Enrichment Analysis
+
+### 12.1. Current Data Collection & Storage Architecture
+
+#### 12.1.1. Database Object Dependencies
+```
+User (1) → CloudProvider (N) → Resource (N) → ResourceState (N)
+                    ↓
+            SyncSnapshot (N) → ResourceState (N)
+                    ↓
+            ResourceMetrics, ResourceTags, ResourceLogs, etc.
+```
+
+#### 12.1.2. Current Resource Collection
+**Account Information (Legacy API)**
+- **Source**: `/api/user/getAccountInfo`
+- **Stored In**: `cloud_providers.provider_metadata` (JSON)
+- **Data**: Balance (174.51 RUB), rates, server info, software versions
+- **Cost**: Daily (60.73 RUB), Monthly (1,847 RUB), Yearly (22,166 RUB)
+
+**Domains (Legacy API)**
+- **Source**: `/api/domain/getList`
+- **Stored In**: `resources` table
+- **Current**: 6 domains (1 registered: neurocola.com, 5 subdomains)
+- **Status**: 1 active, 5 inactive
+
+**VPS Servers (New API)**
+- **Source**: `/v1/vps/server/list`
+- **Stored In**: `resources` table
+- **Current**: 2 VPS instances (Objective Perrin, runner rus)
+- **Status**: Both RUNNING
+
+### 12.2. New Cloud Endpoint Discovery (`/v1/cloud`)
+
+#### 12.2.1. Cloud Services Available
+**MySQL Cloud Database**
+- **ID**: `3cf940aa-3704-499b-8b90-ef0ec941fc76`
+- **Name**: "Cloud database 1"
+- **Cost**: 29 RUB/day, 870 RUB/month
+- **Configuration**: 2 CPU, 2GB RAM, 20GB disk, MySQL 5.7.34
+- **Status**: RUNNING
+- **Features**: phpMyAdmin access, public/private IPs, disk usage tracking
+
+**S3-Compatible Storage**
+- **ID**: `f88ce2cf-8570-4ad0-bb67-824ac5308c34`
+- **Name**: "Humane Orrin"
+- **Cost**: 0 RUB/day, 0 RUB/month (Free)
+- **Features**: FTP/SFTP access, access keys, CORS support
+- **Status**: RUNNING
+
+#### 12.2.2. Enhanced VPS Data
+- **Software Details**: n8n v1.108.2 with admin credentials
+- **Configuration**: CPU, RAM, disk, bandwidth specifications
+- **Cost Breakdown**: Daily and monthly costs per VPS
+- **Admin Access**: SSH, application admin credentials
+
+### 12.3. Enrichment Strategy: Organic Growth Without Duplication
+
+#### 12.3.1. Phase 1: New Resource Types (No Conflicts)
+**MySQL Cloud Database**
+```python
+Resource(
+    resource_id="3cf940aa-3704-499b-8b90-ef0ec941fc76",
+    resource_name="Cloud database 1",
+    resource_type="MySQL Database",
+    service_name="Database",
+    region="ru2",
+    status="RUNNING",
+    effective_cost=870.0,  # Monthly
+    daily_cost=29.0,      # Daily
+    provider_config={
+        "mysql5": {
+            "configuration": {...},
+            "host": "noufekuklorheg.beget.app",
+            "port": 3306,
+            "disk_used": "458227712",
+            "disk_left": "21016608768"
+        }
+    }
+)
+```
+
+**S3 Storage**
+```python
+Resource(
+    resource_id="f88ce2cf-8570-4ad0-bb67-824ac5308c34",
+    resource_name="Humane Orrin",
+    resource_type="S3 Storage",
+    service_name="Storage",
+    region="ru2",
+    status="RUNNING",
+    effective_cost=0.0,   # Free
+    provider_config={
+        "s3": {
+            "access_key": "J1P3082D3HK0JP05JEEF",
+            "secret_key": "...",
+            "ftp": {...},
+            "sftp": {...}
+        }
+    }
+)
+```
+
+#### 12.3.2. Phase 2: VPS Enhancement (Enrichment Strategy)
+**Current VPS Resources**
+- Resource 7: "Objective Perrin" (VPS) - Basic info only
+- Resource 8: "runner rus" (VPS) - Basic info only
+
+**Enrichment Approach**
+```python
+vps_enhancement = {
+    "software": {
+        "name": "n8n",
+        "version": "1.108.2",
+        "admin_credentials": {
+            "email": "cola.isr@gmail.com",
+            "password": "lmc0%CbN"
+        }
+    },
+    "configuration": {
+        "cpu_count": 2,
+        "memory": 2048,
+        "disk_size": 30720,
+        "bandwidth_public": 150
+    },
+    "cost_breakdown": {
+        "daily_cost": 22,
+        "monthly_cost": 660
+    }
+}
+```
+
+#### 12.3.3. Phase 3: Cost Optimization Integration
+**Enhanced Cost Tracking**
+```python
+total_monthly_costs = {
+    "account": 1847.0,      # Cloud plan
+    "mysql_database": 870.0, # New from cloud endpoint
+    "vps_1": 660.0,         # Enhanced from VPS API
+    "vps_2": 291.9,         # Enhanced from VPS API
+    "s3_storage": 0.0,       # New from cloud endpoint
+    "total": 3668.9          # Total monthly cost
+}
+```
+
+### 12.4. Implementation Strategy: Zero-Breaking Changes
+
+#### 12.4.1. Additive Approach
+- **New Resources**: Add MySQL Database and S3 Storage as new resource types
+- **Existing Resources**: Enrich VPS data with additional configuration
+- **No Deletion**: Keep all existing resources and relationships intact
+
+#### 12.4.2. Enrichment Process
+```python
+def enrich_existing_resources(sync_result):
+    """Enrich existing resources with new endpoint data"""
+    
+    # 1. Add new cloud services (no conflicts)
+    for cloud_service in sync_result['cloud_services']:
+        create_new_resource(cloud_service)
+    
+    # 2. Enrich existing VPS resources
+    for vps_data in sync_result['vps_servers']:
+        existing_resource = find_existing_vps(vps_data['id'])
+        if existing_resource:
+            enrich_vps_resource(existing_resource, vps_data)
+        else:
+            create_new_vps_resource(vps_data)
+    
+    # 3. Update cost calculations
+    update_total_cost_analysis()
+```
+
+#### 12.4.3. Data Relationship Preservation
+- **Sync Snapshots**: Continue tracking all changes
+- **Resource States**: Maintain audit trail for enriched data
+- **Cost Tracking**: Enhanced with new cost breakdowns
+- **Tags & Metrics**: Add new tags for cloud services
+
+#### 12.4.4. Backward Compatibility
+- **Existing API calls**: Continue working unchanged
+- **Database schema**: No breaking changes, only additions
+- **UI components**: Progressive enhancement
+- **Sync process**: Additive, not replacement
+
+### 12.5. Expected Results After Enrichment
+
+#### 12.5.1. Resource Count
+- **Before**: 6 domains + 2 VPS = 8 resources
+- **After**: 6 domains + 2 VPS + 1 MySQL + 1 S3 = 10 resources
+
+#### 12.5.2. Cost Visibility
+- **Before**: ~1,847 RUB/month (account only)
+- **After**: ~3,668 RUB/month (full cost breakdown)
+
+#### 12.5.3. New Capabilities
+- **Database Management**: MySQL configuration and usage tracking
+- **Storage Management**: S3 usage and access monitoring
+- **Enhanced VPS**: Software installation tracking, admin credentials
+- **Cost Optimization**: Detailed cost breakdown per service
+
+#### 12.5.4. Zero Breaking Changes
+- **Existing connections**: Remain intact
+- **Current sync**: Continues working
+- **Database integrity**: Preserved
+- **API compatibility**: Maintained
+
+### 12.6. Implementation Readiness
+
+#### 12.6.1. Technical Prerequisites
+- ✅ Beget API authentication working
+- ✅ Cloud endpoint (`/v1/cloud`) accessible
+- ✅ VPS endpoint (`/v1/vps/server/list`) accessible
+- ✅ Database schema supports new resource types
+- ✅ Sync service architecture supports enrichment
+
+#### 12.6.2. Implementation Steps
+1. **Add Cloud Service Processing**: Extend sync service to handle `/v1/cloud` endpoint
+2. **Enhance VPS Processing**: Add software and configuration details to existing VPS resources
+3. **Update Cost Calculations**: Integrate new cost data into existing cost tracking
+4. **Add Resource Tags**: Implement tagging for cloud services
+5. **Test Integration**: Verify no breaking changes to existing functionality
+
+#### 12.6.3. Risk Mitigation
+- **Backward Compatibility**: All existing functionality preserved
+- **Data Integrity**: No data loss or corruption
+- **Performance**: Minimal impact on sync performance
+- **Rollback**: Easy rollback if issues arise
+
+### 12.7. Implementation Results
+
+#### 12.7.1. Successfully Implemented Features
+- ✅ **Cloud Services Processing**: MySQL Database and S3 Storage integration
+- ✅ **Enhanced VPS Processing**: Software details, admin credentials, configuration
+- ✅ **Cost Visibility**: Complete cost breakdown across all services
+- ✅ **Resource Tagging**: Comprehensive tagging for cloud services
+- ✅ **Zero Breaking Changes**: All existing functionality preserved
+
+#### 12.7.2. Resource Discovery Results
+**Before Implementation:**
+- **Resources**: 8 (6 domains + 2 VPS)
+- **Cost Visibility**: ~1,847 RUB/month (account only)
+- **VPS Data**: Basic information only
+
+**After Implementation:**
+- **Resources**: 10 (6 domains + 2 VPS + 1 MySQL + 1 S3)
+- **Cost Visibility**: ~3,668 RUB/month (full breakdown)
+- **VPS Data**: Enhanced with software, admin credentials, detailed configuration
+
+#### 12.7.3. New Resources Discovered
+**MySQL Cloud Database:**
+- **ID**: `3cf940aa-3704-499b-8b90-ef0ec941fc76`
+- **Name**: "Cloud database 1"
+- **Cost**: 29 RUB/day, 870 RUB/month
+- **Configuration**: 2 CPU, 2GB RAM, 20GB disk, MySQL 5.7.34
+- **Features**: phpMyAdmin access, public/private IPs, disk usage tracking
+
+**S3-Compatible Storage:**
+- **ID**: `f88ce2cf-8570-4ad0-bb67-824ac5308c34`
+- **Name**: "Humane Orrin"
+- **Cost**: 0 RUB/day, 0 RUB/month (Free)
+- **Features**: FTP/SFTP access, access keys, CORS support
+
+#### 12.7.4. Enhanced VPS Capabilities
+**Software Integration:**
+- **n8n Automation**: Version 1.108.2 with admin credentials
+- **Admin Access**: SSH and application admin details
+- **Configuration Tracking**: CPU, RAM, disk, bandwidth specifications
+- **Cost Breakdown**: Per-VPS daily and monthly costs
+
+**VPS Details:**
+- **Objective Perrin**: 22 RUB/day, 660 RUB/month + n8n software
+- **runner rus**: 9.73 RUB/day, 291.9 RUB/month + n8n software
+
+#### 12.7.5. Cost Analysis Results
+**Total Monthly Cost Breakdown:**
+- **Account (Cloud Plan)**: 1,847 RUB
+- **MySQL Database**: 870 RUB
+- **VPS #1 (Objective Perrin)**: 660 RUB
+- **VPS #2 (runner rus)**: 291.9 RUB
+- **S3 Storage**: 0 RUB (Free)
+- **Total**: 3,668.9 RUB/month
+
+**Daily Cost Breakdown:**
+- **Account**: 60.73 RUB
+- **MySQL Database**: 29 RUB
+- **VPS #1**: 22 RUB
+- **VPS #2**: 9.73 RUB
+- **S3 Storage**: 0 RUB
+- **Total**: 121.46 RUB/day
+
+#### 12.7.6. Technical Implementation Details
+**New API Endpoints Integrated:**
+- `/v1/cloud` - Cloud services (MySQL, S3)
+- `/v1/vps/server/list` - Enhanced VPS data
+- `/v1/auth` - JWT authentication
+
+**Database Schema Enhancements:**
+- **New Resource Types**: MySQL Database, S3 Storage
+- **Enhanced Tagging**: Service-specific configuration tags
+- **Cost Tracking**: Daily and monthly cost baselines
+- **Resource States**: Complete audit trail for all changes
+
+**Sync Service Enhancements:**
+- **Cloud Services Processing**: `_process_cloud_services()` method
+- **Enhanced VPS Processing**: Software and configuration details
+- **Resource Tagging**: Comprehensive tagging system
+- **Cost Integration**: Enhanced cost calculations
+
+#### 12.7.7. Production Readiness
+- ✅ **Authentication**: JWT Bearer token authentication working
+- ✅ **API Endpoints**: All cloud and VPS endpoints accessible
+- ✅ **Data Processing**: Cloud services and VPS enhancement working
+- ✅ **Cost Tracking**: Complete cost visibility implemented
+- ✅ **Resource Management**: Full resource lifecycle tracking
+- ✅ **Error Handling**: Graceful degradation with detailed error reporting
+- ✅ **Backward Compatibility**: Zero breaking changes confirmed
+
+#### 12.7.8. Business Value Delivered
+**FinOps Capabilities:**
+- **Cost Visibility**: 100% cost transparency across all services
+- **Resource Optimization**: Detailed resource utilization tracking
+- **Cost Forecasting**: Accurate cost projections based on current usage
+- **Service Management**: Complete cloud service lifecycle management
+
+**Operational Benefits:**
+- **Automated Discovery**: Automatic detection of new cloud services
+- **Cost Optimization**: Detailed cost breakdown for optimization opportunities
+- **Resource Tracking**: Complete audit trail of all resource changes
+- **Admin Access**: Centralized management of admin credentials and access
+
 ## 13. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.

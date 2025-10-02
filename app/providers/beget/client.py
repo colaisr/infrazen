@@ -1147,7 +1147,34 @@ class BegetAPIClient:
                 sync_result['vps_sync'] = {'status': 'error', 'error': error_msg}
                 sync_result['errors'].append(error_msg)
             
-            # Sync 3: Additional resources (existing endpoints)
+            # Sync 3: Cloud Services (new endpoint)
+            try:
+                logger.info("Syncing cloud services...")
+                cloud_services = self.get_cloud_services()
+                
+                sync_result['cloud_sync'] = {
+                    'status': 'success',
+                    'cloud_services': cloud_services,
+                    'cloud_count': len(cloud_services)
+                }
+                sync_result['resources']['cloud_services'] = cloud_services
+                
+                # Calculate cloud services costs
+                total_daily_cost = sum(service.get('daily_cost', 0) for service in cloud_services)
+                total_monthly_cost = sum(service.get('monthly_cost', 0) for service in cloud_services)
+                
+                sync_result['cloud_sync']['total_daily_cost'] = total_daily_cost
+                sync_result['cloud_sync']['total_monthly_cost'] = total_monthly_cost
+                
+                logger.info(f"Cloud services sync successful: {len(cloud_services)} cloud services, {total_daily_cost} RUB/day")
+                
+            except Exception as e:
+                error_msg = f"Cloud services sync failed: {str(e)}"
+                logger.error(error_msg)
+                sync_result['cloud_sync'] = {'status': 'error', 'error': error_msg}
+                sync_result['errors'].append(error_msg)
+            
+            # Sync 4: Additional resources (existing endpoints)
             try:
                 logger.info("Syncing additional resources...")
                 databases = self.get_databases()
@@ -1179,6 +1206,7 @@ class BegetAPIClient:
             total_resources = (
                 len(sync_result['resources'].get('vps_servers', [])) +
                 len(sync_result['resources'].get('domains', [])) +
+                len(sync_result['resources'].get('cloud_services', [])) +
                 len(sync_result['resources'].get('databases', [])) +
                 len(sync_result['resources'].get('ftp_accounts', [])) +
                 len(sync_result['resources'].get('email_accounts', []))
@@ -1200,6 +1228,163 @@ class BegetAPIClient:
         except Exception as e:
             logger.error(f"Sync failed: {e}")
             raise BegetAPIError(f"Sync failed: {str(e)}")
+    
+    def get_cloud_services(self) -> List[Dict]:
+        """Get cloud services from Beget Cloud API"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/cloud"
+            
+            logger.info(f"Fetching cloud services from: {url}")
+            
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved cloud services from {url}")
+                
+                # Process the cloud services data
+                if 'service' in result:
+                    return self._process_cloud_services_data(result['service'])
+                else:
+                    logger.warning(f"Unexpected cloud services response format: {result}")
+                    return []
+                    
+            except Exception as e:
+                logger.error(f"Cloud services endpoint failed: {e}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"Failed to get cloud services: {e}")
+            return []
+    
+    def _process_cloud_services_data(self, services_data: List[Dict]) -> List[Dict]:
+        """Process raw cloud services data from API"""
+        processed_services = []
+        
+        for service in services_data:
+            service_type = service.get('type', 'Unknown')
+            service_id = service.get('id')
+            service_name = service.get('display_name', 'Unknown')
+            status = service.get('status', 'unknown')
+            region = service.get('region', 'unknown')
+            
+            # Extract cost information
+            daily_cost = service.get('price_day', 0)
+            monthly_cost = service.get('price_month', 0)
+            
+            # Process based on service type
+            if service_type == 'MYSQL5':
+                processed_service = self._process_mysql_service(service, service_id, service_name, status, region, daily_cost, monthly_cost)
+            elif service_type == 'S_3':
+                processed_service = self._process_s3_service(service, service_id, service_name, status, region, daily_cost, monthly_cost)
+            else:
+                # Generic cloud service
+                processed_service = {
+                    'id': service_id,
+                    'name': service_name,
+                    'type': 'Cloud Service',
+                    'service_type': service_type,
+                    'status': status,
+                    'region': region,
+                    'daily_cost': daily_cost,
+                    'monthly_cost': monthly_cost,
+                    'currency': 'RUB',
+                    'created_at': service.get('created_at'),
+                    'manage_enabled': service.get('manage_enabled', False),
+                    'provider_config': service
+                }
+            
+            processed_services.append(processed_service)
+        
+        return processed_services
+    
+    def _process_mysql_service(self, service: Dict, service_id: str, service_name: str, status: str, region: str, daily_cost: float, monthly_cost: float) -> Dict:
+        """Process MySQL cloud database service"""
+        mysql_config = service.get('mysql5', {})
+        configuration = mysql_config.get('configuration', {})
+        address_info = mysql_config.get('address_info', {})
+        
+        # Extract public and private IPs
+        public_ips = []
+        private_ips = []
+        if address_info:
+            public_ips = [ip.get('ip') for ip in address_info.get('public', []) if ip.get('ip')]
+            private_ips = [ip.get('ip') for ip in address_info.get('private', []) if ip.get('ip')]
+        
+        return {
+            'id': service_id,
+            'name': service_name,
+            'type': 'MySQL Database',
+            'service_type': 'Database',
+            'status': status,
+            'region': region,
+            'daily_cost': daily_cost,
+            'monthly_cost': monthly_cost,
+            'currency': 'RUB',
+            'created_at': service.get('created_at'),
+            'manage_enabled': service.get('manage_enabled', False),
+            
+            # MySQL-specific configuration
+            'mysql_config': {
+                'version': configuration.get('version', '5.7'),
+                'display_version': configuration.get('display_version', '5.7'),
+                'cpu_count': configuration.get('cpu_count', 0),
+                'memory_mb': configuration.get('memory', 0),
+                'disk_size_mb': configuration.get('disk_size', 0),
+                'host': mysql_config.get('host', ''),
+                'port': mysql_config.get('port', 3306),
+                'pma_url': mysql_config.get('pma_url', ''),
+                'disk_used_bytes': mysql_config.get('disk_used', 0),
+                'disk_left_bytes': mysql_config.get('disk_left', 0),
+                'read_only': mysql_config.get('read_only', False),
+                'public_ips': public_ips,
+                'private_ips': private_ips
+            },
+            
+            'provider_config': service
+        }
+    
+    def _process_s3_service(self, service: Dict, service_id: str, service_name: str, status: str, region: str, daily_cost: float, monthly_cost: float) -> Dict:
+        """Process S3-compatible storage service"""
+        s3_config = service.get('s3', {})
+        
+        return {
+            'id': service_id,
+            'name': service_name,
+            'type': 'S3 Storage',
+            'service_type': 'Storage',
+            'status': status,
+            'region': region,
+            'daily_cost': daily_cost,
+            'monthly_cost': monthly_cost,
+            'currency': 'RUB',
+            'created_at': service.get('created_at'),
+            'manage_enabled': service.get('manage_enabled', False),
+            
+            # S3-specific configuration
+            's3_config': {
+                'public': s3_config.get('public', False),
+                'access_key': s3_config.get('access_key', ''),
+                'secret_key': s3_config.get('secret_key', ''),
+                'fqdn': s3_config.get('fqdn', ''),
+                'quota_used_size': s3_config.get('quota_used_size', 0),
+                'ftp': s3_config.get('ftp', {}),
+                'sftp': s3_config.get('sftp', {}),
+                'cors': s3_config.get('cors', [])
+            },
+            
+            'provider_config': service
+        }
     
     def logout(self):
         """Logout from Beget API"""

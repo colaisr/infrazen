@@ -129,6 +129,23 @@ class SyncService:
                 sync_errors.append(f"VPS sync: {error_msg}")
                 logger.error(f"VPS sync failed: {error_msg}")
             
+            # Process Cloud Services Sync
+            if sync_result.get('cloud_sync', {}).get('status') == 'success':
+                logger.info("Processing cloud services sync data")
+                cloud_data = sync_result['cloud_sync']
+                
+                # Process cloud services
+                if 'cloud_services' in cloud_data:
+                    cloud_count = self._process_cloud_services(snapshot, cloud_data['cloud_services'])
+                    total_resources += cloud_count
+                    logger.info(f"Processed {cloud_count} cloud services from cloud sync")
+                else:
+                    logger.warning("No cloud services data in cloud sync")
+            else:
+                error_msg = sync_result.get('cloud_sync', {}).get('error', 'Cloud services sync failed')
+                sync_errors.append(f"Cloud services sync: {error_msg}")
+                logger.error(f"Cloud services sync failed: {error_msg}")
+            
             # Process Additional Resources Sync
             if sync_result.get('domains_sync', {}).get('status') == 'success':
                 logger.info("Processing additional resources sync data")
@@ -240,8 +257,48 @@ class SyncService:
                     'disk_gb': str(vps.get('disk_gb', 0)),
                     'software': vps.get('software', ''),
                     'software_version': vps.get('software_version', ''),
-                    'ssh_access': str(vps.get('ssh_access_allowed', False))
+                    'ssh_access': str(vps.get('ssh_access_allowed', False)),
+                    'region': vps.get('region', 'unknown'),
+                    'created_at': vps.get('date_create', ''),
+                    'disk_used_gb': str(vps.get('disk_used_gb', 0)),
+                    'disk_left_gb': str(vps.get('disk_left_gb', 0)),
+                    'bandwidth_gb': str(vps.get('bandwidth_gb', 0))
                 })
+                
+                # Add software-specific tags if available
+                if vps.get('software') and isinstance(vps.get('software'), dict):
+                    software = vps.get('software', {})
+                    self._add_resource_tags(resource, {
+                        'software_name': software.get('name', ''),
+                        'software_display_name': software.get('display_name', ''),
+                        'software_version': software.get('version', ''),
+                        'software_url': software.get('address', ''),
+                        'software_status': software.get('status', ''),
+                        'software_description': software.get('description', '')
+                    })
+                    
+                    # Add admin credentials if available
+                    if software.get('field_value'):
+                        for field in software.get('field_value', []):
+                            if field.get('variable') == 'beget_n8n_password':
+                                self._add_resource_tags(resource, {
+                                    'admin_password': field.get('value', '')
+                                })
+                            elif field.get('variable') == 'beget_email':
+                                self._add_resource_tags(resource, {
+                                    'admin_email': field.get('value', '')
+                                })
+                            elif field.get('variable') == 'beget_fqdn':
+                                self._add_resource_tags(resource, {
+                                    'software_domain': field.get('value', '')
+                                })
+                elif vps.get('software'):
+                    # Handle case where software is a string (from old processing)
+                    self._add_resource_tags(resource, {
+                        'software_name': vps.get('software', ''),
+                        'software_version': vps.get('software_version', ''),
+                        'software_url': vps.get('software_url', '')
+                    })
                 
                 # Create resource state
                 self._create_resource_state(snapshot, resource, vps)
@@ -251,6 +308,84 @@ class SyncService:
                 
             except Exception as e:
                 logger.error(f"Error processing VPS {vps.get('name', 'unknown')}: {e}")
+                continue
+        
+        return processed_count
+    
+    def _process_cloud_services(self, snapshot: SyncSnapshot, cloud_services: List[Dict]) -> int:
+        """Process cloud services from cloud API"""
+        processed_count = 0
+        
+        for service in cloud_services:
+            try:
+                # Create or update cloud service resource
+                resource = self._create_or_update_resource(
+                    resource_id=service.get('id'),
+                    resource_name=service.get('name'),
+                    resource_type=service.get('type'),
+                    service_name=service.get('service_type', 'Cloud'),
+                    region=service.get('region', 'unknown'),
+                    status=service.get('status', 'unknown'),
+                    provider_config=service
+                )
+                
+                # Set cost information
+                if service.get('daily_cost'):
+                    resource.set_daily_cost_baseline(
+                        original_cost=service.get('daily_cost'),
+                        period='daily',
+                        frequency='recurring'
+                    )
+                elif service.get('monthly_cost'):
+                    resource.set_daily_cost_baseline(
+                        original_cost=service.get('monthly_cost'),
+                        period='monthly',
+                        frequency='recurring'
+                    )
+                
+                # Add cloud service-specific tags
+                self._add_resource_tags(resource, {
+                    'cloud_service_id': service.get('id'),
+                    'service_type': service.get('type'),
+                    'region': service.get('region', 'unknown'),
+                    'created_at': service.get('created_at', ''),
+                    'manage_enabled': str(service.get('manage_enabled', False))
+                })
+                
+                # Add service-specific configuration tags
+                if service.get('type') == 'MySQL Database':
+                    mysql_config = service.get('mysql_config', {})
+                    self._add_resource_tags(resource, {
+                        'mysql_version': mysql_config.get('version', ''),
+                        'mysql_host': mysql_config.get('host', ''),
+                        'mysql_port': str(mysql_config.get('port', 3306)),
+                        'mysql_cpu_count': str(mysql_config.get('cpu_count', 0)),
+                        'mysql_memory_mb': str(mysql_config.get('memory_mb', 0)),
+                        'mysql_disk_size_mb': str(mysql_config.get('disk_size_mb', 0)),
+                        'mysql_disk_used_bytes': str(mysql_config.get('disk_used_bytes', 0)),
+                        'mysql_disk_left_bytes': str(mysql_config.get('disk_left_bytes', 0)),
+                        'mysql_pma_url': mysql_config.get('pma_url', ''),
+                        'mysql_read_only': str(mysql_config.get('read_only', False))
+                    })
+                elif service.get('type') == 'S3 Storage':
+                    s3_config = service.get('s3_config', {})
+                    self._add_resource_tags(resource, {
+                        's3_public': str(s3_config.get('public', False)),
+                        's3_access_key': s3_config.get('access_key', ''),
+                        's3_fqdn': s3_config.get('fqdn', ''),
+                        's3_quota_used_size': str(s3_config.get('quota_used_size', 0)),
+                        's3_ftp_enabled': str(bool(s3_config.get('ftp', {}).get('status') == 'ENABLED')),
+                        's3_sftp_enabled': str(bool(s3_config.get('sftp', {}).get('status') == 'ENABLED'))
+                    })
+                
+                # Create resource state
+                self._create_resource_state(snapshot, resource, service)
+                
+                processed_count += 1
+                logger.debug(f"Processed cloud service: {service.get('name')}")
+                
+            except Exception as e:
+                logger.error(f"Error processing cloud service {service.get('name', 'unknown')}: {e}")
                 continue
         
         return processed_count
