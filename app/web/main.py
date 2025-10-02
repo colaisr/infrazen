@@ -116,7 +116,7 @@ def resources():
     """Resources overview page"""
     if 'user' not in session:
         session['user'] = {
-            'id': 'real-user-123',
+            'id': '106509284268867883869',  # Use the actual user ID from the database
             'email': 'real@infrazen.com',
             'name': 'Real User',
             'picture': ''
@@ -130,19 +130,37 @@ def resources():
         overview = get_overview()
         resources = overview['resources']
         providers = overview['providers']
+        # Group resources by provider for demo
+        resources_by_provider = {}
+        for resource in resources:
+            provider_id = resource.get('provider_id', 'demo-provider')
+            if provider_id not in resources_by_provider:
+                resources_by_provider[provider_id] = []
+            resources_by_provider[provider_id].append(resource)
     else:
         # Real user: show real database data
         try:
-            resources = get_real_user_resources(user['id'])
-            providers = get_real_user_providers(user['id'])
+            # Use the string user_id directly since it's stored as floating point in SQLite
+            user_id_str = user['id']
+            resources = get_real_user_resources(user_id_str)
+            providers = get_real_user_providers(user_id_str)
             # Get latest snapshot metadata for performance data
-            snapshot_metadata = get_latest_snapshot_metadata(user['id'])
+            snapshot_metadata = get_latest_snapshot_metadata(user_id_str)
+            # Group resources by provider
+            resources_by_provider = {}
+            for resource in resources:
+                provider_id = resource.provider.id
+                if provider_id not in resources_by_provider:
+                    resources_by_provider[provider_id] = []
+                resources_by_provider[provider_id].append(resource)
+            
         except Exception as e:
             print(f"Error loading resources: {e}")
             # Fallback to empty data
             resources = []
             providers = []
             snapshot_metadata = {}
+            resources_by_provider = {}
     
     return render_template('resources.html', 
                         user=user,
@@ -151,6 +169,7 @@ def resources():
                         page_subtitle='Обзор всех облачных ресурсов',
                         resources=resources,
                         providers=providers,
+                        resources_by_provider=resources_by_provider,
                         snapshot_metadata=snapshot_metadata,
                         is_demo_user=is_demo_user)
 
@@ -345,7 +364,11 @@ def get_real_user_resources(user_id):
     """Get resources for a real user from database - prioritize resources with performance data"""
     from app.core.models.sync import SyncSnapshot
     
-    providers = CloudProvider.query.filter_by(user_id=user_id).all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues
+    all_providers = CloudProvider.query.all()
+    # Convert scientific notation to integer string for comparison
+    user_id_int = int(float(user_id))
+    providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
     all_resources = []
     
     for provider in providers:
@@ -374,10 +397,16 @@ def get_real_user_resources(user_id):
 def get_real_user_providers(user_id):
     """Get providers for a real user from database using unified models"""
     
-    providers = CloudProvider.query.filter_by(user_id=user_id).all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues
+    all_providers = CloudProvider.query.all()
+    # Convert scientific notation to integer string for comparison
+    user_id_int = int(float(user_id))
+    providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
     
     return [{
-        'id': f"{provider.provider_type}-{provider.id}",
+        'id': provider.id,  # Use the actual database ID
+        'provider_type': provider.provider_type,
+        'connection_name': provider.connection_name,
         'code': provider.provider_type,
         'name': provider.provider_type.title(),
         'status': 'connected' if provider.is_active else 'disconnected',
@@ -394,7 +423,11 @@ def get_latest_snapshot_metadata(user_id):
     from app.core.models.sync import SyncSnapshot
     import json
     
-    providers = CloudProvider.query.filter_by(user_id=user_id).all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues
+    all_providers = CloudProvider.query.all()
+    # Convert scientific notation to integer string for comparison
+    user_id_int = int(float(user_id))
+    providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
     metadata = {}
     
     for provider in providers:
