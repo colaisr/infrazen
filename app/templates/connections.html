@@ -16,8 +16,6 @@
 <div class="connections-content">
     <div class="connections-summary">
         <div class="summary-header">
-            <h2>Обзор подключений</h2>
-            <p>Управление облачными провайдерами и мониторинг состояния</p>
         </div>
         <div class="summary-stats">
             <div class="stat-card">
@@ -183,42 +181,13 @@
         {% endfor %}
 
         <article class="connection-card add-card" id="add-provider-card">
-            <div class="card-header">
-                <div class="provider-logo">
-                    <div class="provider-icon add-icon">
-                        <i class="fa-solid fa-plus"></i>
-                    </div>
+            <div class="add-card-content">
+                <div class="add-icon">
+                    <i class="fa-solid fa-plus"></i>
                 </div>
-                <div class="provider-info">
-                    <div class="provider-badge add-badge">НОВЫЙ</div>
-                    <div class="provider-name">Добавить провайдера</div>
-                </div>
-                <div class="connection-status">
-                    <div class="status-badge add-status">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Готов к настройке</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card-body">
-                <div class="sync-info">
-                    <div class="sync-status add-status">
-                        <i class="fa-solid fa-cloud-plus"></i>
-                        <span>Настроить подключение нового облачного провайдера</span>
-                    </div>
-                </div>
-
-                <div class="provider-details">
-                    <div class="detail-item">
-                        <span class="detail-label">Доступно:</span>
-                        <span class="detail-value">AWS, Azure, GCP, YC, Selectel, Beget</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card-actions">
-                <button class="action-btn primary" onclick="showProviderModal()">
+                <h3>Добавить провайдера</h3>
+                <p>Настроить подключение нового облачного провайдера</p>
+                <button class="add-btn" onclick="showProviderModal()">
                     <i class="fa-solid fa-cog"></i>
                     <span>Настроить подключение</span>
                 </button>
@@ -1419,31 +1388,81 @@
 /* Add Card Styling */
 .add-card {
     border: 2px dashed var(--border-light);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.02) 0%, rgba(59, 130, 246, 0.05) 100%);
+    background: var(--background-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
 }
 
 .add-card:hover {
     border-color: var(--primary-blue);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%);
+    background: rgba(59, 130, 246, 0.02);
     transform: translateY(-2px);
 }
 
-.add-card .card-header {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.1) 100%);
+.add-card-content {
+    text-align: center;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
 }
 
-.add-card .card-actions {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.02) 0%, rgba(59, 130, 246, 0.05) 100%);
+.add-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--background-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
 }
 
-.provider-icon.add-icon {
-    background: linear-gradient(135deg, var(--primary-blue), #1e40af);
+.add-card:hover .add-icon {
+    background: var(--primary-blue);
     color: white;
+    transform: scale(1.05);
 }
 
-.add-badge {
-    background: linear-gradient(135deg, var(--primary-blue), #1e40af);
+.add-card h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.add-card p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.add-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--primary-blue);
     color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.add-btn:hover {
+    background: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 /* Responsive Design */
