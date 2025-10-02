@@ -27,7 +27,7 @@ def add_connection():
         connection_name = request.form.get('connection_name')
         username = request.form.get('username')
         password = request.form.get('password')
-        api_url = request.form.get('api_url', 'https://api.beget.com')
+        api_url = 'https://api.beget.com'  # Fixed API URL for Beget
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
@@ -77,7 +77,7 @@ def test_connection():
     try:
         username = request.json.get('username')
         password = request.json.get('password')
-        api_url = request.json.get('api_url', 'https://api.beget.com')
+        api_url = 'https://api.beget.com'  # Fixed API URL for Beget
         
         if not username or not password:
             return jsonify({'success': False, 'error': 'Username and password required'}), 400
@@ -120,7 +120,7 @@ def edit_connection(provider_id):
             connection_name = request.form.get('connection_name')
             username = request.form.get('username')
             password = request.form.get('password')
-            api_url = request.form.get('api_url', 'https://api.beget.com')
+            api_url = 'https://api.beget.com'  # Fixed API URL for Beget
             auto_sync = request.form.get('auto_sync') == 'on'
             sync_interval = request.form.get('sync_interval', 'daily')
             
@@ -163,7 +163,6 @@ def edit_connection(provider_id):
                 'connection_name': provider.connection_name,
                 'username': credentials.get('username', ''),
                 'password': credentials.get('password', ''),  # Include password for testing
-                'api_url': credentials.get('api_url', 'https://api.beget.com'),
                 'auto_sync': provider.auto_sync,
                 'sync_interval': provider.sync_interval
             }

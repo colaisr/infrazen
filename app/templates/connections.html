@@ -152,7 +152,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-name">Amazon Web Services</span>
-                    <span class="provider-description">AWS API Integration</span>
+                    <span class="provider-description">Ведущая облачная платформа с широким спектром сервисов</span>
                 </div>
                 {% if not is_demo_user %}
                 <button class="btn btn-outline btn-sm" onclick="showProviderModal('aws')">Добавить</button>
@@ -168,7 +168,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-name">Microsoft Azure</span>
-                    <span class="provider-description">Azure Resource Manager</span>
+                    <span class="provider-description">Облачная платформа Microsoft с интеграцией Office 365</span>
                 </div>
                 {% if not is_demo_user %}
                 <button class="btn btn-outline btn-sm" onclick="showProviderModal('azure')">Добавить</button>
@@ -184,7 +184,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-name">Google Cloud Platform</span>
-                    <span class="provider-description">GCP API Integration</span>
+                    <span class="provider-description">Облачная платформа Google с AI и ML сервисами</span>
                 </div>
                 {% if not is_demo_user %}
                 <button class="btn btn-outline btn-sm" onclick="showProviderModal('gcp')">Добавить</button>
@@ -200,7 +200,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-name">VK Cloud</span>
-                    <span class="provider-description">VK Cloud API</span>
+                    <span class="provider-description">Российская облачная платформа от VK</span>
                 </div>
                 {% if not is_demo_user %}
                 <button class="btn btn-outline btn-sm" onclick="showProviderModal('vk-cloud')">Добавить</button>
@@ -216,7 +216,7 @@
                 </div>
                 <div class="provider-info">
                     <span class="provider-name">Beget</span>
-                    <span class="provider-description">Хостинг и домены</span>
+                    <span class="provider-description">Российский хостинг-провайдер с веб-хостингом и VPS</span>
                 </div>
                 {% if not is_demo_user %}
                 <button class="btn btn-outline btn-sm" onclick="showProviderModal('beget')">Добавить</button>
@@ -750,6 +750,115 @@
     outline: 2px solid var(--primary-blue);
     outline-offset: 2px;
 }
+
+/* Modal Form Grid Layout */
+.modal-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-form-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.modal-form-right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Compact Provider Info */
+.provider-info-compact {
+    background: var(--background-light);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.provider-info-header {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.provider-description-compact {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+/* Compact Connection Test */
+.connection-test-compact {
+    padding: 0.375rem;
+    border-radius: 6px;
+    margin-bottom: 0.125rem;
+    font-size: 0.875rem;
+}
+
+.connection-test-compact.success {
+    background: #d1fae5;
+    border: 1px solid #10b981;
+    color: #065f46;
+}
+
+.connection-test-compact.error {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+}
+
+.connection-test-compact.info {
+    background: #dbeafe;
+    border: 1px solid #3b82f6;
+    color: #1e40af;
+}
+
+/* Settings Section */
+.settings-section {
+    background: var(--background-light);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.settings-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+}
+
+/* Compact Textarea */
+.form-textarea-compact {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .modal-form-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .modal-content {
+        max-width: 95vw;
+        max-height: 95vh;
+    }
+}
 </style>
 
 <!-- Provider Connection Modal -->
@@ -763,70 +872,84 @@
             <button class="modal-close" onclick="closeProviderModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <!-- Provider Selection -->
-            <div class="form-group">
-                <label class="form-label" for="provider_select">Выберите провайдера *</label>
-                <select class="form-select" id="provider_select" onchange="changeProvider()" required>
-                    <option value="">-- Выберите провайдера --</option>
-                    <option value="yandex">Yandex Cloud</option>
-                    <option value="selectel">Selectel</option>
-                    <option value="beget">Beget</option>
-                    <option value="aws">Amazon Web Services</option>
-                    <option value="azure">Microsoft Azure</option>
-                    <option value="gcp">Google Cloud Platform</option>
-                    <option value="vk-cloud">VK Cloud</option>
-                </select>
-            </div>
-
-            <div class="provider-info-card" id="providerInfo" style="display: none;">
-                <h4>Информация о провайдере</h4>
-                <p id="providerDescription"></p>
-            </div>
-            
-            <div class="connection-test" id="connectionTest" style="display: none;"></div>
-            
             <form id="providerForm" method="POST" action="/api/providers/beget/add">
                 <input type="hidden" id="selected_provider" name="provider" value="">
                 
-                <!-- Common fields -->
-                <div class="form-group">
-                    <label class="form-label" for="connection_name">Название подключения *</label>
-                    <input type="text" class="form-control" id="connection_name" name="connection_name" 
-                           placeholder="Мой аккаунт" required>
-                </div>
-                
-                <!-- Dynamic provider-specific fields -->
-                <div id="providerFields"></div>
-                
-                <!-- Common settings -->
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="auto_sync" name="auto_sync" checked>
-                        <label class="form-check-label" for="auto_sync">Автоматическая синхронизация</label>
+                <!-- Two-column layout -->
+                <div class="modal-form-grid">
+                    <!-- Left Column -->
+                    <div class="modal-form-left">
+                        <!-- Provider Selection -->
+                        <div class="form-group">
+                            <label class="form-label" for="provider_select">Выберите провайдера *</label>
+                            <select class="form-select" id="provider_select" onchange="changeProvider()" required>
+                                <option value="">-- Выберите провайдера --</option>
+                                <option value="yandex">Yandex Cloud</option>
+                                <option value="selectel">Selectel</option>
+                                <option value="beget">Beget</option>
+                                <option value="aws">Amazon Web Services</option>
+                                <option value="azure">Microsoft Azure</option>
+                                <option value="gcp">Google Cloud Platform</option>
+                                <option value="vk-cloud">VK Cloud</option>
+                            </select>
+                        </div>
+
+                        
+                        <!-- Connection Test (compact) -->
+                        <div class="connection-test-compact" id="connectionTest" style="display: none;"></div>
+                        
+                        <!-- Basic Connection Info -->
+                        <div class="form-group">
+                            <label class="form-label" for="connection_name">Название подключения *</label>
+                            <input type="text" class="form-control" id="connection_name" name="connection_name" 
+                                   placeholder="Мой аккаунт" required>
+                        </div>
+                        
+                        <!-- Dynamic provider-specific fields -->
+                        <div id="providerFields"></div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="sync_interval">Интервал синхронизации</label>
-                    <select class="form-select" id="sync_interval" name="sync_interval">
-                        <option value="hourly">Каждый час</option>
-                        <option value="daily" selected>Ежедневно</option>
-                        <option value="weekly">Еженедельно</option>
-                        <option value="manual">Только вручную</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="enable_notifications" name="enable_notifications" checked>
-                        <label class="form-check-label" for="enable_notifications">Уведомления о изменениях</label>
+                    
+                    <!-- Right Column -->
+                    <div class="modal-form-right">
+                        <!-- Settings Section -->
+                        <div class="settings-section">
+                            <h5 class="settings-title">
+                                <i class="fa-solid fa-gear" style="color: #1E40AF; margin-right: 0.5rem;"></i>
+                                Настройки
+                            </h5>
+                            
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="auto_sync" name="auto_sync" checked>
+                                    <label class="form-check-label" for="auto_sync">Автоматическая синхронизация</label>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="sync_interval">Интервал синхронизации</label>
+                                <select class="form-select" id="sync_interval" name="sync_interval">
+                                    <option value="hourly">Каждый час</option>
+                                    <option value="daily" selected>Ежедневно</option>
+                                    <option value="weekly">Еженедельно</option>
+                                    <option value="manual">Только вручную</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="enable_notifications" name="enable_notifications" checked>
+                                    <label class="form-check-label" for="enable_notifications">Уведомления о изменениях</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Description (optional, compact) -->
+                        <div class="form-group">
+                            <label class="form-label" for="description">Описание (необязательно)</label>
+                            <textarea class="form-control form-textarea-compact" id="description" name="description" 
+                                      placeholder="Дополнительная информация..."></textarea>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="description">Описание</label>
-                    <textarea class="form-control form-textarea" id="description" name="description" 
-                              placeholder="Дополнительная информация о подключении..."></textarea>
                 </div>
             </form>
         </div>
@@ -864,8 +987,7 @@ const providers = {
         description: 'Beget — российский хостинг-провайдер, предоставляющий услуги веб-хостинга, регистрации доменов и виртуальных серверов.',
         fields: [
             { name: 'username', label: 'Имя пользователя *', type: 'text', placeholder: 'your_beget_username', required: true },
-            { name: 'password', label: 'Пароль *', type: 'password', placeholder: '••••••••', required: true },
-            { name: 'api_url', label: 'API URL', type: 'url', placeholder: 'https://api.beget.com', required: false, default: 'https://api.beget.com' }
+            { name: 'password', label: 'Пароль *', type: 'password', placeholder: '••••••••', required: true }
         ]
     },
     aws: {
@@ -958,8 +1080,7 @@ function resetModalToAddMode() {
     providerSelect.style.opacity = '1';
     providerSelect.style.cursor = 'pointer';
     
-    // Hide provider info and connection test sections
-    document.getElementById('providerInfo').style.display = 'none';
+    // Hide connection test section
     document.getElementById('connectionTest').style.display = 'none';
     
     // Remove hidden edit ID field if it exists
@@ -1011,10 +1132,8 @@ function fillEditForm(connectionData) {
     const provider = connectionData.provider;
     if (provider === 'beget') {
         const usernameField = document.querySelector('input[name="username"]');
-        const apiUrlField = document.querySelector('input[name="api_url"]');
         
         if (usernameField) usernameField.value = connectionData.username || '';
-        if (apiUrlField) apiUrlField.value = connectionData.api_url || 'https://api.beget.com';
         
         // Fill password for testing purposes
         const passwordField = document.querySelector('input[name="password"]');
@@ -1024,8 +1143,7 @@ function fillEditForm(connectionData) {
         }
     }
     
-    // Show provider info and connection test sections
-    document.getElementById('providerInfo').style.display = 'block';
+    // Show connection test section
     document.getElementById('connectionTest').style.display = 'block';
     
     // Show buttons
@@ -1036,7 +1154,6 @@ function fillEditForm(connectionData) {
 function closeProviderModal() {
     document.getElementById('providerModal').style.display = 'none';
     document.getElementById('connectionTest').style.display = 'none';
-    document.getElementById('providerInfo').style.display = 'none';
     document.getElementById('testBtn').style.display = 'none';
     document.getElementById('connectBtn').style.display = 'none';
     // Reset form
@@ -1046,8 +1163,6 @@ function closeProviderModal() {
 
 function changeProvider() {
     const selectedProvider = document.getElementById('provider_select').value;
-    const providerInfo = document.getElementById('providerInfo');
-    const providerDescription = document.getElementById('providerDescription');
     const providerFields = document.getElementById('providerFields');
     const testBtn = document.getElementById('testBtn');
     const connectBtn = document.getElementById('connectBtn');
@@ -1055,10 +1170,6 @@ function changeProvider() {
     
     if (selectedProvider && providers[selectedProvider]) {
         const provider = providers[selectedProvider];
-        
-        // Show provider info
-        providerDescription.textContent = provider.description;
-        providerInfo.style.display = 'block';
         
         // Set hidden field
         selectedProviderInput.value = selectedProvider;
@@ -1084,7 +1195,6 @@ function changeProvider() {
         
     } else {
         // Hide everything
-        providerInfo.style.display = 'none';
         providerFields.innerHTML = '';
         testBtn.style.display = 'none';
         connectBtn.style.display = 'none';
@@ -1205,15 +1315,8 @@ function testConnection() {
 
 function showTestResult(message, type) {
     const testDiv = document.getElementById('connectionTest');
-    testDiv.textContent = message;
-    testDiv.className = 'connection-test';
-    if (type === 'success') {
-        testDiv.style.background = 'var(--success-green)';
-    } else if (type === 'error') {
-        testDiv.style.background = 'var(--error-red)';
-    } else {
-        testDiv.style.background = 'var(--warning-orange)';
-    }
+    testDiv.innerHTML = message;
+    testDiv.className = `connection-test-compact ${type}`;
     testDiv.style.display = 'block';
 }
 
