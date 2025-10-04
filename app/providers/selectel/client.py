@@ -149,25 +149,38 @@ class SelectelClient:
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
         }
     
-    def get_openstack_servers(self) -> List[Dict[str, Any]]:
+    def get_openstack_servers(self, region: str = None) -> List[Dict[str, Any]]:
         """
-        Get OpenStack servers (VMs)
+        Get OpenStack servers (VMs) from a specific region
+        
+        Args:
+            region: Optional region to query (if None, uses default openstack_base_url)
         
         Returns:
             List of server dictionaries
         """
         try:
             headers = self._get_openstack_headers()
-            servers_url = f'{self.openstack_base_url}/compute/v2.1/servers/detail'
+            
+            # Determine which base URL to use
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            servers_url = f'{base_url}/compute/v2.1/servers/detail'
             
             response = requests.get(servers_url, headers=headers, timeout=30)
             response.raise_for_status()
             
             data = response.json()
-            return data.get('servers', [])
+            servers = data.get('servers', [])
+            
+            # Add region info to each server if not already present
+            for server in servers:
+                if region and 'region' not in server:
+                    server['region'] = region
+            
+            return servers
             
         except Exception as e:
-            raise Exception(f"Failed to get OpenStack servers: {str(e)}")
+            raise Exception(f"Failed to get OpenStack servers from {region or 'default region'}: {str(e)}")
     
     def get_openstack_volumes(self, project_id: str = None, region: str = None) -> List[Dict[str, Any]]:
         """
@@ -230,14 +243,17 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack networks: {str(e)}")
     
-    def get_openstack_ports(self) -> List[Dict[str, Any]]:
+    def get_openstack_ports(self, region: str = None) -> List[Dict[str, Any]]:
         """
-        Get OpenStack network ports (network interfaces)
+        Get OpenStack network ports (network interfaces) from a specific region
         
         This provides detailed network information including:
         - IP addresses per server
         - MAC addresses
         - Network attachments
+        
+        Args:
+            region: Optional region to query (if None, uses default openstack_base_url)
         
         Returns:
             List of port dictionaries
@@ -245,7 +261,10 @@ class SelectelClient:
         try:
             headers = self._get_openstack_headers()
             headers['Openstack-Api-Version'] = 'network latest'
-            ports_url = f'{self.openstack_base_url}/network/v2.0/ports'
+            
+            # Determine which base URL to use
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            ports_url = f'{base_url}/network/v2.0/ports'
             
             response = requests.get(ports_url, headers=headers, timeout=30)
             response.raise_for_status()
@@ -254,7 +273,7 @@ class SelectelClient:
             return data.get('ports', [])
             
         except Exception as e:
-            raise Exception(f"Failed to get OpenStack ports: {str(e)}")
+            raise Exception(f"Failed to get OpenStack ports from {region or 'default region'}: {str(e)}")
     
     def get_server_cpu_statistics(self, server_id: str, hours: int = 1) -> Dict[str, Any]:
         """
@@ -608,10 +627,10 @@ class SelectelClient:
     
     def get_combined_vm_resources(self) -> List[Dict[str, Any]]:
         """
-        Get VM resources with attached volumes and network interfaces combined
+        Get VM resources from ALL regions with attached volumes and network interfaces combined
         
-        This method combines data from multiple OpenStack APIs to create complete
-        VM resources that match what you see in the Selectel admin panel.
+        This method combines data from multiple OpenStack APIs across all regions 
+        to create complete VM resources that match what you see in the Selectel admin panel.
         
         Returns:
             List of complete VM resource dictionaries including:
@@ -621,15 +640,37 @@ class SelectelClient:
             - Total storage calculation
         """
         try:
-            # Get all required data
-            servers = self.get_openstack_servers()
-            
             # Get project ID for volume API
             projects = self.get_projects()
             project_id = projects[0]['id'] if projects else None
             
-            volumes = self.get_openstack_volumes(project_id)
-            ports = self.get_openstack_ports()
+            # Get all required data from ALL regions
+            all_servers = []
+            all_volumes = []
+            all_ports = []
+            
+            for region_name in self.regions.keys():
+                try:
+                    logger.info(f"Fetching servers from region {region_name}")
+                    region_servers = self.get_openstack_servers(region=region_name)
+                    all_servers.extend(region_servers)
+                    logger.info(f"Found {len(region_servers)} servers in {region_name}")
+                    
+                    logger.info(f"Fetching volumes from region {region_name}")
+                    region_volumes = self.get_openstack_volumes(project_id, region=region_name)
+                    all_volumes.extend(region_volumes)
+                    logger.info(f"Found {len(region_volumes)} volumes in {region_name}")
+                    
+                    logger.info(f"Fetching ports from region {region_name}")
+                    region_ports = self.get_openstack_ports(region=region_name)
+                    all_ports.extend(region_ports)
+                    logger.info(f"Found {len(region_ports)} ports in {region_name}")
+                except Exception as region_err:
+                    logger.warning(f"Failed to fetch resources from region {region_name}: {region_err}")
+            
+            servers = all_servers
+            volumes = all_volumes
+            ports = all_ports
             
             # Create volume mapping by server attachment
             volume_by_server = {}
