@@ -276,7 +276,7 @@
                     <i class="fa-solid fa-sync"></i>
                     <span>Синхронизировать</span>
                 </button>
-                <button class="action-btn danger" title="Удалить" onclick="deleteConnection('{{ provider.id }}')">
+                <button class="action-btn danger" title="Удалить" onclick="deleteConnection('{{ provider.id }}', '{{ provider.provider_type }}')">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
@@ -2316,7 +2316,7 @@ function syncConnection(connectionId, providerType) {
     });
 }
 
-function deleteConnection(connectionId) {
+function deleteConnection(connectionId, providerType) {
     if (confirm('Вы уверены, что хотите удалить это подключение?\n\nЭто действие нельзя отменить.')) {
         // Extract numeric ID from string like "beget-2" -> "2"
         const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
@@ -2327,8 +2327,8 @@ function deleteConnection(connectionId) {
         button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
         button.disabled = true;
         
-        // Make delete request
-        fetch(`/api/providers/beget/${numericId}/delete`, {
+        // Make delete request with correct provider type
+        fetch(`/api/providers/${providerType}/${numericId}/delete`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
@@ -2345,7 +2345,7 @@ function deleteConnection(connectionId) {
                     card.remove();
                 }, 500);
             } else {
-                showFlashMessage('❌ Ошибка удаления: ' + data.error, 'error');
+                showFlashMessage('❌ Ошибка удаления: ' + (data.error || data.message), 'error');
             }
         })
         .catch(error => {

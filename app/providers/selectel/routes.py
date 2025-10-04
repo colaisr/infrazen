@@ -170,7 +170,7 @@ def sync_resources(provider_id):
         }), 500
 
 
-@selectel_bp.route('/<int:provider_id>/delete', methods=['POST'])
+@selectel_bp.route('/<int:provider_id>/delete', methods=['DELETE'])
 def delete_connection(provider_id):
     """Delete a Selectel cloud provider connection."""
     try:
