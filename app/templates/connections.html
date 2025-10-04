@@ -263,6 +263,7 @@
                     <div class="cost-secondary">
                         <div class="cost-amount-secondary">{{ "%.1f"|format(provider.total_monthly_cost or 0) }} ₽</div>
                         <div class="cost-period-secondary">в месяц</div>
+                        <div class="resource-count">{{ provider.last_snapshot_resources or 0 }} ресурсов</div>
                     </div>
                 </div>
             </div>
@@ -848,6 +849,15 @@
     color: var(--text-secondary);
     font-weight: 400;
     margin-top: 0.125rem;
+}
+
+.resource-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--border-light);
 }
 
 /* Card Actions */

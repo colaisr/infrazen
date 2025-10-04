@@ -206,6 +206,19 @@ class SyncService:
                 sync_status = 'success'
                 sync_message = f'Sync completed successfully: {total_resources} resources processed'
             
+            # Update snapshot with statistics
+            sync_result = {
+                'total_resources': total_resources,
+                'resources_created': 0,  # These would need to be tracked during processing
+                'resources_updated': 0,
+                'resources_deleted': 0,
+                'resources_unchanged': 0,
+                'total_monthly_cost': 0,  # This would need to be calculated
+                'resources_by_type': {},
+                'resources_by_status': {}
+            }
+            self._update_snapshot_stats(snapshot, sync_result)
+            
             # Update snapshot with results
             snapshot.mark_completed(sync_status, sync_message)
             

@@ -12,6 +12,7 @@ from app.core.utils.mock_data import get_overview
 from app.core.database import db
 from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
+from app.core.models.sync import SyncSnapshot
 
 main_bp = Blueprint('main', __name__)
 
@@ -88,6 +89,13 @@ def connections():
             # Get resource counts for this provider
             resource_count = Resource.query.filter_by(provider_id=provider.id).count()
             
+            # Get resource count from last successful sync snapshot
+            last_snapshot = SyncSnapshot.query.filter_by(
+                provider_id=provider.id, 
+                sync_status='success'
+            ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+            last_snapshot_resources = last_snapshot.total_resources_found if last_snapshot else 0
+            
             # Calculate provider costs
             provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
             total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
@@ -105,6 +113,7 @@ def connections():
                 'provider_metadata': provider.provider_metadata,  # Add this line
                 'total_daily_cost': total_daily_cost,
                 'total_monthly_cost': total_monthly_cost,
+                'last_snapshot_resources': last_snapshot_resources,  # Add resource count from last snapshot
                 'details': {
                     'connection_name': provider.connection_name,
                     'account_id': provider.account_id,
