@@ -2067,5 +2067,94 @@ The InfraZen platform now features a completely reorganized resources page that 
 - Port mapping: `port_by_server[server_id]` using `device_id` and `device_owner`
 - Total storage: Calculated by summing all attached volume sizes
 
+### 14.2. Selectel Statistics Implementation
+**Date**: October 4, 2025
+**Objective**: Add CPU and memory usage statistics for Selectel VMs, matching Beget functionality
+
+**Changes Implemented:**
+1. **Client Enhancement** (`app/providers/selectel/client.py`)
+   - Added `get_server_cpu_statistics()` method to fetch CPU usage data
+   - Added `get_server_memory_statistics()` method to fetch memory usage data
+   - Added `get_all_server_statistics()` method to batch-fetch statistics for all servers
+   - Uses Selectel's Gnocchi API (`/metric/v1/aggregates`) with POST requests
+   - Granularity: 300 seconds (5 minutes, 12 data points per hour)
+   - Data processing: Calculates avg, max, min, trend, and performance tier
+
+2. **Service Enhancement** (`app/providers/selectel/service.py`)
+   - Added `_process_server_statistics()` method to store statistics as resource tags
+   - Integrated statistics fetching during resource sync
+   - Statistics stored in same format as Beget for UI compatibility
+
+3. **Statistics Format** (Beget-compatible)
+   - **CPU Tags**: `cpu_avg_usage`, `cpu_max_usage`, `cpu_min_usage`, `cpu_trend`, `cpu_performance_tier`, `cpu_data_points`, `cpu_period`, `cpu_collection_timestamp`
+   - **Memory Tags**: `memory_avg_usage_mb`, `memory_max_usage_mb`, `memory_min_usage_mb`, `memory_usage_percent`, `memory_trend`, `memory_tier`, `memory_data_points`, `memory_period`, `memory_collection_timestamp`
+
+**Results:**
+- ✅ CPU usage statistics displayed with Chart.js graphs
+- ✅ Memory usage statistics displayed with Chart.js graphs
+- ✅ Performance tiers (LOW/MEDIUM/HIGH) calculated automatically
+- ✅ 100% compatible with existing Beget statistics display code
+- ✅ No template changes needed - uses existing Chart.js rendering
+
+**API Details:**
+- **Endpoint**: `/metric/v1/aggregates` (POST)
+- **Authentication**: X-Auth-Token (IAM token)
+- **Granularity**: 300 seconds (5 minutes) - only supported granularity
+- **Metrics**: 
+  - CPU: `cpu` (percentage)
+  - Memory: `memory.usage` (MB)
+- **Data Points**: 12 per hour (sufficient coverage)
+
+**Limitations:**
+- Selectel only supports 300-second granularity (vs Beget's 60-second)
+- Still provides 12 data points per hour (good coverage)
+- Other granularities (60s, 120s, 180s, 240s, 600s) return 400 Bad Request
+
+### 14.3. Selectel Status Normalization
+**Date**: October 4, 2025
+**Objective**: Normalize Selectel server status to match Beget convention for consistent UI display
+
+**Changes Implemented:**
+1. **Service Enhancement** (`app/providers/selectel/service.py`)
+   - Added status normalization logic in `_create_resource()` method
+   - OpenStack status mapping:
+     - `ACTIVE` → `RUNNING` (matches Beget)
+     - `SHUTOFF` / `STOPPED` → `STOPPED`
+     - `ERROR` / `FAILED` → `ERROR`
+     - Other statuses → uppercased
+   - Status now properly updates during sync operations
+
+**Results:**
+- ✅ Consistent status display across Beget and Selectel providers
+- ✅ Both providers now show `RUNNING` or `STOPPED` states
+- ✅ Status changes detected and tracked in resource states
+- ✅ Beget VPS: `RUNNING` / `STOPPED`
+- ✅ Selectel VMs: `RUNNING` (ACTIVE) / `STOPPED` (SHUTOFF)
+
+**Status Convention:**
+| Provider | Active State | Stopped State | Error State |
+|----------|-------------|---------------|-------------|
+| Beget | RUNNING | STOPPED | ERROR |
+| Selectel (normalized) | RUNNING | STOPPED | ERROR |
+| Selectel (raw OpenStack) | ACTIVE | SHUTOFF | ERROR |
+
+### 14.4. Complete Feature Parity Achieved
+**Beget vs Selectel Comparison:**
+
+| Feature | Beget | Selectel | Status |
+|---------|-------|----------|--------|
+| **Complete Specs** | ✅ vCPUs, RAM, disk | ✅ vCPUs, RAM, storage | ✅ Parity |
+| **Status Display** | ✅ RUNNING/STOPPED | ✅ RUNNING/STOPPED | ✅ Parity |
+| **IP Addresses** | ✅ Yes | ✅ Yes | ✅ Parity |
+| **CPU Statistics** | ✅ ~60-108 points/hour | ✅ 12 points/hour | ✅ Working |
+| **Memory Statistics** | ✅ ~60-108 points/hour | ✅ 12 points/hour | ✅ Working |
+| **Chart.js Graphs** | ✅ Yes | ✅ Yes | ✅ Parity |
+| **Performance Tiers** | ✅ LOW/MED/HIGH | ✅ LOW/MED/HIGH | ✅ Parity |
+| **Data Format** | ✅ Compatible | ✅ Compatible | ✅ Parity |
+| **Combined Resources** | ✅ Single VPS view | ✅ Single VM view | ✅ Parity |
+
+**Summary:**
+Both Beget and Selectel providers now have complete feature parity with unified data formats, consistent status conventions, comprehensive resource specifications, and real-time CPU/memory statistics displayed via Chart.js graphs.
+
 ## 15. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration (with October 2025 resource combination enhancements), snapshot-based architecture, and multi-cloud resource management.
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration (with October 2025 resource combination enhancements, CPU/memory statistics implementation, and status normalization), snapshot-based architecture, multi-cloud resource management, and complete feature parity between Beget and Selectel providers.
