@@ -26,12 +26,7 @@ class SelectelService:
         """
         self.provider = provider
         self.credentials = json.loads(provider.credentials)
-        self.client = SelectelClient(
-            api_key=self.credentials.get('api_key'),
-            account_id=self.credentials.get('account_id'),
-            service_username=self.credentials.get('service_username'),
-            service_password=self.credentials.get('service_password')
-        )
+        self.client = SelectelClient(provider.credentials)
     
     def test_connection(self) -> Dict[str, Any]:
         """

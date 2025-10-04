@@ -15,20 +15,46 @@ logger = logging.getLogger(__name__)
 class SelectelClient:
     """Selectel API client for managing cloud resources"""
     
-    def __init__(self, api_key: str, account_id: str = None, service_username: str = None, service_password: str = None):
+    def __init__(self, credentials, account_id: str = None, service_username: str = None, service_password: str = None):
         """
         Initialize Selectel client
         
         Args:
-            api_key: Selectel API key (X-Token)
+            credentials: Either a dictionary with credentials or a string (legacy API key)
             account_id: Account ID (optional, can be retrieved from API)
             service_username: Service user username for IAM token generation
             service_password: Service user password for IAM token generation
         """
-        self.api_key = api_key
-        self.account_id = account_id
-        self.service_username = service_username
-        self.service_password = service_password
+        # Handle both dictionary credentials and legacy string API key
+        if isinstance(credentials, dict):
+            self.api_key = credentials.get('api_key')
+            self.account_id = credentials.get('account_id') or account_id
+            self.service_username = credentials.get('service_username') or service_username
+            self.service_password = credentials.get('service_password') or service_password
+            self.service_uid = credentials.get('service_uid')
+        elif isinstance(credentials, str):
+            # Try to parse as JSON first
+            try:
+                creds_dict = json.loads(credentials)
+                self.api_key = creds_dict.get('api_key')
+                self.account_id = creds_dict.get('account_id') or account_id
+                self.service_username = creds_dict.get('service_username') or service_username
+                self.service_password = creds_dict.get('service_password') or service_password
+                self.service_uid = creds_dict.get('service_uid')
+            except:
+                # Fallback to treating as API key
+                self.api_key = credentials
+                self.account_id = account_id
+                self.service_username = service_username
+                self.service_password = service_password
+                self.service_uid = None
+        else:
+            # Legacy: treat as API key
+            self.api_key = credentials
+            self.account_id = account_id
+            self.service_username = service_username
+            self.service_password = service_password
+            self.service_uid = None
         self.base_url = "https://api.selectel.ru/vpc/resell/v2"
         self.openstack_base_url = "https://ru-3.cloud.api.selcloud.ru"
         # Selectel regions - will be populated dynamically from service catalog
@@ -36,6 +62,7 @@ class SelectelClient:
         self.regions = {
             'ru-3': 'https://ru-3.cloud.api.selcloud.ru',
             'kz-1': 'https://kz-1.cloud.api.servercore.com',
+            'ke-1': 'https://ke-1.cloud.api.servercore.com',
             'ru-1': 'https://ru-1.cloud.api.selcloud.ru',
             'ru-2': 'https://ru-2.cloud.api.selcloud.ru',
             'ru-7': 'https://ru-7.cloud.api.selcloud.ru',
@@ -733,7 +760,9 @@ class SelectelClient:
             all_volumes = []
             all_ports = []
             
-            for region_name in self.regions.keys():
+            # Create a copy of regions to avoid "dictionary changed size during iteration" error
+            regions_to_query = list(self.regions.keys())
+            for region_name in regions_to_query:
                 try:
                     logger.info(f"Fetching servers from region {region_name}")
                     region_servers = self.get_openstack_servers(region=region_name)
@@ -1167,10 +1196,16 @@ class SelectelClient:
                 # Get standalone volumes from ALL regions (those not attached to any server)
                 all_volumes = []
                 for project in resources.get('projects', []):
-                    project_id = project.get('id')
+                    if isinstance(project, dict):
+                        project_id = project.get('id')
+                    else:
+                        project_id = project  # In case project is already a string ID
+                    
                     if project_id:
                         # Query each region for volumes
-                        for region_name in self.regions.keys():
+                        # Create a copy of regions to avoid "dictionary changed size during iteration" error
+                        regions_to_query = list(self.regions.keys())
+                        for region_name in regions_to_query:
                             try:
                                 logger.info(f"Fetching volumes for project {project_id} in region {region_name}")
                                 project_volumes = self.get_openstack_volumes(project_id, region=region_name)
