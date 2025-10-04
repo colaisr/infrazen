@@ -416,6 +416,128 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get memory statistics for server {server_id}: {str(e)}")
     
+    def get_resource_costs(self, hours: int = 24) -> Dict[str, Any]:
+        """
+        Get cost/consumption data for all resources
+        
+        Uses the cloud_billing API to get actual costs per resource.
+        Costs are returned in kopecks (1/100 ruble) per hour, grouped by resource.
+        
+        Args:
+            hours: Number of hours to fetch cost data for (default: 24 for daily cost)
+            
+        Returns:
+            Dict mapping resource_id to cost information:
+            {
+                'resource_id': {
+                    'name': 'Resource Name',
+                    'type': 'cloud_vm',
+                    'hourly_cost_kopecks': 43.0,
+                    'hourly_cost_rubles': 0.43,
+                    'daily_cost_rubles': 10.32,
+                    'monthly_cost_rubles': 309.60,
+                    'metrics': {'compute_cores_preemptible': 22, 'compute_ram_preemptible': 9, ...}
+                }
+            }
+        """
+        try:
+            # Calculate time range
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=hours)
+            
+            # Format timestamps for API
+            start_str = start_time.strftime('%Y-%m-%dT%H:00:00')
+            end_str = end_time.strftime('%Y-%m-%dT%H:59:59')
+            
+            # Construct billing API URL
+            billing_url = "https://api.selectel.ru/v1/cloud_billing/statistic/consumption"
+            params = {
+                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
+                'start': start_str,
+                'end': end_str,
+                'locale': 'ru',
+                'group_type': 'project_object_region_metric',
+                'period_group_type': 'hour'
+            }
+            
+            # Make request with X-Token authentication
+            headers = {
+                'X-Token': self.api_key,
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('status') != 'success':
+                return {}
+            
+            # Process consumption data
+            resource_costs = {}
+            
+            for item in data.get('data', []):
+                obj = item.get('object', {})
+                obj_id = obj.get('id')
+                obj_name = obj.get('name', 'Unknown')
+                obj_type = obj.get('type')
+                parent_id = obj.get('parent_id', '')
+                
+                metric_id = item.get('metric', {}).get('id', '')
+                cost_kopecks = item.get('value', 0)  # Cost in kopecks per hour
+                
+                # For VMs, aggregate their own costs
+                if obj_type == 'cloud_vm':
+                    if obj_id not in resource_costs:
+                        resource_costs[obj_id] = {
+                            'name': obj_name,
+                            'type': obj_type,
+                            'metrics': {},
+                            'total_kopecks': 0
+                        }
+                    
+                    resource_costs[obj_id]['metrics'][metric_id] = resource_costs[obj_id]['metrics'].get(metric_id, 0) + cost_kopecks
+                    resource_costs[obj_id]['total_kopecks'] += cost_kopecks
+                
+                # For volumes with parent_id, add their cost to the parent VM
+                elif parent_id:
+                    if parent_id not in resource_costs:
+                        # Initialize parent if not exists (shouldn't happen, but safe)
+                        resource_costs[parent_id] = {
+                            'name': obj.get('parent_name', 'Unknown'),
+                            'type': 'cloud_vm',
+                            'metrics': {},
+                            'total_kopecks': 0
+                        }
+                    
+                    resource_costs[parent_id]['metrics'][metric_id] = resource_costs[parent_id]['metrics'].get(metric_id, 0) + cost_kopecks
+                    resource_costs[parent_id]['total_kopecks'] += cost_kopecks
+            
+            # Calculate averaged costs per resource
+            num_hours = len(set(item.get('period') for item in data.get('data', [])))
+            if num_hours == 0:
+                num_hours = hours  # Fallback
+            
+            for resource_id, cost_data in resource_costs.items():
+                # Average hourly cost
+                avg_hourly_kopecks = cost_data['total_kopecks'] / num_hours if num_hours > 0 else cost_data['total_kopecks']
+                avg_hourly_rubles = avg_hourly_kopecks / 100
+                
+                # Projected costs
+                daily_rubles = avg_hourly_rubles * 24
+                monthly_rubles = daily_rubles * 30
+                
+                cost_data['hourly_cost_kopecks'] = round(avg_hourly_kopecks, 2)
+                cost_data['hourly_cost_rubles'] = round(avg_hourly_rubles, 4)
+                cost_data['daily_cost_rubles'] = round(daily_rubles, 2)
+                cost_data['monthly_cost_rubles'] = round(monthly_rubles, 2)
+            
+            return resource_costs
+            
+        except Exception as e:
+            print(f"Error fetching resource costs: {e}")
+            return {}
+    
     def get_all_server_statistics(self, servers: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Get CPU and memory statistics for all servers

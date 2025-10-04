@@ -190,6 +190,25 @@ class SelectelService:
                     logger.error(f"Failed to get server statistics: {e}", exc_info=True)
                     # Continue sync even if statistics fail
             
+            # Get cost information for all resources (similar to Beget)
+            if servers_list:
+                try:
+                    logger.info(f"Fetching cost data for {len(servers_list)} servers")
+                    resource_costs = self.client.get_resource_costs(hours=24)
+                    
+                    logger.info(f"Retrieved costs for {len(resource_costs)} resources")
+                    
+                    # Update resource costs
+                    if resource_costs:
+                        self._update_resource_costs(resource_costs)
+                        logger.info(f"Successfully updated costs for {len(resource_costs)} resources")
+                    else:
+                        logger.warning("No cost data retrieved")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to get resource costs: {e}", exc_info=True)
+                    # Continue sync even if costs fail
+            
             # Note: Volumes and Networks are now integrated into server resources
             # No need to process them separately as they're part of each VM's metadata
             
@@ -491,6 +510,51 @@ class SelectelService:
                 
             except Exception as e:
                 logger.error(f"Error processing statistics for server {server_id}: {e}")
+    
+    def _update_resource_costs(self, resource_costs: Dict[str, Any]):
+        """
+        Update resource costs in the database (similar to Beget implementation)
+        
+        Args:
+            resource_costs: Dict mapping resource_id to cost information from get_resource_costs()
+        """
+        from app.core.models.resource import Resource
+        from app.core.database import db
+        
+        for resource_id, cost_data in resource_costs.items():
+            try:
+                # Find the resource
+                resource = Resource.query.filter_by(
+                    provider_id=self.provider.id,
+                    resource_id=resource_id,
+                    resource_type='server'
+                ).first()
+                
+                if not resource:
+                    logger.warning(f"Resource not found for ID {resource_id}")
+                    continue
+                
+                # Update cost fields (similar to Beget)
+                daily_cost = cost_data.get('daily_cost_rubles', 0)
+                
+                resource.daily_cost = daily_cost
+                resource.effective_cost = daily_cost  # Daily cost as effective cost
+                resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
+                resource.cost_period = 'MONTHLY'
+                resource.cost_frequency = 'daily'  # We calculate and store daily
+                resource.currency = 'RUB'
+                resource.billing_period = 'monthly'
+                
+                # Also store cost breakdown as tags for detailed view
+                resource.add_tag('cost_daily_rubles', str(daily_cost))
+                resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
+                resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
+                resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
+                
+                logger.debug(f"Updated costs for {cost_data.get('name')}: {daily_cost} ₽/day")
+                
+            except Exception as e:
+                logger.error(f"Error updating costs for resource {resource_id}: {e}")
                 continue
         
         db.session.commit()
