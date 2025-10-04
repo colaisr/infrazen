@@ -268,13 +268,25 @@ class SelectelService:
             ).first()
             
             # Create unified resource data
+            # Extract status from metadata (OpenStack uses ACTIVE/SHUTOFF, convert to uppercase)
+            raw_status = metadata.get('status', 'active')
+            # Normalize status: ACTIVE -> ACTIVE, SHUTOFF -> STOPPED, etc.
+            if raw_status == 'ACTIVE':
+                normalized_status = 'RUNNING'  # Match Beget convention
+            elif raw_status in ['SHUTOFF', 'STOPPED']:
+                normalized_status = 'STOPPED'
+            elif raw_status in ['ERROR', 'FAILED']:
+                normalized_status = 'ERROR'
+            else:
+                normalized_status = raw_status.upper() if isinstance(raw_status, str) else 'UNKNOWN'
+            
             unified_resource = {
                 'resource_id': resource_id,
                 'resource_name': name,
                 'resource_type': resource_type,
                 'service_name': service_name or ('Account' if resource_type == 'account' else resource_type.title()),
                 'region': region or ('global' if resource_type == 'account' else 'unknown'),
-                'status': 'active',
+                'status': normalized_status,
                 'effective_cost': 0.0,
                 'provider_config': metadata
             }
@@ -300,6 +312,7 @@ class SelectelService:
                 # Update resource if there are changes
                 if has_changes:
                     existing_resource.resource_name = name
+                    existing_resource.status = normalized_status  # Update status
                     existing_resource.provider_config = json.dumps(metadata)
                     existing_resource.last_sync = datetime.now()
                     existing_resource.is_active = True
@@ -341,6 +354,7 @@ class SelectelService:
                     resource_name=name,
                     region=region or ('global' if resource_type == 'account' else 'unknown'),
                     service_name=service_name or ('Account' if resource_type == 'account' else resource_type.title()),
+                    status=normalized_status,  # Set normalized status
                     provider_config=json.dumps(metadata),
                     last_sync=datetime.now(),
                     is_active=True
