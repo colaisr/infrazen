@@ -87,7 +87,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 #### **Provider-Specific Data Handling**
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex.Cloud**: Compute instances, storage, databases, load balancers, networks
-- **Selectel**: Virtual servers, block storage, object storage, CDN, DNS
+- **Selectel**: Multi-region OpenStack integration - Virtual servers, standalone volumes (with cost tracking), block storage across all regions (ru-1 through ru-9, kz-1), network ports, dynamic region discovery from service catalog
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.1.5. Sync Mechanics & Features
@@ -1052,6 +1052,228 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Multi-cloud**: Unified account information view
 - **Reporting**: Account information reports
 - **API Access**: Programmatic account information access
+
+## 6.5. Selectel Multi-Region & Volume Integration
+
+### 6.5.1. Overview
+The InfraZen platform implements comprehensive multi-region support for Selectel cloud infrastructure, with automated region discovery and standalone volume tracking. This integration ensures complete visibility across all Selectel regions and resource types, including unattached storage volumes that are often missed in traditional cloud inventory systems.
+
+### 6.5.2. Multi-Region Architecture
+
+#### 6.5.2.1. Dynamic Region Discovery
+The Selectel integration automatically discovers all available regions from the OpenStack service catalog during authentication:
+
+**Supported Regions:**
+- `ru-1`: St. Petersburg
+- `ru-2`: Moscow  
+- `ru-3`: Moscow (default region)
+- `ru-7`: Kazakhstan
+- `ru-8`: Novosibirsk
+- `ru-9`: Almaty
+- `kz-1`: Kazakhstan (servercore.com infrastructure)
+
+**Discovery Mechanism:**
+- Parse OpenStack service catalog from IAM authentication response
+- Extract compute, volume, and network service endpoints
+- Automatically populate regional API endpoints
+- Fallback to hardcoded region list if discovery fails
+- Log discovered regions for visibility and troubleshooting
+
+#### 6.5.2.2. Regional Resource Queries
+All resource types are queried across ALL discovered regions to ensure complete inventory:
+
+**Per-Region Queries:**
+- **Servers (VMs)**: Compute instances across all availability zones
+- **Volumes**: Block storage (both attached and standalone)
+- **Ports**: Network interfaces and IP assignments
+- **Networks**: Virtual network configurations
+
+### 6.5.3. Standalone Volume Support
+
+#### 6.5.3.1. Problem Statement
+Traditional cloud inventory systems often track only volumes attached to virtual machines, missing standalone storage volumes that continue to incur costs. These unattached volumes represent significant cost optimization opportunities.
+
+#### 6.5.3.2. Implementation
+InfraZen tracks ALL volumes across all regions, specifically identifying and pricing standalone volumes:
+
+**Volume Discovery:**
+1. Query volume API for each project across all regions
+2. Filter volumes with empty `attachments` list
+3. Create dedicated `volume` resource entries
+4. Calculate costs based on size and storage type
+
+**Volume Pricing (2025 Rates):**
+- **HDD Basic**: 7.28 ₽/GB/month (~0.24 ₽/GB/day)
+- **SSD Basic**: 8.99 ₽/GB/month (~0.30 ₽/GB/day)
+- **SSD Universal**: 18.55 ₽/GB/month (~0.62 ₽/GB/day)
+- **SSD NVMe Fast**: 39.18 ₽/GB/month (~1.31 ₽/GB/day)
+
+**Cost Calculation:**
+```python
+monthly_cost = size_gb * price_per_gb_month
+daily_cost = monthly_cost / 30
+hourly_cost = monthly_cost / 720  # 30 days * 24 hours
+```
+
+#### 6.5.3.3. Resource Metadata
+Each volume resource captures comprehensive details:
+- Volume ID and name
+- Size in GB
+- Volume type (basic, universal, fast)
+- Availability zone/region
+- Creation and update timestamps
+- Attachment status
+- Bootable flag
+- Daily, monthly, and hourly costs
+
+### 6.5.4. Technical Implementation
+
+#### 6.5.4.1. SelectelClient Enhancements
+**Region Management:**
+- `_discover_regions_from_catalog()`: Parse service catalog for regions
+- `get_available_regions()`: Return list of all discovered regions
+- Region dictionary with dynamic updates from catalog
+
+**Multi-Region Resource Fetching:**
+- `get_openstack_servers(region)`: Fetch VMs from specific region
+- `get_openstack_volumes(project_id, region)`: Fetch volumes per region
+- `get_openstack_ports(region)`: Fetch network ports per region
+- `get_combined_vm_resources()`: Aggregate resources from all regions
+
+**Volume Cost Calculation:**
+- `calculate_volume_cost(volume)`: Determine pricing based on size and type
+- Automatic type detection from volume metadata
+- Support for all Selectel storage tiers
+
+#### 6.5.4.2. SelectelService Integration
+**Resource Processing:**
+```python
+# Process standalone volumes (those not attached to any server)
+volumes_list = []
+if 'volumes' in api_resources:
+    for volume_data in api_resources['volumes']:
+        volume_resource = self._create_resource(
+            resource_type='volume',
+            resource_id=volume_data.get('id'),
+            name=volume_data.get('name'),
+            metadata={...},
+            sync_snapshot_id=sync_snapshot.id,
+            region=volume_data.get('availability_zone'),
+            service_name='Block Storage'
+        )
+```
+
+**Cost Updates:**
+```python
+# Calculate and store volume costs
+for volume_data in volumes_list:
+    cost_data = self.client.calculate_volume_cost(volume_data)
+    volume_resource.daily_cost = cost_data['daily_cost_rubles']
+    volume_resource.effective_cost = cost_data['daily_cost_rubles']
+    volume_resource.original_cost = cost_data['monthly_cost_rubles']
+```
+
+### 6.5.5. OpenStack API Integration
+
+#### 6.5.5.1. Authentication
+**IAM Token Generation:**
+- Endpoint: `https://cloud.api.selcloud.ru/identity/v3/auth/tokens`
+- Method: Username/password authentication with project scoping
+- Token stored for subsequent API calls
+- Service catalog extracted for region discovery
+
+#### 6.5.5.2. Resource APIs
+**Compute Service (Nova):**
+- `GET /compute/v2.1/servers/detail` - List virtual machines
+- Regional endpoints: `https://{region}.cloud.api.selcloud.ru`
+
+**Volume Service (Cinder):**
+- `GET /volume/v3/{project_id}/volumes/detail` - List all volumes
+- `GET /volume/v3/{project_id}/snapshots` - Volume snapshots
+- Regional endpoints vary by region
+
+**Network Service (Neutron):**
+- `GET /network/v2.0/ports` - Network ports and interfaces
+- `GET /network/v2.0/networks` - Virtual networks
+
+### 6.5.6. Sync Process Flow
+
+#### 6.5.6.1. Multi-Region Sync
+1. **Authentication**: Generate IAM token and extract service catalog
+2. **Region Discovery**: Parse catalog to identify all available regions
+3. **Per-Region Queries**:
+   - For each region (ru-1, ru-3, kz-1, etc.):
+     - Query servers API
+     - Query volumes API  
+     - Query ports API
+     - Log discovered resources
+4. **Resource Aggregation**: Combine resources from all regions
+5. **VM Processing**: Create complete VM resources with attached volumes
+6. **Standalone Volume Processing**: Identify and price unattached volumes
+7. **Cost Calculation**: Calculate costs for both VMs and standalone volumes
+8. **Database Storage**: Store all resources with region metadata
+
+#### 6.5.6.2. Error Handling
+- Graceful handling of region-specific API failures
+- Continue sync even if one region fails
+- Log warnings for inaccessible regions
+- Fallback to hardcoded region list if discovery fails
+
+### 6.5.7. Benefits & Use Cases
+
+#### 6.5.7.1. Cost Optimization
+- **Zombie Volume Detection**: Identify unattached volumes incurring costs
+- **Multi-Region Visibility**: Track resources across all geographical regions
+- **Storage Optimization**: Identify oversized or unused storage
+- **Cost Attribution**: Accurate cost breakdown by region and resource type
+
+#### 6.5.7.2. Operational Visibility
+- **Complete Inventory**: No resources missed due to region limitations
+- **Regional Distribution**: Understand resource deployment patterns
+- **Capacity Planning**: Analyze resource usage across regions
+- **Compliance**: Ensure resources are deployed in approved regions
+
+### 6.5.8. Future Enhancements
+
+#### 6.5.8.1. Additional Resource Types
+- Object Storage (S3-compatible)
+- CDN configurations
+- DNS zones and records
+- Load balancers
+- Kubernetes clusters
+
+#### 6.5.8.2. Advanced Features
+- **Volume Snapshot Tracking**: Monitor snapshot costs and retention
+- **Cross-Region Analysis**: Compare pricing and performance across regions
+- **Automated Cleanup**: AI-powered recommendations for unused volumes
+- **Volume Lifecycle**: Track volume age and recommend archival
+- **Regional Cost Optimization**: Suggest optimal region placement
+
+#### 6.5.8.3. Monitoring & Alerts
+- Alert on standalone volumes older than X days
+- Notify when volume costs exceed thresholds
+- Track volume usage patterns for rightsizing
+- Monitor cross-region data transfer costs
+
+### 6.5.9. Implementation Status
+
+#### 6.5.9.1. Completed Features ✅
+- ✅ Dynamic region discovery from service catalog
+- ✅ Multi-region resource queries (servers, volumes, ports)
+- ✅ Standalone volume identification and tracking
+- ✅ Volume cost calculation with tier-based pricing
+- ✅ Regional metadata tagging for all resources
+- ✅ Fallback region list for resilience
+- ✅ Comprehensive error handling and logging
+- ✅ Integration with snapshot-based sync system
+
+#### 6.5.9.2. Technical Deliverables ✅
+- `SelectelClient`: Multi-region support with dynamic discovery
+- `SelectelService`: Standalone volume processing and cost tracking
+- Volume pricing engine with all storage tiers
+- Regional API endpoint management
+- Service catalog parsing and region extraction
+- Database schema support for volume resources
 
 ## 12. Beget Cloud API Enrichment Analysis
 
