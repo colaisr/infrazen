@@ -96,7 +96,7 @@ class SelectelService:
                     resource_id=account_data.get('account', {}).get('name', 'unknown'),
                     name=account_data.get('account', {}).get('name', 'Account'),
                     metadata=account_data,
-                    sync_log_id=sync_snapshot.id
+                    sync_snapshot_id=sync_snapshot.id
                 )
                 if account_resource:
                     synced_resources.append(account_resource)
@@ -203,6 +203,11 @@ class SelectelService:
                 existing_resource.provider_config = json.dumps(metadata)
                 existing_resource.last_sync = datetime.utcnow()
                 existing_resource.is_active = True
+                # Ensure required fields are set
+                if not existing_resource.region:
+                    existing_resource.region = 'global' if resource_type == 'account' else 'unknown'
+                if not existing_resource.service_name:
+                    existing_resource.service_name = 'Account' if resource_type == 'account' else resource_type.title()
                 db.session.commit()
                 return existing_resource
             else:
@@ -212,6 +217,8 @@ class SelectelService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     resource_name=name,
+                    region='global' if resource_type == 'account' else 'unknown',
+                    service_name='Account' if resource_type == 'account' else resource_type.title(),
                     provider_config=json.dumps(metadata),
                     last_sync=datetime.utcnow(),
                     is_active=True

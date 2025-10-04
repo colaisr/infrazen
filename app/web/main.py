@@ -77,8 +77,10 @@ def connections():
     else:
         # Real user: show only real database connections using unified models
         
-        # Get real providers from database
-        cloud_providers = CloudProvider.query.filter_by(user_id=user['id']).all()
+        # Get real providers from database (handle SQLite precision issue)
+        all_providers = CloudProvider.query.all()
+        user_id_int = int(float(user['id']))
+        cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
         
         # Convert to provider format
         providers = []
@@ -95,6 +97,7 @@ def connections():
                 'id': f"{provider.provider_type}-{provider.id}",
                 'code': provider.provider_type,
                 'name': provider.provider_type.title(),
+                'provider_type': provider.provider_type,  # Add this field for template
                 'connection_name': provider.connection_name,
                 'status': 'connected' if provider.is_active else 'disconnected',
                 'last_sync': provider.last_sync,
