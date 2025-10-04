@@ -1587,16 +1587,29 @@ The InfraZen platform now includes complete integration with Selectel cloud prov
 - `/roles` - Role-based access control information
 - `/v1/jwt` - JWT token generation for OpenStack APIs
 - `/identity/v3/auth/tokens` - IAM token generation with service user credentials
-- `/compute/v2.1/servers/detail` - Virtual machine discovery
-- `/volume/v3/volumes/detail` - Block storage discovery
-- `/network/v2.0/networks` - Network resource discovery
+- `/compute/v2.1/servers/detail` - Virtual machine discovery with complete specifications
+- `/volume/v3/{project_id}/volumes/detail` - Block storage with attachment information
+- `/network/v2.0/ports` - Network ports for IP addresses and MAC information
 
 #### 12.10.4. Cloud Resource Discovery
 **Resource Types Discovered:**
-- **Virtual Machines**: Complete VM specifications, status, and configuration
-- **Block Storage**: Volume details, capacity, and attachment information
-- **Networks**: Network configuration and connectivity details
+- **Virtual Machines**: Complete VM specifications with integrated volumes and network information
+  - vCPUs (virtual CPU cores)
+  - RAM (memory in MB)
+  - Flavor type (e.g., SL1.1-1024)
+  - Total storage (calculated from attached volumes)
+  - IP addresses (from network ports)
+  - Attached volumes with device paths
+  - Network interfaces with MAC addresses
+- **Block Storage**: Integrated into VM resources (not shown separately)
+- **Networks**: Integrated into VM resources (network ports)
 - **Account Resources**: Account information, projects, and user management
+
+**Combined Resource Architecture:**
+- **VMs with Volumes**: Volumes attached to VMs are shown as part of the VM resource
+- **Network Integration**: IP addresses and MAC addresses displayed within VM details
+- **Unified View**: Matches Selectel admin panel presentation
+- **Consistent with Beget**: Same resource combination pattern as Beget VPS implementation
 
 **IAM Token Scoping:**
 - **Project-Scoped Tokens**: IAM tokens generated with specific project scope
@@ -1635,11 +1648,14 @@ The InfraZen platform now includes complete integration with Selectel cloud prov
 **Successfully Delivered:**
 - ✅ **Complete API Integration**: All major Selectel endpoints accessible
 - ✅ **Dual Authentication**: Static token + service user credentials working
-- ✅ **Cloud Resource Discovery**: VMs, volumes, and networks successfully retrieved
+- ✅ **Cloud Resource Discovery**: VMs with integrated volumes and network information
+- ✅ **Combined Resource View**: VMs show attached volumes (not separate resources)
+- ✅ **Complete VM Specifications**: vCPUs, RAM, flavor, total storage, IPs displayed
 - ✅ **Connection Management**: Full CRUD operations implemented
 - ✅ **Frontend Integration**: Enhanced forms with service user credentials
 - ✅ **Database Integration**: Unified models with snapshot support
 - ✅ **Snapshot Architecture**: Complete sync history and change tracking
+- ✅ **UI Compatibility**: Template supports both Beget and Selectel field names
 - ✅ **Error Resolution**: All technical issues resolved
 
 **Technical Achievements:**
@@ -1649,16 +1665,71 @@ The InfraZen platform now includes complete integration with Selectel cloud prov
 - **Account Auto-detection**: Automatic account ID extraction
 - **IAM Token Generation**: Dynamic IAM token generation with project scoping
 - **OpenStack Integration**: Full OpenStack API integration for cloud resources
+- **Resource Combination Logic**: Intelligent data merging from servers, volumes, and ports
+- **Volume-to-VM Mapping**: Automatic attachment detection via OpenStack metadata
+- **Network Port Integration**: Clean IP address extraction from network interfaces
 - **Snapshot Support**: Complete sync history with resource state tracking
+- **Template Field Compatibility**: Supports both `cpu_cores` (Beget) and `vcpus` (Selectel)
 - **Error Handling**: Graceful degradation and user feedback
 
-#### 12.10.8. Business Value
+#### 12.10.8. Resource Data Combination Strategy (October 2025 Enhancement)
+**Problem Addressed:**
+- Initial implementation showed VMs and volumes as separate resources (2 VMs + 2 volumes = 4 resources)
+- Resource cards displayed limited information (missing vCPUs, RAM, IPs)
+- Didn't match the Selectel admin panel view where volumes are part of VMs
+
+**Solution Implemented:**
+- **Intelligent Data Combination**: Merge data from multiple OpenStack APIs
+  - Server details (`/compute/v2.1/servers/detail`) → vCPUs, RAM, flavor, status
+  - Volume details (`/volume/v3/{project}/volumes/detail`) → attached storage with device paths
+  - Network ports (`/network/v2.0/ports`) → clean IP addresses and MAC information
+- **Volume-to-VM Mapping**: Match volumes to servers using `attachments.server_id`
+- **Port-to-VM Mapping**: Match network interfaces using `device_id` and `device_owner`
+- **Unified Resource Model**: Single VM resource contains all related information
+
+**Data Combination Process:**
+```python
+# Step 1: Get servers, volumes, and ports from OpenStack
+servers = get_openstack_servers()  # VMs with flavor.vcpus, flavor.ram
+volumes = get_openstack_volumes()  # Volumes with attachments
+ports = get_openstack_ports()      # Network interfaces with IPs
+
+# Step 2: Map volumes to servers by attachment
+volume_by_server[server_id] = [volumes attached to this server]
+
+# Step 3: Map ports to servers by device_id
+port_by_server[server_id] = [ports for this server]
+
+# Step 4: Combine into complete VM resource
+vm_resource = {
+    'vcpus': server.flavor.vcpus,           # From server
+    'ram_mb': server.flavor.ram,             # From server
+    'total_storage_gb': sum(volume sizes),   # Calculated from volumes
+    'ip_addresses': [ips from ports],        # From ports
+    'attached_volumes': [...],               # From volumes
+    'network_interfaces': [...]              # From ports
+}
+```
+
+**Results After Enhancement:**
+- **2 complete VM resources** (instead of 2 VMs + 2 volumes + 2 networks)
+- Each VM displays: vCPUs, RAM, Flavor, Total Storage, IPs, Attached Volumes
+- Matches Selectel admin panel presentation exactly
+- Consistent with Beget provider implementation pattern
+
+**Template Compatibility:**
+- Updated `resources.html` to check both `cpu_cores` (Beget) and `vcpus` (Selectel)
+- Supports `disk_gb` (Beget) and `total_storage_gb` (Selectel)
+- Ensures multi-provider consistency in UI display
+
+#### 12.10.9. Business Value
 **FinOps Capabilities:**
 - **Multi-Cloud Support**: Selectel added to unified FinOps platform
 - **Cost Visibility**: Selectel resources integrated with cost tracking
 - **Resource Management**: Complete resource lifecycle management
 - **Historical Analysis**: Full sync history for trend analysis and optimization
 - **Optimization Ready**: Foundation for cost optimization recommendations
+- **Complete VM Visibility**: Full VM specifications for right-sizing decisions
 
 **Operational Benefits:**
 - **Unified Interface**: Single interface for multiple cloud providers
@@ -1667,6 +1738,7 @@ The InfraZen platform now includes complete integration with Selectel cloud prov
 - **Cost Analysis**: Integrated cost analysis across all providers
 - **Change Tracking**: Complete audit trail of resource changes
 - **Snapshot Management**: Historical data for capacity planning and optimization
+- **Admin Panel Parity**: Resource display matches Selectel's own admin interface
 
 ### 12.11. Snapshot-Based Resource Display Architecture ✅ COMPLETED
 
@@ -1885,13 +1957,17 @@ The InfraZen platform now features a completely reorganized resources page that 
 
 ## 13. Recent Development Achievements (Latest Updates)
 
-### 13.1. Selectel Provider Integration ✅ COMPLETED
+### 13.1. Selectel Provider Integration ✅ COMPLETED & ENHANCED (October 2025)
 **Major Accomplishments:**
 - **Complete API Integration**: Successfully integrated with Selectel's dual API system (Account/Project APIs + OpenStack APIs)
 - **Dual Authentication System**: Implemented static token (X-Token) + service user credentials for comprehensive access
 - **Cloud Resource Discovery**: Successfully retrieved VMs, volumes, and networks from Selectel's OpenStack infrastructure
 - **IAM Token Generation**: Dynamic IAM token generation with project scoping for secure resource access
 - **Frontend Integration**: Enhanced connection forms with service user credentials and real-time testing
+- **Combined Resource View**: VMs now integrate attached volumes and network information (October 2025 enhancement)
+- **Complete VM Specifications**: Full display of vCPUs, RAM, storage, IPs, and attached volumes
+- **Network Port Integration**: Clean IP address extraction from OpenStack network ports API
+- **Template Compatibility**: Multi-provider field name support (cpu_cores/vcpus, disk_gb/total_storage_gb)
 
 ### 13.2. Snapshot-Based Architecture ✅ COMPLETED
 **Key Features Implemented:**
@@ -1932,15 +2008,64 @@ The InfraZen platform now features a completely reorganized resources page that 
 ### 13.5. Current System Capabilities
 **Provider Support:**
 - **Beget**: Complete integration with dual-endpoint API, VPS infrastructure, account information, and performance statistics
-- **Selectel**: Complete integration with dual authentication, cloud resource discovery, and OpenStack API access
+- **Selectel**: Complete integration with combined resource architecture
+  - Dual authentication (static token + service user credentials)
+  - Combined VM resources with integrated volumes and network information
+  - Complete VM specifications (vCPUs, RAM, flavor, storage, IPs)
+  - OpenStack API integration for cloud resource discovery
+  - Network port API for clean IP address extraction
+  - Snapshot-based sync with full change tracking
 - **Future Providers**: Architecture ready for AWS, Azure, GCP, Yandex Cloud, VK Cloud integration
 
 **Data Management:**
 - **Snapshot-Based Sync**: Complete sync history with change tracking
 - **Resource States**: Detailed resource lifecycle management
 - **Cost Tracking**: Daily cost baselines across all providers
-- **Performance Monitoring**: CPU and memory usage statistics with Chart.js visualization
+- **Performance Monitoring**: CPU and memory usage statistics with Chart.js visualization (Beget)
 - **Historical Data**: Complete audit trail for FinOps analysis
+- **Combined Resources**: Intelligent data merging from multiple API endpoints
+- **Multi-Provider Compatibility**: Template supports different field naming conventions
 
-## 14. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration, snapshot-based architecture, and multi-cloud resource management.
+## 14. October 2025 Enhancement Summary
+
+### 14.1. Selectel Resource Combination Improvements
+**Date**: October 4, 2025
+**Objective**: Improve Selectel resource display to match admin panel and Beget implementation patterns
+
+**Changes Implemented:**
+1. **Client Enhancement** (`app/providers/selectel/client.py`)
+   - Added `get_openstack_ports()` method for network interface data
+   - Added `get_combined_vm_resources()` method for intelligent data merging
+   - Modified `get_all_resources()` to return combined VMs instead of separate resources
+
+2. **Service Enhancement** (`app/providers/selectel/service.py`)
+   - Enhanced metadata storage with complete VM specifications
+   - Removed separate volume and network processing
+   - Integrated volumes and network info into VM resources
+
+3. **Template Enhancement** (`app/templates/resources.html`)
+   - Added support for `vcpus` field (Selectel) in addition to `cpu_cores` (Beget)
+   - Added support for `total_storage_gb` field (Selectel) in addition to `disk_gb` (Beget)
+   - Ensures multi-provider field name compatibility
+
+**Results:**
+- VMs now display complete specifications: vCPUs, RAM, flavor, storage, IPs
+- Volumes integrated into VM resources (not shown separately)
+- Network information integrated (IP addresses, MAC addresses)
+- Resource count reduced from 8 to 4 (cleaner, more accurate view)
+- UI matches Selectel admin panel exactly
+- Consistent with Beget provider implementation
+
+**API Endpoints:**
+- Uses 6 endpoints (same count as before)
+- Replaced `/network/v2.0/networks` with `/network/v2.0/ports` for better IP extraction
+- All other endpoints remain the same
+
+**Technical Details:**
+- Data combination happens in `get_combined_vm_resources()` method
+- Volume mapping: `volume_by_server[server_id]` using `attachments.server_id`
+- Port mapping: `port_by_server[server_id]` using `device_id` and `device_owner`
+- Total storage: Calculated by summing all attached volume sizes
+
+## 15. Referencing this Document
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration (with October 2025 resource combination enhancements), snapshot-based architecture, and multi-cloud resource management.

@@ -142,50 +142,34 @@ class SelectelService:
                     if role_resource:
                         synced_resources.append(role_resource)
             
-            # Process actual cloud resources - Servers (VMs)
+            # Process actual cloud resources - Servers (VMs with attached volumes)
             if 'servers' in api_resources:
                 for server_data in api_resources['servers']:
+                    # Extract complete VM information
                     server_resource = self._create_resource(
                         resource_type='server',
                         resource_id=server_data.get('id'),
                         name=server_data.get('name', f"Server {server_data.get('id', 'Unknown')}"),
-                        metadata=server_data,
+                        metadata={
+                            **server_data,
+                            # Add computed fields for easy display
+                            'vcpus': server_data.get('vcpus'),
+                            'ram_mb': server_data.get('ram_mb'),
+                            'flavor_name': server_data.get('flavor_name'),
+                            'total_storage_gb': server_data.get('total_storage_gb'),
+                            'ip_addresses': server_data.get('ip_addresses', []),
+                            'attached_volumes': server_data.get('attached_volumes', []),
+                            'network_interfaces': server_data.get('network_interfaces', [])
+                        },
                         sync_snapshot_id=sync_snapshot.id,
-                        region='ru-3',  # Selectel region
+                        region=server_data.get('region', 'ru-3'),
                         service_name='Compute'
                     )
                     if server_resource:
                         synced_resources.append(server_resource)
             
-            # Process actual cloud resources - Volumes
-            if 'volumes' in api_resources:
-                for volume_data in api_resources['volumes']:
-                    volume_resource = self._create_resource(
-                        resource_type='volume',
-                        resource_id=volume_data.get('id'),
-                        name=volume_data.get('name', f"Volume {volume_data.get('id', 'Unknown')}"),
-                        metadata=volume_data,
-                        sync_snapshot_id=sync_snapshot.id,
-                        region='ru-3',  # Selectel region
-                        service_name='Storage'
-                    )
-                    if volume_resource:
-                        synced_resources.append(volume_resource)
-            
-            # Process actual cloud resources - Networks
-            if 'networks' in api_resources:
-                for network_data in api_resources['networks']:
-                    network_resource = self._create_resource(
-                        resource_type='network',
-                        resource_id=network_data.get('id'),
-                        name=network_data.get('name', f"Network {network_data.get('id', 'Unknown')}"),
-                        metadata=network_data,
-                        sync_snapshot_id=sync_snapshot.id,
-                        region='ru-3',  # Selectel region
-                        service_name='Network'
-                    )
-                    if network_resource:
-                        synced_resources.append(network_resource)
+            # Note: Volumes and Networks are now integrated into server resources
+            # No need to process them separately as they're part of each VM's metadata
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'

@@ -203,20 +203,20 @@
             <!-- Resource Specifications -->
             {% if resource.provider_config %}
                 {% set config = resource.get_provider_config() %}
-                {% if config.get('cpu_cores') or config.get('ram_mb') or config.get('disk_gb') %}
+                {% if config.get('cpu_cores') or config.get('vcpus') or config.get('ram_mb') or config.get('disk_gb') or config.get('total_storage_gb') %}
                 <div class="resource-specs">
                     <div class="specs-header">
                         <span class="specs-title">Характеристики</span>
                     </div>
                     <div class="specs-grid">
-                        {% if config.get('cpu_cores') %}
+                        {% if config.get('cpu_cores') or config.get('vcpus') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-microchip"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ config.cpu_cores }}</span>
-                                <span class="spec-label">CPU</span>
+                                <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') }}</span>
+                                <span class="spec-label">vCPU</span>
                             </div>
                         </div>
                         {% endif %}
@@ -231,13 +231,13 @@
                             </div>
                         </div>
                         {% endif %}
-                        {% if config.get('disk_gb') %}
+                        {% if config.get('disk_gb') or config.get('total_storage_gb') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-hdd"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ config.disk_gb|round(1) }} GB</span>
+                                <span class="spec-value">{{ (config.get('total_storage_gb') or config.get('disk_gb'))|round(1) }} GB</span>
                                 <span class="spec-label">Диск</span>
                             </div>
                         </div>

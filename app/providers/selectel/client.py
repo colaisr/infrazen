@@ -210,6 +210,149 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack networks: {str(e)}")
     
+    def get_openstack_ports(self) -> List[Dict[str, Any]]:
+        """
+        Get OpenStack network ports (network interfaces)
+        
+        This provides detailed network information including:
+        - IP addresses per server
+        - MAC addresses
+        - Network attachments
+        
+        Returns:
+            List of port dictionaries
+        """
+        try:
+            headers = self._get_openstack_headers()
+            headers['Openstack-Api-Version'] = 'network latest'
+            ports_url = f'{self.openstack_base_url}/network/v2.0/ports'
+            
+            response = requests.get(ports_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('ports', [])
+            
+        except Exception as e:
+            raise Exception(f"Failed to get OpenStack ports: {str(e)}")
+    
+    def get_combined_vm_resources(self) -> List[Dict[str, Any]]:
+        """
+        Get VM resources with attached volumes and network interfaces combined
+        
+        This method combines data from multiple OpenStack APIs to create complete
+        VM resources that match what you see in the Selectel admin panel.
+        
+        Returns:
+            List of complete VM resource dictionaries including:
+            - VM specifications (vCPUs, RAM, flavor)
+            - Attached volumes with sizes and device paths
+            - Network interfaces with IPs and MAC addresses
+            - Total storage calculation
+        """
+        try:
+            # Get all required data
+            servers = self.get_openstack_servers()
+            
+            # Get project ID for volume API
+            projects = self.get_projects()
+            project_id = projects[0]['id'] if projects else None
+            
+            volumes = self.get_openstack_volumes(project_id)
+            ports = self.get_openstack_ports()
+            
+            # Create volume mapping by server attachment
+            volume_by_server = {}
+            for volume in volumes:
+                for attachment in volume.get('attachments', []):
+                    server_id = attachment.get('server_id')
+                    if server_id:
+                        if server_id not in volume_by_server:
+                            volume_by_server[server_id] = []
+                        volume_by_server[server_id].append(volume)
+            
+            # Create port mapping by device_id (server_id)
+            port_by_server = {}
+            for port in ports:
+                device_id = port.get('device_id')
+                if device_id and port.get('device_owner', '').startswith('compute:'):
+                    if device_id not in port_by_server:
+                        port_by_server[device_id] = []
+                    port_by_server[device_id].append(port)
+            
+            # Combine everything into complete VM resources
+            complete_vms = []
+            for server in servers:
+                server_id = server['id']
+                
+                # Get attached volumes
+                attached_volumes = volume_by_server.get(server_id, [])
+                
+                # Get network interfaces
+                server_ports = port_by_server.get(server_id, [])
+                
+                # Extract IP addresses
+                ip_addresses = []
+                for port in server_ports:
+                    for fixed_ip in port.get('fixed_ips', []):
+                        ip_addresses.append(fixed_ip.get('ip_address'))
+                
+                # Calculate total storage
+                total_storage_gb = sum(v.get('size', 0) for v in attached_volumes)
+                
+                # Get flavor info
+                flavor = server.get('flavor', {})
+                
+                # Create complete VM resource
+                vm_resource = {
+                    'id': server_id,
+                    'name': server['name'],
+                    'type': 'server',
+                    'status': server['status'],
+                    'created_at': server.get('created'),
+                    'updated_at': server.get('updated'),
+                    'region': server.get('OS-EXT-AZ:availability_zone', 'ru-3'),
+                    'vcpus': flavor.get('vcpus', 0),
+                    'ram_mb': flavor.get('ram', 0),
+                    'disk_gb': flavor.get('disk', 0),
+                    'flavor_name': flavor.get('original_name', ''),
+                    'image_id': server.get('image', {}).get('id'),
+                    'ip_addresses': ip_addresses,
+                    'total_storage_gb': total_storage_gb,
+                    'attached_volumes': [
+                        {
+                            'id': v['id'],
+                            'name': v.get('name', ''),
+                            'size_gb': v['size'],
+                            'type': v.get('volume_type'),
+                            'status': v.get('status'),
+                            'device': next((a.get('device') for a in v.get('attachments', []) if a.get('server_id') == server_id), None),
+                            'bootable': v.get('bootable') == 'true'
+                        }
+                        for v in attached_volumes
+                    ],
+                    'network_interfaces': [
+                        {
+                            'id': p['id'],
+                            'mac_address': p.get('mac_address'),
+                            'status': p.get('status'),
+                            'ip_addresses': [ip.get('ip_address') for ip in p.get('fixed_ips', [])]
+                        }
+                        for p in server_ports
+                    ],
+                    'metadata': server.get('metadata', {}),
+                    'tags': server.get('tags', []),
+                    'tenant_id': server.get('tenant_id'),
+                    'user_id': server.get('user_id')
+                }
+                
+                complete_vms.append(vm_resource)
+            
+            return complete_vms
+            
+        except Exception as e:
+            raise Exception(f"Failed to get combined VM resources: {str(e)}")
+    
     def get_all_cloud_resources(self, project_id: str = None) -> Dict[str, Any]:
         """
         Get all actual cloud resources (servers, volumes, networks)
@@ -447,10 +590,18 @@ class SelectelClient:
     
     def get_all_resources(self) -> Dict[str, Any]:
         """
-        Get all available resources and information including actual cloud resources
+        Get all available resources and information including combined cloud resources
+        
+        This method returns complete VM resources with integrated volumes and network
+        info, matching what you see in the Selectel admin panel.
         
         Returns:
-            Dict containing all available resource information
+            Dict containing all available resource information with:
+            - account: Account information
+            - projects: List of projects
+            - servers: Complete VM resources with attached volumes
+            - volumes: Empty list (volumes are now part of servers)
+            - networks: Empty list (network info is part of servers)
         """
         try:
             # Get basic account/project information
@@ -469,10 +620,12 @@ class SelectelClient:
             except:
                 resources['quotas'] = {}
             
-            # Get actual cloud resources (servers, volumes, networks)
+            # Get combined VM resources (VMs with attached volumes and network info)
             try:
-                cloud_resources = self.get_all_cloud_resources()
-                resources.update(cloud_resources)
+                resources['servers'] = self.get_combined_vm_resources()
+                # Volumes and networks are now integrated into servers
+                resources['volumes'] = []
+                resources['networks'] = []
             except Exception as e:
                 resources['cloud_error'] = str(e)
                 resources['servers'] = []
