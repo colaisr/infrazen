@@ -30,6 +30,11 @@ class SelectelClient:
         self.service_password = service_password
         self.base_url = "https://api.selectel.ru/vpc/resell/v2"
         self.openstack_base_url = "https://ru-3.cloud.api.selcloud.ru"
+        # Selectel regions and their API endpoints
+        self.regions = {
+            'ru-3': 'https://ru-3.cloud.api.selcloud.ru',
+            'kz-1': 'https://kz-1.cloud.api.servercore.com'
+        }
         self.session = requests.Session()
         self.session.headers.update({
             'X-Token': self.api_key,
@@ -164,12 +169,13 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack servers: {str(e)}")
     
-    def get_openstack_volumes(self, project_id: str = None) -> List[Dict[str, Any]]:
+    def get_openstack_volumes(self, project_id: str = None, region: str = None) -> List[Dict[str, Any]]:
         """
-        Get OpenStack volumes
+        Get OpenStack volumes from a specific region
         
         Args:
             project_id: Optional project ID to scope the request
+            region: Optional region to query (if None, uses default openstack_base_url)
             
         Returns:
             List of volume dictionaries
@@ -178,20 +184,30 @@ class SelectelClient:
             headers = self._get_openstack_headers()
             headers['Openstack-Api-Version'] = 'volume latest'
             
+            # Determine which base URL to use
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            
             # Include project ID in URL if provided
             if project_id:
-                volumes_url = f'{self.openstack_base_url}/volume/v3/{project_id}/volumes/detail'
+                volumes_url = f'{base_url}/volume/v3/{project_id}/volumes/detail'
             else:
-                volumes_url = f'{self.openstack_base_url}/volume/v3/volumes/detail'
+                volumes_url = f'{base_url}/volume/v3/volumes/detail'
             
             response = requests.get(volumes_url, headers=headers, timeout=30)
             response.raise_for_status()
             
             data = response.json()
-            return data.get('volumes', [])
+            volumes = data.get('volumes', [])
+            
+            # Add region info to each volume if not already present
+            for vol in volumes:
+                if 'region' not in vol and region:
+                    vol['region'] = region
+            
+            return volumes
             
         except Exception as e:
-            raise Exception(f"Failed to get OpenStack volumes: {str(e)}")
+            raise Exception(f"Failed to get OpenStack volumes from {region or 'default region'}: {str(e)}")
     
     def get_openstack_networks(self) -> List[Dict[str, Any]]:
         """
@@ -1023,22 +1039,27 @@ class SelectelClient:
             try:
                 resources['servers'] = self.get_combined_vm_resources()
                 
-                # Get standalone volumes (those not attached to any server)
+                # Get standalone volumes from ALL regions (those not attached to any server)
                 all_volumes = []
                 for project in resources.get('projects', []):
                     project_id = project.get('id')
                     if project_id:
-                        try:
-                            project_volumes = self.get_openstack_volumes(project_id)
-                            all_volumes.extend(project_volumes)
-                        except Exception as vol_err:
-                            logger.warning(f"Failed to get volumes for project {project_id}: {vol_err}")
+                        # Query each region for volumes
+                        for region_name in self.regions.keys():
+                            try:
+                                logger.info(f"Fetching volumes for project {project_id} in region {region_name}")
+                                project_volumes = self.get_openstack_volumes(project_id, region=region_name)
+                                all_volumes.extend(project_volumes)
+                                logger.info(f"Found {len(project_volumes)} volumes in {region_name}")
+                            except Exception as vol_err:
+                                logger.warning(f"Failed to get volumes for project {project_id} in region {region_name}: {vol_err}")
                 
                 # Filter to only standalone volumes (not attached to any server)
                 standalone_volumes = [
                     vol for vol in all_volumes 
                     if not vol.get('attachments') or len(vol.get('attachments', [])) == 0
                 ]
+                logger.info(f"Found {len(standalone_volumes)} standalone volumes out of {len(all_volumes)} total")
                 resources['volumes'] = standalone_volumes
                 
                 # Networks are integrated into servers
