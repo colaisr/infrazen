@@ -2334,23 +2334,35 @@ function deleteConnection(connectionId, providerType) {
                 'Content-Type': 'application/json',
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 showFlashMessage('✅ Подключение удалено успешно!', 'success');
                 // Remove the card from DOM
                 const card = button.closest('.provider-card');
-                card.style.opacity = '0.5';
-                setTimeout(() => {
-                    card.remove();
-                }, 500);
+                if (card) {
+                    card.style.opacity = '0.5';
+                    setTimeout(() => {
+                        card.remove();
+                    }, 500);
+                } else {
+                    // If card not found, just reload the page
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                }
             } else {
                 showFlashMessage('❌ Ошибка удаления: ' + (data.error || data.message), 'error');
             }
         })
         .catch(error => {
-            showFlashMessage('❌ Ошибка удаления', 'error');
-            console.error('Delete error:', error);
+            console.error('Delete error details:', error);
+            showFlashMessage('❌ Ошибка удаления: ' + error.message, 'error');
         })
         .finally(() => {
             // Restore button state
@@ -2361,6 +2373,12 @@ function deleteConnection(connectionId, providerType) {
 }
 
 function showFlashMessage(message, type) {
+    // Clear existing flash messages first
+    const existingContainer = document.querySelector('.flash-messages');
+    if (existingContainer) {
+        existingContainer.remove();
+    }
+    
     // Create flash message element
     const flashDiv = document.createElement('div');
     flashDiv.className = `flash-message flash-${type}`;

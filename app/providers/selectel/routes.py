@@ -192,7 +192,7 @@ def delete_connection(provider_id):
         db.session.delete(provider)
         db.session.commit()
         
-        return jsonify({'success': True, 'message': 'Connection deleted successfully'})
+        return jsonify({'success': True, 'message': 'Connection deleted successfully'}), 200
         
     except Exception as e:
         logger.error(f"Error deleting Selectel connection {provider_id}: {str(e)}")
