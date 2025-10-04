@@ -57,18 +57,8 @@ class SelectelClient:
             self.service_uid = None
         self.base_url = "https://api.selectel.ru/vpc/resell/v2"
         self.openstack_base_url = "https://ru-3.cloud.api.selcloud.ru"
-        # Selectel regions - will be populated dynamically from service catalog
-        # Fallback to known regions if catalog query fails
-        self.regions = {
-            'ru-3': 'https://ru-3.cloud.api.selcloud.ru',
-            'kz-1': 'https://kz-1.cloud.api.servercore.com',
-            'ke-1': 'https://ke-1.cloud.api.servercore.com',
-            'ru-1': 'https://ru-1.cloud.api.selcloud.ru',
-            'ru-2': 'https://ru-2.cloud.api.selcloud.ru',
-            'ru-7': 'https://ru-7.cloud.api.selcloud.ru',
-            'ru-8': 'https://ru-8.cloud.api.selcloud.ru',
-            'ru-9': 'https://ru-9.cloud.api.selcloud.ru'
-        }
+        # Selectel regions - populated dynamically from service catalog
+        self.regions = {}
         self.session = requests.Session()
         self.session.headers.update({
             'X-Token': self.api_key,
@@ -751,6 +741,14 @@ class SelectelClient:
             - Total storage calculation
         """
         try:
+            # Ensure region discovery is triggered before querying
+            if not self.regions:
+                try:
+                    self._get_iam_token()  # This will trigger region discovery
+                except Exception as e:
+                    logger.warning(f"Failed to discover regions: {e}")
+                    return []  # Return empty list if no regions discovered
+            
             # Get project ID for volume API
             projects = self.get_projects()
             project_id = projects[0]['id'] if projects else None
@@ -762,6 +760,7 @@ class SelectelClient:
             
             # Create a copy of regions to avoid "dictionary changed size during iteration" error
             regions_to_query = list(self.regions.keys())
+            logger.info(f"Querying {len(regions_to_query)} regions: {regions_to_query}")
             for region_name in regions_to_query:
                 try:
                     logger.info(f"Fetching servers from region {region_name}")
@@ -1191,6 +1190,18 @@ class SelectelClient:
             
             # Get combined VM resources (VMs with attached volumes and network info)
             try:
+                # Ensure region discovery is triggered before getting VM resources
+                if not self.regions:
+                    try:
+                        self._get_iam_token()  # This will trigger region discovery
+                    except Exception as e:
+                        logger.warning(f"Failed to discover regions: {e}")
+                        # Set empty servers list if region discovery fails
+                        resources['servers'] = []
+                        resources['volumes'] = []
+                        resources['networks'] = []
+                        return resources
+                
                 resources['servers'] = self.get_combined_vm_resources()
                 
                 # Get standalone volumes from ALL regions (those not attached to any server)
