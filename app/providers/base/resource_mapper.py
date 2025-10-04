@@ -86,7 +86,7 @@ class ResourceMapper:
     def map_metrics(provider_data: Dict[str, Any], resource_id: str) -> List[Dict[str, Any]]:
         """Map provider-specific metrics to unified format"""
         metrics = []
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now()
         
         # CPU metrics
         if 'cpu_usage' in provider_data:

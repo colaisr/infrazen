@@ -61,5 +61,5 @@ class BaseProvider(ABC):
             'supports_metrics': True,
             'supports_cost_data': True,
             'supports_logs': False,  # Override in specific providers
-            'last_updated': datetime.utcnow().isoformat()
+            'last_updated': datetime.now().isoformat()
         }

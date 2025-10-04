@@ -51,7 +51,7 @@ class SelectelService:
                     'account_enabled': account_info.get('enabled'),
                     'account_locked': account_info.get('locked'),
                     'onboarding': account_info.get('onboarding'),
-                    'last_test': datetime.utcnow().isoformat()
+                    'last_test': datetime.now().isoformat()
                 })
                 db.session.commit()
             
@@ -78,7 +78,7 @@ class SelectelService:
                 provider_id=self.provider.id,
                 sync_type='full',
                 sync_status='running',
-                sync_started_at=datetime.utcnow()
+                sync_started_at=datetime.now()
             )
             db.session.add(sync_snapshot)
             db.session.commit()
@@ -189,14 +189,14 @@ class SelectelService:
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
-            sync_snapshot.sync_completed_at = datetime.utcnow()
+            sync_snapshot.sync_completed_at = datetime.now()
             sync_snapshot.resources_created = len(synced_resources)
             sync_snapshot.resources_deleted = 0
             sync_snapshot.total_resources_found = len(synced_resources)
             sync_snapshot.calculate_duration()
             
             # Update provider last_sync timestamp
-            self.provider.last_sync = datetime.utcnow()
+            self.provider.last_sync = datetime.now()
             self.provider.sync_status = 'success'
             self.provider.sync_error = None
             
@@ -216,7 +216,7 @@ class SelectelService:
             # Update sync snapshot with error
             if 'sync_snapshot' in locals():
                 sync_snapshot.sync_status = 'error'
-                sync_snapshot.sync_completed_at = datetime.utcnow()
+                sync_snapshot.sync_completed_at = datetime.now()
                 sync_snapshot.error_message = str(e)
                 sync_snapshot.calculate_duration()
                 
@@ -295,7 +295,7 @@ class SelectelService:
                 if has_changes:
                     existing_resource.resource_name = name
                     existing_resource.provider_config = json.dumps(metadata)
-                    existing_resource.last_sync = datetime.utcnow()
+                    existing_resource.last_sync = datetime.now()
                     existing_resource.is_active = True
                     if region:
                         existing_resource.region = region
@@ -336,7 +336,7 @@ class SelectelService:
                     region=region or ('global' if resource_type == 'account' else 'unknown'),
                     service_name=service_name or ('Account' if resource_type == 'account' else resource_type.title()),
                     provider_config=json.dumps(metadata),
-                    last_sync=datetime.utcnow(),
+                    last_sync=datetime.now(),
                     is_active=True
                 )
                 db.session.add(new_resource)

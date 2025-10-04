@@ -16,7 +16,7 @@ class SyncSnapshot(BaseModel):
     # Sync metadata
     sync_type = db.Column(db.String(20), nullable=False, default='full')  # full, incremental, manual
     sync_status = db.Column(db.String(20), nullable=False, default='running')  # running, success, error, cancelled
-    sync_started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    sync_started_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     sync_completed_at = db.Column(db.DateTime)
     sync_duration_seconds = db.Column(db.Integer)  # Duration in seconds
     
@@ -94,7 +94,7 @@ class SyncSnapshot(BaseModel):
     
     def mark_completed(self, status='success', error_message=None, error_details=None):
         """Mark sync as completed"""
-        self.sync_completed_at = datetime.utcnow()
+        self.sync_completed_at = datetime.now()
         self.sync_status = status
         if error_message:
             self.error_message = error_message

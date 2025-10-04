@@ -38,7 +38,7 @@ class SyncService:
             provider_id=self.provider_id,
             sync_type=sync_type,
             sync_status='running',
-            sync_started_at=datetime.utcnow()
+            sync_started_at=datetime.now()
         )
         
         # Set sync configuration
@@ -46,7 +46,7 @@ class SyncService:
             'sync_type': sync_type,
             'provider_type': self.provider.provider_type,
             'connection_name': self.provider.connection_name,
-            'sync_timestamp': datetime.utcnow().isoformat()
+            'sync_timestamp': datetime.now().isoformat()
         }
         snapshot.set_sync_config(sync_config)
         
@@ -210,7 +210,7 @@ class SyncService:
             snapshot.mark_completed(sync_status, sync_message)
             
             # Update provider sync status
-            self.provider.last_sync = datetime.utcnow()
+            self.provider.last_sync = datetime.now()
             self.provider.sync_status = sync_status
             if sync_errors:
                 self.provider.sync_error = '; '.join(sync_errors)
@@ -724,7 +724,7 @@ class SyncService:
             effective_cost=unified_resource['effective_cost'],
             currency=unified_resource['currency'],
             billing_period=unified_resource['billing_period'],
-            last_sync=datetime.utcnow(),
+            last_sync=datetime.now(),
             is_active=True
         )
         
@@ -795,7 +795,7 @@ class SyncService:
             existing_resource.status = unified_resource['status']
             existing_resource.effective_cost = unified_resource['effective_cost']
             existing_resource.region = unified_resource['region']
-            existing_resource.last_sync = datetime.utcnow()
+            existing_resource.last_sync = datetime.now()
             existing_resource.set_provider_config(unified_resource['provider_config'])
             
             # Update daily cost baseline
@@ -840,7 +840,7 @@ class SyncService:
         # Mark resource as inactive
         resource.is_active = False
         resource.status = 'deleted'
-        resource.last_sync = datetime.utcnow()
+        resource.last_sync = datetime.now()
         
         # Create resource state
         resource_state = ResourceState(
@@ -878,7 +878,7 @@ class SyncService:
             # Update with account information
             current_metadata.update({
                 'account_info': account_info,
-                'last_account_update': datetime.utcnow().isoformat(),
+                'last_account_update': datetime.now().isoformat(),
                 'account_status': account_info.get('account_status', 'unknown'),
                 'balance': account_info.get('balance', 0),
                 'currency': account_info.get('currency', 'RUB'),
@@ -929,7 +929,7 @@ class SyncService:
             existing_resource.region = region
             existing_resource.status = status
             existing_resource.provider_config = provider_config_json
-            existing_resource.updated_at = datetime.utcnow()
+            existing_resource.updated_at = datetime.now()
             return existing_resource
         else:
             # Create new resource
