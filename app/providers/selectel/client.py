@@ -3,9 +3,12 @@ Selectel API client implementation
 """
 import requests
 import json
+import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 # from app.providers.base.provider_base import BaseProvider
+
+logger = logging.getLogger(__name__)
 
 
 class SelectelClient:
