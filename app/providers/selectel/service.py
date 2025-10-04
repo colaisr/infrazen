@@ -143,6 +143,7 @@ class SelectelService:
                         synced_resources.append(role_resource)
             
             # Process actual cloud resources - Servers (VMs with attached volumes)
+            servers_list = []
             if 'servers' in api_resources:
                 for server_data in api_resources['servers']:
                     # Extract complete VM information
@@ -167,6 +168,27 @@ class SelectelService:
                     )
                     if server_resource:
                         synced_resources.append(server_resource)
+                        servers_list.append(server_data)
+            
+            # Get CPU and memory statistics for all servers (similar to Beget)
+            # Note: Selectel uses 5-minute granularity (300 seconds) vs Beget's 1-minute
+            if servers_list:
+                try:
+                    logger.info(f"Fetching statistics for {len(servers_list)} servers (5-minute granularity)")
+                    statistics = self.client.get_all_server_statistics(servers_list)
+                    
+                    logger.info(f"Retrieved statistics for {len(statistics)} servers")
+                    
+                    # Process statistics and add to resources
+                    if statistics:
+                        self._process_server_statistics(sync_snapshot, statistics)
+                        logger.info(f"Successfully processed statistics for {len(statistics)} servers")
+                    else:
+                        logger.warning("No statistics data retrieved")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to get server statistics: {e}", exc_info=True)
+                    # Continue sync even if statistics fail
             
             # Note: Volumes and Networks are now integrated into server resources
             # No need to process them separately as they're part of each VM's metadata
@@ -402,6 +424,62 @@ class SelectelService:
         except Exception as e:
             logger.error(f"Failed to get projects: {str(e)}")
             return []
+    
+    def _process_server_statistics(self, sync_snapshot, statistics: Dict[str, Any]):
+        """
+        Process and store server statistics (similar to Beget implementation)
+        
+        Args:
+            sync_snapshot: SyncSnapshot instance
+            statistics: Dict mapping server_id to CPU/memory statistics
+        """
+        from app.core.models.resource import Resource
+        
+        for server_id, stats in statistics.items():
+            try:
+                # Find the server resource
+                server_resource = Resource.query.filter_by(
+                    provider_id=self.provider.id,
+                    resource_id=server_id,
+                    resource_type='server'
+                ).first()
+                
+                if not server_resource:
+                    logger.warning(f"Server resource not found for ID {server_id}")
+                    continue
+                
+                # Add CPU statistics tags (same format as Beget)
+                if stats.get('cpu_statistics'):
+                    cpu_stats = stats['cpu_statistics']
+                    server_resource.add_tag('cpu_avg_usage', str(cpu_stats.get('avg_cpu_usage', 0)))
+                    server_resource.add_tag('cpu_max_usage', str(cpu_stats.get('max_cpu_usage', 0)))
+                    server_resource.add_tag('cpu_min_usage', str(cpu_stats.get('min_cpu_usage', 0)))
+                    server_resource.add_tag('cpu_trend', str(cpu_stats.get('trend', 0)))
+                    server_resource.add_tag('cpu_performance_tier', cpu_stats.get('performance_tier', 'unknown'))
+                    server_resource.add_tag('cpu_data_points', str(cpu_stats.get('data_points', 0)))
+                    server_resource.add_tag('cpu_period', cpu_stats.get('period', 'HOUR'))
+                    server_resource.add_tag('cpu_collection_timestamp', cpu_stats.get('collection_timestamp', ''))
+                
+                # Add memory statistics tags (same format as Beget)
+                if stats.get('memory_statistics'):
+                    mem_stats = stats['memory_statistics']
+                    server_resource.add_tag('memory_avg_usage_mb', str(mem_stats.get('avg_memory_usage_mb', 0)))
+                    server_resource.add_tag('memory_max_usage_mb', str(mem_stats.get('max_memory_usage_mb', 0)))
+                    server_resource.add_tag('memory_min_usage_mb', str(mem_stats.get('min_memory_usage_mb', 0)))
+                    server_resource.add_tag('memory_usage_percent', str(mem_stats.get('memory_usage_percent', 0)))
+                    server_resource.add_tag('memory_trend', str(mem_stats.get('trend', 0)))
+                    server_resource.add_tag('memory_tier', mem_stats.get('memory_tier', 'unknown'))
+                    server_resource.add_tag('memory_data_points', str(mem_stats.get('data_points', 0)))
+                    server_resource.add_tag('memory_period', mem_stats.get('period', 'HOUR'))
+                    server_resource.add_tag('memory_collection_timestamp', mem_stats.get('collection_timestamp', ''))
+                
+                logger.debug(f"Processed statistics for server: {stats.get('server_name')}")
+                
+            except Exception as e:
+                logger.error(f"Error processing statistics for server {server_id}: {e}")
+                continue
+        
+        db.session.commit()
     
     def get_account_info(self) -> Dict[str, Any]:
         """

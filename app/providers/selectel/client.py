@@ -4,6 +4,7 @@ Selectel API client implementation
 import requests
 import json
 from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
 # from app.providers.base.provider_base import BaseProvider
 
 
@@ -235,6 +236,234 @@ class SelectelClient:
             
         except Exception as e:
             raise Exception(f"Failed to get OpenStack ports: {str(e)}")
+    
+    def get_server_cpu_statistics(self, server_id: str, hours: int = 1) -> Dict[str, Any]:
+        """
+        Get CPU usage statistics for a server
+        
+        Args:
+            server_id: Server UUID
+            hours: Number of hours of historical data (default: 1)
+            
+        Returns:
+            Dict containing CPU statistics in Beget-compatible format:
+            - avg_cpu_usage: Average CPU percentage
+            - max_cpu_usage: Maximum CPU percentage
+            - min_cpu_usage: Minimum CPU percentage
+            - trend: CPU usage variance
+            - performance_tier: low/medium/high
+            - data_points: Number of data points
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            iam_token = self._get_iam_token()
+            
+            # Set time range
+            stop_time = datetime.utcnow()
+            start_time = stop_time - timedelta(hours=hours)
+            
+            start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            
+            # Request CPU metrics with 5-minute granularity (300 seconds)
+            # Note: Selectel only supports 300-second granularity
+            url = f"{self.openstack_base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            
+            body = {
+                "operations": "(max (metric cpu_util mean) (/ (clip_min (rateofchangesec (metric cpu_average mean)) 0) 10000000)))",
+                "search": f"id={server_id}",
+                "resource_type": "generic"
+            }
+            
+            headers = {
+                'X-Auth-Token': iam_token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.post(url, json=body, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract and process data points
+            if 'measures' in data and 'aggregated' in data['measures']:
+                data_points = data['measures']['aggregated']
+                cpu_values = [point[2] for point in data_points if point[2] is not None]
+                
+                if cpu_values:
+                    avg_cpu = sum(cpu_values) / len(cpu_values)
+                    max_cpu = max(cpu_values)
+                    min_cpu = min(cpu_values)
+                    trend = max_cpu - min_cpu
+                    
+                    # Determine performance tier
+                    if avg_cpu < 20:
+                        performance_tier = 'low'
+                    elif avg_cpu < 60:
+                        performance_tier = 'medium'
+                    else:
+                        performance_tier = 'high'
+                    
+                    return {
+                        'avg_cpu_usage': round(avg_cpu, 2),
+                        'max_cpu_usage': round(max_cpu, 2),
+                        'min_cpu_usage': round(min_cpu, 2),
+                        'trend': round(trend, 2),
+                        'performance_tier': performance_tier,
+                        'data_points': len(cpu_values),
+                        'period': 'HOUR',
+                        'collection_timestamp': datetime.utcnow().isoformat(),
+                        'raw_data': data_points
+                    }
+            
+            return {}
+            
+        except Exception as e:
+            raise Exception(f"Failed to get CPU statistics for server {server_id}: {str(e)}")
+    
+    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 1) -> Dict[str, Any]:
+        """
+        Get memory usage statistics for a server
+        
+        Args:
+            server_id: Server UUID
+            ram_mb: Total RAM in MB (for percentage calculation)
+            hours: Number of hours of historical data (default: 1)
+            
+        Returns:
+            Dict containing memory statistics in Beget-compatible format:
+            - avg_memory_usage_mb: Average memory in MB
+            - max_memory_usage_mb: Maximum memory in MB
+            - min_memory_usage_mb: Minimum memory in MB
+            - memory_usage_percent: Average usage percentage
+            - trend: Memory usage variance
+            - memory_tier: low/medium/high
+            - data_points: Number of data points
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            iam_token = self._get_iam_token()
+            
+            # Set time range
+            stop_time = datetime.utcnow()
+            start_time = stop_time - timedelta(hours=hours)
+            
+            start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            
+            # Request memory metrics with 5-minute granularity (300 seconds)
+            # Note: Selectel only supports 300-second granularity
+            url = f"{self.openstack_base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            
+            body = {
+                "operations": "(metric memory.usage mean)",
+                "search": f"id={server_id}",
+                "resource_type": "generic"
+            }
+            
+            headers = {
+                'X-Auth-Token': iam_token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.post(url, json=body, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract and process data points
+            if 'measures' in data and server_id in data['measures']:
+                server_metrics = data['measures'][server_id]
+                
+                if 'memory.usage' in server_metrics and 'mean' in server_metrics['memory.usage']:
+                    data_points = server_metrics['memory.usage']['mean']
+                    mem_values = [point[2] for point in data_points if point[2] is not None]
+                    
+                    if mem_values:
+                        avg_mem_mb = sum(mem_values) / len(mem_values)
+                        max_mem_mb = max(mem_values)
+                        min_mem_mb = min(mem_values)
+                        avg_mem_percent = (avg_mem_mb / ram_mb) * 100 if ram_mb > 0 else 0
+                        trend = max_mem_mb - min_mem_mb
+                        
+                        # Determine memory tier
+                        if avg_mem_percent < 40:
+                            memory_tier = 'low'
+                        elif avg_mem_percent < 70:
+                            memory_tier = 'medium'
+                        else:
+                            memory_tier = 'high'
+                        
+                        return {
+                            'avg_memory_usage_mb': round(avg_mem_mb, 2),
+                            'max_memory_usage_mb': round(max_mem_mb, 2),
+                            'min_memory_usage_mb': round(min_mem_mb, 2),
+                            'memory_usage_percent': round(avg_mem_percent, 2),
+                            'trend': round(trend, 2),
+                            'memory_tier': memory_tier,
+                            'data_points': len(mem_values),
+                            'period': 'HOUR',
+                            'collection_timestamp': datetime.utcnow().isoformat(),
+                            'raw_data': data_points
+                        }
+            
+            return {}
+            
+        except Exception as e:
+            raise Exception(f"Failed to get memory statistics for server {server_id}: {str(e)}")
+    
+    def get_all_server_statistics(self, servers: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Get CPU and memory statistics for all servers
+        
+        Args:
+            servers: List of server dictionaries from get_combined_vm_resources()
+            
+        Returns:
+            Dict mapping server_id to statistics:
+            {
+                'server_id': {
+                    'server_name': 'Server Name',
+                    'cpu_statistics': {...},
+                    'memory_statistics': {...}
+                }
+            }
+        """
+        all_statistics = {}
+        
+        for server in servers:
+            server_id = server.get('id')
+            server_name = server.get('name', 'Unknown')
+            ram_mb = server.get('ram_mb', 1024)
+            
+            try:
+                # Get CPU statistics
+                cpu_stats = self.get_server_cpu_statistics(server_id, hours=1)
+                
+                # Get memory statistics
+                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=1)
+                
+                all_statistics[server_id] = {
+                    'server_name': server_name,
+                    'cpu_statistics': cpu_stats,
+                    'memory_statistics': memory_stats,
+                    'collection_timestamp': datetime.utcnow().isoformat()
+                }
+                
+            except Exception as e:
+                # Log error but continue with other servers
+                all_statistics[server_id] = {
+                    'server_name': server_name,
+                    'error': str(e),
+                    'cpu_statistics': {},
+                    'memory_statistics': {}
+                }
+        
+        return all_statistics
     
     def get_combined_vm_resources(self) -> List[Dict[str, Any]]:
         """
