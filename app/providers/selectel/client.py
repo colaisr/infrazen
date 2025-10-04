@@ -704,6 +704,51 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get combined VM resources: {str(e)}")
     
+    def calculate_volume_cost(self, volume: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Calculate cost for a volume based on its size and type
+        
+        Selectel pricing (as of 2025):
+        - HDD (Network Basic): 7.28 ₽/GB/month
+        - SSD (Network Basic): 8.99 ₽/GB/month
+        - SSD (Network Universal): 18.55 ₽/GB/month
+        - SSD NVMe (Network Fast): 39.18 ₽/GB/month
+        
+        Args:
+            volume: Volume data dictionary
+            
+        Returns:
+            Dict with hourly, daily, and monthly costs in rubles
+        """
+        size_gb = volume.get('size', 0)
+        volume_type = volume.get('volume_type', '').lower()
+        
+        # Determine price per GB per month based on volume type
+        if 'fast' in volume_type or 'nvme' in volume_type:
+            price_per_gb_month = 39.18
+        elif 'universal' in volume_type:
+            price_per_gb_month = 18.55
+        elif 'basic' in volume_type or 'ssd' in volume_type:
+            # Check if it's HDD or SSD basic
+            if 'hdd' in volume_type:
+                price_per_gb_month = 7.28
+            else:
+                # Default basic is HDD basic
+                price_per_gb_month = 7.28
+        else:
+            # Default to HDD basic pricing
+            price_per_gb_month = 7.28
+        
+        monthly_cost = size_gb * price_per_gb_month
+        daily_cost = monthly_cost / 30
+        hourly_cost = monthly_cost / 720  # 30 days * 24 hours
+        
+        return {
+            'hourly_cost_rubles': round(hourly_cost, 4),
+            'daily_cost_rubles': round(daily_cost, 2),
+            'monthly_cost_rubles': round(monthly_cost, 2)
+        }
+    
     def get_all_cloud_resources(self, project_id: str = None) -> Dict[str, Any]:
         """
         Get all actual cloud resources (servers, volumes, networks)
@@ -974,8 +1019,26 @@ class SelectelClient:
             # Get combined VM resources (VMs with attached volumes and network info)
             try:
                 resources['servers'] = self.get_combined_vm_resources()
-                # Volumes and networks are now integrated into servers
-                resources['volumes'] = []
+                
+                # Get standalone volumes (those not attached to any server)
+                all_volumes = []
+                for project in resources.get('projects', []):
+                    project_id = project.get('id')
+                    if project_id:
+                        try:
+                            project_volumes = self.get_openstack_volumes(project_id)
+                            all_volumes.extend(project_volumes)
+                        except Exception as vol_err:
+                            logger.warning(f"Failed to get volumes for project {project_id}: {vol_err}")
+                
+                # Filter to only standalone volumes (not attached to any server)
+                standalone_volumes = [
+                    vol for vol in all_volumes 
+                    if not vol.get('attachments') or len(vol.get('attachments', [])) == 0
+                ]
+                resources['volumes'] = standalone_volumes
+                
+                # Networks are integrated into servers
                 resources['networks'] = []
             except Exception as e:
                 resources['cloud_error'] = str(e)

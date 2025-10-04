@@ -209,8 +209,40 @@ class SelectelService:
                     logger.error(f"Failed to get resource costs: {e}", exc_info=True)
                     # Continue sync even if costs fail
             
-            # Note: Volumes and Networks are now integrated into server resources
-            # No need to process them separately as they're part of each VM's metadata
+            # Process standalone volumes (those not attached to any server)
+            volumes_list = []
+            if 'volumes' in api_resources:
+                for volume_data in api_resources['volumes']:
+                    volume_resource = self._create_resource(
+                        resource_type='volume',
+                        resource_id=volume_data.get('id'),
+                        name=volume_data.get('name', f"Volume {volume_data.get('id', 'Unknown')}"),
+                        metadata={
+                            **volume_data,
+                            'size_gb': volume_data.get('size'),
+                            'volume_type': volume_data.get('volume_type'),
+                            'availability_zone': volume_data.get('availability_zone'),
+                            'created_at': volume_data.get('created_at'),
+                            'bootable': volume_data.get('bootable')
+                        },
+                        sync_snapshot_id=sync_snapshot.id,
+                        region=volume_data.get('availability_zone', 'unknown'),
+                        service_name='Block Storage'
+                    )
+                    if volume_resource:
+                        synced_resources.append(volume_resource)
+                        volumes_list.append(volume_data)
+            
+            # Update costs for standalone volumes
+            if volumes_list:
+                try:
+                    logger.info(f"Calculating costs for {len(volumes_list)} standalone volumes")
+                    self._update_volume_costs(volumes_list)
+                    logger.info(f"Successfully updated costs for {len(volumes_list)} volumes")
+                except Exception as e:
+                    logger.error(f"Failed to update volume costs: {e}", exc_info=True)
+            
+            # Note: Networks are integrated into server resources
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
@@ -555,6 +587,61 @@ class SelectelService:
                 
             except Exception as e:
                 logger.error(f"Error updating costs for resource {resource_id}: {e}")
+                continue
+        
+        db.session.commit()
+    
+    def _update_volume_costs(self, volumes: List[Dict[str, Any]]):
+        """
+        Update costs for standalone volumes
+        
+        Args:
+            volumes: List of volume data dictionaries
+        """
+        from app.core.models.resource import Resource
+        from app.core.database import db
+        
+        for volume_data in volumes:
+            try:
+                volume_id = volume_data.get('id')
+                
+                # Find the volume resource
+                volume_resource = Resource.query.filter_by(
+                    provider_id=self.provider.id,
+                    resource_id=volume_id,
+                    resource_type='volume'
+                ).first()
+                
+                if not volume_resource:
+                    logger.warning(f"Volume resource not found for ID {volume_id}")
+                    continue
+                
+                # Calculate volume cost
+                cost_data = self.client.calculate_volume_cost(volume_data)
+                
+                # Update cost fields
+                daily_cost = cost_data.get('daily_cost_rubles', 0)
+                
+                volume_resource.daily_cost = daily_cost
+                volume_resource.effective_cost = daily_cost
+                volume_resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
+                volume_resource.cost_period = 'MONTHLY'
+                volume_resource.cost_frequency = 'daily'
+                volume_resource.currency = 'RUB'
+                volume_resource.billing_period = 'monthly'
+                
+                # Store cost breakdown as tags
+                volume_resource.add_tag('cost_daily_rubles', str(daily_cost))
+                volume_resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
+                volume_resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
+                volume_resource.add_tag('size_gb', str(volume_data.get('size', 0)))
+                volume_resource.add_tag('volume_type', volume_data.get('volume_type', 'unknown'))
+                volume_resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
+                
+                logger.debug(f"Updated costs for volume {volume_data.get('name')}: {daily_cost} ₽/day")
+                
+            except Exception as e:
+                logger.error(f"Error updating costs for volume {volume_id}: {e}")
                 continue
         
         db.session.commit()
