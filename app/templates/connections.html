@@ -77,11 +77,11 @@
                         </div>
                     {% elif provider.code == 'sel' %}
                         <div class="provider-icon selectel">
-                            <i class="fa-solid fa-server"></i>
+                            <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 2rem; height: 2rem; object-fit: contain;">
                         </div>
                     {% elif provider.code == 'beget' %}
                         <div class="provider-icon beget">
-                            <i class="fa-solid fa-server"></i>
+                            <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
                         </div>
                     {% else %}
                         <div class="provider-icon default">
@@ -377,7 +377,7 @@
             <div class="provider-option">
                 <div class="provider-logo">
                     <div class="provider-icon beget">
-                        <i class="fa-solid fa-server"></i>
+                        <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
                     </div>
                 </div>
                 <div class="provider-info">

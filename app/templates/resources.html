@@ -68,13 +68,13 @@
     <div class="provider-section">
         <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
             <div class="provider-info">
-                <div class="provider-icon" style="width: 64px; height: 64px; font-size: 2.5rem;">
+                <div class="provider-icon" style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;">
                     {% if provider.provider_type == 'beget' %}
-                        <i class="fas fa-server" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
+                        <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 3rem; height: 3rem; object-fit: contain;">
                     {% elif provider.provider_type == 'yandex' %}
                         <i class="fas fa-cloud" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% elif provider.provider_type == 'selectel' %}
-                        <i class="fas fa-database" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
+                        <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 3rem; height: 3rem; object-fit: contain;">
                     {% else %}
                         <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% endif %}
