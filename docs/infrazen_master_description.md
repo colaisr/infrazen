@@ -250,12 +250,12 @@ CREATE TABLE resource_states (
 
 ### 7.1.1 Cloud Connections ✅ IMPLEMENTED
 - **Connection Management:** Full CRUD operations with comprehensive edit functionality, provider pre-selection, and secure credential management
-- **Provider Support:** Beget (fully implemented with direct API integration), AWS, Azure, GCP, VK Cloud, Yandex Cloud, Selectel (UI ready with dynamic forms)
-- **Connection Testing:** Real-time API validation with direct HTTP requests to Beget API using proper token-based authentication
+- **Provider Support:** Beget (fully implemented with direct API integration), Selectel (fully implemented with API key authentication), AWS, Azure, GCP, VK Cloud, Yandex Cloud (UI ready with dynamic forms)
+- **Connection Testing:** Real-time API validation with direct HTTP requests to provider APIs using proper authentication methods
 - **Security:** Encrypted password storage, user ownership validation, authentication checks, secure edit operations
 - **User Experience:** Provider pre-selection from available providers, dynamic forms that adapt to provider type, loading states, comprehensive error handling, pre-filled edit forms
-- **Edit Functionality:** Settings button opens modal with pre-filled connection details, secure password handling, connection validation on updates
-- **API Integration:** Clean, maintainable direct API integration with Beget using requests library for reliable authentication and data retrieval
+- **Edit Functionality:** Settings button opens modal with pre-filled connection details, secure credential handling, connection validation on updates
+- **API Integration:** Clean, maintainable direct API integration with multiple providers using requests library for reliable authentication and data retrieval
 
 ### 7.1.2 Resources Page ✅ IMPLEMENTED
 - **Provider-Grouped Organization:** Resources organized by cloud provider in collapsible sections for better navigation and management
@@ -495,16 +495,17 @@ InfraZen/
 - **✅ Server Stability**: Flask development server running reliably on port 5001
 - **✅ Database Integrity**: Fresh SQLite database with proper schema and all required columns
 - **✅ Authentication Flow**: Google OAuth working with demo user fallback
-- **✅ Provider Management**: Full CRUD operations for Beget connections
+- **✅ Provider Management**: Full CRUD operations for Beget and Selectel connections
 - **✅ Dashboard Functionality**: Mock data display for demo users, real data for authenticated users
 - **✅ Error Resolution**: All database schema conflicts resolved, no more column errors
 - **✅ Clean Architecture**: Follows Flask best practices with proper separation of concerns
 - **✅ Scalability Ready**: Architecture supports easy addition of new cloud providers
+- **✅ Multi-Provider Support**: Beget and Selectel fully integrated with unified data models
 
 #### 13.4.6 Next Development Phases
 **Phase 1: Additional Providers (Immediate)**
+- ✅ Add Selectel integration using unified models (COMPLETED)
 - 🔄 Add Yandex Cloud integration using unified models
-- 🔄 Add Selectel integration using unified models
 - 🔄 Add AWS integration using unified models
 - 🔄 Implement provider-specific resource discovery and sync
 
@@ -1536,12 +1537,93 @@ The platform now features an interactive "Usage" section within each resource ca
 - **Cost-Performance Correlation**: Link resource costs to actual utilization
 - **Capacity Planning**: Historical data supports future resource allocation
 
-### 12.10. Provider-Grouped Resources Page Architecture
+### 12.10. Selectel Provider Integration ✅ COMPLETED
 
 #### 12.10.1. Overview
+The InfraZen platform now includes complete integration with Selectel cloud provider, enabling users to connect, manage, and synchronize Selectel resources through the unified FinOps interface.
+
+#### 12.10.2. Implementation Details
+**API Integration:**
+- **Base URL**: `https://api.selectel.ru/vpc/resell/v2`
+- **Authentication**: Static token (X-Token header) method
+- **API Key**: Long-lived token for direct API access
+- **Account Detection**: Automatic account ID extraction from API response
+
+**Provider Components:**
+- **SelectelClient**: API client with methods for account info, projects, users, roles, and resource discovery
+- **SelectelService**: Business logic layer for data synchronization and resource management
+- **Selectel Routes**: Complete CRUD operations (add, edit, delete, test, sync) with session-based authentication
+- **Frontend Integration**: Dynamic form handling with API key-only authentication
+
+#### 12.10.3. Technical Implementation
+**Database Integration:**
+- **Provider Type**: `selectel` in unified `CloudProvider` model
+- **Credentials Storage**: JSON-encoded API key in `credentials` field
+- **Account Metadata**: Complete account information stored in `provider_metadata`
+- **Resource Tracking**: Unified `Resource` model for all Selectel resources
+
+**Authentication Flow:**
+1. User provides API key in connection form
+2. System tests connection using `/accounts` endpoint
+3. Account ID automatically extracted from API response
+4. Connection saved with API key and account metadata
+5. Future operations use stored credentials
+
+**API Endpoints Integrated:**
+- `/accounts` - Account information and validation
+- `/projects` - Project listing and details
+- `/users` - User management and roles
+- `/roles` - Role-based access control information
+- Resource discovery endpoints for comprehensive resource tracking
+
+#### 12.10.4. User Experience Features
+**Connection Management:**
+- **Simplified Form**: Only API key required (Account ID auto-detected)
+- **Real-time Testing**: Connection validation before saving
+- **Account Display**: Shows actual account name instead of "Unknown"
+- **Error Handling**: Comprehensive error messages and validation
+
+**Resource Synchronization:**
+- **Unified Interface**: Same sync interface as other providers
+- **Change Detection**: Tracks resource changes and updates
+- **Cost Tracking**: Integrated with daily cost baseline system
+- **Performance Monitoring**: Ready for usage metrics collection
+
+#### 12.10.5. Implementation Results
+**Successfully Delivered:**
+- ✅ **Complete API Integration**: All major Selectel endpoints accessible
+- ✅ **Authentication System**: Static token authentication working
+- ✅ **Connection Management**: Full CRUD operations implemented
+- ✅ **Frontend Integration**: Dynamic forms and real-time testing
+- ✅ **Database Integration**: Unified models and data storage
+- ✅ **Error Resolution**: All technical issues resolved
+
+**Technical Achievements:**
+- **Session-based Authentication**: Properly integrated with existing auth system
+- **Form Handling**: Dynamic form actions and validation
+- **Sync Interval Conversion**: Robust string-to-integer conversion
+- **Account Auto-detection**: Automatic account ID extraction
+- **Error Handling**: Graceful degradation and user feedback
+
+#### 12.10.6. Business Value
+**FinOps Capabilities:**
+- **Multi-Cloud Support**: Selectel added to unified FinOps platform
+- **Cost Visibility**: Selectel resources integrated with cost tracking
+- **Resource Management**: Complete resource lifecycle management
+- **Optimization Ready**: Foundation for cost optimization recommendations
+
+**Operational Benefits:**
+- **Unified Interface**: Single interface for multiple cloud providers
+- **Automated Discovery**: Automatic resource detection and tracking
+- **Real-time Sync**: Live resource synchronization and updates
+- **Cost Analysis**: Integrated cost analysis across all providers
+
+### 12.11. Provider-Grouped Resources Page Architecture
+
+#### 12.11.1. Overview
 The InfraZen platform now features a completely reorganized resources page that groups resources by cloud provider in collapsible sections, providing better organization, navigation, and user experience for managing multi-cloud infrastructure.
 
-#### 12.10.2. Page Structure
+#### 12.11.2. Page Structure
 **Summary Card at Top**:
 - Aggregated statistics across all providers
 - Total resources count (10 resources)

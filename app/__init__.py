@@ -37,12 +37,14 @@ def create_app(config_name=None):
     from app.api.providers import providers_bp
     from app.api.resources import resources_bp
     from app.providers.beget.routes import beget_bp
+    from app.providers.selectel.routes import selectel_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(providers_bp, url_prefix='/api/providers')
     app.register_blueprint(resources_bp, url_prefix='/api/resources')
     app.register_blueprint(beget_bp, url_prefix='/api/providers/beget')
+    app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     
     # All routes are now in the new structure
     

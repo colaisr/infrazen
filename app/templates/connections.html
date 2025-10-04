@@ -272,7 +272,7 @@
                     <i class="fa-solid fa-gear"></i>
                     <span>Настройки</span>
                 </button>
-                <button class="action-btn primary" title="Синхронизировать" onclick="syncConnection('{{ provider.id }}')">
+                <button class="action-btn primary" title="Синхронизировать" onclick="syncConnection('{{ provider.id }}', '{{ provider.provider_type }}')">
                     <i class="fa-solid fa-sync"></i>
                     <span>Синхронизировать</span>
                 </button>
@@ -1774,7 +1774,7 @@
             <button class="modal-close" onclick="closeProviderModal()">&times;</button>
         </div>
         <div class="modal-body">
-            <form id="providerForm" method="POST" action="/api/providers/beget/add">
+            <form id="providerForm" method="POST" action="">
                 <input type="hidden" id="selected_provider" name="provider" value="">
                 
                 <!-- Two-column layout -->
@@ -1880,8 +1880,7 @@ const providers = {
         name: 'Selectel',
         description: 'Selectel — российский провайдер облачных услуг, специализирующийся на виртуальных серверах, облачных вычислениях и хостинге.',
         fields: [
-            { name: 'api_key', label: 'API Key *', type: 'text', placeholder: 'sk_...', required: true },
-            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'proj_1234567890', required: true }
+            { name: 'api_key', label: 'API Key *', type: 'text', placeholder: 'geKYksHLzAeQQLakNjyWnmTLJ_478587', required: true }
         ]
     },
     beget: {
@@ -2069,12 +2068,22 @@ function changeProvider() {
     const testBtn = document.getElementById('testBtn');
     const connectBtn = document.getElementById('connectBtn');
     const selectedProviderInput = document.getElementById('selected_provider');
+    const form = document.getElementById('providerForm');
     
     if (selectedProvider && providers[selectedProvider]) {
         const provider = providers[selectedProvider];
         
         // Set hidden field
         selectedProviderInput.value = selectedProvider;
+        
+        // Set form action based on provider
+        if (selectedProvider === 'selectel') {
+            form.action = '/api/providers/selectel/add';
+        } else if (selectedProvider === 'beget') {
+            form.action = '/api/providers/beget/add';
+        } else {
+            form.action = '/api/providers/beget/add'; // Default fallback
+        }
         
         // Generate dynamic fields
         providerFields.innerHTML = '';
@@ -2171,7 +2180,8 @@ function testConnection() {
     showTestResult('Тестирование подключения...', 'info');
     
     // Test connection based on provider
-    fetch(`/api/providers/beget/test`, {
+    const testEndpoint = selectedProvider === 'selectel' ? '/api/providers/selectel/test' : '/api/providers/beget/test';
+    fetch(testEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -2187,13 +2197,14 @@ function testConnection() {
             // Use real account info if available
             if (data.account_info) {
                 const account = data.account_info;
-                const username = account.customer_login || account.username || 'Unknown';
-                const customerId = account.customer_id || '';
+                // For Selectel, use the account name
+                const accountName = account.name || account.customer_login || account.username || 'Unknown';
+                const customerId = account.customer_id || account.id || '';
                 
-                if (customerId) {
-                    message = `✅ Подключение успешно! Пользователь: ${username} (ID: ${customerId})`;
+                if (customerId && customerId !== accountName) {
+                    message = `✅ Подключение успешно! Аккаунт: ${accountName} (ID: ${customerId})`;
                 } else {
-                    message = `✅ Подключение успешно! Пользователь: ${username}`;
+                    message = `✅ Подключение успешно! Аккаунт: ${accountName}`;
                 }
             }
             
@@ -2263,7 +2274,7 @@ function editConnection(connectionId) {
         });
 }
 
-function syncConnection(connectionId) {
+function syncConnection(connectionId, providerType) {
     // Extract numeric ID from string like "beget-2" -> "2"
     const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
     
@@ -2273,8 +2284,8 @@ function syncConnection(connectionId) {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Синхронизация...</span>';
     button.disabled = true;
     
-    // Make sync request
-    fetch(`/api/providers/beget/${numericId}/sync`, {
+    // Make sync request with correct provider type
+    fetch(`/api/providers/${providerType}/${numericId}/sync`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
