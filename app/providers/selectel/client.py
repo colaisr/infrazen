@@ -10,23 +10,231 @@ from typing import Dict, List, Optional, Any
 class SelectelClient:
     """Selectel API client for managing cloud resources"""
     
-    def __init__(self, api_key: str, account_id: str = None):
+    def __init__(self, api_key: str, account_id: str = None, service_username: str = None, service_password: str = None):
         """
         Initialize Selectel client
         
         Args:
             api_key: Selectel API key (X-Token)
             account_id: Account ID (optional, can be retrieved from API)
+            service_username: Service user username for IAM token generation
+            service_password: Service user password for IAM token generation
         """
         self.api_key = api_key
         self.account_id = account_id
+        self.service_username = service_username
+        self.service_password = service_password
         self.base_url = "https://api.selectel.ru/vpc/resell/v2"
+        self.openstack_base_url = "https://ru-3.cloud.api.selcloud.ru"
         self.session = requests.Session()
         self.session.headers.update({
             'X-Token': self.api_key,
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         })
+        self._jwt_token = None
+    
+    def _get_iam_token(self) -> str:
+        """
+        Get IAM token for OpenStack API authentication using service user credentials
+        
+        According to Selectel documentation, OpenStack APIs require IAM tokens which
+        can only be obtained using service user credentials (username/password).
+        The static API key (X-Token) doesn't work with OpenStack APIs.
+        
+        Returns:
+            IAM token string
+        """
+        if self._jwt_token:
+            return self._jwt_token
+            
+        try:
+            # Use service user credentials if available, otherwise fall back to account info
+            if self.service_username and self.service_password:
+                username = self.service_username
+                account_id = self.account_id or '478587'  # Use provided account_id or default
+            else:
+                # Fallback: Get account info to extract username and account_id
+                account_info = self.get_account_info()
+                if not account_info or 'account' not in account_info:
+                    raise Exception("Could not get account information and no service user credentials provided")
+                
+                account_data = account_info['account']
+                username = account_data.get('name', '478587')  # Use account name as username
+                account_id = account_data.get('name', '478587')  # Use account name as domain
+            
+            # Get project ID first to scope the IAM token properly
+            projects = self.get_projects()
+            if not projects:
+                raise Exception("No projects found for this account")
+            
+            # Use the first project (or we could make this configurable)
+            project_id = projects[0].get('id')
+            project_name = projects[0].get('name')
+            
+            # Get IAM token using OpenStack Keystone API with service user credentials
+            # Scope the token to the specific project, not the entire domain
+            auth_url = 'https://cloud.api.selcloud.ru/identity/v3/auth/tokens'
+            auth_data = {
+                "auth": {
+                    "identity": {
+                        "methods": ["password"],
+                        "password": {
+                            "user": {
+                                "name": username,
+                                "domain": {
+                                    "name": account_id
+                                },
+                                "password": self.service_password if self.service_password else self.api_key
+                            }
+                        }
+                    },
+                    "scope": {
+                        "project": {
+                            "id": project_id,
+                            "domain": {
+                                "name": account_id
+                            }
+                        }
+                    }
+                }
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=30)
+            
+            if response.status_code == 201:
+                # Get the token from X-Subject-Token header
+                subject_token = response.headers.get('X-Subject-Token')
+                if subject_token:
+                    self._jwt_token = subject_token
+                    return self._jwt_token
+                else:
+                    raise Exception("No X-Subject-Token header in response")
+            else:
+                # IAM token generation failed
+                raise Exception(f"IAM token generation failed ({response.status_code}): {response.text[:200]}")
+            
+        except Exception as e:
+            # IAM token generation failed
+            raise Exception(f"IAM token generation failed: {str(e)}")
+    
+    def _get_openstack_headers(self) -> Dict[str, str]:
+        """
+        Get headers for OpenStack API requests
+        
+        Returns:
+            Dict containing OpenStack API headers
+        """
+        iam_token = self._get_iam_token()
+        return {
+            'X-Auth-Token': iam_token,
+            'Accept': 'application/json, text/plain, */*',
+            'Openstack-Api-Version': 'compute latest',
+            'Origin': 'https://my.selectel.ru',
+            'Referer': 'https://my.selectel.ru/',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+        }
+    
+    def get_openstack_servers(self) -> List[Dict[str, Any]]:
+        """
+        Get OpenStack servers (VMs)
+        
+        Returns:
+            List of server dictionaries
+        """
+        try:
+            headers = self._get_openstack_headers()
+            servers_url = f'{self.openstack_base_url}/compute/v2.1/servers/detail'
+            
+            response = requests.get(servers_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('servers', [])
+            
+        except Exception as e:
+            raise Exception(f"Failed to get OpenStack servers: {str(e)}")
+    
+    def get_openstack_volumes(self, project_id: str = None) -> List[Dict[str, Any]]:
+        """
+        Get OpenStack volumes
+        
+        Args:
+            project_id: Optional project ID to scope the request
+            
+        Returns:
+            List of volume dictionaries
+        """
+        try:
+            headers = self._get_openstack_headers()
+            headers['Openstack-Api-Version'] = 'volume latest'
+            
+            # Include project ID in URL if provided
+            if project_id:
+                volumes_url = f'{self.openstack_base_url}/volume/v3/{project_id}/volumes/detail'
+            else:
+                volumes_url = f'{self.openstack_base_url}/volume/v3/volumes/detail'
+            
+            response = requests.get(volumes_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('volumes', [])
+            
+        except Exception as e:
+            raise Exception(f"Failed to get OpenStack volumes: {str(e)}")
+    
+    def get_openstack_networks(self) -> List[Dict[str, Any]]:
+        """
+        Get OpenStack networks
+        
+        Returns:
+            List of network dictionaries
+        """
+        try:
+            headers = self._get_openstack_headers()
+            headers['Openstack-Api-Version'] = 'network latest'
+            networks_url = f'{self.openstack_base_url}/network/v2.0/networks'
+            
+            response = requests.get(networks_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('networks', [])
+            
+        except Exception as e:
+            raise Exception(f"Failed to get OpenStack networks: {str(e)}")
+    
+    def get_all_cloud_resources(self, project_id: str = None) -> Dict[str, Any]:
+        """
+        Get all actual cloud resources (servers, volumes, networks)
+        
+        Args:
+            project_id: Optional project ID to scope the requests
+            
+        Returns:
+            Dict containing all cloud resources
+        """
+        try:
+            resources = {
+                'servers': self.get_openstack_servers(),
+                'volumes': self.get_openstack_volumes(project_id),
+                'networks': self.get_openstack_networks()
+            }
+            return resources
+            
+        except Exception as e:
+            return {
+                'error': str(e),
+                'servers': [],
+                'volumes': [],
+                'networks': []
+            }
     
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -239,12 +447,13 @@ class SelectelClient:
     
     def get_all_resources(self) -> Dict[str, Any]:
         """
-        Get all available resources and information
+        Get all available resources and information including actual cloud resources
         
         Returns:
             Dict containing all available resource information
         """
         try:
+            # Get basic account/project information
             resources = {
                 'account': self.get_account_info(),
                 'projects': self.get_projects(),
@@ -260,11 +469,15 @@ class SelectelClient:
             except:
                 resources['quotas'] = {}
             
-            # Try to get resources (might fail)
+            # Get actual cloud resources (servers, volumes, networks)
             try:
-                resources['resources'] = self.get_resources()
-            except:
-                resources['resources'] = {}
+                cloud_resources = self.get_all_cloud_resources()
+                resources.update(cloud_resources)
+            except Exception as e:
+                resources['cloud_error'] = str(e)
+                resources['servers'] = []
+                resources['volumes'] = []
+                resources['networks'] = []
             
             return resources
             
@@ -278,5 +491,7 @@ class SelectelClient:
                 'billing': {},
                 'usage': {},
                 'quotas': {},
-                'resources': {}
+                'servers': [],
+                'volumes': [],
+                'networks': []
             }

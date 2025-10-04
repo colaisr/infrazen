@@ -21,16 +21,22 @@ def test_selectel_connection():
     try:
         # Get form data
         api_key = request.json.get('api_key') if request.is_json else request.form.get('api_key')
+        service_username = request.json.get('service_username') if request.is_json else request.form.get('service_username')
+        service_password = request.json.get('service_password') if request.is_json else request.form.get('service_password')
         
         # Validate required fields
-        if not api_key:
+        if not api_key or not service_username or not service_password:
             return jsonify({
                 'success': False,
-                'message': 'API Key is required'
+                'message': 'API Key, Service Username, and Service Password are required'
             }), 400
         
         # Test the connection
-        test_client = SelectelClient(api_key)
+        test_client = SelectelClient(
+            api_key=api_key,
+            service_username=service_username,
+            service_password=service_password
+        )
         test_result = test_client.test_connection()
         
         return jsonify(test_result)
@@ -58,6 +64,8 @@ def add_connection():
         # Get form data
         connection_name = request.form.get('connection_name')
         api_key = request.form.get('api_key')
+        service_username = request.form.get('service_username')
+        service_password = request.form.get('service_password')
         auto_sync = request.form.get('auto_sync') == 'on'
         
         # Handle sync interval conversion
@@ -71,12 +79,16 @@ def add_connection():
         sync_interval = sync_interval_map.get(sync_interval_value, 86400)  # Default to daily
         
         # Validate required fields
-        if not connection_name or not api_key:
-            flash('Connection name and API key are required', 'error')
+        if not connection_name or not api_key or not service_username or not service_password:
+            flash('Connection name, API key, service username, and service password are required', 'error')
             return redirect(url_for('main.connections'))
         
         # Test the connection
-        test_client = SelectelClient(api_key)
+        test_client = SelectelClient(
+            api_key=api_key,
+            service_username=service_username,
+            service_password=service_password
+        )
         test_result = test_client.test_connection()
         
         if not test_result['success']:
@@ -93,7 +105,9 @@ def add_connection():
             connection_name=connection_name,
             account_id=account_id,
             credentials=json.dumps({
-                'api_key': api_key
+                'api_key': api_key,
+                'service_username': service_username,
+                'service_password': service_password
             }),
             provider_metadata=json.dumps(test_result.get('account_info', {})),
             is_active=True,

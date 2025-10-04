@@ -28,7 +28,9 @@ class SelectelService:
         self.credentials = json.loads(provider.credentials)
         self.client = SelectelClient(
             api_key=self.credentials.get('api_key'),
-            account_id=self.credentials.get('account_id')
+            account_id=self.credentials.get('account_id'),
+            service_username=self.credentials.get('service_username'),
+            service_password=self.credentials.get('service_password')
         )
     
     def test_connection(self) -> Dict[str, Any]:
@@ -140,12 +142,64 @@ class SelectelService:
                     if role_resource:
                         synced_resources.append(role_resource)
             
+            # Process actual cloud resources - Servers (VMs)
+            if 'servers' in api_resources:
+                for server_data in api_resources['servers']:
+                    server_resource = self._create_resource(
+                        resource_type='server',
+                        resource_id=server_data.get('id'),
+                        name=server_data.get('name', f"Server {server_data.get('id', 'Unknown')}"),
+                        metadata=server_data,
+                        sync_snapshot_id=sync_snapshot.id,
+                        region='ru-3',  # Selectel region
+                        service_name='Compute'
+                    )
+                    if server_resource:
+                        synced_resources.append(server_resource)
+            
+            # Process actual cloud resources - Volumes
+            if 'volumes' in api_resources:
+                for volume_data in api_resources['volumes']:
+                    volume_resource = self._create_resource(
+                        resource_type='volume',
+                        resource_id=volume_data.get('id'),
+                        name=volume_data.get('name', f"Volume {volume_data.get('id', 'Unknown')}"),
+                        metadata=volume_data,
+                        sync_snapshot_id=sync_snapshot.id,
+                        region='ru-3',  # Selectel region
+                        service_name='Storage'
+                    )
+                    if volume_resource:
+                        synced_resources.append(volume_resource)
+            
+            # Process actual cloud resources - Networks
+            if 'networks' in api_resources:
+                for network_data in api_resources['networks']:
+                    network_resource = self._create_resource(
+                        resource_type='network',
+                        resource_id=network_data.get('id'),
+                        name=network_data.get('name', f"Network {network_data.get('id', 'Unknown')}"),
+                        metadata=network_data,
+                        sync_snapshot_id=sync_snapshot.id,
+                        region='ru-3',  # Selectel region
+                        service_name='Network'
+                    )
+                    if network_resource:
+                        synced_resources.append(network_resource)
+            
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
             sync_snapshot.sync_completed_at = datetime.utcnow()
             sync_snapshot.resources_created = len(synced_resources)
+            sync_snapshot.resources_deleted = 0
             sync_snapshot.total_resources_found = len(synced_resources)
             sync_snapshot.calculate_duration()
+            
+            # Update provider last_sync timestamp
+            self.provider.last_sync = datetime.utcnow()
+            self.provider.sync_status = 'success'
+            self.provider.sync_error = None
+            
             db.session.commit()
             
             return {
@@ -165,6 +219,11 @@ class SelectelService:
                 sync_snapshot.sync_completed_at = datetime.utcnow()
                 sync_snapshot.error_message = str(e)
                 sync_snapshot.calculate_duration()
+                
+                # Update provider sync status to error
+                self.provider.sync_status = 'error'
+                self.provider.sync_error = str(e)
+                
                 db.session.commit()
             
             return {
@@ -175,20 +234,25 @@ class SelectelService:
     
     def _create_resource(self, resource_type: str, resource_id: str, 
                         name: str, metadata: Dict[str, Any], 
-                        sync_snapshot_id: int) -> Optional[Resource]:
+                        sync_snapshot_id: int, region: str = None, 
+                        service_name: str = None) -> Optional[Resource]:
         """
-        Create or update a resource
+        Create or update a resource and create ResourceState entry
         
         Args:
             resource_type: Type of resource
             resource_id: Unique identifier for the resource
             name: Human-readable name
             metadata: Resource metadata
-                        sync_snapshot_id: ID of the sync snapshot
+            sync_snapshot_id: ID of the sync snapshot
+            region: Resource region (optional)
+            service_name: Service name (optional)
             
         Returns:
             Resource instance or None if failed
         """
+        from app.core.models.sync import ResourceState
+        
         try:
             # Check if resource already exists
             existing_resource = Resource.query.filter_by(
@@ -197,17 +261,69 @@ class SelectelService:
                 resource_id=resource_id
             ).first()
             
+            # Create unified resource data
+            unified_resource = {
+                'resource_id': resource_id,
+                'resource_name': name,
+                'resource_type': resource_type,
+                'service_name': service_name or ('Account' if resource_type == 'account' else resource_type.title()),
+                'region': region or ('global' if resource_type == 'account' else 'unknown'),
+                'status': 'active',
+                'effective_cost': 0.0,
+                'provider_config': metadata
+            }
+            
             if existing_resource:
                 # Update existing resource
-                existing_resource.resource_name = name
-                existing_resource.provider_config = json.dumps(metadata)
-                existing_resource.last_sync = datetime.utcnow()
-                existing_resource.is_active = True
-                # Ensure required fields are set
-                if not existing_resource.region:
-                    existing_resource.region = 'global' if resource_type == 'account' else 'unknown'
-                if not existing_resource.service_name:
-                    existing_resource.service_name = 'Account' if resource_type == 'account' else resource_type.title()
+                previous_state = existing_resource.to_dict()
+                
+                # Check for changes
+                has_changes = False
+                changes = {}
+                
+                # Compare key fields
+                key_fields = ['resource_name', 'status', 'effective_cost', 'region']
+                for field in key_fields:
+                    if getattr(existing_resource, field) != unified_resource.get(field):
+                        has_changes = True
+                        changes[field] = {
+                            'previous': getattr(existing_resource, field),
+                            'current': unified_resource.get(field)
+                        }
+                
+                # Update resource if there are changes
+                if has_changes:
+                    existing_resource.resource_name = name
+                    existing_resource.provider_config = json.dumps(metadata)
+                    existing_resource.last_sync = datetime.utcnow()
+                    existing_resource.is_active = True
+                    if region:
+                        existing_resource.region = region
+                    if service_name:
+                        existing_resource.service_name = service_name
+                
+                # Create resource state
+                resource_state = ResourceState(
+                    sync_snapshot_id=sync_snapshot_id,
+                    resource_id=existing_resource.id,
+                    provider_resource_id=resource_id,
+                    resource_type=resource_type,
+                    resource_name=name,
+                    state_action='updated' if has_changes else 'unchanged',
+                    service_name=unified_resource['service_name'],
+                    region=unified_resource['region'],
+                    status=unified_resource['status'],
+                    effective_cost=unified_resource['effective_cost']
+                )
+                
+                # Set previous and current states as JSON
+                resource_state.set_previous_state(previous_state)
+                resource_state.set_current_state(unified_resource)
+                
+                # Detect changes
+                resource_state.detect_changes()
+                
+                db.session.add(resource_state)
                 db.session.commit()
                 return existing_resource
             else:
@@ -217,13 +333,33 @@ class SelectelService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     resource_name=name,
-                    region='global' if resource_type == 'account' else 'unknown',
-                    service_name='Account' if resource_type == 'account' else resource_type.title(),
+                    region=region or ('global' if resource_type == 'account' else 'unknown'),
+                    service_name=service_name or ('Account' if resource_type == 'account' else resource_type.title()),
                     provider_config=json.dumps(metadata),
                     last_sync=datetime.utcnow(),
                     is_active=True
                 )
                 db.session.add(new_resource)
+                db.session.flush()  # Get the ID
+                
+                # Create resource state
+                resource_state = ResourceState(
+                    sync_snapshot_id=sync_snapshot_id,
+                    resource_id=new_resource.id,
+                    provider_resource_id=resource_id,
+                    resource_type=resource_type,
+                    resource_name=name,
+                    state_action='created',
+                    service_name=unified_resource['service_name'],
+                    region=unified_resource['region'],
+                    status=unified_resource['status'],
+                    effective_cost=unified_resource['effective_cost']
+                )
+                
+                # Set current state as JSON
+                resource_state.set_current_state(unified_resource)
+                
+                db.session.add(resource_state)
                 db.session.commit()
                 return new_resource
                 

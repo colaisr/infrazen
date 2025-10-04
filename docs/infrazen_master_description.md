@@ -41,7 +41,7 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 ## 6.1. Multi-Cloud Sync Architecture
 
 ### 6.1.1. Sync System Overview
-The InfraZen platform implements a comprehensive multi-cloud synchronization system designed to provide real-time visibility into cloud resources, costs, and utilization across all connected providers. The sync architecture is built on a snapshot-based approach that enables historical analysis, trend tracking, and AI-powered optimization recommendations.
+The InfraZen platform implements a comprehensive multi-cloud synchronization system designed to provide real-time visibility into cloud resources, costs, and utilization across all connected providers. The sync architecture is built on a **snapshot-based approach** that enables historical analysis, trend tracking, and AI-powered optimization recommendations. This architecture ensures complete audit trails, change detection, and historical data preservation for FinOps analysis.
 
 ### 6.1.2. Core Sync Components
 
@@ -250,7 +250,7 @@ CREATE TABLE resource_states (
 
 ### 7.1.1 Cloud Connections ✅ IMPLEMENTED
 - **Connection Management:** Full CRUD operations with comprehensive edit functionality, provider pre-selection, and secure credential management
-- **Provider Support:** Beget (fully implemented with direct API integration), Selectel (fully implemented with API key authentication), AWS, Azure, GCP, VK Cloud, Yandex Cloud (UI ready with dynamic forms)
+- **Provider Support:** Beget (fully implemented with dual-endpoint API integration), Selectel (fully implemented with dual authentication system and cloud resource discovery), AWS, Azure, GCP, VK Cloud, Yandex Cloud (UI ready with dynamic forms)
 - **Connection Testing:** Real-time API validation with direct HTTP requests to provider APIs using proper authentication methods
 - **Security:** Encrypted password storage, user ownership validation, authentication checks, secure edit operations
 - **User Experience:** Provider pre-selection from available providers, dynamic forms that adapt to provider type, loading states, comprehensive error handling, pre-filled edit forms
@@ -501,6 +501,14 @@ InfraZen/
 - **✅ Clean Architecture**: Follows Flask best practices with proper separation of concerns
 - **✅ Scalability Ready**: Architecture supports easy addition of new cloud providers
 - **✅ Multi-Provider Support**: Beget and Selectel fully integrated with unified data models
+- **✅ Snapshot-Based Sync**: Complete sync history with `SyncSnapshot` and `ResourceState` models
+- **✅ Resource State Tracking**: Detailed change detection and audit trails
+- **✅ Selectel Integration**: Complete Selectel provider with dual authentication system
+- **✅ Cloud Resource Discovery**: VMs, volumes, and networks successfully retrieved from Selectel
+- **✅ IAM Token Generation**: Dynamic IAM token generation with project scoping
+- **✅ OpenStack Integration**: Full OpenStack API integration for cloud resources
+- **✅ Snapshot-Based Display**: Resources shown from latest successful sync snapshots
+- **✅ Historical Data Preservation**: Complete audit trail for FinOps analysis
 
 #### 13.4.6 Next Development Phases
 **Phase 1: Additional Providers (Immediate)**
@@ -1540,76 +1548,116 @@ The platform now features an interactive "Usage" section within each resource ca
 ### 12.10. Selectel Provider Integration ✅ COMPLETED
 
 #### 12.10.1. Overview
-The InfraZen platform now includes complete integration with Selectel cloud provider, enabling users to connect, manage, and synchronize Selectel resources through the unified FinOps interface.
+The InfraZen platform now includes complete integration with Selectel cloud provider, enabling users to connect, manage, and synchronize Selectel resources through the unified FinOps interface. This integration supports both account-level resources and project-scoped cloud resources (VMs, volumes, networks) through a sophisticated authentication system.
 
 #### 12.10.2. Implementation Details
 **API Integration:**
-- **Base URL**: `https://api.selectel.ru/vpc/resell/v2`
-- **Authentication**: Static token (X-Token header) method
-- **API Key**: Long-lived token for direct API access
+- **Base URL**: `https://api.selectel.ru/vpc/resell/v2` (Account/Project APIs)
+- **OpenStack Base URL**: `https://ru-3.cloud.api.selcloud.ru` (Cloud Resources APIs)
+- **Authentication**: Dual authentication system (Static token + Service user credentials)
+- **API Key**: Long-lived token for account/project access
+- **Service User**: Username/password for OpenStack IAM token generation
 - **Account Detection**: Automatic account ID extraction from API response
 
 **Provider Components:**
-- **SelectelClient**: API client with methods for account info, projects, users, roles, and resource discovery
-- **SelectelService**: Business logic layer for data synchronization and resource management
+- **SelectelClient**: API client with methods for account info, projects, users, roles, and cloud resource discovery
+- **SelectelService**: Business logic layer for data synchronization and resource management with snapshot support
 - **Selectel Routes**: Complete CRUD operations (add, edit, delete, test, sync) with session-based authentication
-- **Frontend Integration**: Dynamic form handling with API key-only authentication
+- **Frontend Integration**: Dynamic form handling with API key and service user credentials
 
 #### 12.10.3. Technical Implementation
 **Database Integration:**
 - **Provider Type**: `selectel` in unified `CloudProvider` model
-- **Credentials Storage**: JSON-encoded API key in `credentials` field
+- **Credentials Storage**: JSON-encoded credentials (API key, service username, service password)
 - **Account Metadata**: Complete account information stored in `provider_metadata`
-- **Resource Tracking**: Unified `Resource` model for all Selectel resources
+- **Resource Tracking**: Unified `Resource` model for all Selectel resources with snapshot support
+- **Sync Snapshots**: Complete sync history with `SyncSnapshot` and `ResourceState` models
 
 **Authentication Flow:**
-1. User provides API key in connection form
-2. System tests connection using `/accounts` endpoint
+1. User provides API key, service username, and service password in connection form
+2. System tests connection using `/accounts` endpoint with static token
 3. Account ID automatically extracted from API response
-4. Connection saved with API key and account metadata
-5. Future operations use stored credentials
+4. Connection saved with all credentials and account metadata
+5. Future operations use stored credentials for both account and cloud resource access
 
 **API Endpoints Integrated:**
 - `/accounts` - Account information and validation
 - `/projects` - Project listing and details
 - `/users` - User management and roles
 - `/roles` - Role-based access control information
-- Resource discovery endpoints for comprehensive resource tracking
+- `/v1/jwt` - JWT token generation for OpenStack APIs
+- `/identity/v3/auth/tokens` - IAM token generation with service user credentials
+- `/compute/v2.1/servers/detail` - Virtual machine discovery
+- `/volume/v3/volumes/detail` - Block storage discovery
+- `/network/v2.0/networks` - Network resource discovery
 
-#### 12.10.4. User Experience Features
+#### 12.10.4. Cloud Resource Discovery
+**Resource Types Discovered:**
+- **Virtual Machines**: Complete VM specifications, status, and configuration
+- **Block Storage**: Volume details, capacity, and attachment information
+- **Networks**: Network configuration and connectivity details
+- **Account Resources**: Account information, projects, and user management
+
+**IAM Token Scoping:**
+- **Project-Scoped Tokens**: IAM tokens generated with specific project scope
+- **Resource Filtering**: Only resources from the user's project are retrieved
+- **Security**: Prevents access to resources from other projects or accounts
+- **Performance**: Reduces API response size and improves sync performance
+
+#### 12.10.5. User Experience Features
 **Connection Management:**
-- **Simplified Form**: Only API key required (Account ID auto-detected)
-- **Real-time Testing**: Connection validation before saving
+- **Enhanced Form**: API key, service username, and service password required
+- **Real-time Testing**: Connection validation before saving with account name display
 - **Account Display**: Shows actual account name instead of "Unknown"
 - **Error Handling**: Comprehensive error messages and validation
 
 **Resource Synchronization:**
 - **Unified Interface**: Same sync interface as other providers
-- **Change Detection**: Tracks resource changes and updates
+- **Snapshot-Based**: Complete sync history with change tracking
+- **Change Detection**: Tracks resource changes and updates with `ResourceState`
 - **Cost Tracking**: Integrated with daily cost baseline system
 - **Performance Monitoring**: Ready for usage metrics collection
 
-#### 12.10.5. Implementation Results
+#### 12.10.6. Snapshot-Based Architecture
+**Sync Snapshots:**
+- **Complete History**: Every sync creates a `SyncSnapshot` record
+- **Resource States**: Each resource linked to specific snapshots via `ResourceState`
+- **Change Tracking**: Detailed change detection (created, updated, deleted, unchanged)
+- **Historical Analysis**: Full audit trail for cost optimization and trend analysis
+
+**Resource State Management:**
+- **State Actions**: Track resource lifecycle changes per snapshot
+- **Previous/Current States**: JSON storage of resource state changes
+- **Change Detection**: Automated comparison between snapshots
+- **Cost Tracking**: Track cost changes over time per resource
+
+#### 12.10.7. Implementation Results
 **Successfully Delivered:**
 - ✅ **Complete API Integration**: All major Selectel endpoints accessible
-- ✅ **Authentication System**: Static token authentication working
+- ✅ **Dual Authentication**: Static token + service user credentials working
+- ✅ **Cloud Resource Discovery**: VMs, volumes, and networks successfully retrieved
 - ✅ **Connection Management**: Full CRUD operations implemented
-- ✅ **Frontend Integration**: Dynamic forms and real-time testing
-- ✅ **Database Integration**: Unified models and data storage
+- ✅ **Frontend Integration**: Enhanced forms with service user credentials
+- ✅ **Database Integration**: Unified models with snapshot support
+- ✅ **Snapshot Architecture**: Complete sync history and change tracking
 - ✅ **Error Resolution**: All technical issues resolved
 
 **Technical Achievements:**
 - **Session-based Authentication**: Properly integrated with existing auth system
-- **Form Handling**: Dynamic form actions and validation
+- **Enhanced Form Handling**: Dynamic form actions with service user credentials
 - **Sync Interval Conversion**: Robust string-to-integer conversion
 - **Account Auto-detection**: Automatic account ID extraction
+- **IAM Token Generation**: Dynamic IAM token generation with project scoping
+- **OpenStack Integration**: Full OpenStack API integration for cloud resources
+- **Snapshot Support**: Complete sync history with resource state tracking
 - **Error Handling**: Graceful degradation and user feedback
 
-#### 12.10.6. Business Value
+#### 12.10.8. Business Value
 **FinOps Capabilities:**
 - **Multi-Cloud Support**: Selectel added to unified FinOps platform
 - **Cost Visibility**: Selectel resources integrated with cost tracking
 - **Resource Management**: Complete resource lifecycle management
+- **Historical Analysis**: Full sync history for trend analysis and optimization
 - **Optimization Ready**: Foundation for cost optimization recommendations
 
 **Operational Benefits:**
@@ -1617,13 +1665,135 @@ The InfraZen platform now includes complete integration with Selectel cloud prov
 - **Automated Discovery**: Automatic resource detection and tracking
 - **Real-time Sync**: Live resource synchronization and updates
 - **Cost Analysis**: Integrated cost analysis across all providers
+- **Change Tracking**: Complete audit trail of resource changes
+- **Snapshot Management**: Historical data for capacity planning and optimization
 
-### 12.11. Provider-Grouped Resources Page Architecture
+### 12.11. Snapshot-Based Resource Display Architecture ✅ COMPLETED
 
 #### 12.11.1. Overview
+The InfraZen platform now implements a sophisticated snapshot-based resource display system that shows resources from the latest successful sync snapshot for each provider. This architecture ensures users see the most current resource state while maintaining complete historical data for analysis and optimization.
+
+#### 12.11.2. Snapshot-Based Display Logic
+**Resource Retrieval Strategy:**
+- **Latest Snapshot**: Resources displayed from the most recent successful `SyncSnapshot`
+- **Resource States**: Resources linked to snapshots via `ResourceState` entries
+- **Historical Preservation**: All historical data maintained for trend analysis
+- **Fallback Logic**: If no snapshots exist, display all resources (backward compatibility)
+
+**Implementation Details:**
+```python
+def get_real_user_resources(user_id):
+    """Get resources from latest snapshot for each provider"""
+    for provider in providers:
+        # Get latest successful sync snapshot
+        latest_snapshot = SyncSnapshot.query.filter_by(
+            provider_id=provider.id, 
+            sync_status='success'
+        ).order_by(SyncSnapshot.created_at.desc()).first()
+        
+        if latest_snapshot:
+            # Get resources from latest snapshot
+            resource_states = ResourceState.query.filter_by(
+                sync_snapshot_id=latest_snapshot.id
+            ).all()
+            # Display resources from this snapshot
+        else:
+            # Fallback: show all resources
+```
+
+#### 12.11.3. Resource State Management
+**State Tracking:**
+- **Created**: New resources discovered in current sync
+- **Updated**: Existing resources with changes detected
+- **Unchanged**: Resources with no changes since last sync
+- **Deleted**: Resources no longer present in provider
+
+**Change Detection:**
+- **Cost Changes**: Track cost fluctuations over time
+- **Status Changes**: Monitor resource lifecycle changes
+- **Configuration Changes**: Detect infrastructure modifications
+- **Metadata Changes**: Track provider-specific attribute changes
+
+#### 12.11.4. Database Schema Enhancement
+**SyncSnapshot Model:**
+```sql
+CREATE TABLE sync_snapshots (
+    id INTEGER PRIMARY KEY,
+    provider_id INTEGER NOT NULL,
+    sync_type VARCHAR(20) NOT NULL,  -- manual, scheduled
+    sync_status VARCHAR(20) NOT NULL,  -- running, success, error
+    sync_started_at DATETIME NOT NULL,
+    sync_completed_at DATETIME,
+    sync_duration_seconds INTEGER,
+    total_resources_found INTEGER DEFAULT 0,
+    resources_created INTEGER DEFAULT 0,
+    resources_updated INTEGER DEFAULT 0,
+    resources_deleted INTEGER DEFAULT 0,
+    resources_unchanged INTEGER DEFAULT 0,
+    total_monthly_cost FLOAT DEFAULT 0.0,
+    error_message TEXT,
+    sync_config TEXT  -- JSON
+);
+```
+
+**ResourceState Model:**
+```sql
+CREATE TABLE resource_states (
+    id INTEGER PRIMARY KEY,
+    sync_snapshot_id INTEGER NOT NULL,
+    resource_id INTEGER,
+    provider_resource_id VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(100) NOT NULL,
+    resource_name VARCHAR(255) NOT NULL,
+    state_action VARCHAR(20) NOT NULL,  -- created, updated, deleted, unchanged
+    previous_state TEXT,  -- JSON
+    current_state TEXT,  -- JSON
+    changes_detected TEXT,  -- JSON
+    service_name VARCHAR(100),
+    region VARCHAR(100),
+    status VARCHAR(50),
+    effective_cost FLOAT,
+    has_cost_change BOOLEAN DEFAULT FALSE,
+    has_status_change BOOLEAN DEFAULT FALSE,
+    has_config_change BOOLEAN DEFAULT FALSE
+);
+```
+
+#### 12.11.5. Implementation Results
+**Successfully Delivered:**
+- ✅ **Snapshot-Based Display**: Resources shown from latest successful sync
+- ✅ **Historical Preservation**: Complete audit trail maintained
+- ✅ **Change Detection**: Detailed change tracking per resource
+- ✅ **Resource States**: Complete resource lifecycle management
+- ✅ **Fallback Logic**: Backward compatibility for existing data
+- ✅ **Performance Optimization**: Efficient queries for latest snapshot data
+
+**Technical Achievements:**
+- **Database Optimization**: Efficient snapshot and resource state queries
+- **Change Detection**: Automated comparison between resource states
+- **JSON Serialization**: Flexible storage of resource state changes
+- **Audit Trail**: Complete history of all resource modifications
+- **Error Handling**: Graceful handling of missing snapshots
+
+#### 12.11.6. Business Value
+**FinOps Capabilities:**
+- **Historical Analysis**: Complete resource change history for trend analysis
+- **Cost Optimization**: Track cost changes over time for optimization opportunities
+- **Resource Lifecycle**: Monitor resource creation, updates, and deletion
+- **Audit Compliance**: Complete audit trail for compliance and governance
+
+**Operational Benefits:**
+- **Current State Visibility**: Users see most recent resource state
+- **Historical Context**: Access to complete resource history when needed
+- **Change Tracking**: Detailed change detection for operational insights
+- **Data Integrity**: No data loss through snapshot-based approach
+
+### 12.12. Provider-Grouped Resources Page Architecture
+
+#### 12.12.1. Overview
 The InfraZen platform now features a completely reorganized resources page that groups resources by cloud provider in collapsible sections, providing better organization, navigation, and user experience for managing multi-cloud infrastructure.
 
-#### 12.11.2. Page Structure
+#### 12.12.2. Page Structure
 **Summary Card at Top**:
 - Aggregated statistics across all providers
 - Total resources count (10 resources)
@@ -1639,7 +1809,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 - Professional styling with provider-specific branding
 - Resource cards organized within each provider section
 
-#### 12.10.3. Technical Implementation
+#### 12.12.3. Technical Implementation
 **Backend Architecture**:
 - **Resource Grouping**: Resources grouped by `provider.id` in `resources_by_provider` dictionary
 - **Provider Data**: Enhanced provider information with resource counts and status
@@ -1658,7 +1828,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 - **Resource Prioritization**: Resources with performance data displayed first
 - **Metadata Access**: Latest snapshot metadata for performance visualization
 
-#### 12.10.4. User Experience Features
+#### 12.12.4. User Experience Features
 **Navigation Benefits**:
 - **Logical Organization**: Resources grouped by cloud provider for easy navigation
 - **Quick Overview**: Summary card provides instant cost and resource visibility
@@ -1677,7 +1847,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 - **Cost Tracking**: Detailed cost information per resource and provider
 - **Status Monitoring**: Real-time resource status and health indicators
 
-#### 12.10.5. Implementation Results
+#### 12.12.5. Implementation Results
 **Successfully Delivered**:
 - ✅ **Provider Grouping**: Resources organized by cloud provider in collapsible sections
 - ✅ **Summary Statistics**: Aggregated cost and resource counts across all providers
@@ -1694,7 +1864,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 - **CSS Styling**: Professional design with provider-specific branding
 - **Error Handling**: Graceful degradation with comprehensive error reporting
 
-#### 12.10.6. Business Value
+#### 12.12.6. Business Value
 **Operational Benefits**:
 - **Multi-Cloud Management**: Unified view of resources across all cloud providers
 - **Cost Visibility**: Complete cost breakdown by provider and resource
@@ -1713,5 +1883,64 @@ The InfraZen platform now features a completely reorganized resources page that 
 - **Budget Management**: Clear cost visibility for budget planning and forecasting
 - **Multi-Cloud Strategy**: Unified view supports multi-cloud cost optimization
 
-## 13. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials.
+## 13. Recent Development Achievements (Latest Updates)
+
+### 13.1. Selectel Provider Integration ✅ COMPLETED
+**Major Accomplishments:**
+- **Complete API Integration**: Successfully integrated with Selectel's dual API system (Account/Project APIs + OpenStack APIs)
+- **Dual Authentication System**: Implemented static token (X-Token) + service user credentials for comprehensive access
+- **Cloud Resource Discovery**: Successfully retrieved VMs, volumes, and networks from Selectel's OpenStack infrastructure
+- **IAM Token Generation**: Dynamic IAM token generation with project scoping for secure resource access
+- **Frontend Integration**: Enhanced connection forms with service user credentials and real-time testing
+
+### 13.2. Snapshot-Based Architecture ✅ COMPLETED
+**Key Features Implemented:**
+- **Sync Snapshots**: Complete sync history with `SyncSnapshot` model tracking all synchronization operations
+- **Resource States**: `ResourceState` model linking resources to specific snapshots with change tracking
+- **Change Detection**: Automated comparison between resource states (created, updated, deleted, unchanged)
+- **Historical Preservation**: Complete audit trail for FinOps analysis and trend tracking
+- **Snapshot-Based Display**: Resources shown from latest successful sync snapshots
+
+### 13.3. Technical Achievements
+**Database Enhancements:**
+- **Unified Models**: All providers use consistent `CloudProvider`, `Resource`, `SyncSnapshot`, and `ResourceState` models
+- **JSON Serialization**: Flexible storage of resource state changes and provider-specific configurations
+- **Change Tracking**: Detailed change detection with previous/current state comparison
+- **Audit Trail**: Complete history of all resource modifications and sync operations
+
+**API Integration:**
+- **Selectel APIs**: `/accounts`, `/projects`, `/users`, `/roles`, `/v1/jwt`, `/identity/v3/auth/tokens`
+- **OpenStack APIs**: `/compute/v2.1/servers/detail`, `/volume/v3/volumes/detail`, `/network/v2.0/networks`
+- **Beget APIs**: Dual-endpoint integration with legacy and modern VPS APIs
+- **Authentication**: Multiple authentication methods (static tokens, service user credentials, JWT, IAM tokens)
+
+### 13.4. Business Value Delivered
+**FinOps Capabilities:**
+- **Multi-Cloud Support**: Beget and Selectel fully integrated with unified cost tracking
+- **Cost Visibility**: Complete cost breakdown across all providers with daily cost baselines
+- **Resource Management**: Full resource lifecycle management with change tracking
+- **Historical Analysis**: Complete sync history for trend analysis and optimization
+- **Audit Compliance**: Complete audit trail for compliance and governance
+
+**Operational Benefits:**
+- **Unified Interface**: Single interface for multiple cloud providers
+- **Automated Discovery**: Automatic resource detection and tracking
+- **Real-time Sync**: Live resource synchronization with snapshot-based history
+- **Change Tracking**: Detailed change detection for operational insights
+- **Data Integrity**: No data loss through snapshot-based approach
+
+### 13.5. Current System Capabilities
+**Provider Support:**
+- **Beget**: Complete integration with dual-endpoint API, VPS infrastructure, account information, and performance statistics
+- **Selectel**: Complete integration with dual authentication, cloud resource discovery, and OpenStack API access
+- **Future Providers**: Architecture ready for AWS, Azure, GCP, Yandex Cloud, VK Cloud integration
+
+**Data Management:**
+- **Snapshot-Based Sync**: Complete sync history with change tracking
+- **Resource States**: Detailed resource lifecycle management
+- **Cost Tracking**: Daily cost baselines across all providers
+- **Performance Monitoring**: CPU and memory usage statistics with Chart.js visualization
+- **Historical Data**: Complete audit trail for FinOps analysis
+
+## 14. Referencing this Document
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration, snapshot-based architecture, and multi-cloud resource management.

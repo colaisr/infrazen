@@ -1878,9 +1878,11 @@ const providers = {
     },
     selectel: {
         name: 'Selectel',
-        description: 'Selectel — российский провайдер облачных услуг, специализирующийся на виртуальных серверах, облачных вычислениях и хостинге.',
+        description: 'Selectel — российский провайдер облачных услуг, специализирующийся на виртуальных серверах, облачными вычислениями и хостинге.',
         fields: [
-            { name: 'api_key', label: 'API Key *', type: 'text', placeholder: 'geKYksHLzAeQQLakNjyWnmTLJ_478587', required: true }
+            { name: 'api_key', label: 'API Key *', type: 'text', placeholder: 'geKYksHLzAeQQLakNjyWnmTLJ_478587', required: true },
+            { name: 'service_username', label: 'Service Username *', type: 'text', placeholder: 'InfraZen', required: true },
+            { name: 'service_password', label: 'Service Password *', type: 'password', placeholder: '••••••••', required: true }
         ]
     },
     beget: {

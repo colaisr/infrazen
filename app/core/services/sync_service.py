@@ -966,8 +966,9 @@ class SyncService:
             resource_name=resource.resource_name,
             state_action='created',
             status=resource.status,
-            cost=resource.effective_cost,
-            provider_config=data_json
+            effective_cost=resource.effective_cost,
+            service_name=resource.service_name,
+            region=resource.region
         )
         db.session.add(resource_state)
     

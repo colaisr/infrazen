@@ -371,8 +371,8 @@ def get_real_user_overview(user_id):
     }
 
 def get_real_user_resources(user_id):
-    """Get resources for a real user from database - prioritize resources with performance data"""
-    from app.core.models.sync import SyncSnapshot
+    """Get resources for a real user from database - show resources from latest snapshot for each provider"""
+    from app.core.models.sync import SyncSnapshot, ResourceState
     
     # Get all providers and filter by user_id in Python to avoid floating point precision issues
     all_providers = CloudProvider.query.all()
@@ -382,25 +382,59 @@ def get_real_user_resources(user_id):
     all_resources = []
     
     for provider in providers:
-        # Get all resources for this provider
-        provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+        # Get the latest successful sync snapshot for this provider
+        latest_snapshot = SyncSnapshot.query.filter_by(
+            provider_id=provider.id, 
+            sync_status='success'
+        ).order_by(SyncSnapshot.created_at.desc()).first()
         
-        # Separate resources with and without performance data
-        resources_with_performance = []
-        resources_without_performance = []
-        
-        for resource in provider_resources:
-            tags = resource.get_all_tags()
-            has_performance = 'cpu_avg_usage' in tags or 'memory_avg_usage_mb' in tags
+        if latest_snapshot:
+            # Get resources from the latest snapshot
+            resource_states = ResourceState.query.filter_by(
+                sync_snapshot_id=latest_snapshot.id
+            ).all()
             
-            if has_performance:
-                resources_with_performance.append(resource)
-            else:
-                resources_without_performance.append(resource)
-        
-        # Add performance resources first, then others
-        all_resources.extend(resources_with_performance)
-        all_resources.extend(resources_without_performance)
+            # Get the actual Resource objects
+            resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id]
+            if resource_ids:
+                provider_resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
+                
+                # Separate resources with and without performance data
+                resources_with_performance = []
+                resources_without_performance = []
+                
+                for resource in provider_resources:
+                    tags = resource.get_all_tags()
+                    has_performance = 'cpu_avg_usage' in tags or 'memory_avg_usage_mb' in tags
+                    
+                    if has_performance:
+                        resources_with_performance.append(resource)
+                    else:
+                        resources_without_performance.append(resource)
+                
+                # Add performance resources first, then others
+                all_resources.extend(resources_with_performance)
+                all_resources.extend(resources_without_performance)
+        else:
+            # Fallback: if no snapshots, show all resources (for backward compatibility)
+            provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+            
+            # Separate resources with and without performance data
+            resources_with_performance = []
+            resources_without_performance = []
+            
+            for resource in provider_resources:
+                tags = resource.get_all_tags()
+                has_performance = 'cpu_avg_usage' in tags or 'memory_avg_usage_mb' in tags
+                
+                if has_performance:
+                    resources_with_performance.append(resource)
+                else:
+                    resources_without_performance.append(resource)
+            
+            # Add performance resources first, then others
+            all_resources.extend(resources_with_performance)
+            all_resources.extend(resources_without_performance)
     
     return all_resources
 
