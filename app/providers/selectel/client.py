@@ -4,6 +4,7 @@ Selectel API client implementation
 import requests
 import json
 import logging
+import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 # from app.providers.base.provider_base import BaseProvider
@@ -30,10 +31,16 @@ class SelectelClient:
         self.service_password = service_password
         self.base_url = "https://api.selectel.ru/vpc/resell/v2"
         self.openstack_base_url = "https://ru-3.cloud.api.selcloud.ru"
-        # Selectel regions and their API endpoints
+        # Selectel regions - will be populated dynamically from service catalog
+        # Fallback to known regions if catalog query fails
         self.regions = {
             'ru-3': 'https://ru-3.cloud.api.selcloud.ru',
-            'kz-1': 'https://kz-1.cloud.api.servercore.com'
+            'kz-1': 'https://kz-1.cloud.api.servercore.com',
+            'ru-1': 'https://ru-1.cloud.api.selcloud.ru',
+            'ru-2': 'https://ru-2.cloud.api.selcloud.ru',
+            'ru-7': 'https://ru-7.cloud.api.selcloud.ru',
+            'ru-8': 'https://ru-8.cloud.api.selcloud.ru',
+            'ru-9': 'https://ru-9.cloud.api.selcloud.ru'
         }
         self.session = requests.Session()
         self.session.headers.update({
@@ -42,6 +49,8 @@ class SelectelClient:
             'Content-Type': 'application/json'
         })
         self._jwt_token = None
+        self._service_catalog = None
+        self._discovered_regions = False
     
     def _get_iam_token(self) -> str:
         """
@@ -121,6 +130,15 @@ class SelectelClient:
                 subject_token = response.headers.get('X-Subject-Token')
                 if subject_token:
                     self._jwt_token = subject_token
+                    
+                    # Extract service catalog from response to discover regions
+                    try:
+                        auth_response = response.json()
+                        self._service_catalog = auth_response.get('token', {}).get('catalog', [])
+                        self._discover_regions_from_catalog()
+                    except Exception as catalog_err:
+                        logger.warning(f"Could not extract service catalog: {catalog_err}")
+                    
                     return self._jwt_token
                 else:
                     raise Exception("No X-Subject-Token header in response")
@@ -131,6 +149,72 @@ class SelectelClient:
         except Exception as e:
             # IAM token generation failed
             raise Exception(f"IAM token generation failed: {str(e)}")
+    
+    def _discover_regions_from_catalog(self):
+        """
+        Discover available regions from the OpenStack service catalog
+        
+        The service catalog contains all available services and their endpoints
+        across different regions. We extract compute service endpoints to identify
+        all available regions.
+        """
+        if not self._service_catalog or self._discovered_regions:
+            return
+        
+        try:
+            discovered_regions = {}
+            
+            # Look for compute service (nova) in the catalog
+            for service in self._service_catalog:
+                service_type = service.get('type')
+                
+                # We're interested in compute, volume, and network services
+                if service_type in ['compute', 'volume', 'volumev3']:
+                    endpoints = service.get('endpoints', [])
+                    
+                    for endpoint in endpoints:
+                        region = endpoint.get('region')
+                        url = endpoint.get('url', '')
+                        interface = endpoint.get('interface')
+                        
+                        # Only use public endpoints
+                        if region and interface == 'public' and url:
+                            # Extract base URL (remove path after domain)
+                            match = re.match(r'(https://[^/]+)', url)
+                            if match:
+                                base_url = match.group(1)
+                                discovered_regions[region] = base_url
+                                logger.info(f"Discovered region: {region} -> {base_url}")
+            
+            # Update regions dictionary with discovered regions
+            if discovered_regions:
+                self.regions.update(discovered_regions)
+                self._discovered_regions = True
+                logger.info(f"Total regions available: {len(self.regions)}")
+            else:
+                logger.warning("No regions discovered from service catalog, using fallback list")
+                
+        except Exception as e:
+            logger.warning(f"Error discovering regions from catalog: {e}")
+    
+    def get_available_regions(self) -> List[str]:
+        """
+        Get list of available regions
+        
+        Returns regions discovered from service catalog if available,
+        otherwise returns the fallback hardcoded list.
+        
+        Returns:
+            List of region names
+        """
+        # Ensure we've attempted discovery
+        if not self._discovered_regions:
+            try:
+                self._get_iam_token()  # This will discover regions
+            except:
+                pass  # Use fallback regions
+        
+        return list(self.regions.keys())
     
     def _get_openstack_headers(self) -> Dict[str, str]:
         """
