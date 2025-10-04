@@ -2138,7 +2138,68 @@ The InfraZen platform now features a completely reorganized resources page that 
 | Selectel (normalized) | RUNNING | STOPPED | ERROR |
 | Selectel (raw OpenStack) | ACTIVE | SHUTOFF | ERROR |
 
-### 14.4. Complete Feature Parity Achieved
+### 14.4. Selectel Cost Tracking Implementation
+**Date**: October 4, 2025
+**Objective**: Implement daily cost tracking for Selectel resources, matching Beget's cost display functionality
+
+**Changes Implemented:**
+1. **Client Enhancement** (`app/providers/selectel/client.py`)
+   - Added `get_resource_costs()` method to fetch consumption data
+   - Uses cloud_billing API (`/v1/cloud_billing/statistic/consumption`)
+   - Fetches 24-hour cost data with hourly granularity
+   - Aggregates VM costs (vCPU + RAM) with attached volume costs
+   - Uses `parent_id` to map volumes to parent VMs
+   - Converts kopecks to rubles (÷100)
+   - Calculates averaged hourly, daily (×24), and monthly (×30) costs
+
+2. **Service Enhancement** (`app/providers/selectel/service.py`)
+   - Added `_update_resource_costs()` method to store costs in database
+   - Integrated cost fetching during resource sync
+   - Updates Resource fields:
+     - `daily_cost`: Daily cost in RUB
+     - `effective_cost`: Same as daily cost (for consistency)
+     - `original_cost`: Monthly projection
+     - `cost_period`: MONTHLY
+     - `cost_frequency`: daily
+     - `currency`: RUB
+   - Stores cost breakdown as tags:
+     - `cost_daily_rubles`
+     - `cost_monthly_rubles`
+     - `cost_hourly_rubles`
+     - `cost_calculation_timestamp`
+
+**Results:**
+- ✅ Daily cost tracking for all Selectel VMs
+- ✅ Includes VM compute costs (vCPU, RAM) + attached volume costs
+- ✅ Same data format as Beget for consistency
+- ✅ Real consumption data from billing API
+- ✅ Example: Doreen VM = 10.37 ₽/day (311.14 ₽/month)
+- ✅ Example: Tilly VM = 10.37 ₽/day (311.14 ₽/month)
+
+**API Details:**
+- **Endpoint**: `/v1/cloud_billing/statistic/consumption` (GET)
+- **Authentication**: X-Token (API key)
+- **Parameters**:
+  - `provider_keys`: vpc, mks, dbaas, craas
+  - `start`/`end`: 24-hour time window
+  - `group_type`: project_object_region_metric
+  - `period_group_type`: hour
+  - `locale`: ru
+- **Response Format**:
+  - `data[]`: Array of consumption records
+  - Each record contains:
+    - `object.id`: Resource ID
+    - `object.parent_id`: For volumes attached to VMs
+    - `metric.id`: Metric type (compute_cores_preemptible, compute_ram_preemptible, volume_gigabytes_universal)
+    - `value`: Cost in kopecks per hour
+    - `period`: Hour timestamp
+- **Cost Calculation**:
+  - Aggregates all metrics for each VM
+  - Includes attached volume costs via parent_id
+  - Averages across all hours in period
+  - Projects to daily and monthly costs
+
+### 14.5. Complete Feature Parity Achieved
 **Beget vs Selectel Comparison:**
 
 | Feature | Beget | Selectel | Status |
@@ -2152,9 +2213,12 @@ The InfraZen platform now features a completely reorganized resources page that 
 | **Performance Tiers** | ✅ LOW/MED/HIGH | ✅ LOW/MED/HIGH | ✅ Parity |
 | **Data Format** | ✅ Compatible | ✅ Compatible | ✅ Parity |
 | **Combined Resources** | ✅ Single VPS view | ✅ Single VM view | ✅ Parity |
+| **Cost Tracking** | ✅ Daily ₽/day | ✅ Daily ₽/day | ✅ Parity |
+| **Cost Breakdown** | ✅ Tags | ✅ Tags | ✅ Parity |
+| **Currency** | ✅ RUB | ✅ RUB | ✅ Parity |
 
 **Summary:**
-Both Beget and Selectel providers now have complete feature parity with unified data formats, consistent status conventions, comprehensive resource specifications, and real-time CPU/memory statistics displayed via Chart.js graphs.
+Both Beget and Selectel providers now have complete feature parity with unified data formats, consistent status conventions, comprehensive resource specifications, real-time CPU/memory statistics displayed via Chart.js graphs, and accurate daily cost tracking for FinOps analysis.
 
 ## 15. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration (with October 2025 resource combination enhancements, CPU/memory statistics implementation, and status normalization), snapshot-based architecture, multi-cloud resource management, and complete feature parity between Beget and Selectel providers.
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in Selectel integration (October 2025 enhancements: resource combination, CPU/memory statistics, status normalization, and cost tracking), snapshot-based architecture, multi-cloud resource management, and complete feature parity between Beget and Selectel providers with full FinOps capabilities.
