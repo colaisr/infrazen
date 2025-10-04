@@ -1945,7 +1945,7 @@ function showProviderModal(selectedProvider = null) {
     }
 }
 
-function showProviderModalForEdit(connectionData) {
+function showProviderModalForEdit(connectionData, providerType) {
     document.getElementById('providerModal').style.display = 'block';
     
     // Set modal to edit mode
@@ -1953,13 +1953,20 @@ function showProviderModalForEdit(connectionData) {
     
     // Pre-select provider and fill fields
     const providerSelect = document.getElementById('provider_select');
-    providerSelect.value = connectionData.provider;
+    providerSelect.value = providerType || connectionData.provider;
     changeProvider(); // Trigger the change to show provider-specific fields
     
-    // Fill in the existing data
-    setTimeout(() => {
-        fillEditForm(connectionData);
-    }, 100);
+    // Fill in the existing data after fields are generated
+    // Use a more robust approach to wait for fields
+    const waitForFields = () => {
+        const apiKeyField = document.querySelector('input[name="api_key"]');
+        if (apiKeyField) {
+            fillEditForm(connectionData);
+        } else {
+            setTimeout(waitForFields, 50);
+        }
+    };
+    waitForFields();
 }
 
 function resetModalToAddMode() {
@@ -2033,6 +2040,7 @@ function fillEditForm(connectionData) {
     
     // Fill provider-specific fields
     const provider = connectionData.provider;
+    
     if (provider === 'beget') {
         const usernameField = document.querySelector('input[name="username"]');
         
@@ -2043,6 +2051,23 @@ function fillEditForm(connectionData) {
         if (passwordField) {
             passwordField.value = connectionData.password || '';
             passwordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
+        }
+    } else if (provider === 'selectel') {
+        // Fill Selectel-specific fields
+        const apiKeyField = document.querySelector('input[name="api_key"]');
+        if (apiKeyField) {
+            apiKeyField.value = connectionData.api_key || '';
+        }
+        
+        const serviceUsernameField = document.querySelector('input[name="service_username"]');
+        if (serviceUsernameField) {
+            serviceUsernameField.value = connectionData.service_username || '';
+        }
+        
+        const servicePasswordField = document.querySelector('input[name="service_password"]');
+        if (servicePasswordField) {
+            servicePasswordField.value = connectionData.service_password || '';
+            servicePasswordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
         }
     }
     
@@ -2078,7 +2103,7 @@ function changeProvider() {
         // Set hidden field
         selectedProviderInput.value = selectedProvider;
         
-        // Set form action based on provider
+        // Set form action based on provider (will be overridden in edit mode)
         if (selectedProvider === 'selectel') {
             form.action = '/api/providers/selectel/add';
         } else if (selectedProvider === 'beget') {
@@ -2113,6 +2138,50 @@ function changeProvider() {
         connectBtn.style.display = 'none';
     }
 }
+
+// Handle form submission for both add and edit modes
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('providerForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+            
+            const editIdField = document.getElementById('edit_connection_id');
+            const selectedProvider = document.getElementById('selected_provider').value;
+            
+            if (editIdField && editIdField.value) {
+                // Edit mode - submit to update endpoint
+                const providerId = editIdField.value;
+                const updateUrl = `/api/providers/${selectedProvider}/${providerId}/update`;
+                
+                // Create FormData and submit
+                const formData = new FormData(form);
+                
+                fetch(updateUrl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showFlashMessage('✅ Подключение обновлено успешно!', 'success');
+                        closeProviderModal();
+                        location.reload(); // Reload to show updated data
+                    } else {
+                        showFlashMessage('❌ Ошибка обновления: ' + (data.message || data.error), 'error');
+                    }
+                })
+                .catch(error => {
+                    showFlashMessage('❌ Ошибка обновления подключения', 'error');
+                    console.error('Update error:', error);
+                });
+            } else {
+                // Add mode - submit to add endpoint
+                form.submit(); // Use default form submission for add mode
+            }
+        });
+    }
+});
 
 function createFieldHtml(field) {
     const required = field.required ? 'required' : '';
@@ -2245,8 +2314,10 @@ window.onclick = function(event) {
 
 // Connection management functions
 function editConnection(connectionId) {
-    // Extract numeric ID from string like "beget-2" -> "2"
-    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    // Extract numeric ID and provider type from string like "beget-2" -> ["beget", "2"]
+    const parts = connectionId.includes('-') ? connectionId.split('-') : [connectionId];
+    const providerType = parts[0];
+    const numericId = parts[1] || parts[0];
     
     // Show loading state
     const button = event.target.closest('button');
@@ -2254,13 +2325,14 @@ function editConnection(connectionId) {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Загрузка...</span>';
     button.disabled = true;
     
-    // Fetch connection details
-    fetch(`/api/providers/beget/${numericId}/edit`)
+    // Fetch connection details based on provider type
+    const editUrl = `/api/providers/${providerType}/${numericId}/edit`;
+    fetch(editUrl)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 // Open modal in edit mode
-                showProviderModalForEdit(data.data);
+                showProviderModalForEdit(data.data, providerType);
             } else {
                 showFlashMessage('❌ Ошибка загрузки данных: ' + data.error, 'error');
             }

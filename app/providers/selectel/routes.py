@@ -170,6 +170,143 @@ def sync_resources(provider_id):
         }), 500
 
 
+@selectel_bp.route('/<int:provider_id>/edit', methods=['GET'])
+def edit_connection(provider_id):
+    """Get Selectel provider details for editing."""
+    try:
+        # Check if user is authenticated
+        if 'user' not in session:
+            return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        user_id = session['user']['id']
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id,
+            user_id=user_id,
+            provider_type='selectel'
+        ).first()
+        
+        if not provider:
+            return jsonify({'success': False, 'message': 'Provider not found'}), 404
+        
+        # Parse credentials
+        credentials = json.loads(provider.credentials)
+        
+        # Return provider data for editing
+        provider_data = {
+            'id': provider.id,
+            'provider': 'selectel',  # Add provider type for frontend
+            'connection_name': provider.connection_name,
+            'account_id': provider.account_id,
+            'api_key': credentials.get('api_key', ''),
+            'service_username': credentials.get('service_username', ''),
+            'service_password': credentials.get('service_password', ''),
+            'auto_sync': provider.auto_sync,
+            'sync_interval': provider.sync_interval,
+            'is_active': provider.is_active
+        }
+        
+        return jsonify({
+            'success': True,
+            'data': provider_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting Selectel connection {provider_id} for editing: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error loading connection data: {str(e)}'
+        }), 500
+
+
+@selectel_bp.route('/<int:provider_id>/update', methods=['POST'])
+def update_connection(provider_id):
+    """Update a Selectel cloud provider connection."""
+    try:
+        # Check if user is authenticated
+        if 'user' not in session:
+            return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        user_id = session['user']['id']
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id,
+            user_id=user_id,
+            provider_type='selectel'
+        ).first()
+        
+        if not provider:
+            return jsonify({'success': False, 'message': 'Provider not found'}), 404
+        
+        # Get form data
+        connection_name = request.form.get('connection_name')
+        api_key = request.form.get('api_key')
+        service_username = request.form.get('service_username')
+        service_password = request.form.get('service_password')
+        auto_sync = request.form.get('auto_sync') == 'on'
+        sync_interval = request.form.get('sync_interval', 'daily')
+        
+        # Validate required fields
+        if not connection_name or not api_key or not service_username or not service_password:
+            return jsonify({
+                'success': False,
+                'message': 'Connection name, API key, service username, and service password are required'
+            }), 400
+        
+        # Convert sync interval to seconds
+        sync_interval_map = {
+            'hourly': 3600,
+            'daily': 86400,
+            'weekly': 604800,
+            'monthly': 2592000
+        }
+        sync_interval_seconds = sync_interval_map.get(sync_interval, 86400)
+        
+        # Test the connection with new credentials
+        test_client = SelectelClient(
+            api_key=api_key,
+            service_username=service_username,
+            service_password=service_password
+        )
+        test_result = test_client.test_connection()
+        
+        if not test_result.get('success'):
+            return jsonify({
+                'success': False,
+                'message': f'Connection test failed: {test_result.get("error", "Unknown error")}'
+            }), 400
+        
+        # Get account info for metadata
+        account_info = test_client.get_account_info()
+        account_id = account_info.get('account', {}).get('name', '') if account_info else ''
+        
+        # Update provider record
+        provider.connection_name = connection_name
+        provider.account_id = account_id
+        provider.credentials = json.dumps({
+            'api_key': api_key,
+            'service_username': service_username,
+            'service_password': service_password
+        })
+        provider.provider_metadata = json.dumps(test_result.get('account_info', {}))
+        provider.auto_sync = auto_sync
+        provider.sync_interval = sync_interval_seconds
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Connection updated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating Selectel connection {provider_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error updating connection: {str(e)}'
+        }), 500
+
+
 @selectel_bp.route('/<int:provider_id>/delete', methods=['DELETE'])
 def delete_connection(provider_id):
     """Delete a Selectel cloud provider connection."""
