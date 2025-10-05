@@ -323,6 +323,46 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack volumes from {region or 'default region'}: {str(e)}")
     
+    def get_openstack_shares(self, project_id: str = None, region: str = None) -> List[Dict[str, Any]]:
+        """
+        Get OpenStack Manila shares (file storage) from a specific region
+        
+        Args:
+            project_id: Optional project ID to scope the request
+            region: Optional region to query (if None, uses default openstack_base_url)
+            
+        Returns:
+            List of share dictionaries
+        """
+        try:
+            headers = self._get_openstack_headers()
+            headers['Openstack-Api-Version'] = 'share 2.45'
+            
+            # Determine which base URL to use
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            
+            # Include project ID in URL if provided
+            if project_id:
+                shares_url = f'{base_url}/share/v2/{project_id}/shares/detail'
+            else:
+                shares_url = f'{base_url}/share/v2/shares/detail'
+            
+            response = requests.get(shares_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            shares = data.get('shares', [])
+            
+            # Add region info to each share if not already present
+            for share in shares:
+                if 'region' not in share and region:
+                    share['region'] = region
+            
+            return shares
+            
+        except Exception as e:
+            raise Exception(f"Failed to get OpenStack shares from {region or 'default region'}: {str(e)}")
+    
     def get_openstack_networks(self) -> List[Dict[str, Any]]:
         """
         Get OpenStack networks
@@ -614,58 +654,57 @@ class SelectelClient:
             
             # Process consumption data
             resource_costs = {}
+            periods_per_object: Dict[str, set] = {}
             
             for item in data.get('data', []):
                 obj = item.get('object', {})
                 obj_id = obj.get('id')
                 obj_name = obj.get('name', 'Unknown')
                 obj_type = obj.get('type')
-                parent_id = obj.get('parent_id', '')
-                
                 metric_id = item.get('metric', {}).get('id', '')
                 cost_kopecks = item.get('value', 0)  # Cost in kopecks per hour
                 
-                # For VMs, aggregate their own costs
+                # Normalize object type to our resource taxonomy
                 if obj_type == 'cloud_vm':
-                    if obj_id not in resource_costs:
-                        resource_costs[obj_id] = {
-                            'name': obj_name,
-                            'type': obj_type,
-                            'metrics': {},
-                            'total_kopecks': 0
-                        }
-                    
-                    resource_costs[obj_id]['metrics'][metric_id] = resource_costs[obj_id]['metrics'].get(metric_id, 0) + cost_kopecks
-                    resource_costs[obj_id]['total_kopecks'] += cost_kopecks
+                    normalized_type = 'server'
+                elif obj_type and obj_type.startswith('volume_'):
+                    normalized_type = 'volume'
+                elif obj_type and obj_type.startswith('share_'):
+                    normalized_type = 'file_storage'
+                else:
+                    normalized_type = obj_type or 'unknown'
                 
-                # For volumes with parent_id, add their cost to the parent VM
-                elif parent_id:
-                    if parent_id not in resource_costs:
-                        # Initialize parent if not exists (shouldn't happen, but safe)
-                        resource_costs[parent_id] = {
-                            'name': obj.get('parent_name', 'Unknown'),
-                            'type': 'cloud_vm',
-                            'metrics': {},
-                            'total_kopecks': 0
-                        }
-                    
-                    resource_costs[parent_id]['metrics'][metric_id] = resource_costs[parent_id]['metrics'].get(metric_id, 0) + cost_kopecks
-                    resource_costs[parent_id]['total_kopecks'] += cost_kopecks
+                if not obj_id:
+                    continue
+                
+                if obj_id not in resource_costs:
+                    resource_costs[obj_id] = {
+                        'name': obj_name,
+                        'type': normalized_type,
+                        'metrics': {},
+                        'total_kopecks': 0
+                    }
+                    periods_per_object[obj_id] = set()
+                
+                resource_costs[obj_id]['metrics'][metric_id] = resource_costs[obj_id]['metrics'].get(metric_id, 0) + cost_kopecks
+                resource_costs[obj_id]['total_kopecks'] += cost_kopecks
+                # Track number of hourly periods for this specific object
+                period = item.get('period')
+                if period is not None:
+                    periods_per_object[obj_id].add(period)
             
-            # Calculate averaged costs per resource
-            num_hours = len(set(item.get('period') for item in data.get('data', [])))
-            if num_hours == 0:
-                num_hours = hours  # Fallback
-            
+            # Calculate costs per resource
             for resource_id, cost_data in resource_costs.items():
-                # Average hourly cost
-                avg_hourly_kopecks = cost_data['total_kopecks'] / num_hours if num_hours > 0 else cost_data['total_kopecks']
+                obj_hours = len(periods_per_object.get(resource_id, set()))
+                if obj_hours == 0:
+                    obj_hours = hours  # Fallback to requested range
+                # Hourly average for reference
+                avg_hourly_kopecks = cost_data['total_kopecks'] / obj_hours if obj_hours > 0 else cost_data['total_kopecks']
                 avg_hourly_rubles = avg_hourly_kopecks / 100
-                
-                # Projected costs
-                daily_rubles = avg_hourly_rubles * 24
+                # Daily is sum of the hourly periods we fetched (avoids inflating when fewer than 24 periods present)
+                daily_rubles = cost_data['total_kopecks'] / 100
                 monthly_rubles = daily_rubles * 30
-                
+
                 cost_data['hourly_cost_kopecks'] = round(avg_hourly_kopecks, 2)
                 cost_data['hourly_cost_rubles'] = round(avg_hourly_rubles, 4)
                 cost_data['daily_cost_rubles'] = round(daily_rubles, 2)
@@ -876,50 +915,6 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get combined VM resources: {str(e)}")
     
-    def calculate_volume_cost(self, volume: Dict[str, Any]) -> Dict[str, float]:
-        """
-        Calculate cost for a volume based on its size and type
-        
-        Selectel pricing (as of 2025):
-        - HDD (Network Basic): 7.28 ₽/GB/month
-        - SSD (Network Basic): 8.99 ₽/GB/month
-        - SSD (Network Universal): 18.55 ₽/GB/month
-        - SSD NVMe (Network Fast): 39.18 ₽/GB/month
-        
-        Args:
-            volume: Volume data dictionary
-            
-        Returns:
-            Dict with hourly, daily, and monthly costs in rubles
-        """
-        size_gb = volume.get('size', 0)
-        volume_type = volume.get('volume_type', '').lower()
-        
-        # Determine price per GB per month based on volume type
-        if 'fast' in volume_type or 'nvme' in volume_type:
-            price_per_gb_month = 39.18
-        elif 'universal' in volume_type:
-            price_per_gb_month = 18.55
-        elif 'basic' in volume_type or 'ssd' in volume_type:
-            # Check if it's HDD or SSD basic
-            if 'hdd' in volume_type:
-                price_per_gb_month = 7.28
-            else:
-                # Default basic is HDD basic
-                price_per_gb_month = 7.28
-        else:
-            # Default to HDD basic pricing
-            price_per_gb_month = 7.28
-        
-        monthly_cost = size_gb * price_per_gb_month
-        daily_cost = monthly_cost / 30
-        hourly_cost = monthly_cost / 720  # 30 days * 24 hours
-        
-        return {
-            'hourly_cost_rubles': round(hourly_cost, 4),
-            'daily_cost_rubles': round(daily_cost, 2),
-            'monthly_cost_rubles': round(monthly_cost, 2)
-        }
     
     def get_all_cloud_resources(self, project_id: str = None) -> Dict[str, Any]:
         """
@@ -1204,8 +1199,9 @@ class SelectelClient:
                 
                 resources['servers'] = self.get_combined_vm_resources()
                 
-                # Get standalone volumes from ALL regions (those not attached to any server)
+                # Get standalone volumes and shares from ALL regions
                 all_volumes = []
+                all_shares = []
                 for project in resources.get('projects', []):
                     if isinstance(project, dict):
                         project_id = project.get('id')
@@ -1213,7 +1209,7 @@ class SelectelClient:
                         project_id = project  # In case project is already a string ID
                     
                     if project_id:
-                        # Query each region for volumes
+                        # Query each region for volumes and shares separately
                         # Create a copy of regions to avoid "dictionary changed size during iteration" error
                         regions_to_query = list(self.regions.keys())
                         for region_name in regions_to_query:
@@ -1224,6 +1220,15 @@ class SelectelClient:
                                 logger.info(f"Found {len(project_volumes)} volumes in {region_name}")
                             except Exception as vol_err:
                                 logger.warning(f"Failed to get volumes for project {project_id} in region {region_name}: {vol_err}")
+                            
+                            # Fetch shares (file storage) separately
+                            try:
+                                logger.info(f"Fetching shares for project {project_id} in region {region_name}")
+                                project_shares = self.get_openstack_shares(project_id, region=region_name)
+                                all_shares.extend(project_shares)  # Keep shares separate from volumes
+                                logger.info(f"Found {len(project_shares)} shares in {region_name}")
+                            except Exception as share_err:
+                                logger.warning(f"Failed to get shares for project {project_id} in region {region_name}: {share_err}")
                 
                 # Filter to only standalone volumes (not attached to any server)
                 standalone_volumes = [
@@ -1231,7 +1236,9 @@ class SelectelClient:
                     if not vol.get('attachments') or len(vol.get('attachments', [])) == 0
                 ]
                 logger.info(f"Found {len(standalone_volumes)} standalone volumes out of {len(all_volumes)} total")
+                logger.info(f"Found {len(all_shares)} file storage shares")
                 resources['volumes'] = standalone_volumes
+                resources['shares'] = all_shares
                 
                 # Networks are integrated into servers
                 resources['networks'] = []

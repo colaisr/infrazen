@@ -228,14 +228,32 @@ class SelectelService:
                         synced_resources.append(volume_resource)
                         volumes_list.append(volume_data)
             
-            # Update costs for standalone volumes
-            if volumes_list:
-                try:
-                    logger.info(f"Calculating costs for {len(volumes_list)} standalone volumes")
-                    self._update_volume_costs(volumes_list)
-                    logger.info(f"Successfully updated costs for {len(volumes_list)} volumes")
-                except Exception as e:
-                    logger.error(f"Failed to update volume costs: {e}", exc_info=True)
+            # Process file storage shares
+            shares_list = []
+            if 'shares' in api_resources:
+                for share_data in api_resources['shares']:
+                    share_resource = self._create_resource(
+                        resource_type='file_storage',
+                        resource_id=share_data.get('id'),
+                        name=share_data.get('name', f"File Storage {share_data.get('id', 'Unknown')}"),
+                        metadata={
+                            **share_data,
+                            'size_gb': share_data.get('size'),
+                            'share_type': share_data.get('share_type'),
+                            'share_proto': share_data.get('share_proto'),
+                            'availability_zone': share_data.get('availability_zone'),
+                            'created_at': share_data.get('created_at'),
+                            'export_locations': share_data.get('export_locations', [])
+                        },
+                        sync_snapshot_id=sync_snapshot.id,
+                        region=share_data.get('availability_zone', 'unknown'),
+                        service_name='File Storage'
+                    )
+                    if share_resource:
+                        synced_resources.append(share_resource)
+                        shares_list.append(share_data)
+            
+            # Note: Volume costs are now only set from billing API, no hardcoded calculations
             
             # Note: Networks are integrated into server resources
             
@@ -306,12 +324,20 @@ class SelectelService:
         from app.core.models.sync import ResourceState
         
         try:
-            # Check if resource already exists
-            existing_resource = Resource.query.filter_by(
+            # Find any existing records for this provider/resource_id (regardless of type)
+            existing_records = Resource.query.filter_by(
                 provider_id=self.provider.id,
-                resource_type=resource_type,
                 resource_id=resource_id
-            ).first()
+            ).all()
+
+            # Choose primary existing resource (prefer matching type)
+            existing_resource = None
+            for r in existing_records:
+                if r.resource_type == resource_type:
+                    existing_resource = r
+                    break
+            if not existing_resource and existing_records:
+                existing_resource = existing_records[0]
             
             # Create unified resource data
             # Extract status from metadata (OpenStack uses ACTIVE/SHUTOFF, convert to uppercase)
@@ -338,6 +364,17 @@ class SelectelService:
             }
             
             if existing_resource:
+                # If there's a type mismatch (e.g., previously saved as 'volume' but now 'file_storage'),
+                # reclassify the existing record and remove duplicates.
+                if existing_resource.resource_type != resource_type:
+                    existing_resource.resource_type = resource_type
+                    if service_name:
+                        existing_resource.service_name = service_name
+                    # Remove any other duplicates with same resource_id but different id
+                    for dup in existing_records:
+                        if dup.id != existing_resource.id:
+                            db.session.delete(dup)
+                    db.session.flush()
                 # Update existing resource
                 previous_state = existing_resource.to_dict()
                 
@@ -540,105 +577,65 @@ class SelectelService:
     
     def _update_resource_costs(self, resource_costs: Dict[str, Any]):
         """
-        Update resource costs in the database (similar to Beget implementation)
-        
+        Update costs for resources based on billing API data.
+        Only updates resources that exist in our current sync.
+        Resources not in billing API get costs set to 0.
+
         Args:
             resource_costs: Dict mapping resource_id to cost information from get_resource_costs()
         """
         from app.core.models.resource import Resource
         from app.core.database import db
-        
-        for resource_id, cost_data in resource_costs.items():
+
+        # Get all current resources for this provider
+        all_resources = Resource.query.filter_by(provider_id=self.provider.id).all()
+        billing_resource_ids = set(resource_costs.keys())
+
+        for resource in all_resources:
             try:
-                # Find the resource
-                resource = Resource.query.filter_by(
-                    provider_id=self.provider.id,
-                    resource_id=resource_id,
-                    resource_type='server'
-                ).first()
-                
-                if not resource:
-                    logger.warning(f"Resource not found for ID {resource_id}")
-                    continue
-                
-                # Update cost fields (similar to Beget)
-                daily_cost = cost_data.get('daily_cost_rubles', 0)
-                
-                resource.daily_cost = daily_cost
-                resource.effective_cost = daily_cost  # Daily cost as effective cost
-                resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
-                resource.cost_period = 'MONTHLY'
-                resource.cost_frequency = 'daily'  # We calculate and store daily
-                resource.currency = 'RUB'
-                resource.billing_period = 'monthly'
-                
-                # Also store cost breakdown as tags for detailed view
-                resource.add_tag('cost_daily_rubles', str(daily_cost))
-                resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
-                resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
-                resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
-                
-                logger.debug(f"Updated costs for {cost_data.get('name')}: {daily_cost} ₽/day")
-                
+                if resource.resource_id in billing_resource_ids:
+                    # Resource is in billing API - update with actual costs
+                    cost_data = resource_costs[resource.resource_id]
+                    daily_cost = cost_data.get('daily_cost_rubles', 0)
+
+                    resource.daily_cost = daily_cost
+                    resource.effective_cost = daily_cost
+                    resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
+                    resource.cost_period = 'MONTHLY'
+                    resource.cost_frequency = 'daily'
+                    resource.currency = 'RUB'
+                    resource.billing_period = 'monthly'
+
+                    # Store cost breakdown as tags
+                    resource.add_tag('cost_daily_rubles', str(daily_cost))
+                    resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
+                    resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
+                    resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
+
+                    logger.debug(f"Updated costs for {cost_data.get('name')}: {daily_cost} ₽/day")
+                else:
+                    # Resource is NOT in billing API - set costs to 0
+                    resource.daily_cost = 0.0
+                    resource.effective_cost = 0.0
+                    resource.original_cost = 0.0
+                    resource.cost_period = 'MONTHLY'
+                    resource.cost_frequency = 'daily'
+                    resource.currency = 'RUB'
+                    resource.billing_period = 'monthly'
+
+                    # Store zero costs as tags
+                    resource.add_tag('cost_daily_rubles', '0.0')
+                    resource.add_tag('cost_monthly_rubles', '0.0')
+                    resource.add_tag('cost_hourly_rubles', '0.0')
+                    resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
+                    resource.add_tag('cost_source', 'billing_api_not_found')
+
+                    logger.debug(f"Set costs to 0 for {resource.resource_name} (not in billing API)")
+
             except Exception as e:
-                logger.error(f"Error updating costs for resource {resource_id}: {e}")
+                logger.error(f"Error updating costs for resource {resource.resource_id}: {e}")
                 continue
-        
-        db.session.commit()
-    
-    def _update_volume_costs(self, volumes: List[Dict[str, Any]]):
-        """
-        Update costs for standalone volumes
-        
-        Args:
-            volumes: List of volume data dictionaries
-        """
-        from app.core.models.resource import Resource
-        from app.core.database import db
-        
-        for volume_data in volumes:
-            try:
-                volume_id = volume_data.get('id')
-                
-                # Find the volume resource
-                volume_resource = Resource.query.filter_by(
-                    provider_id=self.provider.id,
-                    resource_id=volume_id,
-                    resource_type='volume'
-                ).first()
-                
-                if not volume_resource:
-                    logger.warning(f"Volume resource not found for ID {volume_id}")
-                    continue
-                
-                # Calculate volume cost
-                cost_data = self.client.calculate_volume_cost(volume_data)
-                
-                # Update cost fields
-                daily_cost = cost_data.get('daily_cost_rubles', 0)
-                
-                volume_resource.daily_cost = daily_cost
-                volume_resource.effective_cost = daily_cost
-                volume_resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
-                volume_resource.cost_period = 'MONTHLY'
-                volume_resource.cost_frequency = 'daily'
-                volume_resource.currency = 'RUB'
-                volume_resource.billing_period = 'monthly'
-                
-                # Store cost breakdown as tags
-                volume_resource.add_tag('cost_daily_rubles', str(daily_cost))
-                volume_resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
-                volume_resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
-                volume_resource.add_tag('size_gb', str(volume_data.get('size', 0)))
-                volume_resource.add_tag('volume_type', volume_data.get('volume_type', 'unknown'))
-                volume_resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
-                
-                logger.debug(f"Updated costs for volume {volume_data.get('name')}: {daily_cost} ₽/day")
-                
-            except Exception as e:
-                logger.error(f"Error updating costs for volume {volume_id}: {e}")
-                continue
-        
+
         db.session.commit()
     
     def get_account_info(self) -> Dict[str, Any]:
