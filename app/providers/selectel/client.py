@@ -681,6 +681,7 @@ class SelectelClient:
                     resource_costs[obj_id] = {
                         'name': obj_name,
                         'type': normalized_type,
+                        'service_type': normalized_type,  # Add service_type for sync logic
                         'metrics': {},
                         'total_kopecks': 0
                     }

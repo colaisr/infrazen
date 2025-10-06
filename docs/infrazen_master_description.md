@@ -57,23 +57,60 @@ The InfraZen platform implements a comprehensive multi-cloud synchronization sys
 - **Change Detection**: Automated comparison between current and previous resource states
 - **State Management**: Tracks resource lifecycle (created, updated, deleted, unchanged)
 
-### 6.1.3. Sync Process Flow
+### 6.1.3. Billing-First Sync Process Flow
 
-#### **Manual Sync Trigger**
-1. User clicks "Синхронизировать" button on connection card
-2. `SyncService` creates new `SyncSnapshot` with "running" status
-3. Provider-specific client authenticates and fetches all resources
-4. Service compares current resources with existing database records
-5. Creates/updates/deletes `Resource` entries as needed
-6. Records `ResourceState` entries for change tracking
-7. Updates `SyncSnapshot` with completion status and statistics
-8. Updates provider's `last_sync` timestamp
+#### **Universal Billing-First Sync Algorithm**
+The platform implements a revolutionary **billing-first synchronization approach** that prioritizes cost visibility and FinOps principles. This method ensures all resources with actual costs are captured, including zombie resources (deleted but still billed) and orphan volumes.
 
-#### **Resource Processing Logic**
-- **New Resources**: Create `Resource` entry with provider-specific configuration stored as JSON
-- **Existing Resources**: Compare fields and update if changes detected
-- **Deleted Resources**: Mark as inactive with "deleted" status
-- **Change Detection**: Track cost changes, status changes, and configuration changes
+#### **8-Phase Sync Process**
+1. **PHASE 1: Billing Data Collection**
+   - Fetch current resource costs from cloud billing API (last 1 hour for current snapshot)
+   - Normalize resource types to universal taxonomy (server, volume, file_storage, etc.)
+   - Group resources by service type for specialized processing
+
+2. **PHASE 2: Resource Type Grouping**
+   - Categorize billed resources into normalized service types
+   - Map provider-specific types to universal taxonomy
+   - Prepare resources for type-specific processing logic
+
+3. **PHASE 3: VM Resource Processing**
+   - Process server resources with OpenStack enrichment
+   - Detect zombie VMs (billed but deleted from OpenStack)
+   - Extract CPU/RAM from flavor data for UI display
+   - Calculate total storage from attached volumes
+
+4. **PHASE 4: Volume Resource Processing**
+   - **Unified Volume Handling**: Attach volumes to VMs (Beget-style display)
+   - **Naming Convention Matching**: Match `disk-for-{VM-name}` volumes to VMs
+   - **Orphan Detection**: Identify standalone volumes for FinOps visibility
+   - **Zombie Volume Detection**: Handle deleted but still billed volumes
+
+5. **PHASE 5: File Storage Processing**
+   - Process file storage resources (Manila shares)
+   - Detect active vs zombie file storage
+   - Enrich with OpenStack details where available
+
+6. **PHASE 6: Generic Service Processing**
+   - Handle all other service types (databases, Kubernetes, etc.)
+   - Ensure no billed resource is missed
+   - Apply appropriate status classification
+
+7. **PHASE 7: Resource Unification**
+   - Merge volumes into VM metadata (no separate DB resources)
+   - Deactivate old standalone volume records
+   - Calculate unified costs (VM + volumes)
+
+8. **PHASE 8: Snapshot Completion**
+   - Record sync metadata and statistics
+   - Update provider sync status
+   - Generate FinOps insights and recommendations
+
+#### **Key Billing-First Principles**
+- **Cost Visibility First**: All resources with costs are captured, regardless of OpenStack status
+- **Zombie Resource Detection**: Deleted resources still appearing in billing are properly classified
+- **Volume Unification**: Volumes attached to VMs are shown within VM cards (Beget-style)
+- **Orphan Resource Identification**: Standalone resources are flagged for FinOps analysis
+- **Real-Time Snapshot**: Uses current moment data (1 hour) for accurate status reporting
 
 ### 6.1.4. Data Normalization & Storage
 
@@ -87,7 +124,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 #### **Provider-Specific Data Handling**
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex.Cloud**: Compute instances, storage, databases, load balancers, networks
-- **Selectel**: Multi-region OpenStack integration - Virtual servers, standalone volumes (with cost tracking), block storage across all regions (ru-1 through ru-9, kz-1), network ports, dynamic region discovery from service catalog
+- **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.1.5. Sync Mechanics & Features
@@ -138,12 +175,50 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - API rate limiting and throttling
 - Background job processing for long-running syncs
 
-### 6.1.8. Current Implementation Status
+### 6.1.8. Selectel Billing-First Integration
+
+#### **Revolutionary Billing-First Architecture**
+The Selectel integration implements a groundbreaking **billing-first synchronization approach** that prioritizes cost visibility and FinOps principles over traditional infrastructure-first methods.
+
+#### **Core Innovation: Universal Billing-First Sync Algorithm**
+- **Primary Data Source**: Cloud billing API as the single source of truth for resource costs
+- **OpenStack Enrichment**: Infrastructure details fetched only for cost context and UI display
+- **Zombie Resource Detection**: Deleted resources still appearing in billing are properly classified
+- **Volume Unification**: Volumes attached to VMs are displayed within VM cards (Beget-style interface)
+- **Real-Time Snapshots**: Uses current moment data (1 hour) for accurate status reporting
+
+#### **8-Phase Universal Sync Process**
+1. **Billing Data Collection**: Fetch current resource costs from Selectel billing API
+2. **Resource Type Grouping**: Normalize Selectel types to universal taxonomy
+3. **VM Resource Processing**: Enrich with OpenStack details, detect zombie VMs
+4. **Volume Resource Processing**: Unify volumes with VMs, detect orphan volumes
+5. **File Storage Processing**: Handle Manila shares and file storage resources
+6. **Generic Service Processing**: Process databases, Kubernetes, and other services
+7. **Resource Unification**: Merge volumes into VM metadata, deactivate old records
+8. **Snapshot Completion**: Record metadata, update status, generate insights
+
+#### **Key Technical Features**
+- **Multi-Region Support**: Dynamic region discovery across ru-1 through ru-9, kz-1
+- **Service Type Normalization**: Maps Selectel billing types to universal taxonomy
+- **Volume Naming Convention**: Matches `disk-for-{VM-name}` volumes to VMs automatically
+- **Zombie Detection**: Identifies deleted resources still appearing in billing
+- **Cost Tracking**: Comprehensive daily/monthly cost tracking with currency normalization
+- **UI Integration**: Beget-style resource cards with CPU/RAM/Disk specifications
+
+#### **FinOps Benefits**
+- **Complete Cost Visibility**: All resources with costs are captured, including deleted ones
+- **Orphan Resource Detection**: Standalone volumes and unused resources are identified
+- **Unified Resource View**: VMs and their volumes are displayed as single logical resources
+- **Historical Analysis**: Snapshot-based approach enables trend analysis and forecasting
+- **Audit Trail**: Complete change tracking and resource lifecycle management
+
+### 6.1.9. Current Implementation Status
 
 #### **Implemented Components**
 - **Sync Models**: `SyncSnapshot` and `ResourceState` models fully implemented with JSON serialization support
 - **Sync Service**: Core `SyncService` class with comprehensive resource processing logic and dual-endpoint support
 - **Beget Integration**: Complete dual-endpoint Beget API client with legacy and modern VPS API integration
+- **Selectel Billing-First Integration**: Revolutionary billing-first sync with OpenStack enrichment
 - **VPS Infrastructure**: Modern VPS API with server specifications, admin credentials, and cost tracking
 - **Account Information**: Legacy API integration with account details, service limits, and billing information
 - **Change Detection**: Automated comparison between current and previous resource states

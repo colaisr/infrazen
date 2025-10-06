@@ -62,7 +62,14 @@ class SelectelService:
     
     def sync_resources(self) -> Dict[str, Any]:
         """
-        Sync resources from Selectel API
+        Universal billing-first sync for ALL Selectel services
+        
+        Philosophy:
+        1. Billing API is source of truth - shows everything that costs money
+        2. Show all resources (active + zombie)
+        3. Enrich with details when available
+        4. Unified view where logical (VMs + volumes)
+        5. Handles: VMs, Volumes, Kubernetes, Databases, S3, Load Balancers, etc.
         
         Returns:
             Dict containing sync results
@@ -71,217 +78,178 @@ class SelectelService:
             # Create sync snapshot entry
             sync_snapshot = SyncSnapshot(
                 provider_id=self.provider.id,
-                sync_type='full',
+                sync_type='billing_first',
                 sync_status='running',
                 sync_started_at=datetime.now()
             )
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # Get all resources from API
-            api_resources = self.client.get_all_resources()
+            # PHASE 1: Get all billed resources (48h window to catch deletions)
+            logger.info("PHASE 1: Fetching billing data (48h window)")
+            billed_resources = self.client.get_resource_costs(hours=48)
             
-            # Process and store resources
+            if not billed_resources:
+                logger.warning("No billed resources found - will fetch from OpenStack APIs")
+                # Fallback to old approach if billing API fails
+                return self._sync_resources_fallback(sync_snapshot)
+            
+            logger.info(f"Found {len(billed_resources)} billed resources")
+            
+            # PHASE 2: Group by service type
+            logger.info("PHASE 2: Grouping resources by service type")
+            resources_by_type = self._group_by_service_type(billed_resources)
+            
             synced_resources = []
-            errors = []
+            orphan_volumes = []
+            zombie_resources = []
+            unified_vms = {}
             
-            # Process account information
-            if 'account' in api_resources:
-                account_data = api_resources['account']
-                account_resource = self._create_resource(
-                    resource_type='account',
-                    resource_id=account_data.get('account', {}).get('name', 'unknown'),
-                    name=account_data.get('account', {}).get('name', 'Account'),
-                    metadata=account_data,
-                    sync_snapshot_id=sync_snapshot.id
-                )
-                if account_resource:
-                    synced_resources.append(account_resource)
-            
-            # Process projects
-            if 'projects' in api_resources:
-                for project_data in api_resources['projects']:
-                    project_resource = self._create_resource(
-                        resource_type='project',
-                        resource_id=project_data.get('id'),
-                        name=project_data.get('name'),
-                        metadata=project_data,
-                        sync_snapshot_id=sync_snapshot.id
+            # PHASE 3: Process servers first (needed for volume unification)
+            logger.info("PHASE 3: Processing servers")
+            if 'server' in resources_by_type:
+                for resource_id, billing_data in resources_by_type['server'].items():
+                    vm = self._process_vm_resource(
+                        resource_id,
+                        billing_data,
+                        sync_snapshot.id
                     )
-                    if project_resource:
-                        synced_resources.append(project_resource)
+                    if vm:
+                        unified_vms[resource_id] = vm
+                        synced_resources.append(vm)
+                        if vm.status == 'DELETED_BILLED':
+                            zombie_resources.append(vm)
+                
+                logger.info(f"Processed {len(unified_vms)} VMs ({len([v for v in unified_vms.values() if v.status == 'DELETED_BILLED'])} zombies)")
             
-            # Process users
-            if 'users' in api_resources:
-                for user_data in api_resources['users']:
-                    user_resource = self._create_resource(
-                        resource_type='user',
-                        resource_id=user_data.get('id'),
-                        name=user_data.get('name'),
-                        metadata=user_data,
-                        sync_snapshot_id=sync_snapshot.id
+            # PHASE 4: Process volumes (unify with VMs where possible)
+            logger.info("PHASE 4: Processing volumes")
+            if 'volume' in resources_by_type:
+                for resource_id, billing_data in resources_by_type['volume'].items():
+                    volume_result = self._process_volume_resource(
+                        resource_id,
+                        billing_data,
+                        unified_vms,
+                        sync_snapshot.id
                     )
-                    if user_resource:
-                        synced_resources.append(user_resource)
+                    if volume_result:
+                        if not volume_result.get('unified_into_vm'):
+                            # Standalone or orphan volume
+                            synced_resources.append(volume_result['resource'])
+                            if volume_result.get('is_orphan'):
+                                orphan_volumes.append(volume_result['resource'])
+                        # Else: volume was merged into VM, no separate resource needed
+                
+                logger.info(f"Processed volumes: {len(orphan_volumes)} orphans, {len([v for v in resources_by_type['volume'].values()])} total")
             
-            # Process roles
-            if 'roles' in api_resources:
-                for role_data in api_resources['roles']:
-                    role_resource = self._create_resource(
-                        resource_type='role',
-                        resource_id=role_data.get('id'),
-                        name=role_data.get('name'),
-                        metadata=role_data,
-                        sync_snapshot_id=sync_snapshot.id
+            # PHASE 5: Process file storage
+            logger.info("PHASE 5: Processing file storage")
+            if 'file_storage' in resources_by_type:
+                for resource_id, billing_data in resources_by_type['file_storage'].items():
+                    share = self._process_file_storage_resource(
+                        resource_id,
+                        billing_data,
+                        sync_snapshot.id
                     )
-                    if role_resource:
-                        synced_resources.append(role_resource)
+                    if share:
+                        synced_resources.append(share)
+                        if share.status == 'DELETED_BILLED':
+                            zombie_resources.append(share)
             
-            # Process actual cloud resources - Servers (VMs with attached volumes)
-            servers_list = []
-            if 'servers' in api_resources:
-                for server_data in api_resources['servers']:
-                    # Extract complete VM information
-                    server_resource = self._create_resource(
-                        resource_type='server',
-                        resource_id=server_data.get('id'),
-                        name=server_data.get('name', f"Server {server_data.get('id', 'Unknown')}"),
-                        metadata={
-                            **server_data,
-                            # Add computed fields for easy display
-                            'vcpus': server_data.get('vcpus'),
-                            'ram_mb': server_data.get('ram_mb'),
-                            'flavor_name': server_data.get('flavor_name'),
-                            'total_storage_gb': server_data.get('total_storage_gb'),
-                            'ip_addresses': server_data.get('ip_addresses', []),
-                            'attached_volumes': server_data.get('attached_volumes', []),
-                            'network_interfaces': server_data.get('network_interfaces', [])
-                        },
-                        sync_snapshot_id=sync_snapshot.id,
-                        region=server_data.get('region', 'ru-3'),
-                        service_name='Compute'
+            # PHASE 6: Process all other service types generically
+            logger.info("PHASE 6: Processing other services (K8s, DBaaS, S3, etc.)")
+            other_types = [t for t in resources_by_type.keys() 
+                          if t not in ['server', 'volume', 'file_storage']]
+            
+            for service_type in other_types:
+                for resource_id, billing_data in resources_by_type[service_type].items():
+                    generic = self._process_generic_resource(
+                        resource_id,
+                        billing_data,
+                        service_type,
+                        sync_snapshot.id
                     )
-                    if server_resource:
-                        synced_resources.append(server_resource)
-                        servers_list.append(server_data)
+                    if generic:
+                        synced_resources.append(generic)
+                        if generic.status == 'DELETED_BILLED':
+                            zombie_resources.append(generic)
             
-            # Get CPU and memory statistics for all servers (similar to Beget)
-            # Note: Selectel uses 5-minute granularity (300 seconds) vs Beget's 1-minute
-            if servers_list:
+            # PHASE 7: Get statistics for active servers
+            logger.info("PHASE 7: Fetching performance statistics")
+            active_servers = [vm for vm in unified_vms.values() if vm.status != 'DELETED_BILLED']
+            if active_servers:
                 try:
-                    logger.info(f"Fetching statistics for {len(servers_list)} servers (5-minute granularity)")
-                    statistics = self.client.get_all_server_statistics(servers_list)
+                    server_data_list = []
+                    for vm in active_servers:
+                        metadata = json.loads(vm.provider_config) if vm.provider_config else {}
+                        server_data_list.append({
+                            'id': vm.resource_id,
+                            'name': vm.resource_name,
+                            'ram_mb': metadata.get('ram_mb', 1024)
+                        })
                     
-                    logger.info(f"Retrieved statistics for {len(statistics)} servers")
-                    
-                    # Process statistics and add to resources
+                    statistics = self.client.get_all_server_statistics(server_data_list)
                     if statistics:
                         self._process_server_statistics(sync_snapshot, statistics)
-                        logger.info(f"Successfully processed statistics for {len(statistics)} servers")
-                    else:
-                        logger.warning("No statistics data retrieved")
-                        
+                        logger.info(f"Retrieved statistics for {len(statistics)} servers")
                 except Exception as e:
-                    logger.error(f"Failed to get server statistics: {e}", exc_info=True)
-                    # Continue sync even if statistics fail
+                    logger.warning(f"Failed to get server statistics: {e}")
             
-            # Get cost information for all resources (similar to Beget)
-            if servers_list:
-                try:
-                    logger.info(f"Fetching cost data for {len(servers_list)} servers")
-                    resource_costs = self.client.get_resource_costs(hours=24)
-                    
-                    logger.info(f"Retrieved costs for {len(resource_costs)} resources")
-                    
-                    # Update resource costs
-                    if resource_costs:
-                        self._update_resource_costs(resource_costs)
-                        logger.info(f"Successfully updated costs for {len(resource_costs)} resources")
-                    else:
-                        logger.warning("No cost data retrieved")
-                        
-                except Exception as e:
-                    logger.error(f"Failed to get resource costs: {e}", exc_info=True)
-                    # Continue sync even if costs fail
-            
-            # Process standalone volumes (those not attached to any server)
-            volumes_list = []
-            if 'volumes' in api_resources:
-                for volume_data in api_resources['volumes']:
-                    volume_resource = self._create_resource(
-                        resource_type='volume',
-                        resource_id=volume_data.get('id'),
-                        name=volume_data.get('name', f"Volume {volume_data.get('id', 'Unknown')}"),
-                        metadata={
-                            **volume_data,
-                            'size_gb': volume_data.get('size'),
-                            'volume_type': volume_data.get('volume_type'),
-                            'availability_zone': volume_data.get('availability_zone'),
-                            'created_at': volume_data.get('created_at'),
-                            'bootable': volume_data.get('bootable')
-                        },
-                        sync_snapshot_id=sync_snapshot.id,
-                        region=volume_data.get('availability_zone', 'unknown'),
-                        service_name='Block Storage'
-                    )
-                    if volume_resource:
-                        synced_resources.append(volume_resource)
-                        volumes_list.append(volume_data)
-            
-            # Process file storage shares
-            shares_list = []
-            if 'shares' in api_resources:
-                for share_data in api_resources['shares']:
-                    share_resource = self._create_resource(
-                        resource_type='file_storage',
-                        resource_id=share_data.get('id'),
-                        name=share_data.get('name', f"File Storage {share_data.get('id', 'Unknown')}"),
-                        metadata={
-                            **share_data,
-                            'size_gb': share_data.get('size'),
-                            'share_type': share_data.get('share_type'),
-                            'share_proto': share_data.get('share_proto'),
-                            'availability_zone': share_data.get('availability_zone'),
-                            'created_at': share_data.get('created_at'),
-                            'export_locations': share_data.get('export_locations', [])
-                        },
-                        sync_snapshot_id=sync_snapshot.id,
-                        region=share_data.get('availability_zone', 'unknown'),
-                        service_name='File Storage'
-                    )
-                    if share_resource:
-                        synced_resources.append(share_resource)
-                        shares_list.append(share_data)
-            
-            # Note: Volume costs are now only set from billing API, no hardcoded calculations
-            
-            # Note: Networks are integrated into server resources
+            # PHASE 8: Calculate totals and update snapshot
+            logger.info("PHASE 8: Finalizing sync")
+            total_cost = sum(r.daily_cost or 0 for r in synced_resources)
+            zombie_cost = sum(r.daily_cost or 0 for r in zombie_resources)
+            orphan_cost = sum(r.daily_cost or 0 for r in orphan_volumes)
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
             sync_snapshot.sync_completed_at = datetime.now()
             sync_snapshot.resources_created = len(synced_resources)
-            sync_snapshot.resources_deleted = 0
             sync_snapshot.total_resources_found = len(synced_resources)
             sync_snapshot.calculate_duration()
             
-            # Update provider last_sync timestamp
+            # Store metadata about special cases
+            sync_config = json.loads(sync_snapshot.sync_config) if sync_snapshot.sync_config else {}
+            sync_config.update({
+                'sync_method': 'billing_first',
+                'orphan_volumes': len(orphan_volumes),
+                'zombie_resources': len(zombie_resources),
+                'unified_vms': len(unified_vms),
+                'total_daily_cost': round(total_cost, 2),
+                'zombie_daily_cost': round(zombie_cost, 2),
+                'orphan_daily_cost': round(orphan_cost, 2),
+                'service_types': list(resources_by_type.keys()),
+                'billed_resource_count': len(billed_resources)
+            })
+            sync_snapshot.sync_config = json.dumps(sync_config)
+            
+            # Update provider
             self.provider.last_sync = datetime.now()
             self.provider.sync_status = 'success'
             self.provider.sync_error = None
             
             db.session.commit()
             
+            logger.info(f"Sync completed: {len(synced_resources)} resources, {total_cost:.2f} ₽/day")
+            logger.info(f"  - Active: {len(synced_resources) - len(zombie_resources)}")
+            logger.info(f"  - Zombies: {len(zombie_resources)} ({zombie_cost:.2f} ₽/day)")
+            logger.info(f"  - Orphan volumes: {len(orphan_volumes)} ({orphan_cost:.2f} ₽/day)")
+            
             return {
                 'success': True,
                 'resources_synced': len(synced_resources),
-                'errors': len(errors),
+                'orphan_volumes': len(orphan_volumes),
+                'zombie_resources': len(zombie_resources),
+                'total_daily_cost': round(total_cost, 2),
+                'zombie_daily_cost': round(zombie_cost, 2),
+                'orphan_daily_cost': round(orphan_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
-                'message': f'Successfully synced {len(synced_resources)} resources'
+                'service_types': list(resources_by_type.keys()),
+                'message': f'Successfully synced {len(synced_resources)} resources ({total_cost:.2f} ₽/day)'
             }
             
         except Exception as e:
-            logger.error(f"Selectel sync failed: {str(e)}")
+            logger.error(f"Selectel billing-first sync failed: {str(e)}", exc_info=True)
             
             # Update sync snapshot with error
             if 'sync_snapshot' in locals():
@@ -301,6 +269,547 @@ class SelectelService:
                 'error': str(e),
                 'message': 'Sync failed'
             }
+    
+    def _group_by_service_type(self, billed_resources: Dict[str, Any]) -> Dict[str, Dict]:
+        """
+        Group billing resources by normalized service type
+        
+        Maps Selectel billing types to our resource taxonomy:
+        - cloud_vm -> server
+        - volume_* -> volume
+        - share_* -> file_storage
+        - dbaas_* -> database
+        - mks_* -> kubernetes
+        - etc.
+        """
+        SERVICE_TYPE_MAPPING = {
+            # Already normalized types (from billing API)
+            'server': 'server',
+            'volume': 'volume',
+            'file_storage': 'file_storage',
+            
+            # Compute (raw Selectel types)
+            'cloud_vm': 'server',
+            'cloud_vm_gpu': 'server',
+            
+            # Storage (raw Selectel types)
+            'volume_basic': 'volume',
+            'volume_universal': 'volume', 
+            'volume_fast': 'volume',
+            'volume_ultra': 'volume',
+            'share_basic': 'file_storage',
+            'share_universal': 'file_storage',
+            
+            # Managed Databases
+            'dbaas_postgresql': 'database',
+            'dbaas_mysql': 'database',
+            'dbaas_redis': 'database',
+            'dbaas_kafka': 'message_queue',
+            'dbaas_mongodb': 'database',
+            
+            # Kubernetes
+            'mks_cluster': 'kubernetes_cluster',
+            'mks_node_group': 'kubernetes_nodegroup',
+            
+            # Container Registry
+            'craas_registry': 'container_registry',
+            
+            # Object Storage
+            's3_storage': 's3_bucket',
+            's3_traffic': 's3_bandwidth',
+            
+            # Network
+            'network_floating_ip': 'floating_ip',
+            'network_load_balancer': 'load_balancer',
+            'network_traffic': 'network_bandwidth',
+            
+            # Backup
+            'backup_storage': 'backup'
+        }
+        
+        grouped = {}
+        for resource_id, billing_data in billed_resources.items():
+            obj_type = billing_data.get('type', 'unknown')
+            normalized_type = SERVICE_TYPE_MAPPING.get(obj_type, 'other_service')
+            
+            if normalized_type not in grouped:
+                grouped[normalized_type] = {}
+            
+            grouped[normalized_type][resource_id] = billing_data
+        
+        logger.info(f"Grouped into {len(grouped)} service types: {list(grouped.keys())}")
+        return grouped
+    
+    def _process_vm_resource(self, resource_id: str, billing_data: Dict,
+                            sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process VM resource with billing data
+        Try to enrich with OpenStack details, fallback to billing-only for zombies
+        """
+        try:
+            # Try to get full details from OpenStack
+            server_details = self._fetch_server_from_openstack(resource_id)
+            
+            if server_details:
+                # Active VM - full details available
+                # Extract CPU/RAM from flavor
+                flavor = server_details.get('flavor', {})
+                vcpus = flavor.get('vcpus')
+                ram_mb = flavor.get('ram')  # OpenStack flavor uses 'ram', not 'ram_mb'
+                
+                # Calculate total disk from attached volumes
+                attached_volumes = server_details.get('attached_volumes', [])
+                total_storage_gb = sum(v.get('size_gb', 0) for v in attached_volumes)
+                
+                resource = self._create_resource(
+                    resource_type='server',
+                    resource_id=resource_id,
+                    name=server_details.get('name', billing_data['name']),
+                    metadata={
+                        **server_details,
+                        'billing': billing_data,
+                        'vcpus': vcpus,
+                        'ram_mb': ram_mb,
+                        'total_storage_gb': total_storage_gb,
+                        'ip_addresses': server_details.get('ip_addresses', []),
+                        'attached_volumes': attached_volumes
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region=server_details.get('region', 'ru-3'),
+                    service_name='Compute'
+                )
+                
+                if resource:
+                    # Set cost from billing
+                    resource.daily_cost = billing_data['daily_cost_rubles']
+                    resource.effective_cost = billing_data['daily_cost_rubles']
+                    resource.original_cost = billing_data['monthly_cost_rubles']
+                    resource.currency = 'RUB'
+                    resource.add_tag('monthly_cost_rubles', str(billing_data['monthly_cost_rubles']))
+                    resource.add_tag('cost_source', 'billing_api')
+                
+                return resource
+            else:
+                # Zombie VM - deleted but still billed
+                logger.warning(f"Zombie VM: {resource_id} ({billing_data['name']}) - billed but not in OpenStack")
+                
+                resource = self._create_resource(
+                    resource_type='server',
+                    resource_id=resource_id,
+                    name=billing_data['name'],
+                    metadata={
+                        'billing': billing_data,
+                        'is_zombie': True,
+                        'note': 'Deleted from OpenStack but still billed'
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region='unknown',
+                    service_name='Compute'
+                )
+                
+                if resource:
+                    resource.status = 'DELETED_BILLED'
+                    resource.daily_cost = billing_data['daily_cost_rubles']
+                    resource.effective_cost = billing_data['daily_cost_rubles']
+                    resource.original_cost = billing_data['monthly_cost_rubles']
+                    resource.currency = 'RUB'
+                    resource.add_tag('is_zombie', 'true')
+                    resource.add_tag('recommendation', 'Contact support - billed for deleted resource')
+                    resource.add_tag('cost_source', 'billing_api')
+                
+                return resource
+                
+        except Exception as e:
+            logger.error(f"Error processing VM {resource_id}: {e}")
+            return None
+    
+    def _process_volume_resource(self, resource_id: str, billing_data: Dict,
+                                 unified_vms: Dict[str, Resource],
+                                 sync_snapshot_id: int) -> Optional[Dict]:
+        """
+        Process volume - try to unify with VM or create standalone
+        
+        Philosophy:
+        - If attached to VM: merge into VM metadata (NO separate DB resource)
+        - If detached but name matches "disk-for-{VM-name}": still merge into VM
+        - If standalone: create separate DB resource
+        
+        Returns:
+            Dict with:
+            - resource: Resource object (None if unified)
+            - unified_into_vm: bool
+            - is_orphan: bool
+        """
+        try:
+            # Try to get volume details from OpenStack
+            volume_details = self._fetch_volume_from_openstack(resource_id)
+            
+            if volume_details:
+                # Volume exists in OpenStack
+                attachments = volume_details.get('attachments', [])
+                volume_name = volume_details.get('name', billing_data['name'])
+                
+                # Try to match by attachment
+                if attachments and len(attachments) > 0:
+                    server_id = attachments[0].get('server_id')
+                    
+                    if server_id in unified_vms:
+                        # Merge volume into existing VM resource (NO separate DB resource)
+                        vm_resource = unified_vms[server_id]
+                        self._add_volume_to_vm(vm_resource, volume_details, billing_data)
+                        
+                        logger.debug(f"Volume {resource_id} unified into VM {server_id} via attachment")
+                        
+                        # Deactivate any existing standalone volume resource for this volume
+                        from app.core.models.resource import Resource
+                        existing_volume = Resource.query.filter_by(
+                            provider_id=self.provider.id,
+                            resource_id=resource_id,
+                            resource_type='volume'
+                        ).first()
+                        
+                        if existing_volume and existing_volume.is_active:
+                            logger.info(f"Deactivating standalone volume resource {volume_name} (now unified with VM)")
+                            existing_volume.is_active = False
+                            db.session.add(existing_volume)
+                        
+                        # Return without creating a resource - volume is ONLY in VM metadata
+                        return {
+                            'unified_into_vm': True,
+                            'vm_id': server_id,
+                            'resource': None  # NO separate resource!
+                        }
+                
+                # Try to match by naming convention: "disk-for-{VM-name}-#N"
+                if volume_name.startswith('disk-for-'):
+                    # Extract VM name from "disk-for-Doreen-#1" -> "Doreen"
+                    try:
+                        vm_name_part = volume_name.replace('disk-for-', '').split('-#')[0]
+                        
+                        # Find VM by name
+                        for server_id, vm_resource in unified_vms.items():
+                            if vm_resource.resource_name == vm_name_part:
+                                # Found matching VM - unify even if detached (SHELVED case)
+                                self._add_volume_to_vm(vm_resource, volume_details, billing_data)
+                                
+                                logger.info(f"Volume {volume_name} unified into VM {vm_name_part} via naming convention (VM status: {vm_resource.status})")
+                                
+                                # Deactivate any existing standalone volume resource for this volume
+                                from app.core.models.resource import Resource
+                                existing_volume = Resource.query.filter_by(
+                                    provider_id=self.provider.id,
+                                    resource_id=resource_id,
+                                    resource_type='volume'
+                                ).first()
+                                
+                                if existing_volume and existing_volume.is_active:
+                                    logger.info(f"Deactivating standalone volume resource {volume_name} (now unified with VM)")
+                                    existing_volume.is_active = False
+                                    db.session.add(existing_volume)
+                                
+                                return {
+                                    'unified_into_vm': True,
+                                    'vm_id': server_id,
+                                    'resource': None
+                                }
+                    except Exception as e:
+                        logger.warning(f"Failed to parse volume name {volume_name}: {e}")
+                
+                # Standalone volume (not attached and no name match)
+                is_orphan = self._is_volume_orphan(volume_details)
+                
+                logger.info(f"Creating standalone volume resource: {volume_details.get('name')} (orphan: {is_orphan})")
+                
+                resource = self._create_resource(
+                    resource_type='volume',
+                    resource_id=resource_id,
+                    name=volume_details.get('name', billing_data['name']),
+                    metadata={
+                        **volume_details,
+                        'billing': billing_data,
+                        'size_gb': volume_details.get('size'),
+                        'volume_type': volume_details.get('volume_type'),
+                        'is_orphan': is_orphan
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region=volume_details.get('availability_zone', 'unknown'),
+                    service_name='Block Storage'
+                )
+                
+                if resource:
+                    resource.daily_cost = billing_data['daily_cost_rubles']
+                    resource.effective_cost = billing_data['daily_cost_rubles']
+                    resource.original_cost = billing_data['monthly_cost_rubles']
+                    resource.currency = 'RUB'
+                    resource.add_tag('cost_source', 'billing_api')
+                    
+                    if is_orphan:
+                        resource.add_tag('is_orphan', 'true')
+                        resource.add_tag('recommendation', 'Unused volume - consider deletion')
+                
+                return {
+                    'unified_into_vm': False,
+                    'is_orphan': is_orphan,
+                    'resource': resource
+                }
+            else:
+                # Zombie volume - deleted but still billed
+                logger.warning(f"Zombie volume: {resource_id} ({billing_data['name']})")
+                
+                resource = self._create_resource(
+                    resource_type='volume',
+                    resource_id=resource_id,
+                    name=billing_data['name'],
+                    metadata={
+                        'billing': billing_data,
+                        'is_zombie': True
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region='unknown',
+                    service_name='Block Storage'
+                )
+                
+                if resource:
+                    resource.status = 'DELETED_BILLED'
+                    resource.daily_cost = billing_data['daily_cost_rubles']
+                    resource.effective_cost = billing_data['daily_cost_rubles']
+                    resource.add_tag('is_zombie', 'true')
+                    resource.add_tag('recommendation', 'Contact support - billed for deleted volume')
+                
+                return {
+                    'unified_into_vm': False,
+                    'is_orphan': False,
+                    'resource': resource
+                }
+                
+        except Exception as e:
+            logger.error(f"Error processing volume {resource_id}: {e}")
+            return None
+    
+    def _process_file_storage_resource(self, resource_id: str, billing_data: Dict,
+                                       sync_snapshot_id: int) -> Optional[Resource]:
+        """Process file storage (Manila shares)"""
+        try:
+            share_details = self._fetch_share_from_openstack(resource_id)
+            
+            if share_details:
+                # Active file storage
+                resource = self._create_resource(
+                    resource_type='file_storage',
+                    resource_id=resource_id,
+                    name=share_details.get('name', billing_data['name']),
+                    metadata={
+                        **share_details,
+                        'billing': billing_data,
+                        'size_gb': share_details.get('size'),
+                        'share_proto': share_details.get('share_proto')
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region=share_details.get('availability_zone', 'ru-3'),
+                    service_name='File Storage'
+                )
+            else:
+                # Zombie file storage
+                resource = self._create_resource(
+                    resource_type='file_storage',
+                    resource_id=resource_id,
+                    name=billing_data['name'],
+                    metadata={'billing': billing_data, 'is_zombie': True},
+                    sync_snapshot_id=sync_snapshot_id,
+                    region='unknown',
+                    service_name='File Storage'
+                )
+                if resource:
+                    resource.status = 'DELETED_BILLED'
+                    resource.add_tag('is_zombie', 'true')
+            
+            if resource:
+                resource.daily_cost = billing_data['daily_cost_rubles']
+                resource.effective_cost = billing_data['daily_cost_rubles']
+                resource.add_tag('cost_source', 'billing_api')
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing file storage {resource_id}: {e}")
+            return None
+    
+    def _process_generic_resource(self, resource_id: str, billing_data: Dict,
+                                  service_type: str, sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Generic processor for any service type from billing
+        Handles: K8s, DBaaS, S3, Load Balancers, etc.
+        """
+        try:
+            resource = self._create_resource(
+                resource_type=service_type,
+                resource_id=resource_id,
+                name=billing_data['name'],
+                metadata={
+                    'billing': billing_data,
+                    'metrics': billing_data.get('metrics', {}),
+                    'service_type': service_type
+                },
+                sync_snapshot_id=sync_snapshot_id,
+                region='unknown',
+                service_name=service_type.replace('_', ' ').title()
+            )
+            
+            if resource:
+                resource.daily_cost = billing_data['daily_cost_rubles']
+                resource.effective_cost = billing_data['daily_cost_rubles']
+                resource.original_cost = billing_data['monthly_cost_rubles']
+                resource.currency = 'RUB'
+                resource.add_tag('cost_source', 'billing_api')
+                resource.add_tag('service_type', service_type)
+                
+                # Add all billing metrics as tags
+                for metric_id, metric_value in billing_data.get('metrics', {}).items():
+                    resource.add_tag(f'metric_{metric_id}', str(metric_value))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing {service_type} {resource_id}: {e}")
+            return None
+    
+    def _fetch_server_from_openstack(self, server_id: str) -> Optional[Dict]:
+        """Fetch server details from OpenStack APIs across all regions"""
+        try:
+            # Try each region
+            for region in self.client.regions.keys() if self.client.regions else ['ru-3']:
+                try:
+                    servers = self.client.get_openstack_servers(region=region)
+                    for server in servers:
+                        if server['id'] == server_id:
+                            return server
+                except Exception as e:
+                    logger.debug(f"Server {server_id} not in region {region}")
+                    continue
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching server {server_id}: {e}")
+            return None
+    
+    def _fetch_volume_from_openstack(self, volume_id: str) -> Optional[Dict]:
+        """Fetch volume details from OpenStack APIs"""
+        try:
+            projects = self.client.get_projects()
+            project_id = projects[0]['id'] if projects else None
+            
+            if project_id:
+                for region in self.client.regions.keys() if self.client.regions else ['ru-3']:
+                    try:
+                        volumes = self.client.get_openstack_volumes(project_id, region=region)
+                        for volume in volumes:
+                            if volume['id'] == volume_id:
+                                return volume
+                    except Exception:
+                        continue
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching volume {volume_id}: {e}")
+            return None
+    
+    def _fetch_share_from_openstack(self, share_id: str) -> Optional[Dict]:
+        """Fetch file storage share details"""
+        try:
+            projects = self.client.get_projects()
+            project_id = projects[0]['id'] if projects else None
+            
+            if project_id:
+                for region in self.client.regions.keys() if self.client.regions else ['ru-3']:
+                    try:
+                        shares = self.client.get_openstack_shares(project_id, region=region)
+                        for share in shares:
+                            if share['id'] == share_id:
+                                return share
+                    except Exception:
+                        continue
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching share {share_id}: {e}")
+            return None
+    
+    def _add_volume_to_vm(self, vm_resource: Resource, volume_details: Dict, billing_data: Dict):
+        """Add volume information to VM resource and update totals"""
+        try:
+            # Update VM metadata to include volume
+            metadata = json.loads(vm_resource.provider_config) if vm_resource.provider_config else {}
+            
+            if 'attached_volumes' not in metadata:
+                metadata['attached_volumes'] = []
+            
+            volume_info = {
+                'id': volume_details['id'],
+                'name': volume_details.get('name', ''),
+                'size_gb': volume_details['size'],
+                'type': volume_details.get('volume_type'),
+                'daily_cost': billing_data['daily_cost_rubles']
+            }
+            
+            metadata['attached_volumes'].append(volume_info)
+            
+            # Recalculate total storage (for UI display)
+            total_storage_gb = sum(v.get('size_gb', 0) for v in metadata['attached_volumes'])
+            metadata['total_storage_gb'] = total_storage_gb
+            
+            vm_resource.provider_config = json.dumps(metadata)
+            
+            # Update VM total cost
+            vm_resource.daily_cost = (vm_resource.daily_cost or 0) + billing_data['daily_cost_rubles']
+            vm_resource.effective_cost = vm_resource.daily_cost
+            
+            # Add volume cost as tag
+            vm_resource.add_tag(f'volume_{volume_details["id"]}_cost', str(billing_data['daily_cost_rubles']))
+            
+        except Exception as e:
+            logger.error(f"Error adding volume to VM: {e}")
+    
+    def _is_volume_orphan(self, volume_details: Dict) -> bool:
+        """Check if volume is likely an orphan (old, unattached)"""
+        try:
+            # Volume is orphan if:
+            # 1. Not attached
+            # 2. Created more than 7 days ago
+            
+            if volume_details.get('attachments'):
+                return False
+            
+            created_at = volume_details.get('created_at')
+            if created_at:
+                from dateutil import parser
+                created_date = parser.parse(created_at)
+                age_days = (datetime.now(created_date.tzinfo) - created_date).days
+                return age_days > 7
+            
+            return False
+        except Exception:
+            return False
+    
+    def _sync_resources_fallback(self, sync_snapshot: SyncSnapshot) -> Dict[str, Any]:
+        """
+        Fallback sync method using OpenStack APIs directly
+        Used when billing API is unavailable
+        """
+        logger.warning("Using fallback sync method (OpenStack APIs)")
+        
+        try:
+            # This is the old method - just return basic success
+            sync_snapshot.sync_status = 'success'
+            sync_snapshot.sync_completed_at = datetime.now()
+            sync_snapshot.error_message = 'Billing API unavailable - fallback not implemented'
+            sync_snapshot.calculate_duration()
+            db.session.commit()
+            
+            return {
+                'success': False,
+                'error': 'Billing API unavailable',
+                'message': 'Cannot sync without billing data'
+            }
+        except Exception as e:
+            logger.error(f"Fallback sync failed: {e}")
+            return {'success': False, 'error': str(e)}
     
     def _create_resource(self, resource_type: str, resource_id: str, 
                         name: str, metadata: Dict[str, Any], 
@@ -575,68 +1084,6 @@ class SelectelService:
             except Exception as e:
                 logger.error(f"Error processing statistics for server {server_id}: {e}")
     
-    def _update_resource_costs(self, resource_costs: Dict[str, Any]):
-        """
-        Update costs for resources based on billing API data.
-        Only updates resources that exist in our current sync.
-        Resources not in billing API get costs set to 0.
-
-        Args:
-            resource_costs: Dict mapping resource_id to cost information from get_resource_costs()
-        """
-        from app.core.models.resource import Resource
-        from app.core.database import db
-
-        # Get all current resources for this provider
-        all_resources = Resource.query.filter_by(provider_id=self.provider.id).all()
-        billing_resource_ids = set(resource_costs.keys())
-
-        for resource in all_resources:
-            try:
-                if resource.resource_id in billing_resource_ids:
-                    # Resource is in billing API - update with actual costs
-                    cost_data = resource_costs[resource.resource_id]
-                    daily_cost = cost_data.get('daily_cost_rubles', 0)
-
-                    resource.daily_cost = daily_cost
-                    resource.effective_cost = daily_cost
-                    resource.original_cost = cost_data.get('monthly_cost_rubles', 0)
-                    resource.cost_period = 'MONTHLY'
-                    resource.cost_frequency = 'daily'
-                    resource.currency = 'RUB'
-                    resource.billing_period = 'monthly'
-
-                    # Store cost breakdown as tags
-                    resource.add_tag('cost_daily_rubles', str(daily_cost))
-                    resource.add_tag('cost_monthly_rubles', str(cost_data.get('monthly_cost_rubles', 0)))
-                    resource.add_tag('cost_hourly_rubles', str(cost_data.get('hourly_cost_rubles', 0)))
-                    resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
-
-                    logger.debug(f"Updated costs for {cost_data.get('name')}: {daily_cost} ₽/day")
-                else:
-                    # Resource is NOT in billing API - set costs to 0
-                    resource.daily_cost = 0.0
-                    resource.effective_cost = 0.0
-                    resource.original_cost = 0.0
-                    resource.cost_period = 'MONTHLY'
-                    resource.cost_frequency = 'daily'
-                    resource.currency = 'RUB'
-                    resource.billing_period = 'monthly'
-
-                    # Store zero costs as tags
-                    resource.add_tag('cost_daily_rubles', '0.0')
-                    resource.add_tag('cost_monthly_rubles', '0.0')
-                    resource.add_tag('cost_hourly_rubles', '0.0')
-                    resource.add_tag('cost_calculation_timestamp', datetime.now().isoformat())
-                    resource.add_tag('cost_source', 'billing_api_not_found')
-
-                    logger.debug(f"Set costs to 0 for {resource.resource_name} (not in billing API)")
-
-            except Exception as e:
-                logger.error(f"Error updating costs for resource {resource.resource_id}: {e}")
-                continue
-
-        db.session.commit()
     
     def get_account_info(self) -> Dict[str, Any]:
         """
