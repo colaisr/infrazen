@@ -36,7 +36,7 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
   - `src/routes/` (main.py, auth.py, user.py - modular routing)
   - `src/models/` (user.py - database models)
 - **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
-- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. **Enhanced User System** with Google OAuth integration, database persistence, and role-based access control fully implemented. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management. **Admin functionality** with user management, role assignment, and impersonation capabilities.
+- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. **Enhanced User System** with Google OAuth integration, database persistence, and role-based access control fully implemented. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management. **Complete Admin System** with dashboard, user management, role assignment, impersonation capabilities, and navigation interface.
 
 ## 6.1. Enhanced User System & Authentication
 
@@ -105,6 +105,8 @@ The InfraZen platform implements a comprehensive user management system with Goo
 - **Admin API**: Complete user management endpoints
 - **Admin Interface**: User management dashboard and forms
 - **Database Migration**: Schema updates and initialization scripts
+- **Admin Dashboard**: System overview with statistics and navigation
+- **Admin Navigation**: Tab-based interface for admin functions
 
 #### **Key Features**
 - **Automatic User Creation**: Seamless Google OAuth user onboarding
@@ -112,6 +114,15 @@ The InfraZen platform implements a comprehensive user management system with Goo
 - **User Impersonation**: Admin support functionality
 - **Search & Filtering**: Advanced user discovery and management
 - **Audit Trail**: Complete user activity tracking
+- **Admin Dashboard**: Real-time system statistics and overview
+- **Navigation System**: Dashboard, Users, System Status, Providers, Preferences
+
+#### **Admin Interface Structure**
+- **Main Dashboard** (`/api/admin/dashboard`): System statistics and overview
+- **User Management** (`/api/admin/users-page`): Full user CRUD operations
+- **Navigation Tabs**: Dashboard, Users, System Status, Providers, System Preferences
+- **Sidebar Integration**: "Админ панель" (Admin Panel) link for admin users
+- **Role-Based Access**: Admin functions only visible to admin users
 
 ## 6.2. Multi-Cloud Sync Architecture
 
