@@ -61,6 +61,7 @@ class Resource(BaseModel):
     # Constraints
     __table_args__ = (
         db.UniqueConstraint('provider_id', 'resource_id', 'resource_type', name='unique_provider_resource'),
+        {'extend_existing': True}
     )
     
     def get_provider_config(self):

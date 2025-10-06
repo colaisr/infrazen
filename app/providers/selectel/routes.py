@@ -32,11 +32,12 @@ def test_selectel_connection():
             }), 400
         
         # Test the connection
-        test_client = SelectelClient(
-            api_key=api_key,
-            service_username=service_username,
-            service_password=service_password
-        )
+        credentials = {
+            'api_key': api_key,
+            'service_username': service_username,
+            'service_password': service_password
+        }
+        test_client = SelectelClient(credentials)
         test_result = test_client.test_connection()
         
         return jsonify(test_result)
@@ -84,11 +85,12 @@ def add_connection():
             return redirect(url_for('main.connections'))
         
         # Test the connection
-        test_client = SelectelClient(
-            api_key=api_key,
-            service_username=service_username,
-            service_password=service_password
-        )
+        credentials = {
+            'api_key': api_key,
+            'service_username': service_username,
+            'service_password': service_password
+        }
+        test_client = SelectelClient(credentials)
         test_result = test_client.test_connection()
         
         if not test_result['success']:
@@ -263,11 +265,12 @@ def update_connection(provider_id):
         sync_interval_seconds = sync_interval_map.get(sync_interval, 86400)
         
         # Test the connection with new credentials
-        test_client = SelectelClient(
-            api_key=api_key,
-            service_username=service_username,
-            service_password=service_password
-        )
+        credentials = {
+            'api_key': api_key,
+            'service_username': service_username,
+            'service_password': service_password
+        }
+        test_client = SelectelClient(credentials)
         test_result = test_client.test_connection()
         
         if not test_result.get('success'):
