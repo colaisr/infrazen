@@ -74,6 +74,16 @@
                     <div class="nav-icon"><i class="fa-solid fa-cog"></i></div>
                     <span>Настройки</span>
                 </a>
+                
+                {% if user.is_admin %}
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">Администрирование</div>
+                <a href="{{ url_for("admin.users_page") }}" 
+                   class="nav-item {% if active_page == "admin_users" %}active{% endif %}">
+                    <div class="nav-icon"><i class="fa-solid fa-users"></i></div>
+                    <span>Управление пользователями</span>
+                </a>
+                {% endif %}
             </nav>
             
             <div class="sidebar-footer">
@@ -89,6 +99,19 @@
                     <div class="user-info">
                         <div class="user-name">{{ user.name if user.name else "Пользователь" }}</div>
                         <div class="user-email">{{ user.email if user.email else "user@example.com" }}</div>
+                        {% if user.role %}
+                        <div class="user-role">
+                            <span class="role-badge role-{{ user.role }}">
+                                {{ user.role.replace('_', ' ').upper() }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        {% if user.impersonated %}
+                        <div class="impersonation-warning">
+                            <i class="fa-solid fa-user-secret"></i>
+                            Impersonating {{ user.impersonated_by }}
+                        </div>
+                        {% endif %}
                     </div>
                     <a href="{{ url_for("auth.logout") }}" class="logout-icon">
                         <i class="fa-solid fa-sign-out-alt"></i>

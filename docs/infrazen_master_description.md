@@ -36,9 +36,84 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
   - `src/routes/` (main.py, auth.py, user.py - modular routing)
   - `src/models/` (user.py - database models)
 - **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
-- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. Google OAuth authentication fully implemented with profile integration. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management.
+- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. **Enhanced User System** with Google OAuth integration, database persistence, and role-based access control fully implemented. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management. **Admin functionality** with user management, role assignment, and impersonation capabilities.
 
-## 6.1. Multi-Cloud Sync Architecture
+## 6.1. Enhanced User System & Authentication
+
+### 6.1.1. User System Overview
+The InfraZen platform implements a comprehensive user management system with Google OAuth integration, database persistence, and role-based access control. This system provides seamless authentication, user data management, and administrative capabilities for enterprise deployments.
+
+### 6.1.2. Authentication Architecture
+
+#### **Google OAuth Integration**
+- **Automatic User Creation**: Users are automatically created in the database on first Google login
+- **Profile Data Storage**: Google profile information (picture, locale, verified email) is stored
+- **Seamless Migration**: Existing users are updated with Google data when they authenticate
+- **Session Management**: Enhanced session handling with database persistence
+
+#### **Database Schema**
+- **Enhanced User Model**: Extended with Google OAuth fields and role system
+- **Role-Based Access**: Three-tier role system (user, admin, super_admin)
+- **Permission System**: Granular permissions for specific actions
+- **Audit Trail**: Login tracking and admin action logging
+
+### 6.1.3. Role-Based Access Control
+
+#### **User Roles**
+- **User**: Standard access to platform features and their own data
+- **Admin**: User management capabilities with configurable permissions
+- **Super Admin**: Full system access with all administrative privileges
+
+#### **Permission System**
+- `manage_users`: Create, edit, and delete users
+- `impersonate_users`: Login as other users for support
+- `view_all_data`: Access data from all users
+- `manage_providers`: Manage cloud provider connections
+- `manage_resources`: Manage cloud resources
+
+### 6.1.4. Admin Functionality
+
+#### **User Management**
+- **CRUD Operations**: Complete user lifecycle management
+- **Role Assignment**: Assign and modify user roles and permissions
+- **User Impersonation**: Admins can impersonate users for support
+- **Search & Filtering**: Find users by various criteria
+
+#### **Admin Interface**
+- **Dedicated Admin Panel**: User management dashboard
+- **Role Indicators**: Visual role badges throughout the interface
+- **Admin Navigation**: Specialized navigation for administrative functions
+- **Impersonation Warning**: Clear indication when impersonating users
+
+### 6.1.5. Security Features
+
+#### **Data Protection**
+- **Sensitive Data Exclusion**: Passwords and tokens not stored unnecessarily
+- **Google Data Handling**: Only profile data stored, not OAuth tokens
+- **Session Security**: Enhanced session management with role information
+
+#### **Access Control**
+- **Role-Based Restrictions**: Admin functions require appropriate roles
+- **Permission Validation**: Granular permission checking for all actions
+- **Audit Logging**: Complete tracking of administrative actions
+
+### 6.1.6. Implementation Status ✅ COMPLETED
+
+#### **Core Components**
+- **Enhanced User Model**: Google OAuth fields, roles, and permissions
+- **Authentication API**: Updated Google OAuth handler with database integration
+- **Admin API**: Complete user management endpoints
+- **Admin Interface**: User management dashboard and forms
+- **Database Migration**: Schema updates and initialization scripts
+
+#### **Key Features**
+- **Automatic User Creation**: Seamless Google OAuth user onboarding
+- **Role Management**: Three-tier role system with permissions
+- **User Impersonation**: Admin support functionality
+- **Search & Filtering**: Advanced user discovery and management
+- **Audit Trail**: Complete user activity tracking
+
+## 6.2. Multi-Cloud Sync Architecture
 
 ### 6.1.1. Sync System Overview
 The InfraZen platform implements a comprehensive multi-cloud synchronization system designed to provide real-time visibility into cloud resources, costs, and utilization across all connected providers. The sync architecture is built on a **snapshot-based approach** that enables historical analysis, trend tracking, and AI-powered optimization recommendations. This architecture ensures complete audit trails, change detection, and historical data preservation for FinOps analysis.
