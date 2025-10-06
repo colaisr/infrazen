@@ -428,7 +428,7 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack ports from {region or 'default region'}: {str(e)}")
     
-    def get_server_cpu_statistics(self, server_id: str, hours: int = 1) -> Dict[str, Any]:
+    def get_server_cpu_statistics(self, server_id: str, hours: int = 1, region: str = None) -> Dict[str, Any]:
         """
         Get CPU usage statistics for a server
         
@@ -459,7 +459,9 @@ class SelectelClient:
             
             # Request CPU metrics with 5-minute granularity (300 seconds)
             # Note: Selectel only supports 300-second granularity
-            url = f"{self.openstack_base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            # Use the correct region for metrics API
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(max (metric cpu_util mean) (/ (clip_min (rateofchangesec (metric cpu_average mean)) 0) 10000000)))",
@@ -514,7 +516,7 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get CPU statistics for server {server_id}: {str(e)}")
     
-    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 1) -> Dict[str, Any]:
+    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 1, region: str = None) -> Dict[str, Any]:
         """
         Get memory usage statistics for a server
         
@@ -547,7 +549,9 @@ class SelectelClient:
             
             # Request memory metrics with 5-minute granularity (300 seconds)
             # Note: Selectel only supports 300-second granularity
-            url = f"{self.openstack_base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            # Use the correct region for metrics API
+            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(metric memory.usage mean)",
@@ -760,11 +764,15 @@ class SelectelClient:
             ram_mb = server.get('ram_mb', 1024)
             
             try:
+                # Determine the correct region for this server
+                # For now, try ru-7 since that's where we found the VM
+                server_region = 'ru-7'
+                
                 # Get CPU statistics
-                cpu_stats = self.get_server_cpu_statistics(server_id, hours=1)
+                cpu_stats = self.get_server_cpu_statistics(server_id, hours=1, region=server_region)
                 
                 # Get memory statistics
-                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=1)
+                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=1, region=server_region)
                 
                 all_statistics[server_id] = {
                     'server_name': server_name,

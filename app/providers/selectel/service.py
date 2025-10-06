@@ -26,7 +26,12 @@ class SelectelService:
         """
         self.provider = provider
         self.credentials = json.loads(provider.credentials)
-        self.client = SelectelClient(provider.credentials)
+        
+        # Add account_id to credentials for OpenStack authentication
+        credentials_with_account = self.credentials.copy()
+        credentials_with_account['account_id'] = provider.account_id
+        
+        self.client = SelectelClient(credentials_with_account)
     
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -719,15 +724,20 @@ class SelectelService:
     def _fetch_server_from_openstack(self, server_id: str) -> Optional[Dict]:
         """Fetch server details from OpenStack APIs across all regions"""
         try:
+            # Get available regions (this will trigger region discovery if needed)
+            regions = self.client.get_available_regions()
+            logger.debug(f"Searching for server {server_id} in regions: {regions}")
+            
             # Try each region
-            for region in self.client.regions.keys() if self.client.regions else ['ru-3']:
+            for region in regions:
                 try:
                     servers = self.client.get_openstack_servers(region=region)
                     for server in servers:
                         if server['id'] == server_id:
+                            logger.info(f"Found server {server_id} in region {region}")
                             return server
                 except Exception as e:
-                    logger.debug(f"Server {server_id} not in region {region}")
+                    logger.debug(f"Server {server_id} not in region {region}: {e}")
                     continue
             return None
         except Exception as e:
@@ -1121,6 +1131,39 @@ class SelectelService:
                     server_resource.add_tag('memory_data_points', str(mem_stats.get('data_points', 0)))
                     server_resource.add_tag('memory_period', mem_stats.get('period', 'HOUR'))
                     server_resource.add_tag('memory_collection_timestamp', mem_stats.get('collection_timestamp', ''))
+                
+                # Also add usage statistics to provider_config for UI display
+                if server_resource.provider_config:
+                    import json
+                    config = json.loads(server_resource.provider_config)
+                    
+                    # Add usage statistics to metadata
+                    usage_stats = {}
+                    if stats.get('cpu_statistics'):
+                        cpu_stats = stats['cpu_statistics']
+                        usage_stats['cpu'] = {
+                            'avg_usage': cpu_stats.get('avg_cpu_usage', 0),
+                            'max_usage': cpu_stats.get('max_cpu_usage', 0),
+                            'min_usage': cpu_stats.get('min_cpu_usage', 0),
+                            'trend': cpu_stats.get('trend', 0),
+                            'performance_tier': cpu_stats.get('performance_tier', 'unknown')
+                        }
+                    
+                    if stats.get('memory_statistics'):
+                        mem_stats = stats['memory_statistics']
+                        usage_stats['memory'] = {
+                            'avg_usage_mb': mem_stats.get('avg_memory_usage_mb', 0),
+                            'max_usage_mb': mem_stats.get('max_memory_usage_mb', 0),
+                            'min_usage_mb': mem_stats.get('min_memory_usage_mb', 0),
+                            'usage_percent': mem_stats.get('memory_usage_percent', 0),
+                            'trend': mem_stats.get('trend', 0)
+                        }
+                    
+                    if usage_stats:
+                        config['usage_statistics'] = usage_stats
+                        server_resource.provider_config = json.dumps(config)
+                        server_resource.last_sync = datetime.now()
+                        db.session.add(server_resource)
                 
                 logger.debug(f"Processed statistics for server: {stats.get('server_name')}")
                 
