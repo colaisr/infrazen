@@ -252,13 +252,13 @@ class SelectelClient:
     
     def get_openstack_servers(self, region: str = None) -> List[Dict[str, Any]]:
         """
-        Get OpenStack servers (VMs) from a specific region
+        Get OpenStack servers (VMs) from a specific region with flavor details
         
         Args:
             region: Optional region to query (if None, uses default openstack_base_url)
         
         Returns:
-            List of server dictionaries
+            List of server dictionaries with flavor information
         """
         try:
             headers = self._get_openstack_headers()
@@ -273,10 +273,22 @@ class SelectelClient:
             data = response.json()
             servers = data.get('servers', [])
             
-            # Add region info to each server if not already present
+            # Enrich each server with flavor details
             for server in servers:
                 if region and 'region' not in server:
                     server['region'] = region
+                
+                # Get flavor details if flavor ID is present
+                flavor_id = server.get('flavor', {}).get('id')
+                if flavor_id:
+                    try:
+                        flavor_url = f'{base_url}/compute/v2.1/flavors/{flavor_id}'
+                        flavor_response = requests.get(flavor_url, headers=headers, timeout=10)
+                        if flavor_response.status_code == 200:
+                            flavor_data = flavor_response.json().get('flavor', {})
+                            server['flavor'] = flavor_data
+                    except Exception as e:
+                        logger.debug(f"Failed to get flavor {flavor_id} for server {server.get('id')}: {e}")
             
             return servers
             
@@ -702,8 +714,14 @@ class SelectelClient:
                 # Hourly average for reference
                 avg_hourly_kopecks = cost_data['total_kopecks'] / obj_hours if obj_hours > 0 else cost_data['total_kopecks']
                 avg_hourly_rubles = avg_hourly_kopecks / 100
-                # Daily is sum of the hourly periods we fetched (avoids inflating when fewer than 24 periods present)
-                daily_rubles = cost_data['total_kopecks'] / 100
+                # For 1-hour window: daily cost = hourly cost * 24, monthly = daily * 30
+                # For longer windows: daily cost = total cost / hours * 24
+                if hours == 1:
+                    # Current moment snapshot - extrapolate to daily
+                    daily_rubles = avg_hourly_rubles * 24
+                else:
+                    # Historical data - use actual consumption
+                    daily_rubles = cost_data['total_kopecks'] / 100
                 monthly_rubles = daily_rubles * 30
 
                 cost_data['hourly_cost_kopecks'] = round(avg_hourly_kopecks, 2)
