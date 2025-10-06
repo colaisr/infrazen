@@ -78,10 +78,10 @@
                 {% if user.is_admin %}
                 <div class="nav-divider"></div>
                 <div class="nav-section-title">Администрирование</div>
-                <a href="{{ url_for("admin.users_page") }}" 
-                   class="nav-item {% if active_page == "admin_users" %}active{% endif %}">
-                    <div class="nav-icon"><i class="fa-solid fa-users"></i></div>
-                    <span>Управление пользователями</span>
+                <a href="{{ url_for("admin.dashboard") }}" 
+                   class="nav-item {% if active_page == "admin_dashboard" %}active{% endif %}">
+                    <div class="nav-icon"><i class="fa-solid fa-cog"></i></div>
+                    <span>Админ панель</span>
                 </a>
                 {% endif %}
             </nav>

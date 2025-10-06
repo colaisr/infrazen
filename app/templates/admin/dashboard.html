@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - InfraZen{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">
+        <h1>Admin Dashboard</h1>
+        <p>System administration and management</p>
+    </div>
+</div>
+
+<!-- Admin Navigation Menu -->
+<div class="admin-nav">
+    <div class="admin-nav-tabs">
+        <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-tab active">
+            <i class="fa-solid fa-chart-line"></i>
+            Dashboard
+        </a>
+        <a href="{{ url_for('admin.users_page') }}" class="admin-nav-tab">
+            <i class="fa-solid fa-users"></i>
+            Users
+        </a>
+        <a href="#" class="admin-nav-tab">
+            <i class="fa-solid fa-server"></i>
+            System Status
+        </a>
+        <a href="#" class="admin-nav-tab">
+            <i class="fa-solid fa-cloud"></i>
+            Providers
+        </a>
+        <a href="#" class="admin-nav-tab">
+            <i class="fa-solid fa-cog"></i>
+            System Preferences
+        </a>
+    </div>
+</div>
+
+<div class="admin-content">
+    <div class="admin-stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="totalUsers">-</h3>
+                <p>Total Users</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="adminUsers">-</h3>
+                <p>Admin Users</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-cloud"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="totalProviders">-</h3>
+                <p>Cloud Providers</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-database"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="totalResources">-</h3>
+                <p>Resources</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="admin-overview">
+        <h2>System Overview</h2>
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Recent Activity</h3>
+                <div id="recentActivity">
+                    <p>Loading recent activity...</p>
+                </div>
+            </div>
+            <div class="overview-card">
+                <h3>Quick Stats</h3>
+                <div class="quick-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Active Users Today:</span>
+                        <span class="stat-value" id="activeUsersToday">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">New Users This Week:</span>
+                        <span class="stat-value" id="newUsersWeek">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Logins:</span>
+                        <span class="stat-value" id="totalLogins">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load admin statistics
+document.addEventListener('DOMContentLoaded', function() {
+    loadAdminStats();
+});
+
+function loadAdminStats() {
+    // Load user statistics
+    fetch('/api/admin/users')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('totalUsers').textContent = data.pagination.total;
+                
+                // Count admin users
+                const adminCount = data.users.filter(user => user.role === 'admin' || user.role === 'super_admin').length;
+                document.getElementById('adminUsers').textContent = adminCount;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading user stats:', error);
+        });
+    
+    // Load provider statistics
+    fetch('/api/providers')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('totalProviders').textContent = data.providers.length;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading provider stats:', error);
+        });
+    
+    // Load resource statistics
+    fetch('/api/resources')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('totalResources').textContent = data.resources.length;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading resource stats:', error);
+        });
+}
+</script>
+
+<style>
+/* Admin Navigation */
+.admin-nav {
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.admin-nav-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.admin-nav-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    flex: 1;
+    justify-content: center;
+}
+
+.admin-nav-tab:hover {
+    color: var(--primary-blue);
+    background: var(--background-light);
+}
+
+.admin-nav-tab.active {
+    color: var(--primary-blue);
+    border-bottom-color: var(--primary-blue);
+    background: var(--background-light);
+}
+
+.admin-nav-tab i {
+    font-size: 1rem;
+}
+
+/* Stats Grid */
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.stat-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--primary-blue);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stat-content p {
+    color: var(--text-secondary);
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+}
+
+/* Admin Overview */
+.admin-overview {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.admin-overview h2 {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+}
+
+.overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.overview-card {
+    background: var(--background-light);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.overview-card h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.quick-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .admin-nav-tabs {
+        flex-direction: column;
+    }
+    
+    .admin-nav-tab {
+        justify-content: flex-start;
+        border-bottom: 1px solid var(--border-light);
+        border-right: none;
+    }
+    
+    .admin-nav-tab.active {
+        border-bottom: 1px solid var(--border-light);
+        border-left: 3px solid var(--primary-blue);
+    }
+    
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

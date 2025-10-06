@@ -274,13 +274,15 @@ def stop_impersonating():
         return jsonify({'success': False, 'error': str(e)})
 
 @admin_bp.route('/dashboard')
-def admin_dashboard():
+def dashboard():
     """Admin dashboard page"""
     admin_check = require_admin()
     if admin_check:
         return redirect(url_for('main.dashboard'))
     
-    return render_template('admin/dashboard.html')
+    # Get current user from session
+    user = session.get('user', {})
+    return render_template('admin/dashboard.html', user=user)
 
 @admin_bp.route('/users-page')
 def users_page():
@@ -289,4 +291,6 @@ def users_page():
     if admin_check:
         return redirect(url_for('main.dashboard'))
     
-    return render_template('admin/users.html')
+    # Get current user from session
+    user = session.get('user', {})
+    return render_template('admin/users.html', user=user)
