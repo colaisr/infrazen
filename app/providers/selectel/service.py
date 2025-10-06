@@ -85,14 +85,57 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # PHASE 1: Get all billed resources (48h window to catch deletions)
-            logger.info("PHASE 1: Fetching billing data (48h window)")
-            billed_resources = self.client.get_resource_costs(hours=48)
+            # PHASE 1: Get all billed resources (1h window for current snapshot)
+            logger.info("PHASE 1: Fetching billing data (1h window for current moment)")
+            billed_resources = self.client.get_resource_costs(hours=1)
             
             if not billed_resources:
-                logger.warning("No billed resources found - will fetch from OpenStack APIs")
-                # Fallback to old approach if billing API fails
-                return self._sync_resources_fallback(sync_snapshot)
+                logger.warning("No billed resources found - deactivating all existing resources")
+                # Deactivate all existing resources since nothing is currently consuming
+                from app.core.models.resource import Resource
+                existing_resources = Resource.query.filter_by(
+                    provider_id=self.provider.id,
+                    is_active=True
+                ).all()
+                
+                deactivated_count = 0
+                for resource in existing_resources:
+                    resource.is_active = False
+                    resource.add_tag('deactivation_reason', 'no_current_billing')
+                    resource.add_tag('deactivated_at', datetime.now().isoformat())
+                    db.session.add(resource)
+                    deactivated_count += 1
+                
+                db.session.commit()
+                
+                # Update sync snapshot
+                sync_snapshot.sync_status = 'success'
+                sync_snapshot.sync_completed_at = datetime.now()
+                sync_snapshot.sync_duration_seconds = int((sync_snapshot.sync_completed_at - sync_snapshot.sync_started_at).total_seconds())
+                sync_snapshot.total_resources_found = 0
+                sync_snapshot.resources_deleted = deactivated_count
+                sync_snapshot.total_monthly_cost = 0.0
+                
+                sync_config = {
+                    'sync_method': 'billing_first',
+                    'deactivation_reason': 'no_current_billing',
+                    'deactivated_resources': deactivated_count,
+                    'billing_window_hours': 1
+                }
+                sync_snapshot.sync_config = json.dumps(sync_config)
+                
+                db.session.add(sync_snapshot)
+                db.session.commit()
+                
+                logger.info(f"Deactivated {deactivated_count} resources - no current billing")
+                
+                return {
+                    'success': True,
+                    'resources_synced': 0,
+                    'resources_deactivated': deactivated_count,
+                    'total_daily_cost': 0.0,
+                    'message': f'No current resources consuming - deactivated {deactivated_count} existing resources'
+                }
             
             logger.info(f"Found {len(billed_resources)} billed resources")
             

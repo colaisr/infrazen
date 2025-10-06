@@ -96,8 +96,8 @@ def connections():
             ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
             last_snapshot_resources = last_snapshot.total_resources_found if last_snapshot else 0
             
-            # Calculate provider costs
-            provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+            # Calculate provider costs (only from active resources)
+            provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
             total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
             total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
             
