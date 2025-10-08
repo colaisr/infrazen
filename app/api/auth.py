@@ -35,7 +35,15 @@ def google_auth():
                 'email': 'demo@infrazen.com',
                 'name': 'Demo User',
                 'picture': '',
-                'role': 'demo'
+                'role': 'demo',
+                'is_admin': True,
+                'permissions': {
+                    'manage_users': True,
+                    'impersonate_users': True,
+                    'view_all_data': True,
+                    'manage_providers': True,
+                    'manage_resources': True
+                }
             }
             return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
         
@@ -110,6 +118,40 @@ def google_auth():
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/admin-login')
+def admin_login():
+    """Direct admin login for testing purposes"""
+    # Get admin user from database
+    admin_user = User.query.filter_by(role='super_admin').first()
+    if not admin_user:
+        admin_user = User.query.filter_by(role='admin').first()
+    
+    if admin_user:
+        session['user'] = {
+            'id': str(admin_user.id),
+            'db_id': admin_user.id,
+            'google_id': admin_user.google_id,
+            'email': admin_user.email,
+            'name': f"{admin_user.first_name} {admin_user.last_name}".strip() or admin_user.email.split('@')[0],
+            'picture': admin_user.google_picture or '',
+            'role': admin_user.role,
+            'is_admin': admin_user.is_admin(),
+            'permissions': admin_user.get_permissions()
+        }
+        return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
+    else:
+        return jsonify({'success': False, 'error': 'No admin user found'})
+
+@auth_bp.route('/me')
+def current_user():
+    """Get current user session info"""
+    user = session.get('user', {})
+    return jsonify({
+        'authenticated': bool(user),
+        'user': user,
+        'is_admin': user.get('is_admin', False) if user else False
+    })
 
 @auth_bp.route('/logout')
 def logout():

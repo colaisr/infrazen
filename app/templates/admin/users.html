@@ -166,11 +166,12 @@ function loadUsers(page = 1) {
                 displayPagination(data.pagination);
                 currentPage = page;
             } else {
+                console.error('API Error:', data.error);
                 showError('Failed to load users: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch Error:', error);
             showError('Failed to load users');
         });
 }
@@ -187,11 +188,11 @@ function displayUsers(users) {
                     <div class="user-avatar">
                         ${user.google_picture ? 
                             `<img src="${user.google_picture}" alt="${user.name}">` : 
-                            `<div class="avatar-placeholder">${user.name.charAt(0).toUpperCase()}</div>`
+                            `<div class="avatar-placeholder">${(user.name || user.email || 'U').charAt(0).toUpperCase()}</div>`
                         }
                     </div>
                     <div class="user-details">
-                        <div class="user-name">${user.first_name} ${user.last_name}`.trim() || user.email.split('@')[0]}</div>
+                        <div class="user-name">${(user.first_name + ' ' + user.last_name).trim() || user.email.split('@')[0]}</div>
                         <div class="user-company">${user.company || ''}</div>
                     </div>
                 </div>
