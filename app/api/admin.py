@@ -115,7 +115,8 @@ def update_user(user_id):
         if 'role' in data:
             user.role = data['role']
         if 'is_active' in data:
-            user.is_active = data['is_active']
+            # Convert string to boolean
+            user.is_active = data['is_active'] in [True, 'true', 'True', '1', 1]
         if 'admin_notes' in data:
             user.admin_notes = data['admin_notes']
         if 'permissions' in data:

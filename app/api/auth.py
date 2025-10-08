@@ -143,6 +143,53 @@ def admin_login():
     else:
         return jsonify({'success': False, 'error': 'No admin user found'})
 
+@auth_bp.route('/login-password', methods=['POST'])
+def login_password():
+    """Handle username/password authentication"""
+    try:
+        data = request.get_json()
+        username_or_email = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not username_or_email or not password:
+            return jsonify({'success': False, 'error': 'Username/email and password are required'})
+        
+        # Find user by username or email
+        user = User.find_by_username_or_email(username_or_email)
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'Invalid username/email or password'})
+        
+        # Check if user can login with password
+        if not user.can_login_with_password():
+            return jsonify({'success': False, 'error': 'Password login not available for this account'})
+        
+        # Verify password
+        if not user.check_password(password):
+            return jsonify({'success': False, 'error': 'Invalid username/email or password'})
+        
+        # Update login information
+        user.update_login_info()
+        
+        # Store user in session
+        session['user'] = {
+            'id': str(user.id),
+            'db_id': user.id,
+            'google_id': user.google_id,
+            'email': user.email,
+            'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+            'picture': user.google_picture or '',
+            'role': user.role,
+            'is_admin': user.is_admin(),
+            'permissions': user.get_permissions(),
+            'login_method': 'password'
+        }
+        
+        return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 @auth_bp.route('/me')
 def current_user():
     """Get current user session info"""
@@ -152,6 +199,125 @@ def current_user():
         'user': user,
         'is_admin': user.get('is_admin', False) if user else False
     })
+
+@auth_bp.route('/set-password', methods=['POST'])
+def set_password():
+    """Set password for current user"""
+    try:
+        # Check if user is logged in
+        user_data = session.get('user')
+        if not user_data:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        
+        data = request.get_json()
+        password = data.get('password', '').strip()
+        confirm_password = data.get('confirm_password', '').strip()
+        
+        if not password or not confirm_password:
+            return jsonify({'success': False, 'error': 'Password and confirmation are required'})
+        
+        if password != confirm_password:
+            return jsonify({'success': False, 'error': 'Passwords do not match'})
+        
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': 'Password must be at least 6 characters'})
+        
+        # Get user from database
+        user = User.find_by_id(user_data.get('db_id'))
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        # Set password
+        user.set_password(password)
+        
+        return jsonify({'success': True, 'message': 'Password set successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/change-password', methods=['POST'])
+def change_password():
+    """Change password for current user (requires current password)"""
+    try:
+        # Check if user is logged in
+        user_data = session.get('user')
+        if not user_data:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        
+        data = request.get_json()
+        current_password = data.get('current_password', '').strip()
+        new_password = data.get('password', '').strip()
+        confirm_password = data.get('confirm_password', '').strip()
+        
+        if not current_password or not new_password or not confirm_password:
+            return jsonify({'success': False, 'error': 'All fields are required'})
+        
+        if new_password != confirm_password:
+            return jsonify({'success': False, 'error': 'Passwords do not match'})
+        
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'error': 'Password must be at least 6 characters'})
+        
+        # Get user from database
+        user = User.find_by_id(user_data.get('db_id'))
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        # Check current password
+        if not user.check_password(current_password):
+            return jsonify({'success': False, 'error': 'Current password is incorrect'})
+        
+        # Set new password
+        user.set_password(new_password)
+        
+        return jsonify({'success': True, 'message': 'Password changed successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/user-details')
+def user_details():
+    """Get detailed user information for settings page"""
+    try:
+        # Check if user is logged in
+        user_data = session.get('user')
+        if not user_data:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        
+        # Get user from database
+        user = User.find_by_id(user_data.get('db_id'))
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+                'company': user.company,
+                'role': user.role,
+                'is_active': user.is_active,
+                'created_at': user.created_at.isoformat() if user.created_at else None,
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'login_count': user.login_count,
+                'google_id': user.google_id,
+                'google_picture': user.google_picture,
+                'has_password': user.has_password(),
+                'can_login_with_password': user.can_login_with_password(),
+                'can_login_with_google': user.can_login_with_google(),
+                'current_login_method': user_data.get('login_method', 'unknown'),
+                'timezone': user.timezone,
+                'currency': user.currency,
+                'language': user.language
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @auth_bp.route('/logout')
 def logout():

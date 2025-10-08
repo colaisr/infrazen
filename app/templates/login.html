@@ -22,7 +22,21 @@
             <h1 class="login-title">Добро пожаловать</h1>
             <p class="login-subtitle">Войдите в систему для управления облачными расходами</p>
             
-            <!-- Google Sign-In Button -->
+            <!-- Login Options Tabs -->
+            <div class="login-tabs">
+                <button class="tab-button active" onclick="switchTab('google')" id="google-tab">
+                    <i class="fa-brands fa-google"></i>
+                    Google
+                </button>
+                <button class="tab-button" onclick="switchTab('password')" id="password-tab">
+                    <i class="fa-solid fa-lock"></i>
+                    Пароль
+                </button>
+            </div>
+            
+            <!-- Google OAuth Section -->
+            <div id="google-login" class="login-section active">
+                <!-- Google Sign-In Button -->
             <div id="g_id_onload"
                  data-client_id="{{ google_client_id }}"
                  data-context="signin"
@@ -75,6 +89,29 @@
                 </button>
             </div>
             {% endif %}
+            </div>
+            
+            <!-- Password Login Section -->
+            <div id="password-login" class="login-section">
+                <form id="password-form" onsubmit="handlePasswordLogin(event)">
+                    <div class="form-group">
+                        <label for="username">Имя пользователя или Email</label>
+                        <input type="text" id="username" name="username" required 
+                               placeholder="Введите имя пользователя или email">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Пароль</label>
+                        <input type="password" id="password" name="password" required 
+                               placeholder="Введите пароль">
+                    </div>
+                    
+                    <button type="submit" class="password-login-btn">
+                        <i class="fa-solid fa-sign-in-alt"></i>
+                        Войти
+                    </button>
+                </form>
+            </div>
             
             <div style="margin-top: 2rem; text-align: center;">
                 <a href="{{ url_for('main.index') }}" style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem;">
@@ -85,6 +122,57 @@
     </div>
 
     <script>
+        // Tab switching functionality
+        function switchTab(tab) {
+            // Hide all sections
+            document.getElementById('google-login').classList.remove('active');
+            document.getElementById('password-login').classList.remove('active');
+            
+            // Remove active class from all tabs
+            document.getElementById('google-tab').classList.remove('active');
+            document.getElementById('password-tab').classList.remove('active');
+            
+            // Show selected section and activate tab
+            if (tab === 'google') {
+                document.getElementById('google-login').classList.add('active');
+                document.getElementById('google-tab').classList.add('active');
+            } else if (tab === 'password') {
+                document.getElementById('password-login').classList.add('active');
+                document.getElementById('password-tab').classList.add('active');
+            }
+        }
+        
+        // Handle password login
+        function handlePasswordLogin(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const data = {
+                username: formData.get('username'),
+                password: formData.get('password')
+            };
+            
+            fetch('/api/auth/login-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    alert('Ошибка входа: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при входе');
+            });
+        }
+        
         // Handle Google Sign-In response
         function handleCredentialResponse(response) {
             fetch('/api/auth/google', {
@@ -151,6 +239,97 @@
     </script>
     
     <style>
+        /* Login Tabs */
+        .login-tabs {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab-button.active {
+            color: var(--primary-blue);
+            border-bottom-color: var(--primary-blue);
+        }
+        
+        .tab-button:hover {
+            color: var(--primary-blue);
+        }
+        
+        /* Login Sections */
+        .login-section {
+            display: none;
+        }
+        
+        .login-section.active {
+            display: block;
+        }
+        
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .password-login-btn {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-blue);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .password-login-btn:hover {
+            background: var(--secondary-blue);
+        }
+        
+        /* Existing styles */
         .google-login-btn, .demo-login-btn {
             width: 100%;
             padding: 12px 16px;

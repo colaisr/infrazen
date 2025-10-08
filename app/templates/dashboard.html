@@ -450,7 +450,7 @@ function syncProvider(providerId) {
             // Show success state
             button.innerHTML = '<i class="fa-solid fa-check"></i><span>Синхронизировано</span>';
             button.style.background = 'var(--success-green)';
-            button.style.border-color = 'var(--success-green)';
+            button.style.borderColor = 'var(--success-green)';
             button.style.color = 'white';
             
             // Reset after 2 seconds
@@ -459,7 +459,7 @@ function syncProvider(providerId) {
                 button.classList.remove('loading');
                 button.innerHTML = originalText;
                 button.style.background = '';
-                button.style.border-color = '';
+                button.style.borderColor = '';
                 button.style.color = '';
             }, 2000);
         } else {
@@ -472,7 +472,7 @@ function syncProvider(providerId) {
         // Show error state
         button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span>Ошибка</span>';
         button.style.background = 'var(--error-red)';
-        button.style.border-color = 'var(--error-red)';
+        button.style.borderColor = 'var(--error-red)';
         button.style.color = 'white';
         
         // Reset after 3 seconds
@@ -481,7 +481,7 @@ function syncProvider(providerId) {
             button.classList.remove('loading');
             button.innerHTML = originalText;
             button.style.background = '';
-            button.style.border-color = '';
+            button.style.borderColor = '';
             button.style.color = '';
         }, 3000);
     });

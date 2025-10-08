@@ -4,6 +4,7 @@ User model for authentication and user management
 from app.core.models import db
 from .base import BaseModel
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class User(BaseModel):
     """User model for authentication with Google OAuth integration and roles"""
@@ -104,6 +105,29 @@ class User(BaseModel):
         """Check if user can manage other users"""
         return self.is_admin() and self.has_permission('manage_users')
     
+    def set_password(self, password):
+        """Set password for user"""
+        self.password_hash = generate_password_hash(password)
+        db.session.commit()
+    
+    def check_password(self, password):
+        """Check if provided password is correct"""
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+    
+    def has_password(self):
+        """Check if user has a password set"""
+        return bool(self.password_hash)
+    
+    def can_login_with_password(self):
+        """Check if user can login with password"""
+        return self.has_password() and self.is_active
+    
+    def can_login_with_google(self):
+        """Check if user can login with Google OAuth"""
+        return bool(self.google_id) and self.is_active
+    
     def update_login_info(self):
         """Update login information"""
         from datetime import datetime
@@ -120,6 +144,21 @@ class User(BaseModel):
     def find_by_email(cls, email):
         """Find user by email"""
         return cls.query.filter_by(email=email).first()
+    
+    @classmethod
+    def find_by_username(cls, username):
+        """Find user by username"""
+        return cls.query.filter_by(username=username).first()
+    
+    @classmethod
+    def find_by_username_or_email(cls, identifier):
+        """Find user by username or email"""
+        return cls.query.filter(
+            db.or_(
+                cls.username == identifier,
+                cls.email == identifier
+            )
+        ).first()
     
     @classmethod
     def create_from_google(cls, google_data):

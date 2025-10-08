@@ -303,11 +303,11 @@ def settings():
     else:
         overview = get_real_user_overview(user['id'])
     
-    return render_template('page.html', 
+    return render_template('settings.html', 
                         user=user,
                         active_page='settings',
-                        page_title='Настройки',
-                        page_subtitle='Настройки системы',
+                        page_title='Settings',
+                        page_subtitle='Manage your account settings',
                         overview=overview,
                         is_demo_user=is_demo_user)
 

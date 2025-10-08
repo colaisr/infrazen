@@ -322,9 +322,10 @@ function saveUser() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            const isUpdate = currentUserId !== null;
             closeUserModal();
             loadUsers(currentPage);
-            showSuccess(currentUserId ? 'User updated successfully' : 'User created successfully');
+            showSuccess(isUpdate ? 'User updated successfully' : 'User created successfully');
         } else {
             showError('Failed to save user: ' + data.error);
         }
