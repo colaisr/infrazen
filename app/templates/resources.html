@@ -237,13 +237,13 @@
                             </div>
                         </div>
                         {% endif %}
-                        {% if config.get('disk_gb') or config.get('total_storage_gb') %}
+                        {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-hdd"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ (config.get('total_storage_gb') or config.get('disk_gb'))|round(1) }} GB</span>
+                                <span class="spec-value">{{ (config.get('total_storage_gb') or config.get('disk_gb') or config.get('billing', {}).get('total_storage_gb', 0))|round(1) }} GB</span>
                                 <span class="spec-label">Диск</span>
                             </div>
                         </div>
