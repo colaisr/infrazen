@@ -677,7 +677,7 @@ class SelectelClient:
             unified_resources = {}  # Unified resources (VM + attached volumes)
             period_costs = {}  # Track cost per unified resource per period
             project_id = None  # Track project ID to filter it out
-            
+
             for item in data.get('data', []):
                 obj = item.get('object', {})
                 obj_id = obj.get('id')
@@ -688,14 +688,14 @@ class SelectelClient:
                 cost_kopecks = item.get('value', 0)
                 period = item.get('period', '')
                 region = item.get('metric', {}).get('region', 'unknown')
-                
+
                 if not obj_id:
                     continue
-                
+
                 # Detect project ID (parent of top-level resources)
                 if parent_id and not project_id and len(parent_id) == 32:
                     project_id = parent_id
-                
+
                 # Determine unified resource ID
                 # If parent_id is a VM (not project), this is an attached volume
                 # Otherwise, it's a standalone resource (VM or detached volume)
@@ -705,12 +705,12 @@ class SelectelClient:
                 else:
                     # This is a parent/standalone resource
                     unified_id = obj_id
-                
+
                 # Initialize unified resource
                 if unified_id not in unified_resources:
                     # Determine if this is a VM or standalone volume
                     is_vm = obj_type == 'cloud_vm'
-                    
+
                     if unified_id == obj_id:
                         # This is the main resource
                         unified_resources[unified_id] = {
@@ -736,6 +736,32 @@ class SelectelClient:
                             'region': region
                         }
                     period_costs[unified_id] = {}
+
+                # If this is a VM resource, try to enrich with OpenStack details
+                if unified_id == obj_id and obj_type == 'cloud_vm':
+                    try:
+                        # Try to get VM details from OpenStack to add CPU/RAM info
+                        vm_details = self._fetch_server_from_openstack(obj_id)
+                        if vm_details:
+                            # Add CPU and memory information
+                            flavor = vm_details.get('flavor', {})
+                            vcpus = flavor.get('vcpus')
+                            ram_mb = flavor.get('ram')  # OpenStack uses 'ram' in MB
+
+                            if vcpus:
+                                unified_resources[unified_id]['cpu_cores'] = vcpus
+                                unified_resources[unified_id]['vcpus'] = vcpus
+                            if ram_mb:
+                                unified_resources[unified_id]['ram_mb'] = ram_mb
+
+                            # Add region from VM details if available
+                            vm_region = vm_details.get('region') or vm_details.get('region_id')
+                            if vm_region:
+                                unified_resources[unified_id]['region'] = vm_region
+
+                    except Exception as e:
+                        # If we can't get OpenStack details, continue with billing data only
+                        pass
                 
                 # Update resource info if this is the main VM (not a child)
                 if unified_id == obj_id and obj_type == 'cloud_vm':
@@ -745,9 +771,24 @@ class SelectelClient:
                 
                 # Track attached volumes
                 if parent_id and parent_id != project_id and unified_id != obj_id:
-                    if obj_id not in unified_resources[unified_id]['attached_volumes']:
-                        unified_resources[unified_id]['attached_volumes'].append(obj_id)
+                    # Get volume size from billing API metric quantity
+                    volume_size_gb = item.get('metric', {}).get('quantity', 0)
+
+                    # Add volume info with size
+                    volume_info = {
+                        'id': obj_id,
+                        'name': obj_name,
+                        'size_gb': volume_size_gb
+                    }
+
+                    if volume_info not in unified_resources[unified_id]['attached_volumes']:
+                        unified_resources[unified_id]['attached_volumes'].append(volume_info)
+
                     unified_resources[unified_id]['is_unified'] = True
+
+                    # Recalculate total storage
+                    total_storage_gb = sum(v.get('size_gb', 0) for v in unified_resources[unified_id]['attached_volumes'])
+                    unified_resources[unified_id]['total_storage_gb'] = total_storage_gb
                 
                 # Aggregate metrics
                 if metric_id:
@@ -767,12 +808,16 @@ class SelectelClient:
             # Also filter out standalone volumes that are already unified with VMs
             final_resources = {}
             attached_volume_ids = set()
-            
+
             # First pass: collect all attached volume IDs
             for unified_id, resource_data in unified_resources.items():
                 if resource_data.get('attached_volumes'):
-                    attached_volume_ids.update(resource_data['attached_volumes'])
-            
+                    for vol in resource_data['attached_volumes']:
+                        if isinstance(vol, dict):
+                            attached_volume_ids.add(vol.get('id'))
+                        else:
+                            attached_volume_ids.add(vol)
+
             # Second pass: calculate costs and filter
             for unified_id, resource_data in unified_resources.items():
                 # Skip if this is a standalone volume that's already attached to a VM
