@@ -164,6 +164,37 @@ The InfraZen platform implements a comprehensive user management system with Goo
 - **Sidebar Integration**: "Админ панель" (Admin Panel) link for admin users
 - **Role-Based Access**: Admin functions only visible to admin users
 
+### 6.1.7. Database Initialization & Bootstrap Process
+
+#### **Initialization Script (`init_database.py`)**
+The platform includes a comprehensive database initialization script that bootstraps the system with essential data and default configurations. This script ensures consistent deployment across environments and provides a foundation for the user management system.
+
+#### **Super Admin User Creation**
+- **Default Super Admin**: Email `admin@infrazen.com`, Username `admin`
+- **Secure Password**: Pre-configured password `kok5489103` for initial system access
+- **Full Permissions**: Complete administrative privileges including:
+  - `manage_users`: Create, edit, and delete users
+  - `impersonate_users`: Login as other users for support
+  - `view_all_data`: Access data from all users
+  - `manage_providers`: Manage cloud provider connections
+  - `manage_resources`: Manage cloud resources
+- **Role Assignment**: `super_admin` with highest system privileges
+- **Account Status**: Pre-verified and active for immediate use
+
+#### **Initialization Process Flow**
+1. **Database Creation**: Creates all required tables using SQLAlchemy models
+2. **Super Admin Check**: Verifies if super admin already exists to prevent duplicates
+3. **User Creation**: Generates super admin account with secure password hash
+4. **Permission Assignment**: Sets comprehensive admin permissions
+5. **Database Commit**: Persists user data with atomic transaction
+6. **Statistics Display**: Shows database statistics and role distribution
+
+#### **Bootstrap Benefits**
+- **Consistent Deployment**: Ensures identical setup across development/production
+- **Security Foundation**: Provides secure administrative access from system initialization
+- **Role-Based Start**: Establishes hierarchical user management from day one
+- **Audit Trail**: Maintains creation timestamps and admin notes
+
 ## 6.2. Multi-Cloud Sync Architecture
 
 ### 6.1.1. Sync System Overview

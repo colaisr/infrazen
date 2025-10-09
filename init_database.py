@@ -52,7 +52,10 @@ def init_database():
                     'manage_resources': True
                 }
                 super_admin.set_permissions(admin_permissions)
-                
+
+                # Set password for super admin
+                super_admin.set_password('kok5489103')
+
                 db.session.add(super_admin)
                 db.session.commit()
                 
