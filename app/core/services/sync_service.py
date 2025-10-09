@@ -9,6 +9,7 @@ from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot, ResourceState
 from app.providers.beget.client import BegetAPIClient
+from app.providers import sync_orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -998,3 +999,14 @@ class SyncService:
         return SyncSnapshot.query.filter_by(provider_id=self.provider_id)\
             .order_by(SyncSnapshot.sync_started_at.desc())\
             .first()
+
+    def sync_with_orchestrator(self, sync_type: str = 'manual') -> Dict:
+        """
+        Sync using the new plugin-based orchestrator
+        This is the preferred method for new implementations
+        """
+        return sync_orchestrator.sync_provider(self.provider_id, sync_type)
+
+    def test_connection_with_orchestrator(self) -> Dict[str, Any]:
+        """Test connection using the new orchestrator"""
+        return sync_orchestrator.test_provider_connection(self.provider_id)

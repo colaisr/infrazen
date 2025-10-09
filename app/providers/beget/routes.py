@@ -185,22 +185,20 @@ def sync_connection(provider_id):
         if not provider:
             return jsonify({'success': False, 'error': 'Connection not found'}), 404
         
-        # Import sync service
-        from app.core.services.sync_service import SyncService
-        
-        # Initialize sync service
-        sync_service = SyncService(provider_id)
-        
-        # Perform comprehensive sync
-        sync_result = sync_service.sync_resources(sync_type='manual')
+        # Import sync orchestrator
+        from app.providers import sync_orchestrator
+
+        # Perform sync using new plugin-based orchestrator
+        sync_result = sync_orchestrator.sync_provider(provider_id, sync_type='manual')
         
         if sync_result['success']:
             return jsonify({
-                'success': True, 
+                'success': True,
                 'message': sync_result['message'],
-                'snapshot_id': sync_result['snapshot_id'],
-                'status': sync_result['status'],
-                'total_resources': sync_result['total_resources'],
+                'snapshot_id': sync_result['sync_snapshot_id'],
+                'status': 'success',
+                'total_resources': sync_result['resources_synced'],
+                'total_cost': sync_result.get('total_cost', 0),
                 'errors': sync_result['errors']
             })
         else:

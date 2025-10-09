@@ -162,9 +162,15 @@ class Resource(BaseModel):
     def get_all_tags(self) -> dict:
         """Get all tags for this resource as a dictionary"""
         from app.core.models.tags import ResourceTag
-        
+
         tags = ResourceTag.query.filter_by(resource_id=self.id).all()
         return {tag.tag_key: tag.tag_value for tag in tags}
+
+    def clear_tags(self):
+        """Remove all tags from this resource"""
+        from app.core.models.tags import ResourceTag
+
+        ResourceTag.query.filter_by(resource_id=self.id).delete()
     
     def to_dict(self):
         """Convert resource to dictionary"""
