@@ -90,8 +90,8 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # PHASE 1: Get all billed resources (24h window for accurate daily costs)
-            logger.info("PHASE 1: Fetching billing data (24h window for accurate daily costs)")
+            # PHASE 1: Get all billed resources (24h window, uses latest hour for hourly cost like Selectel UI)
+            logger.info("PHASE 1: Fetching billing data (24h window, latest hour method matching Selectel UI)")
             billed_resources = self.client.get_resource_costs(hours=24)
             
             if not billed_resources:
@@ -123,9 +123,10 @@ class SelectelService:
                 
                 sync_config = {
                     'sync_method': 'billing_first',
+                    'cost_calculation': 'latest_hour_selectel_ui_match',
                     'deactivation_reason': 'no_current_billing',
                     'deactivated_resources': deactivated_count,
-                    'billing_window_hours': 1
+                    'billing_window_hours': 24
                 }
                 sync_snapshot.sync_config = json.dumps(sync_config)
                 

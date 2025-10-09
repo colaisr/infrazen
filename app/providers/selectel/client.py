@@ -616,7 +616,7 @@ class SelectelClient:
         Get cost/consumption data for all resources
         
         Uses the cloud_billing API to get actual costs per resource.
-        Costs are returned in kopecks (1/100 ruble) per hour, grouped by resource.
+        Matches Selectel UI behavior: uses project-level grouping and latest hour's cost as hourly rate.
         
         Args:
             hours: Number of hours to fetch cost data for (default: 24 for daily cost)
@@ -627,7 +627,7 @@ class SelectelClient:
                 'resource_id': {
                     'name': 'Resource Name',
                     'type': 'cloud_vm',
-                    'hourly_cost_kopecks': 43.0,
+                    'hourly_cost_kopecks': 43.0,  # Latest hour's cost (matches Selectel UI)
                     'hourly_cost_rubles': 0.43,
                     'daily_cost_rubles': 10.32,
                     'monthly_cost_rubles': 309.60,
@@ -646,12 +646,14 @@ class SelectelClient:
             
             # Construct billing API URL
             billing_url = "https://api.selectel.ru/v1/cloud_billing/statistic/consumption"
-            params = {
+            
+            # STEP 1: Get project-level consumption to find latest hourly costs (matches Selectel UI)
+            project_params = {
                 'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
                 'start': start_str,
                 'end': end_str,
                 'locale': 'ru',
-                'group_type': 'project_object_region_metric',
+                'group_type': 'project',  # Project-level grouping like Selectel UI
                 'period_group_type': 'hour'
             }
             
@@ -661,7 +663,30 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            response = requests.get(billing_url, params=project_params, headers=headers, timeout=30)
+            response.raise_for_status()
+            project_data = response.json()
+            
+            # Find the latest hour's cost from project-level data
+            latest_hourly_cost = 0
+            if project_data.get('status') == 'success':
+                project_items = project_data.get('data', [])
+                if project_items:
+                    # Get the most recent period's cost
+                    latest_item = max(project_items, key=lambda x: x.get('period', ''))
+                    latest_hourly_cost = latest_item.get('value', 0)  # Cost in kopecks
+            
+            # STEP 2: Get detailed resource-level data
+            resource_params = {
+                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
+                'start': start_str,
+                'end': end_str,
+                'locale': 'ru',
+                'group_type': 'project_object_region_metric',
+                'period_group_type': 'hour'
+            }
+            
+            response = requests.get(billing_url, params=resource_params, headers=headers, timeout=30)
             response.raise_for_status()
             data = response.json()
             
@@ -671,6 +696,7 @@ class SelectelClient:
             # Process consumption data
             resource_costs = {}
             periods_per_object: Dict[str, set] = {}
+            resource_latest_period_cost: Dict[str, Dict[str, int]] = {}  # Track cost per resource per period
             
             for item in data.get('data', []):
                 obj = item.get('object', {})
@@ -679,6 +705,7 @@ class SelectelClient:
                 obj_type = obj.get('type')
                 metric_id = item.get('metric', {}).get('id', '')
                 cost_kopecks = item.get('value', 0)  # Cost in kopecks per hour
+                period = item.get('period')
                 
                 # Normalize object type to our resource taxonomy
                 if obj_type == 'cloud_vm':
@@ -702,34 +729,38 @@ class SelectelClient:
                         'total_kopecks': 0
                     }
                     periods_per_object[obj_id] = set()
+                    resource_latest_period_cost[obj_id] = {}
                 
                 resource_costs[obj_id]['metrics'][metric_id] = resource_costs[obj_id]['metrics'].get(metric_id, 0) + cost_kopecks
                 resource_costs[obj_id]['total_kopecks'] += cost_kopecks
-                # Track number of hourly periods for this specific object
-                period = item.get('period')
+                
+                # Track cost per period for this resource
                 if period is not None:
                     periods_per_object[obj_id].add(period)
+                    if period not in resource_latest_period_cost[obj_id]:
+                        resource_latest_period_cost[obj_id][period] = 0
+                    resource_latest_period_cost[obj_id][period] += cost_kopecks
             
-            # Calculate costs per resource
+            # Calculate costs per resource (Selectel UI method: use latest hour's cost as hourly rate)
             for resource_id, cost_data in resource_costs.items():
-                obj_hours = len(periods_per_object.get(resource_id, set()))
-                if obj_hours == 0:
-                    obj_hours = hours  # Fallback to requested range
-                # Hourly average for reference
-                avg_hourly_kopecks = cost_data['total_kopecks'] / obj_hours if obj_hours > 0 else cost_data['total_kopecks']
-                avg_hourly_rubles = avg_hourly_kopecks / 100
-                # For 1-hour window: daily cost = hourly cost * 24, monthly = daily * 30
-                # For longer windows: daily cost = total cost / hours * 24
-                if hours == 1:
-                    # Current moment snapshot - extrapolate to daily
-                    daily_rubles = avg_hourly_rubles * 24
+                # Find the latest period's cost for this resource
+                if resource_id in resource_latest_period_cost and resource_latest_period_cost[resource_id]:
+                    latest_period = max(resource_latest_period_cost[resource_id].keys())
+                    latest_hour_kopecks = resource_latest_period_cost[resource_id][latest_period]
                 else:
-                    # Historical data - use actual consumption
-                    daily_rubles = cost_data['total_kopecks'] / 100
+                    # Fallback: calculate average
+                    obj_hours = len(periods_per_object.get(resource_id, set()))
+                    if obj_hours == 0:
+                        obj_hours = hours
+                    latest_hour_kopecks = cost_data['total_kopecks'] / obj_hours if obj_hours > 0 else cost_data['total_kopecks']
+                
+                # Use latest hour's cost as the hourly rate (matches Selectel UI)
+                hourly_rubles = latest_hour_kopecks / 100
+                daily_rubles = hourly_rubles * 24  # Extrapolate to daily
                 monthly_rubles = daily_rubles * 30
 
-                cost_data['hourly_cost_kopecks'] = round(avg_hourly_kopecks, 2)
-                cost_data['hourly_cost_rubles'] = round(avg_hourly_rubles, 4)
+                cost_data['hourly_cost_kopecks'] = round(latest_hour_kopecks, 2)
+                cost_data['hourly_cost_rubles'] = round(hourly_rubles, 4)
                 cost_data['daily_cost_rubles'] = round(daily_rubles, 2)
                 cost_data['monthly_cost_rubles'] = round(monthly_rubles, 2)
             
