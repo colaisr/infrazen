@@ -90,9 +90,9 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # PHASE 1: Get all billed resources (1h window for current snapshot)
-            logger.info("PHASE 1: Fetching billing data (1h window for current moment)")
-            billed_resources = self.client.get_resource_costs(hours=1)
+            # PHASE 1: Get all billed resources (24h window for accurate daily costs)
+            logger.info("PHASE 1: Fetching billing data (24h window for accurate daily costs)")
+            billed_resources = self.client.get_resource_costs(hours=24)
             
             if not billed_resources:
                 logger.warning("No billed resources found - deactivating all existing resources")
