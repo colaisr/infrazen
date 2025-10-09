@@ -464,17 +464,15 @@ def link_google_account():
         if user.google_id:
             return jsonify({'success': False, 'error': 'Google account is already connected'})
         
-        # Verify the Google credential
+        # Verify the Google credential using the same method as login
         try:
-            from google.oauth2 import id_token
-            from google.auth.transport import requests
-            
             GOOGLE_CLIENT_ID = current_app.config.get('GOOGLE_CLIENT_ID')
             if not GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID == 'your-google-client-id':
-                # For development, simulate successful verification
+                # For development, allow any token (same as login behavior)
+                # This matches the behavior in the login function
                 idinfo = {
                     'sub': f'google-{user.id}-{int(time.time())}',
-                    'email': user.email,  # Use the same email
+                    'email': user.email,  # Use the same email as user account
                     'given_name': user.first_name or 'User',
                     'family_name': user.last_name or '',
                     'picture': '',
@@ -482,6 +480,9 @@ def link_google_account():
                     'locale': 'en'
                 }
             else:
+                # Production: verify real Google token
+                from google.oauth2 import id_token
+                from google.auth.transport import requests
                 idinfo = id_token.verify_oauth2_token(credential, requests.Request(), GOOGLE_CLIENT_ID)
             
             # Verify email matches

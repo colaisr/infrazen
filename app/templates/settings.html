@@ -2,6 +2,10 @@
 
 {% block title %}Settings - InfraZen FinOps Platform{% endblock %}
 
+{% block scripts %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+{% endblock %}
+
 {% block page_title %}Settings{% endblock %}
 {% block page_subtitle %}Manage your account settings and preferences{% endblock %}
 
@@ -525,6 +529,69 @@ function handleGoogleConnect() {
         return;
     }
     
+    // Show the Google OAuth modal
+    showGoogleConnectModal();
+}
+
+function showGoogleConnectModal() {
+    // Create modal HTML
+    const modalHTML = `
+        <div id="googleConnectModal" class="modal-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+            <div class="modal-content" style="background: white; padding: 2rem; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
+                <h3 style="margin-bottom: 1rem; color: #1e293b;">Connect Google Account</h3>
+                <p style="margin-bottom: 1.5rem; color: #64748b;">Sign in with Google to link your account</p>
+                
+                <!-- Google Sign-In Button (same as login) -->
+                <div id="g_id_onload_connect"
+                     data-client_id="{{ google_client_id }}"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleGoogleConnectResponse"
+                     data-auto_prompt="false">
+                </div>
+                
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="rectangular"
+                     data-theme="outline"
+                     data-text="signin_with"
+                     data-size="large"
+                     data-logo_alignment="left"
+                     data-width="100%">
+                </div>
+                
+                <button onclick="closeGoogleConnectModal()" style="margin-top: 1rem; background: #f1f5f9; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; color: #64748b;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Initialize Google Sign-In for the modal
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.renderButton(document.querySelector('#googleConnectModal .g_id_signin'), {
+            theme: 'outline',
+            size: 'large',
+            width: '100%',
+            text: 'signin_with'
+        });
+    }
+}
+
+function closeGoogleConnectModal() {
+    const modal = document.getElementById('googleConnectModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function handleGoogleConnectResponse(response) {
+    // Close the modal first
+    closeGoogleConnectModal();
+    
     // Show loading state
     const googleStatus = document.getElementById('googleStatus');
     const googleBadge = document.getElementById('googleBadge');
@@ -532,23 +599,6 @@ function handleGoogleConnect() {
     googleStatus.textContent = 'Connecting...';
     googleBadge.textContent = 'Connecting';
     
-    // Initialize Google OAuth
-    if (typeof google !== 'undefined' && google.accounts) {
-        // Use Google's One Tap or OAuth flow
-        google.accounts.id.initialize({
-            client_id: '{{ google_client_id }}',
-            callback: handleGoogleCallback
-        });
-        
-        // Trigger the OAuth flow
-        google.accounts.id.prompt();
-    } else {
-        // Fallback: redirect to Google OAuth
-        window.location.href = '/api/auth/connect-google';
-    }
-}
-
-function handleGoogleCallback(response) {
     // Send the credential to our backend to link the account
     fetch('/api/auth/link-google', {
         method: 'POST',
@@ -568,8 +618,6 @@ function handleGoogleCallback(response) {
         } else {
             showMessage('Failed to connect Google account: ' + data.error, 'error');
             // Reset UI state
-            const googleStatus = document.getElementById('googleStatus');
-            const googleBadge = document.getElementById('googleBadge');
             googleStatus.textContent = 'Not connected - Click to connect';
             googleBadge.textContent = 'Connect';
         }
@@ -578,12 +626,11 @@ function handleGoogleCallback(response) {
         console.error('Error:', error);
         showMessage('Failed to connect Google account', 'error');
         // Reset UI state
-        const googleStatus = document.getElementById('googleStatus');
-        const googleBadge = document.getElementById('googleBadge');
         googleStatus.textContent = 'Not connected - Click to connect';
         googleBadge.textContent = 'Connect';
     });
 }
+
 
 function updatePasswordManagement(user) {
     const container = document.getElementById('passwordManagementContent');
