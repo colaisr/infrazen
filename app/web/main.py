@@ -1,7 +1,7 @@
 """
 Main web interface routes
 """
-from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash
+from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash, current_app
 from datetime import datetime
 import json
 import sys
@@ -335,7 +335,8 @@ def settings():
                         page_title='Settings',
                         page_subtitle='Manage your account settings',
                         overview=overview,
-                        is_demo_user=is_demo_user)
+                        is_demo_user=is_demo_user,
+                        google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'))
 
 # Helper functions for real user data
 def get_real_user_overview(user_id):

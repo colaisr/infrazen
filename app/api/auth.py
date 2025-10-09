@@ -1,20 +1,20 @@
 """
 Authentication API routes
 """
-from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from functools import wraps
 from google.auth.transport import requests
 from google.oauth2 import id_token
 import os
+import time
 from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
 
 auth_bp = Blueprint('auth', __name__)
 
-# Google OAuth configuration
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
+# Google OAuth configuration will be accessed from app config
 
 def validate_session(f):
     """Decorator to validate user session and ensure user exists in database"""
@@ -61,7 +61,7 @@ def validate_session(f):
 @auth_bp.route('/login')
 def login():
     """Display login page"""
-    return render_template('login.html', google_client_id=GOOGLE_CLIENT_ID)
+    return render_template('login.html', google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'))
 
 @auth_bp.route('/google', methods=['POST'])
 def google_auth():
@@ -94,6 +94,7 @@ def google_auth():
         # Verify the Google ID token
         try:
             # For development, we'll be more lenient with token verification
+            GOOGLE_CLIENT_ID = current_app.config.get('GOOGLE_CLIENT_ID')
             if GOOGLE_CLIENT_ID == 'your-google-client-id':
                 # If not properly configured, allow any token for development
                 session['user'] = {
@@ -366,7 +367,7 @@ def user_details():
 @auth_bp.route('/register')
 def register():
     """Display registration page"""
-    return render_template('register.html', google_client_id=GOOGLE_CLIENT_ID)
+    return render_template('register.html', google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'))
 
 @auth_bp.route('/register', methods=['POST'])
 def handle_register():
@@ -432,6 +433,97 @@ def handle_register():
         })
         
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/connect-google')
+def connect_google():
+    """Redirect to Google OAuth for account linking"""
+    # This is a fallback if the JavaScript Google API doesn't work
+    # In a real implementation, you'd redirect to Google's OAuth endpoint
+    return jsonify({'success': False, 'error': 'Please use the clickable Google OAuth card in settings'})
+
+@auth_bp.route('/link-google', methods=['POST'])
+@validate_session
+def link_google_account():
+    """Link Google account to existing user"""
+    try:
+        data = request.get_json()
+        credential = data.get('credential')
+        
+        if not credential:
+            return jsonify({'success': False, 'error': 'No credential provided'})
+        
+        # Get current user
+        user_data = session.get('user')
+        user = User.find_by_id(user_data.get('db_id'))
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        # Check if user already has Google connected
+        if user.google_id:
+            return jsonify({'success': False, 'error': 'Google account is already connected'})
+        
+        # Verify the Google credential
+        try:
+            from google.oauth2 import id_token
+            from google.auth.transport import requests
+            
+            GOOGLE_CLIENT_ID = current_app.config.get('GOOGLE_CLIENT_ID')
+            if not GOOGLE_CLIENT_ID or GOOGLE_CLIENT_ID == 'your-google-client-id':
+                # For development, simulate successful verification
+                idinfo = {
+                    'sub': f'google-{user.id}-{int(time.time())}',
+                    'email': user.email,  # Use the same email
+                    'given_name': user.first_name or 'User',
+                    'family_name': user.last_name or '',
+                    'picture': '',
+                    'email_verified': True,
+                    'locale': 'en'
+                }
+            else:
+                idinfo = id_token.verify_oauth2_token(credential, requests.Request(), GOOGLE_CLIENT_ID)
+            
+            # Verify email matches
+            if idinfo.get('email') != user.email:
+                return jsonify({'success': False, 'error': 'Google account email does not match your account email'})
+            
+            # Update user with Google information
+            user.google_id = idinfo.get('sub')
+            user.google_picture = idinfo.get('picture', '')
+            user.google_verified_email = idinfo.get('email_verified', False)
+            user.google_locale = idinfo.get('locale', '')
+            
+            # Update first/last name if not set
+            if not user.first_name and idinfo.get('given_name'):
+                user.first_name = idinfo.get('given_name')
+            if not user.last_name and idinfo.get('family_name'):
+                user.last_name = idinfo.get('family_name')
+            
+            # Update is_verified based on Google verification
+            if idinfo.get('email_verified'):
+                user.is_verified = True
+            
+            db.session.commit()
+            
+            # Update session with new Google data
+            session['user'].update({
+                'google_id': user.google_id,
+                'picture': user.google_picture or '',
+                'initials': user.get_initials()
+            })
+            
+            return jsonify({
+                'success': True, 
+                'message': 'Google account linked successfully!'
+            })
+            
+        except ValueError as e:
+            print(f"Google token verification failed: {e}")
+            return jsonify({'success': False, 'error': 'Invalid Google credential'})
+        
+    except Exception as e:
+        print(f"Error linking Google account: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @auth_bp.route('/logout')

@@ -45,7 +45,7 @@
         </div>
         <div class="settings-card-body">
             <div class="login-methods">
-                <div class="login-method" id="googleLoginMethod">
+                <div class="login-method" id="googleLoginMethod" onclick="handleGoogleConnect()">
                     <div class="method-icon google">
                         <i class="fa-brands fa-google"></i>
                     </div>
@@ -190,6 +190,22 @@
 .login-method:hover {
     border-color: #cbd5e1;
     background: #f8fafc;
+}
+
+.login-method.clickable {
+    cursor: pointer;
+}
+
+.login-method.clickable:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateY(-1px);
+    background: white;
+}
+
+.login-method.clickable:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 }
 
 .method-icon {
@@ -465,15 +481,18 @@ function updateLoginMethods(user) {
     const hasGoogle = user.google_id !== null;
     const googleStatus = document.getElementById('googleStatus');
     const googleBadge = document.getElementById('googleBadge');
+    const googleMethod = document.getElementById('googleLoginMethod');
     
     if (hasGoogle) {
         googleStatus.textContent = 'Connected to Google account';
         googleBadge.className = 'method-badge badge-enabled';
         googleBadge.textContent = 'Enabled';
+        googleMethod.classList.remove('clickable');
     } else {
-        googleStatus.textContent = 'Not connected';
+        googleStatus.textContent = 'Not connected - Click to connect';
         googleBadge.className = 'method-badge badge-disabled';
-        googleBadge.textContent = 'Disabled';
+        googleBadge.textContent = 'Connect';
+        googleMethod.classList.add('clickable');
     }
     
     // Password status
@@ -495,6 +514,75 @@ function updateLoginMethods(user) {
     const loginMethod = user.current_login_method || 'unknown';
     document.getElementById('currentLoginMethod').innerHTML = 
         `Current session: <strong>${loginMethod === 'google' ? 'Google OAuth' : loginMethod === 'password' ? 'Username & Password' : 'Unknown'}</strong>`;
+}
+
+function handleGoogleConnect() {
+    // Check if user already has Google connected
+    const hasGoogle = userDetails && userDetails.google_id !== null;
+    
+    if (hasGoogle) {
+        showMessage('Google account is already connected', 'info');
+        return;
+    }
+    
+    // Show loading state
+    const googleStatus = document.getElementById('googleStatus');
+    const googleBadge = document.getElementById('googleBadge');
+    
+    googleStatus.textContent = 'Connecting...';
+    googleBadge.textContent = 'Connecting';
+    
+    // Initialize Google OAuth
+    if (typeof google !== 'undefined' && google.accounts) {
+        // Use Google's One Tap or OAuth flow
+        google.accounts.id.initialize({
+            client_id: '{{ google_client_id }}',
+            callback: handleGoogleCallback
+        });
+        
+        // Trigger the OAuth flow
+        google.accounts.id.prompt();
+    } else {
+        // Fallback: redirect to Google OAuth
+        window.location.href = '/api/auth/connect-google';
+    }
+}
+
+function handleGoogleCallback(response) {
+    // Send the credential to our backend to link the account
+    fetch('/api/auth/link-google', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            credential: response.credential
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Google account connected successfully!', 'success');
+            // Reload user details to update the UI
+            loadUserDetails();
+        } else {
+            showMessage('Failed to connect Google account: ' + data.error, 'error');
+            // Reset UI state
+            const googleStatus = document.getElementById('googleStatus');
+            const googleBadge = document.getElementById('googleBadge');
+            googleStatus.textContent = 'Not connected - Click to connect';
+            googleBadge.textContent = 'Connect';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Failed to connect Google account', 'error');
+        // Reset UI state
+        const googleStatus = document.getElementById('googleStatus');
+        const googleBadge = document.getElementById('googleBadge');
+        googleStatus.textContent = 'Not connected - Click to connect';
+        googleBadge.textContent = 'Connect';
+    });
 }
 
 function updatePasswordManagement(user) {
