@@ -3,6 +3,7 @@ Authentication API routes
 """
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
+from functools import wraps
 from google.auth.transport import requests
 from google.oauth2 import id_token
 import os
@@ -14,6 +15,47 @@ auth_bp = Blueprint('auth', __name__)
 
 # Google OAuth configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
+
+def validate_session(f):
+    """Decorator to validate user session and ensure user exists in database"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_data = session.get('user')
+        if not user_data:
+            return jsonify({'success': False, 'error': 'Not authenticated', 'redirect': '/login'}), 401
+        
+        # Skip validation for demo users (they don't have db_id)
+        if user_data.get('id') == 'demo-user-123' or user_data.get('id') == 'dev-user-123':
+            return f(*args, **kwargs)
+        
+        # Get user ID from session for real users
+        user_id = user_data.get('db_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Invalid session', 'redirect': '/login'}), 401
+        
+        # Check if user still exists in database
+        user = User.find_by_id(user_id)
+        if not user:
+            # User no longer exists - clear session and redirect to login
+            session.clear()
+            return jsonify({'success': False, 'error': 'User account no longer exists', 'redirect': '/login'}), 401
+        
+        # Check if user is still active
+        if not user.is_active:
+            session.clear()
+            return jsonify({'success': False, 'error': 'Account is deactivated', 'redirect': '/login'}), 401
+        
+        # Update session with current user data
+        session['user'].update({
+            'email': user.email,
+            'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+            'role': user.role,
+            'is_admin': user.is_admin(),
+            'permissions': user.get_permissions()
+        })
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 @auth_bp.route('/login')
 def login():
@@ -276,18 +318,13 @@ def change_password():
         return jsonify({'success': False, 'error': str(e)})
 
 @auth_bp.route('/user-details')
+@validate_session
 def user_details():
     """Get detailed user information for settings page"""
     try:
-        # Check if user is logged in
+        # Get user from database (already validated by decorator)
         user_data = session.get('user')
-        if not user_data:
-            return jsonify({'success': False, 'error': 'Not authenticated'})
-        
-        # Get user from database
         user = User.find_by_id(user_data.get('db_id'))
-        if not user:
-            return jsonify({'success': False, 'error': 'User not found'})
         
         return jsonify({
             'success': True,

@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, redirect, url_for, session, reques
 from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
+from app.api.auth import validate_session
 
 admin_bp = Blueprint('admin', __name__)
 

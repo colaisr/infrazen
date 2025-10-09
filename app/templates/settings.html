@@ -420,14 +420,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadUserDetails() {
     fetch('/api/auth/user-details')
-        .then(response => response.json())
+        .then(response => {
+            if (response.status === 401) {
+                // Authentication error - redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
+            if (data && data.success) {
                 userDetails = data.user;
                 updateAccountInfo(userDetails);
                 updateLoginMethods(userDetails);
                 updatePasswordManagement(userDetails);
                 updatePreferences(userDetails);
+            } else if (data && data.redirect) {
+                // Server requested redirect (e.g., user account no longer exists)
+                showMessage(data.error || 'Session expired', 'error');
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 2000);
             } else {
                 showMessage('Failed to load user details', 'error');
             }

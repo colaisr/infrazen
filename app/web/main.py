@@ -13,13 +13,39 @@ from app.core.database import db
 from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot
+from app.core.models.user import User
 
 main_bp = Blueprint('main', __name__)
 
 def require_auth():
-    """Check if user is authenticated"""
-    if 'user' not in session:
+    """Check if user is authenticated and session is valid"""
+    user_data = session.get('user')
+    if not user_data:
         return redirect(url_for('auth.login'))
+    
+    # Allow demo user to pass through without validation
+    if user_data.get('id') == 'demo-user-123':
+        return None
+    
+    # For real users, validate session
+    user_id = user_data.get('db_id')
+    if not user_id:
+        session.clear()
+        return redirect(url_for('auth.login'))
+    
+    # Check if user still exists in database
+    user = User.find_by_id(user_id)
+    if not user:
+        session.clear()
+        flash('Your account no longer exists. Please contact support.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    # Check if user is still active
+    if not user.is_active:
+        session.clear()
+        flash('Your account has been deactivated. Please contact support.', 'error')
+        return redirect(url_for('auth.login'))
+    
     return None
 
 @main_bp.route('/')
