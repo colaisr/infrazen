@@ -613,25 +613,28 @@ class SelectelClient:
     
     def get_resource_costs(self, hours: int = 24) -> Dict[str, Any]:
         """
-        Get cost/consumption data for all resources
+        Get cost/consumption data for all resources with unified VM + volume view
         
-        Uses the cloud_billing API to get actual costs per resource.
-        Matches Selectel UI behavior: uses project-level grouping and latest hour's cost as hourly rate.
+        Matches Selectel UI behavior exactly:
+        - Uses parent_id to unify VMs with their attached volumes
+        - Shows latest hour's cost as hourly rate
+        - Returns unified resources (VM + volumes) as single entities
         
         Args:
-            hours: Number of hours to fetch cost data for (default: 24 for daily cost)
+            hours: Number of hours to fetch cost data for (default: 24)
             
         Returns:
-            Dict mapping resource_id to cost information:
+            Dict mapping unified_resource_id to cost information:
             {
-                'resource_id': {
-                    'name': 'Resource Name',
-                    'type': 'cloud_vm',
-                    'hourly_cost_kopecks': 43.0,  # Latest hour's cost (matches Selectel UI)
+                'vm_id': {  # VM with attached volumes unified
+                    'name': 'VM Name',
+                    'type': 'server',
+                    'hourly_cost_kopecks': 43.0,  # VM + volumes latest hour
                     'hourly_cost_rubles': 0.43,
                     'daily_cost_rubles': 10.32,
                     'monthly_cost_rubles': 309.60,
-                    'metrics': {'compute_cores_preemptible': 22, 'compute_ram_preemptible': 9, ...}
+                    'metrics': {...},
+                    'attached_volumes': ['vol_id1', 'vol_id2']
                 }
             }
         """
@@ -647,36 +650,7 @@ class SelectelClient:
             # Construct billing API URL
             billing_url = "https://api.selectel.ru/v1/cloud_billing/statistic/consumption"
             
-            # STEP 1: Get project-level consumption to find latest hourly costs (matches Selectel UI)
-            project_params = {
-                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
-                'start': start_str,
-                'end': end_str,
-                'locale': 'ru',
-                'group_type': 'project',  # Project-level grouping like Selectel UI
-                'period_group_type': 'hour'
-            }
-            
-            # Make request with X-Token authentication
-            headers = {
-                'X-Token': self.api_key,
-                'Accept': 'application/json'
-            }
-            
-            response = requests.get(billing_url, params=project_params, headers=headers, timeout=30)
-            response.raise_for_status()
-            project_data = response.json()
-            
-            # Find the latest hour's cost from project-level data
-            latest_hourly_cost = 0
-            if project_data.get('status') == 'success':
-                project_items = project_data.get('data', [])
-                if project_items:
-                    # Get the most recent period's cost
-                    latest_item = max(project_items, key=lambda x: x.get('period', ''))
-                    latest_hourly_cost = latest_item.get('value', 0)  # Cost in kopecks
-            
-            # STEP 2: Get detailed resource-level data
+            # Get detailed resource-level data with parent_id information
             resource_params = {
                 'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
                 'start': start_str,
@@ -686,6 +660,12 @@ class SelectelClient:
                 'period_group_type': 'hour'
             }
             
+            # Make request with X-Token authentication
+            headers = {
+                'X-Token': self.api_key,
+                'Accept': 'application/json'
+            }
+            
             response = requests.get(billing_url, params=resource_params, headers=headers, timeout=30)
             response.raise_for_status()
             data = response.json()
@@ -693,81 +673,138 @@ class SelectelClient:
             if data.get('status') != 'success':
                 return {}
             
-            # Process consumption data
-            resource_costs = {}
-            periods_per_object: Dict[str, set] = {}
-            resource_latest_period_cost: Dict[str, Dict[str, int]] = {}  # Track cost per resource per period
+            # STEP 1: Analyze parent-child relationships and group by unified resources
+            unified_resources = {}  # Unified resources (VM + attached volumes)
+            period_costs = {}  # Track cost per unified resource per period
+            project_id = None  # Track project ID to filter it out
             
             for item in data.get('data', []):
                 obj = item.get('object', {})
                 obj_id = obj.get('id')
                 obj_name = obj.get('name', 'Unknown')
-                obj_type = obj.get('type')
+                obj_type = obj.get('type', '')
+                parent_id = obj.get('parent_id', '')
                 metric_id = item.get('metric', {}).get('id', '')
-                cost_kopecks = item.get('value', 0)  # Cost in kopecks per hour
-                period = item.get('period')
-                
-                # Normalize object type to our resource taxonomy
-                if obj_type == 'cloud_vm':
-                    normalized_type = 'server'
-                elif obj_type and obj_type.startswith('volume_'):
-                    normalized_type = 'volume'
-                elif obj_type and obj_type.startswith('share_'):
-                    normalized_type = 'file_storage'
-                else:
-                    normalized_type = obj_type or 'unknown'
+                cost_kopecks = item.get('value', 0)
+                period = item.get('period', '')
+                region = item.get('metric', {}).get('region', 'unknown')
                 
                 if not obj_id:
                     continue
                 
-                if obj_id not in resource_costs:
-                    resource_costs[obj_id] = {
-                        'name': obj_name,
-                        'type': normalized_type,
-                        'service_type': normalized_type,  # Add service_type for sync logic
-                        'metrics': {},
-                        'total_kopecks': 0
-                    }
-                    periods_per_object[obj_id] = set()
-                    resource_latest_period_cost[obj_id] = {}
+                # Detect project ID (parent of top-level resources)
+                if parent_id and not project_id and len(parent_id) == 32:
+                    project_id = parent_id
                 
-                resource_costs[obj_id]['metrics'][metric_id] = resource_costs[obj_id]['metrics'].get(metric_id, 0) + cost_kopecks
-                resource_costs[obj_id]['total_kopecks'] += cost_kopecks
-                
-                # Track cost per period for this resource
-                if period is not None:
-                    periods_per_object[obj_id].add(period)
-                    if period not in resource_latest_period_cost[obj_id]:
-                        resource_latest_period_cost[obj_id][period] = 0
-                    resource_latest_period_cost[obj_id][period] += cost_kopecks
-            
-            # Calculate costs per resource (Selectel UI method: use latest hour's cost as hourly rate)
-            for resource_id, cost_data in resource_costs.items():
-                # Find the latest period's cost for this resource
-                if resource_id in resource_latest_period_cost and resource_latest_period_cost[resource_id]:
-                    latest_period = max(resource_latest_period_cost[resource_id].keys())
-                    latest_hour_kopecks = resource_latest_period_cost[resource_id][latest_period]
+                # Determine unified resource ID
+                # If parent_id is a VM (not project), this is an attached volume
+                # Otherwise, it's a standalone resource (VM or detached volume)
+                if parent_id and parent_id != project_id:
+                    # This is a child resource (volume attached to VM)
+                    unified_id = parent_id  # Group under parent VM
                 else:
-                    # Fallback: calculate average
-                    obj_hours = len(periods_per_object.get(resource_id, set()))
-                    if obj_hours == 0:
-                        obj_hours = hours
-                    latest_hour_kopecks = cost_data['total_kopecks'] / obj_hours if obj_hours > 0 else cost_data['total_kopecks']
+                    # This is a parent/standalone resource
+                    unified_id = obj_id
                 
-                # Use latest hour's cost as the hourly rate (matches Selectel UI)
-                hourly_rubles = latest_hour_kopecks / 100
-                daily_rubles = hourly_rubles * 24  # Extrapolate to daily
-                monthly_rubles = daily_rubles * 30
-
-                cost_data['hourly_cost_kopecks'] = round(latest_hour_kopecks, 2)
-                cost_data['hourly_cost_rubles'] = round(hourly_rubles, 4)
-                cost_data['daily_cost_rubles'] = round(daily_rubles, 2)
-                cost_data['monthly_cost_rubles'] = round(monthly_rubles, 2)
+                # Initialize unified resource
+                if unified_id not in unified_resources:
+                    # Determine if this is a VM or standalone volume
+                    is_vm = obj_type == 'cloud_vm'
+                    
+                    if unified_id == obj_id:
+                        # This is the main resource
+                        unified_resources[unified_id] = {
+                            'name': obj_name,
+                            'type': 'server' if is_vm else ('volume' if 'volume' in obj_type else 'unknown'),
+                            'service_type': 'server' if is_vm else ('volume' if 'volume' in obj_type else 'unknown'),
+                            'metrics': {},
+                            'total_kopecks': 0,
+                            'attached_volumes': [],
+                            'is_unified': False,
+                            'region': region
+                        }
+                    else:
+                        # This is a child being added to parent, parent info not yet available
+                        unified_resources[unified_id] = {
+                            'name': f'VM {unified_id[:20]}...',  # Will be updated when we see the VM
+                            'type': 'server',
+                            'service_type': 'server',
+                            'metrics': {},
+                            'total_kopecks': 0,
+                            'attached_volumes': [],
+                            'is_unified': True,
+                            'region': region
+                        }
+                    period_costs[unified_id] = {}
+                
+                # Update resource info if this is the main VM (not a child)
+                if unified_id == obj_id and obj_type == 'cloud_vm':
+                    unified_resources[unified_id]['name'] = obj_name
+                    unified_resources[unified_id]['type'] = 'server'
+                    unified_resources[unified_id]['service_type'] = 'server'
+                
+                # Track attached volumes
+                if parent_id and parent_id != project_id and unified_id != obj_id:
+                    if obj_id not in unified_resources[unified_id]['attached_volumes']:
+                        unified_resources[unified_id]['attached_volumes'].append(obj_id)
+                    unified_resources[unified_id]['is_unified'] = True
+                
+                # Aggregate metrics
+                if metric_id:
+                    if metric_id not in unified_resources[unified_id]['metrics']:
+                        unified_resources[unified_id]['metrics'][metric_id] = 0
+                    unified_resources[unified_id]['metrics'][metric_id] += cost_kopecks
+                
+                # Track period costs for this unified resource
+                if period:
+                    if period not in period_costs[unified_id]:
+                        period_costs[unified_id][period] = 0
+                    period_costs[unified_id][period] += cost_kopecks
+                
+                unified_resources[unified_id]['total_kopecks'] += cost_kopecks
             
-            return resource_costs
+            # STEP 2: Calculate costs using latest hour method (Selectel UI approach)
+            # Also filter out standalone volumes that are already unified with VMs
+            final_resources = {}
+            attached_volume_ids = set()
+            
+            # First pass: collect all attached volume IDs
+            for unified_id, resource_data in unified_resources.items():
+                if resource_data.get('attached_volumes'):
+                    attached_volume_ids.update(resource_data['attached_volumes'])
+            
+            # Second pass: calculate costs and filter
+            for unified_id, resource_data in unified_resources.items():
+                # Skip if this is a standalone volume that's already attached to a VM
+                if unified_id in attached_volume_ids:
+                    continue  # This volume is already shown as part of a unified VM
+                
+                # Find latest period's cost for this unified resource
+                if unified_id in period_costs and period_costs[unified_id]:
+                    latest_period = max(period_costs[unified_id].keys())
+                    latest_hour_kopecks = period_costs[unified_id][latest_period]
+                else:
+                    # Fallback: use total divided by hours
+                    latest_hour_kopecks = resource_data['total_kopecks'] / hours if hours > 0 else resource_data['total_kopecks']
+                
+                # Calculate costs
+                hourly_rubles = latest_hour_kopecks / 100
+                daily_rubles = hourly_rubles * 24
+                monthly_rubles = daily_rubles * 30
+                
+                resource_data['hourly_cost_kopecks'] = round(latest_hour_kopecks, 2)
+                resource_data['hourly_cost_rubles'] = round(hourly_rubles, 4)
+                resource_data['daily_cost_rubles'] = round(daily_rubles, 2)
+                resource_data['monthly_cost_rubles'] = round(monthly_rubles, 2)
+                
+                final_resources[unified_id] = resource_data
+            
+            return final_resources
             
         except Exception as e:
             print(f"Error fetching resource costs: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
     
     def get_all_server_statistics(self, servers: List[Dict[str, Any]]) -> Dict[str, Any]:
