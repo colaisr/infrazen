@@ -644,14 +644,16 @@ function updatePasswordManagement(user) {
                 You have a password set. You can change it below.
             </div>
             <form class="password-form" onsubmit="changePassword(event)">
+                <!-- Hidden username field for accessibility -->
+                <input type="email" name="username" value="${user.email}" style="display: none;" autocomplete="username">
                 <div class="form-group">
                     <label for="currentPassword">Current Password</label>
-                    <input type="password" id="currentPassword" name="currentPassword" required>
+                    <input type="password" id="currentPassword" name="currentPassword" required autocomplete="current-password">
                 </div>
                 <div class="form-group">
                     <label for="newPassword">New Password</label>
                     <input type="password" id="newPassword" name="newPassword" required 
-                           oninput="checkPasswordStrength()">
+                           oninput="checkPasswordStrength()" autocomplete="new-password">
                     <div class="password-requirements">
                         <div>Password must:</div>
                         <ul>
@@ -662,7 +664,7 @@ function updatePasswordManagement(user) {
                 <div class="form-group">
                     <label for="confirmPassword">Confirm New Password</label>
                     <input type="password" id="confirmPassword" name="confirmPassword" required 
-                           oninput="checkPasswordMatch()">
+                           oninput="checkPasswordMatch()" autocomplete="new-password">
                     <small id="passwordMatchMessage" style="color: #dc2626; display: none;">Passwords do not match</small>
                 </div>
                 <button type="submit" class="btn btn-primary" id="changePasswordBtn">
@@ -678,10 +680,12 @@ function updatePasswordManagement(user) {
                 You don't have a password set. Set a password to enable username/password login.
             </div>
             <form class="password-form" onsubmit="setPassword(event)">
+                <!-- Hidden username field for accessibility -->
+                <input type="email" name="username" value="${user.email}" style="display: none;" autocomplete="username">
                 <div class="form-group">
                     <label for="newPassword">New Password</label>
                     <input type="password" id="newPassword" name="newPassword" required 
-                           oninput="checkPasswordStrength()">
+                           oninput="checkPasswordStrength()" autocomplete="new-password">
                     <div class="password-requirements">
                         <div>Password must:</div>
                         <ul>
@@ -692,7 +696,7 @@ function updatePasswordManagement(user) {
                 <div class="form-group">
                     <label for="confirmPassword">Confirm Password</label>
                     <input type="password" id="confirmPassword" name="confirmPassword" required 
-                           oninput="checkPasswordMatch()">
+                           oninput="checkPasswordMatch()" autocomplete="new-password">
                     <small id="passwordMatchMessage" style="color: #dc2626; display: none;">Passwords do not match</small>
                 </div>
                 <button type="submit" class="btn btn-primary" id="setPasswordBtn">
