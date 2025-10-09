@@ -173,6 +173,12 @@
                 </div>
                 {% if resource.provider_config %}
                     {% set config = resource.get_provider_config() %}
+                    {% if config.get('size_gb') %}
+                    <div class="detail-row">
+                        <span class="detail-label">Размер</span>
+                        <span class="detail-value">{{ config.size_gb }} ГБ</span>
+                    </div>
+                    {% endif %}
                     {% if config.get('ip_address') %}
                     <div class="detail-row">
                         <span class="detail-label">IP адрес</span>

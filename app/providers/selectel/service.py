@@ -580,7 +580,7 @@ class SelectelService:
                         'is_orphan': is_orphan
                     },
                     sync_snapshot_id=sync_snapshot_id,
-                    region=volume_details.get('availability_zone', 'unknown'),
+                    region=volume_details.get('region', volume_details.get('availability_zone', 'unknown')),
                     service_name='Block Storage'
                 )
                 
@@ -747,17 +747,29 @@ class SelectelService:
     def _fetch_volume_from_openstack(self, volume_id: str) -> Optional[Dict]:
         """Fetch volume details from OpenStack APIs"""
         try:
+            # Ensure regions are discovered before searching
+            if not self.client.regions:
+                try:
+                    self.client.get_available_regions()
+                except Exception as e:
+                    logger.warning(f"Failed to discover regions: {e}")
+            
             projects = self.client.get_projects()
             project_id = projects[0]['id'] if projects else None
             
             if project_id:
-                for region in self.client.regions.keys() if self.client.regions else ['ru-3']:
+                # Use discovered regions, fallback to known regions
+                regions_to_try = list(self.client.regions.keys()) if self.client.regions else ['ru-3', 'ru-7', 'ru-1']
+                
+                for region in regions_to_try:
                     try:
                         volumes = self.client.get_openstack_volumes(project_id, region=region)
                         for volume in volumes:
                             if volume['id'] == volume_id:
+                                logger.debug(f"Found volume {volume_id} in region {region}")
                                 return volume
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Volume {volume_id} not in region {region}: {e}")
                         continue
             return None
         except Exception as e:
@@ -905,14 +917,19 @@ class SelectelService:
             # Extract status from metadata (OpenStack uses ACTIVE/SHUTOFF, convert to uppercase)
             raw_status = metadata.get('status', 'active')
             # Normalize status: ACTIVE -> ACTIVE, SHUTOFF -> STOPPED, etc.
-            if raw_status == 'ACTIVE':
+            # Convert to uppercase first to handle case variations
+            raw_status_upper = raw_status.upper() if isinstance(raw_status, str) else 'UNKNOWN'
+            
+            if raw_status_upper == 'ACTIVE':
                 normalized_status = 'RUNNING'  # Match Beget convention
-            elif raw_status in ['SHUTOFF', 'STOPPED']:
+            elif raw_status_upper in ['SHUTOFF', 'STOPPED']:
                 normalized_status = 'STOPPED'
-            elif raw_status in ['ERROR', 'FAILED']:
+            elif raw_status_upper == 'RESERVED':  # OpenStack volume status for detached volumes
+                normalized_status = 'STOPPED'  # Detached volumes are stopped
+            elif raw_status_upper in ['ERROR', 'FAILED']:
                 normalized_status = 'ERROR'
             else:
-                normalized_status = raw_status.upper() if isinstance(raw_status, str) else 'UNKNOWN'
+                normalized_status = raw_status_upper
             
             unified_resource = {
                 'resource_id': resource_id,

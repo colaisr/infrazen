@@ -1671,6 +1671,47 @@ for volume_data in volumes_list:
 - Service catalog parsing and region extraction
 - Database schema support for volume resources
 
+#### 6.5.9.3. Sync Process Fixes ✅
+**Volume Processing Enhancements (October 2025)**
+
+Fixed critical issues in the Selectel volume sync process to ensure accurate resource state representation:
+
+1. **Status Normalization Fix**
+   - **Issue**: OpenStack `reserved` status (lowercase) not properly normalized to `STOPPED`
+   - **Fix**: Added case-insensitive status normalization in `_create_resource` method
+   - **Impact**: Detached volumes now correctly display as "Stopped" instead of "Reserved"
+
+2. **Region Extraction Fix**
+   - **Issue**: Volume region showing as "unknown" due to prioritizing `availability_zone` over `region`
+   - **Fix**: Modified `_process_volume_resource` to use `region` field from OpenStack details
+   - **Impact**: Volumes now display correct region (e.g., "ru-7") in UI
+
+3. **Capacity Storage Fix**
+   - **Issue**: Volume size not stored in `provider_config` metadata
+   - **Fix**: Ensured `size_gb` field properly extracted and stored from OpenStack API
+   - **Impact**: Volume capacity (e.g., "5 GB") now visible in resource cards
+
+4. **Volume Type Storage Fix**
+   - **Issue**: Volume type information missing from resource metadata
+   - **Fix**: Proper extraction of `volume_type` from OpenStack (e.g., "universal.ru-7b")
+   - **Impact**: Complete volume specifications now available in UI
+
+5. **Region Discovery Fix**
+   - **Issue**: OpenStack region discovery not triggered before volume fetching
+   - **Fix**: Ensured region discovery completes before volume processing
+   - **Impact**: Volumes properly found and enriched with OpenStack details
+
+6. **Frontend Display Fix**
+   - **Issue**: Size/capacity information not displayed in resource cards
+   - **Fix**: Added size display section to resource card template
+   - **Impact**: Volume size now visible as "Размер: 5 ГБ" in UI
+
+**Technical Implementation:**
+- Modified `app/providers/selectel/service.py` for backend fixes
+- Updated `app/templates/resources.html` for frontend display
+- All fixes maintain backward compatibility with existing sync logic
+- Enhanced error handling for edge cases in volume processing
+
 ## 12. Beget Cloud API Enrichment Analysis
 
 ### 12.1. Current Data Collection & Storage Architecture
