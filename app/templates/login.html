@@ -95,9 +95,9 @@
             <div id="password-login" class="login-section">
                 <form id="password-form" onsubmit="handlePasswordLogin(event)">
                     <div class="form-group">
-                        <label for="username">Имя пользователя или Email</label>
-                        <input type="text" id="username" name="username" required 
-                               placeholder="Введите имя пользователя или email">
+                        <label for="username">Email</label>
+                        <input type="email" id="username" name="username" required 
+                               placeholder="Введите ваш email">
                     </div>
                     
                     <div class="form-group">
@@ -114,6 +114,15 @@
             </div>
             
             <div style="margin-top: 2rem; text-align: center;">
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                    Нет аккаунта?
+                </p>
+                <a href="{{ url_for('auth.register') }}" style="color: var(--primary-blue); text-decoration: none; font-weight: 500; margin-bottom: 1rem; display: inline-block;">
+                    Зарегистрироваться
+                </a>
+            </div>
+            
+            <div style="margin-top: 1rem; text-align: center;">
                 <a href="{{ url_for('main.index') }}" style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem;">
                     ← Вернуться на главную
                 </a>
@@ -326,7 +335,7 @@
         }
         
         .password-login-btn:hover {
-            background: var(--secondary-blue);
+            background: var(--primary-blue-dark);
         }
         
         /* Existing styles */
@@ -360,8 +369,8 @@
         }
         
         .demo-login-btn:hover {
-            background: var(--secondary-blue);
-            border-color: var(--secondary-blue);
+            background: var(--primary-blue-dark);
+            border-color: var(--primary-blue-dark);
         }
     </style>
 </body>

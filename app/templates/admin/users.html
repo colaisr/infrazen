@@ -188,7 +188,7 @@ function displayUsers(users) {
                     <div class="user-avatar">
                         ${user.google_picture ? 
                             `<img src="${user.google_picture}" alt="${user.name}">` : 
-                            `<div class="avatar-placeholder">${(user.name || user.email || 'U').charAt(0).toUpperCase()}</div>`
+                            `<div class="avatar-placeholder">${user.initials || (user.name || user.email || 'U').charAt(0).toUpperCase()}</div>`
                         }
                     </div>
                     <div class="user-details">

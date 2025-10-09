@@ -22,7 +22,7 @@ def validate_session(f):
     def decorated_function(*args, **kwargs):
         user_data = session.get('user')
         if not user_data:
-            return jsonify({'success': False, 'error': 'Not authenticated', 'redirect': '/login'}), 401
+            return jsonify({'success': False, 'error': 'Not authenticated', 'redirect': '/api/auth/login'}), 401
         
         # Skip validation for demo users (they don't have db_id)
         if user_data.get('id') == 'demo-user-123' or user_data.get('id') == 'dev-user-123':
@@ -31,24 +31,25 @@ def validate_session(f):
         # Get user ID from session for real users
         user_id = user_data.get('db_id')
         if not user_id:
-            return jsonify({'success': False, 'error': 'Invalid session', 'redirect': '/login'}), 401
+            return jsonify({'success': False, 'error': 'Invalid session', 'redirect': '/api/auth/login'}), 401
         
         # Check if user still exists in database
         user = User.find_by_id(user_id)
         if not user:
             # User no longer exists - clear session and redirect to login
             session.clear()
-            return jsonify({'success': False, 'error': 'User account no longer exists', 'redirect': '/login'}), 401
+            return jsonify({'success': False, 'error': 'User account no longer exists', 'redirect': '/api/auth/login'}), 401
         
         # Check if user is still active
         if not user.is_active:
             session.clear()
-            return jsonify({'success': False, 'error': 'Account is deactivated', 'redirect': '/login'}), 401
+            return jsonify({'success': False, 'error': 'Account is deactivated', 'redirect': '/api/auth/login'}), 401
         
         # Update session with current user data
         session['user'].update({
             'email': user.email,
             'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+            'initials': user.get_initials(),
             'role': user.role,
             'is_admin': user.is_admin(),
             'permissions': user.get_permissions()
@@ -76,6 +77,7 @@ def google_auth():
                 'id': 'demo-user-123',
                 'email': 'demo@infrazen.com',
                 'name': 'Demo User',
+                'initials': 'DU',
                 'picture': '',
                 'role': 'demo',
                 'is_admin': True,
@@ -98,6 +100,7 @@ def google_auth():
                     'id': 'dev-user-123',
                     'email': 'dev@infrazen.com',
                     'name': 'Development User',
+                    'initials': 'DU',
                     'picture': '',
                     'role': 'user'
                 }
@@ -138,6 +141,7 @@ def google_auth():
                 'google_id': user.google_id,
                 'email': user.email,
                 'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+                'initials': user.get_initials(),
                 'picture': user.google_picture or '',
                 'role': user.role,
                 'is_admin': user.is_admin(),
@@ -153,6 +157,7 @@ def google_auth():
                 'id': 'dev-user-123',
                 'email': 'dev@infrazen.com',
                 'name': 'Development User',
+                'initials': 'DU',
                 'picture': '',
                 'role': 'user'
             }
@@ -176,6 +181,7 @@ def admin_login():
             'google_id': admin_user.google_id,
             'email': admin_user.email,
             'name': f"{admin_user.first_name} {admin_user.last_name}".strip() or admin_user.email.split('@')[0],
+            'initials': admin_user.get_initials(),
             'picture': admin_user.google_picture or '',
             'role': admin_user.role,
             'is_admin': admin_user.is_admin(),
@@ -187,20 +193,20 @@ def admin_login():
 
 @auth_bp.route('/login-password', methods=['POST'])
 def login_password():
-    """Handle username/password authentication"""
+    """Handle email/password authentication"""
     try:
         data = request.get_json()
-        username_or_email = data.get('username', '').strip()
+        email = data.get('username', '').strip()  # Frontend sends email in 'username' field
         password = data.get('password', '')
         
-        if not username_or_email or not password:
-            return jsonify({'success': False, 'error': 'Username/email and password are required'})
+        if not email or not password:
+            return jsonify({'success': False, 'error': 'Email и пароль обязательны'})
         
-        # Find user by username or email
-        user = User.find_by_username_or_email(username_or_email)
+        # Find user by email (username field contains email)
+        user = User.find_by_email(email)
         
         if not user:
-            return jsonify({'success': False, 'error': 'Invalid username/email or password'})
+            return jsonify({'success': False, 'error': 'Неверный email или пароль'})
         
         # Check if user can login with password
         if not user.can_login_with_password():
@@ -208,7 +214,7 @@ def login_password():
         
         # Verify password
         if not user.check_password(password):
-            return jsonify({'success': False, 'error': 'Invalid username/email or password'})
+            return jsonify({'success': False, 'error': 'Неверный email или пароль'})
         
         # Update login information
         user.update_login_info()
@@ -220,6 +226,7 @@ def login_password():
             'google_id': user.google_id,
             'email': user.email,
             'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+            'initials': user.get_initials(),
             'picture': user.google_picture or '',
             'role': user.role,
             'is_admin': user.is_admin(),
@@ -331,10 +338,10 @@ def user_details():
             'user': {
                 'id': user.id,
                 'email': user.email,
-                'username': user.username,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+                'initials': user.get_initials(),
                 'company': user.company,
                 'role': user.role,
                 'is_active': user.is_active,
@@ -351,6 +358,77 @@ def user_details():
                 'currency': user.currency,
                 'language': user.language
             }
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/register')
+def register():
+    """Display registration page"""
+    return render_template('register.html', google_client_id=GOOGLE_CLIENT_ID)
+
+@auth_bp.route('/register', methods=['POST'])
+def handle_register():
+    """Handle user registration"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip()
+        password = data.get('password', '')
+        confirm_password = data.get('confirm_password', '')
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        
+        # No username needed - email is the primary identifier
+        
+        # Validation
+        if not email or not password:
+            return jsonify({'success': False, 'error': 'Email и пароль обязательны для заполнения'})
+        
+        if password != confirm_password:
+            return jsonify({'success': False, 'error': 'Пароли не совпадают'})
+        
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': 'Пароль должен содержать минимум 6 символов'})
+        
+        # Check if user already exists
+        if User.find_by_email(email):
+            return jsonify({'success': False, 'error': 'Пользователь с таким email уже существует'})
+        
+        # Create new user
+        user = User(
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            role='user',
+            is_active=True,
+            is_verified=False  # Will need email verification in production
+        )
+        
+        # Set password
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Automatically log the user in after successful registration
+        session['user'] = {
+            'id': str(user.id),
+            'db_id': user.id,
+            'email': user.email,
+            'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+            'initials': user.get_initials(),
+            'picture': '',
+            'role': user.role,
+            'is_admin': user.is_admin(),
+            'permissions': user.get_permissions(),
+            'login_method': 'registration'
+        }
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Регистрация прошла успешно! Вы автоматически вошли в систему.',
+            'redirect': '/dashboard'
         })
         
     except Exception as e:

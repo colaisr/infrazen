@@ -175,13 +175,25 @@ class User(BaseModel):
             role='user'  # Default role for new users
         )
         
-        # Set username from email if not provided
-        if not user.username:
-            user.username = user.email.split('@')[0]
+        # No username needed - email is the primary identifier
         
         db.session.add(user)
         db.session.commit()
         return user
     
+    def get_initials(self):
+        """Get user initials from first and last name"""
+        if self.first_name and self.last_name:
+            return f"{self.first_name[0].upper()}{self.last_name[0].upper()}"
+        elif self.first_name:
+            return self.first_name[0].upper()
+        elif self.last_name:
+            return self.last_name[0].upper()
+        elif self.email:
+            # Fallback to email prefix
+            return self.email.split('@')[0][0].upper()
+        else:
+            return "U"
+    
     def __repr__(self):
-        return f'<User {self.username or self.email}>'
+        return f'<User {self.email}>'

@@ -193,8 +193,7 @@ def create_user():
             admin_notes=data.get('admin_notes', '')
         )
         
-        # Set username from email
-        user.username = user.email.split('@')[0]
+        # No username needed - email is the primary identifier
         
         # Set permissions if provided
         if 'permissions' in data:

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация - InfraZen FinOps Platform</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo" style="justify-content: center; margin-bottom: 2rem;">
+                <div class="logo-icon">☁</div>
+                <div class="logo-text">
+                    <span>InfraZen</span>
+                    <span class="logo-subtitle">FinOps Platform</span>
+                </div>
+            </div>
+            
+            <h1 class="login-title">Регистрация</h1>
+            <p class="login-subtitle">Создайте аккаунт для управления облачными расходами</p>
+            
+            <!-- Registration Form -->
+            <form id="register-form" onsubmit="handleRegistration(event)">
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required 
+                           placeholder="Введите ваш email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="first_name">Имя</label>
+                    <input type="text" id="first_name" name="first_name" 
+                           placeholder="Введите ваше имя">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Фамилия</label>
+                    <input type="text" id="last_name" name="last_name" 
+                           placeholder="Введите вашу фамилию">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Пароль *</label>
+                    <input type="password" id="password" name="password" required 
+                           placeholder="Введите пароль" oninput="checkPasswordStrength()">
+                    <div class="password-requirements">
+                        <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                            Пароль должен содержать минимум 6 символов
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Подтверждение пароля *</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required 
+                           placeholder="Подтвердите пароль" oninput="checkPasswordMatch()">
+                    <small id="passwordMatchMessage" style="color: #dc2626; display: none; font-size: 0.75rem;">
+                        Пароли не совпадают
+                    </small>
+                </div>
+                
+                <button type="submit" class="password-login-btn" id="registerBtn">
+                    <i class="fa-solid fa-user-plus"></i>
+                    Зарегистрироваться
+                </button>
+            </form>
+            
+            <div style="margin-top: 2rem; text-align: center;">
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                    Уже есть аккаунт?
+                </p>
+                <a href="{{ url_for('auth.login') }}" style="color: var(--primary-blue); text-decoration: none; font-weight: 500;">
+                    Войти в систему
+                </a>
+            </div>
+            
+            <div style="margin-top: 1rem; text-align: center;">
+                <a href="{{ url_for('main.index') }}" style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem;">
+                    ← Вернуться на главную
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Handle registration form submission
+        function handleRegistration(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const data = {
+                email: formData.get('email'),
+                first_name: formData.get('first_name'),
+                last_name: formData.get('last_name'),
+                password: formData.get('password'),
+                confirm_password: formData.get('confirm_password')
+            };
+            
+            // Validate passwords match
+            if (data.password !== data.confirm_password) {
+                showMessage('Пароли не совпадают', 'error');
+                return;
+            }
+            
+            // Validate password length
+            if (data.password.length < 6) {
+                showMessage('Пароль должен содержать минимум 6 символов', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Регистрация...';
+            
+            fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = data.redirect;
+                    }, 2000);
+                } else {
+                    showMessage(data.error || 'Ошибка регистрации', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Зарегистрироваться';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Произошла ошибка при регистрации', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Зарегистрироваться';
+            });
+        }
+        
+        // Check password strength
+        function checkPasswordStrength() {
+            const password = document.getElementById('password').value;
+            const requirements = document.querySelector('.password-requirements');
+            
+            if (password.length >= 6) {
+                requirements.innerHTML = '<div style="font-size: 0.75rem; color: #16a34a; margin-top: 0.25rem;">✓ Пароль достаточно длинный</div>';
+            } else {
+                requirements.innerHTML = '<div style="font-size: 0.75rem; color: #dc2626; margin-top: 0.25rem;">Пароль должен содержать минимум 6 символов</div>';
+            }
+        }
+        
+        // Check password match
+        function checkPasswordMatch() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            const matchMessage = document.getElementById('passwordMatchMessage');
+            
+            if (confirmPassword && password !== confirmPassword) {
+                matchMessage.style.display = 'block';
+                matchMessage.textContent = 'Пароли не совпадают';
+                matchMessage.style.color = '#dc2626';
+            } else if (confirmPassword && password === confirmPassword) {
+                matchMessage.style.display = 'block';
+                matchMessage.textContent = '✓ Пароли совпадают';
+                matchMessage.style.color = '#16a34a';
+            } else {
+                matchMessage.style.display = 'none';
+            }
+        }
+        
+        // Show message function
+        function showMessage(message, type) {
+            // Remove existing messages
+            const existingMessages = document.querySelectorAll('.message');
+            existingMessages.forEach(msg => msg.remove());
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${type}`;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 12px 24px;
+                border-radius: 8px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                max-width: 400px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            
+            if (type === 'success') {
+                messageDiv.style.background = '#16a34a';
+            } else if (type === 'error') {
+                messageDiv.style.background = '#dc2626';
+            }
+            
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+    </script>
+    
+    <style>
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .password-login-btn {
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-blue);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .password-login-btn:hover:not(:disabled) {
+            background: var(--primary-blue-dark);
+            color: white;
+        }
+        
+        .password-login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Password requirements styling */
+        .password-requirements {
+            margin-top: 0.25rem;
+        }
+        
+        /* Existing styles from login page */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-icon {
+            font-size: 2.5rem;
+            color: var(--primary-blue);
+        }
+        
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .logo-text span:first-child {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-blue);
+        }
+        
+        .logo-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .login-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0 0 0.5rem 0;
+            text-align: center;
+        }
+        
+        .login-subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin: 0 0 2rem 0;
+            line-height: 1.5;
+        }
+    </style>
+</body>
+</html>
