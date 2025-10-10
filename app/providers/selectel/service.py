@@ -752,13 +752,14 @@ class SelectelService:
                 )
                 
                 if resource:
-                    resource.status = 'STOPPED'  # Detached volume (not verified in OpenStack)
+                    # Volume is being billed, so it's active (just detached from any VM)
+                    resource.status = 'RUNNING'  # Active detached volume
                     resource.daily_cost = billing_data['daily_cost_rubles']
                     resource.effective_cost = billing_data['daily_cost_rubles']
                     resource.original_cost = billing_data['monthly_cost_rubles']
                     resource.currency = 'RUB'
                     resource.add_tag('cost_source', 'billing_api')
-                    resource.add_tag('note', 'Detached volume - OpenStack verification skipped for performance')
+                    resource.add_tag('note', 'Detached volume (not attached to any VM)')
                 
                 return {
                     'unified_into_vm': False,
