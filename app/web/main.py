@@ -129,11 +129,14 @@ def connections():
             if last_snapshot:
                 # Use cost from sync snapshot if available (billing-first approach)
                 sync_config = json.loads(last_snapshot.sync_config) if last_snapshot.sync_config else {}
-                total_cost_from_sync = sync_config.get('total_cost', 0)
+                # Support both 'total_cost' (old) and 'total_daily_cost' (new Selectel format)
+                total_cost_from_sync = sync_config.get('total_daily_cost', sync_config.get('total_cost', 0))
                 
-                # Check if this is billing-first sync (has billing validation)
+                # Check if this is billing-first sync (has billing validation or sync_method)
                 billing_validation = sync_config.get('billing_validation', {})
-                if billing_validation.get('valid', False):
+                is_billing_first = billing_validation.get('valid', False) or sync_config.get('sync_method') == 'billing_first'
+                
+                if is_billing_first and total_cost_from_sync > 0:
                     # Use validated cost from billing-first sync
                     total_daily_cost = total_cost_from_sync
                     total_monthly_cost = total_cost_from_sync * 30
