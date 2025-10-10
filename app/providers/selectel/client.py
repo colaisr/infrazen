@@ -1004,24 +1004,29 @@ class SelectelClient:
                 unified_resources[unified_id]['total_kopecks'] += cost_kopecks
             
             # STEP 2: Calculate costs using latest hour method (Selectel UI approach)
-            # Also filter out standalone volumes that are already unified with VMs
+            # Also filter out standalone volumes that are already unified with ACTIVE VMs
             final_resources = {}
-            attached_volume_ids = set()
+            attached_volume_ids_from_active_vms = set()
 
-            # First pass: collect all attached volume IDs
+            # First pass: collect volume IDs that are attached to VMs (active or orphaned)
+            # We'll only filter volumes that are part of a unified resource with VM data
             for unified_id, resource_data in unified_resources.items():
-                if resource_data.get('attached_volumes'):
+                # Only filter volumes if this is a VM resource (has vcpus/ram_mb from OpenStack)
+                # Orphaned volumes won't have these fields
+                is_active_vm = resource_data.get('vcpus') is not None or resource_data.get('ram_mb') is not None
+                
+                if is_active_vm and resource_data.get('attached_volumes'):
                     for vol in resource_data['attached_volumes']:
                         if isinstance(vol, dict):
-                            attached_volume_ids.add(vol.get('id'))
+                            attached_volume_ids_from_active_vms.add(vol.get('id'))
                         else:
-                            attached_volume_ids.add(vol)
+                            attached_volume_ids_from_active_vms.add(vol)
 
             # Second pass: calculate costs and filter
             for unified_id, resource_data in unified_resources.items():
-                # Skip if this is a standalone volume that's already attached to a VM
-                if unified_id in attached_volume_ids:
-                    continue  # This volume is already shown as part of a unified VM
+                # Skip if this is a standalone volume that's already attached to an ACTIVE VM
+                if unified_id in attached_volume_ids_from_active_vms:
+                    continue  # This volume is already shown as part of an active unified VM
                 
                 # Find latest period's cost for this unified resource
                 if unified_id in period_costs and period_costs[unified_id]:

@@ -175,6 +175,47 @@ class SelectelService:
                 
                 logger.info(f"Processed {len(unified_vms)} VMs ({len([v for v in unified_vms.values() if v.status == 'DELETED_BILLED'])} zombies)")
             
+            # PHASE 3.5: Extract orphaned volumes from deleted VMs (volumes with no parent VM in OpenStack)
+            logger.info("PHASE 3.5: Extracting orphaned volumes from deleted VMs")
+            orphaned_volumes_from_deleted_vms = {}
+            
+            if 'server' in resources_by_type:
+                for resource_id, billing_data in resources_by_type['server'].items():
+                    # Check if this VM exists in unified_vms (was found in OpenStack)
+                    if resource_id not in unified_vms:
+                        # VM not in OpenStack - check for attached volumes
+                        attached_volumes = billing_data.get('attached_volumes', [])
+                        if attached_volumes:
+                            logger.info(f"Found {len(attached_volumes)} orphaned volumes from deleted VM {billing_data['name']}")
+                            for vol_info in attached_volumes:
+                                vol_id = vol_info.get('id')
+                                # Create a billing data entry for this volume
+                                orphaned_volumes_from_deleted_vms[vol_id] = {
+                                    'name': vol_info.get('name', f'Volume {vol_id[:20]}...'),
+                                    'type': 'volume',
+                                    'service_type': 'volume',
+                                    'region': billing_data.get('region', 'unknown'),
+                                    'project_id': billing_data.get('project_id'),
+                                    'project_name': billing_data.get('project_name'),
+                                    'size_gb': vol_info.get('size_gb', 0),
+                                    # Pro-rate the cost based on volume size contribution
+                                    # For now, assign the full deleted VM cost to the volumes
+                                    'daily_cost_rubles': billing_data['daily_cost_rubles'] / len(attached_volumes) if len(attached_volumes) > 0 else 0,
+                                    'monthly_cost_rubles': billing_data['monthly_cost_rubles'] / len(attached_volumes) if len(attached_volumes) > 0 else 0,
+                                    'hourly_cost_rubles': billing_data.get('hourly_cost_rubles', 0) / len(attached_volumes) if len(attached_volumes) > 0 else 0,
+                                    'hourly_cost_kopecks': billing_data.get('hourly_cost_kopecks', 0) / len(attached_volumes) if len(attached_volumes) > 0 else 0,
+                                    'is_orphan': True,
+                                    'parent_vm_name': billing_data['name'],
+                                    'parent_vm_id': resource_id
+                                }
+            
+            logger.info(f"Extracted {len(orphaned_volumes_from_deleted_vms)} orphaned volumes from deleted VMs")
+            
+            # Add orphaned volumes to the volume list for processing
+            if 'volume' not in resources_by_type:
+                resources_by_type['volume'] = {}
+            resources_by_type['volume'].update(orphaned_volumes_from_deleted_vms)
+            
             # PHASE 4: Process volumes (unify with VMs where possible)
             logger.info("PHASE 4: Processing volumes")
             if 'volume' in resources_by_type:
@@ -469,36 +510,46 @@ class SelectelService:
                 
                 return resource
             else:
-                # Zombie VM - deleted but still billed
-                logger.warning(f"Zombie VM: {resource_id} ({billing_data['name']}) - billed but not in OpenStack")
+                # VM not found in OpenStack - could be deleted VM or orphaned volume
+                # Check if this is actually just orphaned volumes (VM deleted but volumes remain)
+                attached_volumes = billing_data.get('attached_volumes', [])
                 
-                # Extract provision date from billing data
-                created_at = self._extract_provision_date_from_billing(resource_id)
-                
-                resource = self._create_resource(
-                    resource_type='server',
-                    resource_id=resource_id,
-                    name=billing_data['name'],
-                    metadata={
-                        'billing': billing_data,
-                        'is_zombie': True,
-                        'note': 'Deleted from OpenStack but still billed',
-                        'created_at': created_at
-                    },
-                    sync_snapshot_id=sync_snapshot_id,
-                    region='unknown',
-                    service_name='Compute'
-                )
-                
-                if resource:
-                    resource.status = 'DELETED_BILLED'
-                    resource.daily_cost = billing_data['daily_cost_rubles']
-                    resource.effective_cost = billing_data['daily_cost_rubles']
-                    resource.original_cost = billing_data['monthly_cost_rubles']
-                    resource.currency = 'RUB'
-                    resource.add_tag('is_zombie', 'true')
-                    resource.add_tag('recommendation', 'Contact support - billed for deleted resource')
-                    resource.add_tag('cost_source', 'billing_api')
+                if attached_volumes and len(attached_volumes) > 0:
+                    # This "VM" is actually orphaned volumes - the VM was deleted
+                    # Don't create a zombie VM resource - volumes will be processed separately
+                    logger.info(f"Skipping deleted VM {resource_id} - {len(attached_volumes)} orphaned volumes will be processed separately")
+                    return None
+                else:
+                    # True zombie VM - deleted but still billed (no volumes)
+                    logger.warning(f"Zombie VM: {resource_id} ({billing_data['name']}) - billed but not in OpenStack")
+                    
+                    # Extract provision date from billing data
+                    created_at = self._extract_provision_date_from_billing(resource_id)
+                    
+                    resource = self._create_resource(
+                        resource_type='server',
+                        resource_id=resource_id,
+                        name=billing_data['name'],
+                        metadata={
+                            'billing': billing_data,
+                            'is_zombie': True,
+                            'note': 'Deleted from OpenStack but still billed',
+                            'created_at': created_at
+                        },
+                        sync_snapshot_id=sync_snapshot_id,
+                        region='unknown',
+                        service_name='Compute'
+                    )
+                    
+                    if resource:
+                        resource.status = 'DELETED_BILLED'
+                        resource.daily_cost = billing_data['daily_cost_rubles']
+                        resource.effective_cost = billing_data['daily_cost_rubles']
+                        resource.original_cost = billing_data['monthly_cost_rubles']
+                        resource.currency = 'RUB'
+                        resource.add_tag('is_zombie', 'true')
+                        resource.add_tag('recommendation', 'Contact support - billed for deleted resource')
+                        resource.add_tag('cost_source', 'billing_api')
                 
                 return resource
                 
