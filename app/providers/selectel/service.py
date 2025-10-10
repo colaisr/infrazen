@@ -94,6 +94,10 @@ class SelectelService:
             logger.info("PHASE 1: Fetching billing data (24h window, latest hour method matching Selectel UI)")
             billed_resources = self.client.get_resource_costs(hours=24)
             
+            # Cache provision dates for all resources (single API call)
+            logger.info("Caching provision dates for all resources")
+            self._provision_dates_cache = self._fetch_all_provision_dates()
+            
             if not billed_resources:
                 logger.warning("No billed resources found - deactivating all existing resources")
                 # Deactivate all existing resources since nothing is currently consuming
@@ -730,15 +734,12 @@ class SelectelService:
             logger.error(f"Error getting volume details for {volume_id}: {e}")
             return None
     
-    def _extract_provision_date_from_billing(self, resource_id: str) -> Optional[str]:
+    def _fetch_all_provision_dates(self) -> Dict[str, str]:
         """
-        Extract provision_start date from billing API for any resource
+        Fetch provision dates for all resources in a single API call
         
-        Args:
-            resource_id: Resource ID to get provision date for
-            
         Returns:
-            Provision start date string or None if not found
+            Dict mapping resource_id to provision_start date
         """
         try:
             from datetime import datetime, timedelta
@@ -769,16 +770,47 @@ class SelectelService:
             if response.status_code == 200:
                 data = response.json()
                 if data.get('status') == 'success':
-                    # Look for the resource in billing data
+                    # Build cache of provision dates
+                    provision_dates = {}
                     for item in data.get('data', []):
-                        if item.get('object', {}).get('id') == resource_id:
-                            provision_start = item.get('provision_start')
-                            if provision_start:
-                                logger.debug(f"Found provision date for {resource_id}: {provision_start}")
-                                return provision_start
+                        obj_id = item.get('object', {}).get('id')
+                        provision_start = item.get('provision_start')
+                        if obj_id and provision_start and obj_id not in provision_dates:
+                            provision_dates[obj_id] = provision_start
+                    
+                    logger.info(f"Cached provision dates for {len(provision_dates)} resources")
+                    return provision_dates
             
-            logger.warning(f"Could not find provision date for {resource_id} in billing API")
-            return None
+            logger.warning("Could not fetch provision dates from billing API")
+            return {}
+            
+        except Exception as e:
+            logger.error(f"Error fetching provision dates: {e}")
+            return {}
+    
+    def _extract_provision_date_from_billing(self, resource_id: str) -> Optional[str]:
+        """
+        Extract provision_start date from cached billing data
+        
+        Args:
+            resource_id: Resource ID to get provision date for
+            
+        Returns:
+            Provision start date string or None if not found
+        """
+        try:
+            # Use cached provision dates if available
+            if hasattr(self, '_provision_dates_cache') and self._provision_dates_cache:
+                provision_date = self._provision_dates_cache.get(resource_id)
+                if provision_date:
+                    logger.debug(f"Found cached provision date for {resource_id}: {provision_date}")
+                    return provision_date
+                else:
+                    logger.debug(f"No provision date found in cache for {resource_id}")
+                    return None
+            else:
+                logger.warning(f"Provision dates cache not available, skipping for {resource_id}")
+                return None
             
         except Exception as e:
             logger.error(f"Error getting provision date for {resource_id}: {e}")
