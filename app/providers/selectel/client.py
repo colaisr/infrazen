@@ -236,6 +236,7 @@ class SelectelClient:
     def _get_openstack_headers(self) -> Dict[str, str]:
         """
         Get headers for OpenStack API requests
+        Updated to match Selectel UI's exact headers for compatibility
         
         Returns:
             Dict containing OpenStack API headers
@@ -247,12 +248,21 @@ class SelectelClient:
             'Openstack-Api-Version': 'compute latest',
             'Origin': 'https://my.selectel.ru',
             'Referer': 'https://my.selectel.ru/',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8,he;q=0.7',
+            'Sec-Ch-Ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site'
         }
     
     def get_openstack_servers(self, region: str = None) -> List[Dict[str, Any]]:
         """
         Get OpenStack servers (VMs) from a specific region with flavor details
+        Updated to use exact same endpoint and headers as Selectel UI
         
         Args:
             region: Optional region to query (if None, uses default openstack_base_url)
@@ -263,15 +273,28 @@ class SelectelClient:
         try:
             headers = self._get_openstack_headers()
             
-            # Determine which base URL to use
-            base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
+            # Determine which base URL to use - match Selectel UI pattern
+            if region:
+                # Use region-specific URL like the UI does
+                if region in self.regions:
+                    base_url = self.regions[region]
+                else:
+                    # Fallback to default pattern
+                    base_url = f'https://{region}.cloud.api.selcloud.ru'
+            else:
+                base_url = self.openstack_base_url
+            
+            # Use exact same endpoint as Selectel UI
             servers_url = f'{base_url}/compute/v2.1/servers/detail'
             
+            logger.debug(f"Fetching servers from: {servers_url}")
             response = requests.get(servers_url, headers=headers, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             servers = data.get('servers', [])
+            
+            logger.info(f"Found {len(servers)} servers in region {region}")
             
             # Enrich each server with flavor details
             for server in servers:

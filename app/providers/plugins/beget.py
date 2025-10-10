@@ -3,6 +3,7 @@ Beget provider plugin
 Wraps existing Beget functionality in the new plugin architecture
 """
 import logging
+import json
 from typing import Dict, List, Any
 from datetime import datetime
 
@@ -104,40 +105,56 @@ class BegetProviderPlugin(ProviderPlugin):
             }
 
     def sync_resources(self) -> SyncResult:
-        """Sync all resources from Beget"""
+        """Sync resources from Beget using billing-first approach"""
         result = SyncResult(success=False, message="Sync not started", provider_type=self.get_provider_type())
 
         try:
-            self.logger.info(f"Starting Beget resource sync for provider {self.provider_id}")
+            self.logger.info(f"Starting Beget billing-first resource sync for provider {self.provider_id}")
 
-            # Get all resources from Beget
-            all_resources = self.client.get_all_resources()
-
-            if not all_resources:
-                result.message = "No resources found or sync failed"
-                result.errors = ["Failed to retrieve resources from Beget API"]
+            # PHASE 1: Billing Data Collection
+            self.logger.info("Phase 1: Collecting billing data")
+            account_billing = self._collect_account_billing()
+            if not account_billing:
+                result.message = "Failed to collect account billing data"
+                result.errors = ["Account billing data unavailable"]
                 return result
 
-            # Process resources into unified format
-            unified_resources = self._process_beget_resources(all_resources)
+            # PHASE 2: Resource Discovery with Cost Filtering
+            self.logger.info("Phase 2: Discovering paid resources")
+            paid_resources = self._discover_paid_resources()
+
+            # PHASE 3: Resource Processing and Unification
+            self.logger.info("Phase 3: Processing and unifying resources")
+            unified_resources, cpu_statistics, memory_statistics = self._process_paid_resources(paid_resources)
+
+            # PHASE 4: Cost Validation
+            self.logger.info("Phase 4: Validating costs against account billing")
+            total_calculated_cost = sum(r.effective_cost for r in unified_resources)
+            billing_validation = self._validate_costs_against_billing(total_calculated_cost, account_billing)
 
             result.success = True
-            result.message = f"Successfully synced {len(unified_resources)} resources from Beget"
+            result.message = f"Successfully synced {len(unified_resources)} paid resources from Beget"
             result.resources_synced = len(unified_resources)
+            result.total_cost = total_calculated_cost
             result.data = {
                 'resources': [r.to_dict() for r in unified_resources],
-                'raw_data': all_resources,
-                'sync_timestamp': datetime.now().isoformat()
+                'account_billing': account_billing,
+                'billing_validation': billing_validation,
+                'cpu_statistics': cpu_statistics,
+                'memory_statistics': memory_statistics,
+                'sync_timestamp': datetime.now().isoformat(),
+                'billing_first_phases': {
+                    'phase_1_billing_collected': True,
+                    'phase_2_paid_resources_found': len(paid_resources),
+                    'phase_3_resources_unified': len(unified_resources),
+                    'phase_4_costs_validated': billing_validation.get('valid', False)
+                }
             }
 
-            # Calculate total cost
-            total_cost = sum(r.effective_cost for r in unified_resources)
-            result.total_cost = total_cost
-
-            self.logger.info(f"Beget sync completed: {len(unified_resources)} resources, {total_cost:.2f} RUB")
+            self.logger.info(f"Beget billing-first sync completed: {len(unified_resources)} paid resources, {total_calculated_cost:.2f} RUB/day")
 
         except Exception as e:
-            error_msg = f"Beget sync failed: {str(e)}"
+            error_msg = f"Beget billing-first sync failed: {str(e)}"
             self.logger.error(error_msg, exc_info=True)
             result.message = error_msg
             result.errors = [str(e)]
@@ -200,6 +217,235 @@ class BegetProviderPlugin(ProviderPlugin):
 
         return unified_resources
 
+    def _collect_account_billing(self) -> Dict[str, Any]:
+        """Phase 1: Collect account-level billing data"""
+        try:
+            account_info = self.client.get_detailed_account_info()
+            if not account_info or 'error' in account_info:
+                self.logger.warning("Failed to get account billing data")
+                return {}
+
+            # Extract billing-relevant data
+            billing_data = {
+                'account_id': account_info.get('account_id'),
+                'balance': account_info.get('balance', 0),
+                'currency': account_info.get('currency', 'RUB'),
+                'daily_rate': account_info.get('daily_rate', 0),
+                'monthly_rate': account_info.get('monthly_rate', 0),
+                'yearly_rate': account_info.get('yearly_rate', 0),
+                'days_to_block': account_info.get('days_to_block', 0),
+                'account_status': account_info.get('account_status', 'unknown'),
+                'plan_name': account_info.get('plan_name', 'Unknown'),
+                'billing_timestamp': datetime.now().isoformat()
+            }
+
+            self.logger.info(f"Collected account billing: {billing_data['daily_rate']} RUB/day, balance: {billing_data['balance']} RUB")
+            return billing_data
+
+        except Exception as e:
+            self.logger.error(f"Failed to collect account billing: {e}")
+            return {}
+
+    def _discover_paid_resources(self) -> Dict[str, List[Dict]]:
+        """Phase 2: Discover only resources that have actual costs"""
+        paid_resources = {
+            'vps_servers': [],
+            'cloud_services': [],
+            'paid_domains': []  # Only domains with actual costs
+        }
+
+        try:
+            # Get VPS servers - these always have costs in Beget
+            vps_servers = self.client.get_vps_servers_new_api()
+            paid_vps = []
+
+            for vps in vps_servers:
+                # Only include VPS if it has a cost > 0
+                daily_cost = vps.get('daily_cost', 0)
+                monthly_cost = vps.get('monthly_cost', 0)
+
+                if daily_cost > 0 or monthly_cost > 0:
+                    paid_vps.append(vps)
+                    self.logger.debug(f"Including paid VPS: {vps.get('name')} - {daily_cost} RUB/day")
+                else:
+                    self.logger.debug(f"Skipping free VPS: {vps.get('name')}")
+
+            paid_resources['vps_servers'] = paid_vps
+
+            # Get cloud services - these may have costs
+            cloud_services = self.client.get_cloud_services()
+            paid_cloud_services = []
+
+            for service in cloud_services:
+                daily_cost = service.get('daily_cost', 0)
+                monthly_cost = service.get('monthly_cost', 0)
+
+                if daily_cost > 0 or monthly_cost > 0:
+                    paid_cloud_services.append(service)
+                    self.logger.debug(f"Including paid cloud service: {service.get('name')} - {daily_cost} RUB/day")
+                else:
+                    self.logger.debug(f"Skipping free cloud service: {service.get('name')}")
+
+            paid_resources['cloud_services'] = paid_cloud_services
+
+            # Get domains - filter for only paid domains (not free subdomains)
+            domains = self.client.get_domains()
+            paid_domains = []
+
+            for domain in domains:
+                # Include domains that have renewal costs or are registered domains
+                renewal_cost = domain.get('renewal_cost', 0)
+                monthly_cost = domain.get('monthly_cost', 0)
+                domain_type = domain.get('domain_type', '')
+
+                # Only include if it has actual costs or is a registered domain
+                if renewal_cost > 0 or monthly_cost > 0 or domain_type == 'registered':
+                    paid_domains.append(domain)
+                    self.logger.debug(f"Including domain: {domain.get('name')} - {renewal_cost} RUB/renewal")
+                else:
+                    self.logger.debug(f"Skipping free domain: {domain.get('name')}")
+
+            paid_resources['paid_domains'] = paid_domains
+
+            total_paid_resources = len(paid_vps) + len(paid_cloud_services) + len(paid_domains)
+            self.logger.info(f"Discovered {total_paid_resources} paid resources: {len(paid_vps)} VPS, {len(paid_cloud_services)} cloud services, {len(paid_domains)} domains")
+
+            return paid_resources
+
+        except Exception as e:
+            self.logger.error(f"Failed to discover paid resources: {e}")
+            return paid_resources
+
+    def _process_paid_resources(self, paid_resources: Dict[str, List[Dict]]) -> List[ProviderResource]:
+        """Phase 3: Process and unify only paid resources"""
+        unified_resources = []
+
+        # Process VPS servers and collect CPU/memory statistics
+        vps_servers_for_stats = []
+        for vps in paid_resources['vps_servers']:
+            try:
+                unified_vps = self._create_unified_vps(vps)
+                if unified_vps:
+                    unified_resources.append(unified_vps)
+                    vps_servers_for_stats.append(vps)
+            except Exception as e:
+                self.logger.warning(f"Failed to process paid VPS {vps.get('name', 'unknown')}: {e}")
+
+        # Collect CPU and memory statistics for VPS servers
+        cpu_statistics = {}
+        memory_statistics = {}
+        if vps_servers_for_stats:
+            try:
+                self.logger.info("Collecting CPU statistics for VPS servers...")
+                cpu_statistics = self.client.get_all_vps_cpu_statistics(vps_servers_for_stats, period='HOUR')
+                
+                self.logger.info("Collecting memory statistics for VPS servers...")
+                memory_statistics = self.client.get_all_vps_memory_statistics(vps_servers_for_stats, period='HOUR')
+                
+                self.logger.info(f"CPU statistics collected for {cpu_statistics.get('vps_with_cpu_data', 0)} VPS servers")
+                self.logger.info(f"Memory statistics collected for {memory_statistics.get('vps_with_memory_data', 0)} VPS servers")
+                
+                # Attach CPU/memory statistics to VPS resources
+                self._attach_performance_stats_to_resources(unified_resources, cpu_statistics, memory_statistics)
+                
+            except Exception as e:
+                self.logger.warning(f"Failed to collect CPU/memory statistics: {e}")
+
+        # Process cloud services
+        for service in paid_resources['cloud_services']:
+            try:
+                unified_service = self._create_unified_cloud_service(service)
+                if unified_service:
+                    unified_resources.append(unified_service)
+            except Exception as e:
+                self.logger.warning(f"Failed to process paid cloud service {service.get('name', 'unknown')}: {e}")
+
+        # Process paid domains
+        for domain in paid_resources['paid_domains']:
+            try:
+                unified_domain = self._create_unified_domain(domain)
+                if unified_domain:
+                    unified_resources.append(unified_domain)
+            except Exception as e:
+                self.logger.warning(f"Failed to process paid domain {domain.get('name', 'unknown')}: {e}")
+
+        self.logger.info(f"Unified {len(unified_resources)} paid resources")
+        return unified_resources, cpu_statistics, memory_statistics
+
+    def _validate_costs_against_billing(self, total_calculated_cost: float, account_billing: Dict) -> Dict[str, Any]:
+        """Phase 4: Validate calculated costs against account billing"""
+        validation = {
+            'valid': False,
+            'total_calculated': total_calculated_cost,
+            'account_daily_rate': account_billing.get('daily_rate', 0),
+            'difference': 0,
+            'tolerance_percent': 5.0,  # Allow 5% variance
+            'issues': []
+        }
+
+        account_daily_rate = account_billing.get('daily_rate', 0)
+        difference = abs(total_calculated_cost - account_daily_rate)
+        tolerance_amount = account_daily_rate * (validation['tolerance_percent'] / 100)
+
+        validation['difference'] = difference
+
+        if difference <= tolerance_amount:
+            validation['valid'] = True
+            self.logger.info(f"Cost validation passed: calculated {total_calculated_cost:.2f}, account {account_daily_rate:.2f}, difference {difference:.2f}")
+        else:
+            validation['valid'] = False
+            validation['issues'].append(f"Cost mismatch: calculated {total_calculated_cost:.2f}, account {account_daily_rate:.2f}, difference {difference:.2f}")
+            self.logger.warning(f"Cost validation failed: {validation['issues'][0]}")
+
+        return validation
+
+    def _attach_performance_stats_to_resources(self, unified_resources: List[ProviderResource], 
+                                             cpu_statistics: Dict, memory_statistics: Dict):
+        """Attach CPU/memory statistics to VPS resources for UI display"""
+        try:
+            cpu_stats_data = cpu_statistics.get('cpu_statistics', {})
+            memory_stats_data = memory_statistics.get('memory_statistics', {})
+            
+            for resource in unified_resources:
+                if resource.resource_type == 'server':
+                    vps_id = resource.resource_id
+                    
+                    # Attach CPU statistics
+                    if vps_id in cpu_stats_data:
+                        cpu_data = cpu_stats_data[vps_id].get('cpu_statistics', {})
+                        if cpu_data:
+                            resource.tags.update({
+                                'cpu_avg_usage': str(cpu_data.get('avg_cpu_usage', 0)),
+                                'cpu_max_usage': str(cpu_data.get('max_cpu_usage', 0)),
+                                'cpu_min_usage': str(cpu_data.get('min_cpu_usage', 0)),
+                                'cpu_trend': str(cpu_data.get('trend', 0)),
+                                'cpu_performance_tier': cpu_data.get('performance_tier', 'unknown'),
+                                'cpu_data_points': str(cpu_data.get('data_points', 0)),
+                                'cpu_timestamp': cpu_data.get('timestamp', ''),
+                                'cpu_raw_data': json.dumps(cpu_data.get('raw_data', {}))
+                            })
+                    
+                    # Attach memory statistics
+                    if vps_id in memory_stats_data:
+                        memory_data = memory_stats_data[vps_id].get('memory_statistics', {})
+                        if memory_data:
+                            resource.tags.update({
+                                'memory_avg_usage_mb': str(memory_data.get('avg_memory_usage_mb', 0)),
+                                'memory_max_usage_mb': str(memory_data.get('max_memory_usage_mb', 0)),
+                                'memory_min_usage_mb': str(memory_data.get('min_memory_usage_mb', 0)),
+                                'memory_usage_percent': str(memory_data.get('memory_usage_percent', 0)),
+                                'memory_trend': str(memory_data.get('trend', 0)),
+                                'memory_tier': memory_data.get('memory_tier', 'unknown'),
+                                'memory_data_points': str(memory_data.get('data_points', 0)),
+                                'memory_timestamp': memory_data.get('timestamp', ''),
+                                'memory_raw_data': json.dumps(memory_data.get('raw_data', {}))
+                            })
+                            
+            self.logger.info(f"Attached performance statistics to {len(unified_resources)} resources")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to attach performance statistics: {e}")
+
     def _create_unified_vps(self, vps_data: Dict[str, Any]) -> ProviderResource:
         """Create unified resource for VPS server"""
         # Extract CPU/RAM from configuration
@@ -215,6 +461,21 @@ class BegetProviderPlugin(ProviderPlugin):
         raw_status = vps_data.get('status', 'unknown')
         unified_status = resource_registry._map_status(raw_status.lower(), 'beget')
 
+        # Use daily cost for consistency across all resources
+        daily_cost = float(vps_data.get('daily_cost', 0.0))
+        monthly_cost = float(vps_data.get('monthly_cost', 0.0))
+
+        # Use daily cost if available, otherwise convert monthly to daily
+        if daily_cost > 0:
+            effective_cost = daily_cost
+            billing_period = 'daily'
+        elif monthly_cost > 0:
+            effective_cost = monthly_cost / 30.0  # Convert to daily
+            billing_period = 'daily'
+        else:
+            effective_cost = 0.0
+            billing_period = 'monthly'
+
         unified_resource = ProviderResource(
             resource_id=str(vps_data.get('id', '')),
             resource_name=vps_data.get('name', vps_data.get('display_name', 'Unknown')),
@@ -222,9 +483,9 @@ class BegetProviderPlugin(ProviderPlugin):
             service_name='Compute',
             region='global',  # Beget is global
             status=unified_status,
-            effective_cost=float(vps_data.get('monthly_cost', 0.0)),
+            effective_cost=effective_cost,
             currency='RUB',
-            billing_period='monthly',
+            billing_period=billing_period,
             provider_config=vps_data,
             provider_type='beget'
         )
@@ -249,9 +510,25 @@ class BegetProviderPlugin(ProviderPlugin):
 
     def _create_unified_domain(self, domain_data: Dict[str, Any]) -> ProviderResource:
         """Create unified resource for domain"""
-        # Calculate costs
+        # Calculate costs - domains are typically annual, so convert to daily
         monthly_cost = domain_data.get('monthly_cost', 0.0)
         renewal_cost = domain_data.get('renewal_cost', 0.0)
+
+        # Use renewal cost as primary, convert to daily for consistency
+        if renewal_cost > 0:
+            # Assume renewal cost is annual, convert to daily
+            daily_cost = renewal_cost / 365.0
+            billing_period = 'daily'
+            effective_cost = daily_cost
+        elif monthly_cost > 0:
+            # Use monthly cost, convert to daily
+            daily_cost = monthly_cost / 30.0
+            billing_period = 'daily'
+            effective_cost = daily_cost
+        else:
+            # No cost - this shouldn't happen for paid domains
+            effective_cost = 0.0
+            billing_period = 'monthly'
 
         unified_resource = ProviderResource(
             resource_id=str(domain_data.get('id', domain_data.get('name', ''))),
@@ -260,9 +537,9 @@ class BegetProviderPlugin(ProviderPlugin):
             service_name='DNS',
             region='global',
             status=domain_data.get('status', 'active'),
-            effective_cost=monthly_cost + renewal_cost,  # Include both
+            effective_cost=effective_cost,
             currency='RUB',
-            billing_period='monthly',
+            billing_period=billing_period,
             provider_config=domain_data,
             provider_type='beget'
         )
@@ -336,6 +613,48 @@ class BegetProviderPlugin(ProviderPlugin):
             'server_host': ftp_data.get('server_host', ''),
             'port': str(ftp_data.get('port', 21)),
             'monthly_cost': str(ftp_data.get('monthly_cost', 0))
+        })
+
+        return unified_resource
+
+    def _create_unified_cloud_service(self, service_data: Dict[str, Any]) -> ProviderResource:
+        """Create unified resource for cloud service"""
+        service_type = service_data.get('service_type', 'Cloud Service')
+        service_name = service_data.get('name', 'Unknown')
+
+        # Determine the appropriate resource type based on service type
+        if service_type == 'Database':
+            resource_type = 'database'
+            service_name_display = 'Database'
+        elif service_type == 'Storage':
+            resource_type = 'storage'
+            service_name_display = 'Storage'
+        else:
+            resource_type = 'cloud_service'
+            service_name_display = 'Cloud Service'
+
+        unified_resource = ProviderResource(
+            resource_id=str(service_data.get('id', service_data.get('name', ''))),
+            resource_name=service_name,
+            resource_type=resource_type,
+            service_name=service_name_display,
+            region='global',  # Beget is global
+            status=service_data.get('status', 'unknown'),
+            effective_cost=float(service_data.get('daily_cost', 0)),  # Use daily cost as primary
+            currency='RUB',
+            billing_period='daily',  # Cloud services use daily billing
+            provider_config=service_data,
+            provider_type='beget'
+        )
+
+        # Add cloud service-specific tags
+        unified_resource.tags.update({
+            'service_type': service_data.get('service_type', 'Unknown'),
+            'cloud_service_id': str(service_data.get('id', '')),
+            'region': service_data.get('region', 'global'),
+            'manage_enabled': str(service_data.get('manage_enabled', False)),
+            'daily_cost': str(service_data.get('daily_cost', 0)),
+            'monthly_cost': str(service_data.get('monthly_cost', 0))
         })
 
         return unified_resource

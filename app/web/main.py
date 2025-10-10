@@ -122,10 +122,31 @@ def connections():
             ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
             last_snapshot_resources = last_snapshot.total_resources_found if last_snapshot else 0
             
-            # Calculate provider costs (only from active resources)
-            provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
-            total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
-            total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
+            # Calculate provider costs from latest sync snapshot (billing-first approach)
+            total_daily_cost = 0.0
+            total_monthly_cost = 0.0
+            
+            if last_snapshot:
+                # Use cost from sync snapshot if available (billing-first approach)
+                sync_config = json.loads(last_snapshot.sync_config) if last_snapshot.sync_config else {}
+                total_cost_from_sync = sync_config.get('total_cost', 0)
+                
+                # Check if this is billing-first sync (has billing validation)
+                billing_validation = sync_config.get('billing_validation', {})
+                if billing_validation.get('valid', False):
+                    # Use validated cost from billing-first sync
+                    total_daily_cost = total_cost_from_sync
+                    total_monthly_cost = total_cost_from_sync * 30
+                else:
+                    # Fallback to resource-based calculation for old syncs
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                    total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
+                    total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
+            else:
+                # No sync snapshot - use resource table
+                provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
+                total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
             
             providers.append({
                 'id': f"{provider.provider_type}-{provider.id}",
@@ -137,8 +158,8 @@ def connections():
                 'last_sync': provider.last_sync,
                 'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
                 'provider_metadata': provider.provider_metadata,  # Add this line
-                'total_daily_cost': total_daily_cost,
-                'total_monthly_cost': total_monthly_cost,
+                'total_daily_cost': round(total_daily_cost, 2),
+                'total_monthly_cost': round(total_monthly_cost, 2),
                 'last_snapshot_resources': last_snapshot_resources,  # Add resource count from last snapshot
                 'details': {
                     'connection_name': provider.connection_name,

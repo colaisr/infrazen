@@ -1712,6 +1712,26 @@ Fixed critical issues in the Selectel volume sync process to ensure accurate res
 - All fixes maintain backward compatibility with existing sync logic
 - Enhanced error handling for edge cases in volume processing
 
+7. **Cost Calculation Method Alignment (October 2025)**
+   - **Issue**: InfraZen calculated hourly costs as 24-hour average, Selectel UI showed latest hour's cost
+   - **Discovery**: Through HAR file analysis, found Selectel UI uses `group_type=project` and displays most recent hour's cost as hourly rate
+   - **Fix**: Updated `get_resource_costs()` to fetch both project-level and resource-level data, use latest hour's cost as hourly rate
+   - **Impact**: InfraZen now exactly matches Selectel UI cost display (e.g., 0.43 RUB/hour instead of 0.162 RUB/hour average)
+   - **Method**: Fetch project-level consumption to find latest hourly costs, then get detailed resource-level data and assign each resource its latest hour's cost
+   - **Rationale**: Latest hour cost provides real-time cost visibility, better for monitoring current spending than historical averages
+
+8. **IAM Token Generation Verification (October 2025)**
+   - **Investigation**: Addressed concerns about OpenStack API authentication reliability
+   - **Verification**: Confirmed IAM token generation is working correctly using Fernet encryption format
+   - **Technical Details**:
+     - Token format: `gAAAAA...` (Fernet encrypted, 183 characters)
+     - Authentication method: Keystone v3 with service user credentials
+     - Token validity: Successfully authenticates against all Selectel OpenStack endpoints
+     - Token lifecycle: Time-based Fernet tokens auto-refresh as needed
+   - **Validation**: Extensive testing confirmed OpenStack API calls return HTTP 200 with valid data
+   - **Zombie VM Detection**: System correctly identifies resources billed but not in OpenStack (e.g., Winona, Annemarie)
+   - **Impact**: Confirmed billing-first sync approach accurately detects deleted resources still incurring costs
+
 ## 12. Beget Cloud API Enrichment Analysis
 
 ### 12.1. Current Data Collection & Storage Architecture

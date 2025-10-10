@@ -1,0 +1,1223 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 9
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 23
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T01:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 9
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 12
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T02:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 23
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 12
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 12
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 23
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T03:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T04:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 23
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T05:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-7b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d5f34ed6-9beb-412f-b267-0646d808dda4",
+        "name": "disk-for-Annemarie-#1",
+        "parent_id": "48643015916742d080f0ecdd519bada3",
+        "parent_name": "",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 12
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-8a",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "d42402b5-7f73-4a85-9b7d-2fb48a599fc6",
+        "name": "disk-for-Rhiannon-#1",
+        "parent_id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "parent_name": "Rhiannon",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 13
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "volume_gigabytes_universal",
+        "locale": "ru",
+        "name": "Универсальные SSD диски",
+        "quantity": 5,
+        "region": "ru-3b",
+        "unit": "GB*H"
+      },
+      "object": {
+        "id": "2f05b7fc-d9a7-428d-9f31-04e19c419c8c",
+        "name": "disk-for-Winona-#1",
+        "parent_id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "parent_name": "Winona",
+        "type": "volume_gigabytes_universal",
+        "type_name": "Универсальный диск"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 12
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-3b",
+        "unit": "item"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 22
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-3b",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "c09d8418-a03e-408a-b7ee-c10cb954b3d9",
+        "name": "Winona",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "48643015916742d080f0ecdd519bada3",
+        "name": "My First Project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 9
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_cores_preemptible",
+        "locale": "ru",
+        "name": "vCPU, прерываемый",
+        "quantity": 1,
+        "region": "ru-8a",
+        "unit": "item"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 23
+    },
+    {
+      "account_id": "478587",
+      "balance": null,
+      "metric": {
+        "id": "compute_ram_preemptible",
+        "locale": "ru",
+        "name": "RAM, прерываемый",
+        "quantity": 1024,
+        "region": "ru-8a",
+        "unit": "MB"
+      },
+      "object": {
+        "id": "be030e64-437e-4b2e-97cc-33802bf5c147",
+        "name": "Rhiannon",
+        "parent_id": "",
+        "parent_name": "",
+        "type": "cloud_vm",
+        "type_name": "Сервер"
+      },
+      "period": "2025-10-10T06:00:00",
+      "project": {
+        "id": "ae452e6f559f4aeca2c4412dcbbfb60b",
+        "name": "second project"
+      },
+      "provider_key": "vpc",
+      "provision_end": "2025-10-10T07:59:59",
+      "provision_start": "2025-10-10T01:00:00",
+      "value": 8
+    }
+  ]
+}
