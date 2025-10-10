@@ -705,8 +705,9 @@ class SelectelService:
                     'resource': resource
                 }
             else:
-                # Zombie volume - deleted but still billed
-                logger.warning(f"Zombie volume: {resource_id} ({billing_data['name']})")
+                # Volume not found in OpenStack (could be deleted or OpenStack API issue)
+                # Mark as STOPPED instead of DELETED_BILLED since we can't definitively say it's deleted
+                logger.warning(f"Volume not enriched from OpenStack: {resource_id} ({billing_data['name']})")
                 
                 # Extract volume size and creation timestamp from billing data if available
                 # For volumes, the size is typically in the metrics under volume_gigabytes_universal
@@ -727,27 +728,37 @@ class SelectelService:
                                 created_at = self._extract_provision_date_from_billing(resource_id)
                             break
                 
+                # Extract region from billing data
+                volume_region = billing_data.get('region', 'unknown')
+                # Convert billing zone to region (ru-3b -> ru-3)
+                if volume_region and len(volume_region) > 2:
+                    if volume_region[-1].isalpha() and volume_region[-2].isdigit():
+                        volume_region = volume_region[:-1]
+                
                 resource = self._create_resource(
                     resource_type='volume',
                     resource_id=resource_id,
                     name=billing_data['name'],
                     metadata={
                         'billing': billing_data,
-                        'is_zombie': True,
                         'size_gb': volume_size_gb,
-                        'created_at': created_at
+                        'created_at': created_at,
+                        'project_id': billing_data.get('project_id'),
+                        'project_name': billing_data.get('project_name')
                     },
                     sync_snapshot_id=sync_snapshot_id,
-                    region='unknown',
+                    region=volume_region,
                     service_name='Block Storage'
                 )
                 
                 if resource:
-                    resource.status = 'DELETED_BILLED'
+                    resource.status = 'STOPPED'  # Detached volume (not verified in OpenStack)
                     resource.daily_cost = billing_data['daily_cost_rubles']
                     resource.effective_cost = billing_data['daily_cost_rubles']
-                    resource.add_tag('is_zombie', 'true')
-                    resource.add_tag('recommendation', 'Contact support - billed for deleted volume')
+                    resource.original_cost = billing_data['monthly_cost_rubles']
+                    resource.currency = 'RUB'
+                    resource.add_tag('cost_source', 'billing_api')
+                    resource.add_tag('note', 'Detached volume - OpenStack verification skipped for performance')
                 
                 return {
                     'unified_into_vm': False,
