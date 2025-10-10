@@ -723,24 +723,40 @@ class SelectelService:
             return None
     
     def _fetch_server_from_openstack(self, server_id: str) -> Optional[Dict]:
-        """Fetch server details from OpenStack APIs across all regions"""
+        """Fetch server details from OpenStack APIs across all regions and projects"""
         try:
-            # Get available regions (this will trigger region discovery if needed)
-            regions = self.client.get_available_regions()
-            logger.debug(f"Searching for server {server_id} in regions: {regions}")
+            # Discover all projects from billing
+            projects = self.client.get_all_projects_from_billing()
+            if not projects:
+                logger.warning("No projects discovered from billing, falling back to legacy method")
+                projects = [{'id': None, 'name': 'default'}]  # Will use default token
             
-            # Try each region
-            for region in regions:
-                try:
-                    servers = self.client.get_openstack_servers(region=region)
-                    for server in servers:
-                        if server['id'] == server_id:
-                            logger.info(f"Found server {server_id} in region {region}")
-                            return server
-                except Exception as e:
-                    logger.debug(f"Server {server_id} not in region {region}: {e}")
-                    continue
+            # Get available regions
+            regions = self.client.get_available_regions()
+            logger.debug(f"Searching for server {server_id} across {len(projects)} projects and {len(regions)} regions")
+            
+            # Try each project/region combination
+            for project in projects:
+                project_id = project.get('id')
+                project_name = project.get('name', 'Unknown')
+                
+                for region in regions:
+                    try:
+                        servers = self.client.get_openstack_servers(region=region, project_id=project_id)
+                        for server in servers:
+                            if server['id'] == server_id:
+                                logger.info(f"Found server {server_id} in project '{project_name}' region {region}")
+                                # Store project info in server metadata
+                                server['project_id'] = project_id
+                                server['project_name'] = project_name
+                                return server
+                    except Exception as e:
+                        logger.debug(f"Server {server_id} not in project '{project_name}' region {region}: {e}")
+                        continue
+            
+            logger.warning(f"Server {server_id} not found in any project/region combination")
             return None
+            
         except Exception as e:
             logger.error(f"Error fetching server {server_id}: {e}")
             return None

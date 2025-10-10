@@ -259,19 +259,124 @@ class SelectelClient:
             'Sec-Fetch-Site': 'cross-site'
         }
     
-    def get_openstack_servers(self, region: str = None) -> List[Dict[str, Any]]:
+    def _get_project_scoped_headers(self, project_id: str) -> Dict[str, str]:
+        """
+        Get headers for OpenStack API requests scoped to a specific project
+        
+        Args:
+            project_id: The project ID to scope the token to
+        
+        Returns:
+            Dict containing OpenStack API headers with project-scoped token
+        """
+        # Generate a new token scoped to this specific project
+        iam_token = self._get_project_scoped_token(project_id)
+        return {
+            'X-Auth-Token': iam_token,
+            'Accept': 'application/json, text/plain, */*',
+            'Openstack-Api-Version': 'compute latest',
+            'Origin': 'https://my.selectel.ru',
+            'Referer': 'https://my.selectel.ru/',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8,he;q=0.7',
+            'Sec-Ch-Ua': '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cross-site'
+        }
+    
+    def _get_project_scoped_token(self, project_id: str) -> str:
+        """
+        Generate an IAM token scoped to a specific project
+        
+        Args:
+            project_id: The project ID to scope the token to
+        
+        Returns:
+            Project-scoped IAM token string
+        """
+        try:
+            # Use service user credentials if available
+            if self.service_username and self.service_password:
+                username = self.service_username
+                account_id = self.account_id or '478587'
+            else:
+                # Fallback to account info
+                account_info = self.get_account_info()
+                if not account_info or 'account' not in account_info:
+                    raise Exception("Could not get account information")
+                
+                account_data = account_info['account']
+                username = account_data.get('name', '478587')
+                account_id = account_data.get('name', '478587')
+            
+            # Get IAM token scoped to the specific project
+            auth_url = 'https://cloud.api.selcloud.ru/identity/v3/auth/tokens'
+            auth_data = {
+                "auth": {
+                    "identity": {
+                        "methods": ["password"],
+                        "password": {
+                            "user": {
+                                "name": username,
+                                "domain": {
+                                    "name": account_id
+                                },
+                                "password": self.service_password if self.service_password else self.api_key
+                            }
+                        }
+                    },
+                    "scope": {
+                        "project": {
+                            "id": project_id,
+                            "domain": {
+                                "name": account_id
+                            }
+                        }
+                    }
+                }
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=30)
+            
+            if response.status_code == 201:
+                subject_token = response.headers.get('X-Subject-Token')
+                if subject_token:
+                    return subject_token
+                else:
+                    raise Exception("No X-Subject-Token header in response")
+            else:
+                raise Exception(f"IAM token generation failed ({response.status_code}): {response.text[:200]}")
+                
+        except Exception as e:
+            raise Exception(f"Project-scoped token generation failed for project {project_id}: {str(e)}")
+    
+    def get_openstack_servers(self, region: str = None, project_id: str = None) -> List[Dict[str, Any]]:
         """
         Get OpenStack servers (VMs) from a specific region with flavor details
-        Updated to use exact same endpoint and headers as Selectel UI
+        Updated to support multi-project environments
         
         Args:
             region: Optional region to query (if None, uses default openstack_base_url)
+            project_id: Optional project ID to scope the query (if None, uses current token's project)
         
         Returns:
             List of server dictionaries with flavor information
         """
         try:
-            headers = self._get_openstack_headers()
+            # If project_id is specified, get a project-scoped token
+            if project_id:
+                headers = self._get_project_scoped_headers(project_id)
+            else:
+                headers = self._get_openstack_headers()
             
             # Determine which base URL to use - match Selectel UI pattern
             if region:
@@ -287,19 +392,23 @@ class SelectelClient:
             # Use exact same endpoint as Selectel UI
             servers_url = f'{base_url}/compute/v2.1/servers/detail'
             
-            logger.debug(f"Fetching servers from: {servers_url}")
+            logger.debug(f"Fetching servers from: {servers_url} (project: {project_id or 'default'})")
             response = requests.get(servers_url, headers=headers, timeout=30)
             response.raise_for_status()
             
             data = response.json()
             servers = data.get('servers', [])
             
-            logger.info(f"Found {len(servers)} servers in region {region}")
+            logger.info(f"Found {len(servers)} servers in region {region} for project {project_id or 'default'}")
             
             # Enrich each server with flavor details
             for server in servers:
                 if region and 'region' not in server:
                     server['region'] = region
+                
+                # Store project_id in server metadata
+                if project_id:
+                    server['project_id'] = project_id
                 
                 # Get flavor details if flavor ID is present
                 flavor_id = server.get('flavor', {}).get('id')
@@ -633,6 +742,64 @@ class SelectelClient:
             
         except Exception as e:
             raise Exception(f"Failed to get memory statistics for server {server_id}: {str(e)}")
+    
+    def get_all_projects_from_billing(self) -> List[Dict[str, str]]:
+        """
+        Discover all projects from billing API
+        
+        Returns:
+            List of dicts with 'id' and 'name' for each project
+        """
+        try:
+            # Get billing data
+            from datetime import datetime, timedelta
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=24)
+            
+            start_str = start_time.strftime('%Y-%m-%dT%H:00:00')
+            end_str = end_time.strftime('%Y-%m-%dT%H:59:59')
+            
+            billing_url = "https://api.selectel.ru/v1/cloud_billing/statistic/consumption"
+            
+            params = {
+                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
+                'start': start_str,
+                'end': end_str,
+                'locale': 'ru',
+                'group_type': 'project_object_region_metric',
+                'period_group_type': 'hour'
+            }
+            
+            headers = {
+                'X-Token': self.api_key,
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('status') != 'success':
+                return []
+            
+            # Extract unique projects
+            projects = {}
+            for item in data.get('data', []):
+                project = item.get('project', {})
+                project_id = project.get('id')
+                project_name = project.get('name')
+                
+                if project_id and project_id not in projects:
+                    projects[project_id] = {
+                        'id': project_id,
+                        'name': project_name or 'Unnamed Project'
+                    }
+            
+            return list(projects.values())
+            
+        except Exception as e:
+            logger.error(f"Error discovering projects from billing: {e}")
+            return []
     
     def get_resource_costs(self, hours: int = 24) -> Dict[str, Any]:
         """
