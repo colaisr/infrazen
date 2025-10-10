@@ -6,6 +6,7 @@ from app.providers.selectel.client import SelectelClient
 from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot
+from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.core.database import db
 import json
 import logging
@@ -151,7 +152,7 @@ class SelectelService:
             
             # PHASE 2: Group by service type
             logger.info("PHASE 2: Grouping resources by service type")
-            resources_by_type = self._group_by_service_type(billed_resources)
+            resources_by_type = self._group_by_service_type(billed_resources, sync_snapshot.id)
             
             synced_resources = []
             orphan_volumes = []
@@ -369,7 +370,7 @@ class SelectelService:
                 'message': 'Sync failed'
             }
     
-    def _group_by_service_type(self, billed_resources: Dict[str, Any]) -> Dict[str, Dict]:
+    def _group_by_service_type(self, billed_resources: Dict[str, Any], sync_snapshot_id: int = None) -> Dict[str, Dict]:
         """
         Group billing resources by normalized service type
         
@@ -380,6 +381,8 @@ class SelectelService:
         - dbaas_* -> database
         - mks_* -> kubernetes
         - etc.
+        
+        Also tracks unrecognized resource types for platform improvement.
         """
         SERVICE_TYPE_MAPPING = {
             # Already normalized types (from billing API)
@@ -427,17 +430,80 @@ class SelectelService:
         }
         
         grouped = {}
+        unrecognized_count = 0
+        
         for resource_id, billing_data in billed_resources.items():
             obj_type = billing_data.get('type', 'unknown')
             normalized_type = SERVICE_TYPE_MAPPING.get(obj_type, 'other_service')
+            
+            # Track unrecognized resource types for platform improvement
+            if obj_type not in SERVICE_TYPE_MAPPING and obj_type != 'unknown':
+                self._track_unrecognized_resource(
+                    resource_id=resource_id,
+                    billing_data=billing_data,
+                    sync_snapshot_id=sync_snapshot_id
+                )
+                unrecognized_count += 1
             
             if normalized_type not in grouped:
                 grouped[normalized_type] = {}
             
             grouped[normalized_type][resource_id] = billing_data
         
+        if unrecognized_count > 0:
+            logger.info(f"Found {unrecognized_count} unrecognized resource types - tracked for platform improvement")
+        
         logger.info(f"Grouped into {len(grouped)} service types: {list(grouped.keys())}")
         return grouped
+    
+    def _track_unrecognized_resource(self, resource_id: str, billing_data: Dict, sync_snapshot_id: int = None):
+        """
+        Track unrecognized resource types for platform improvement
+        
+        Args:
+            resource_id: Resource ID from billing data
+            billing_data: Raw billing data for the resource
+            sync_snapshot_id: ID of the current sync snapshot
+        """
+        try:
+            # Check if we already tracked this resource type recently (avoid duplicates)
+            existing = UnrecognizedResource.query.filter_by(
+                provider_id=self.provider.id,
+                resource_id=resource_id,
+                is_resolved=False
+            ).first()
+            
+            if existing:
+                # Update the existing record with latest billing data
+                existing.billing_data = json.dumps(billing_data, ensure_ascii=False)
+                existing.discovered_at = datetime.utcnow()
+                existing.sync_snapshot_id = sync_snapshot_id
+                existing.updated_at = datetime.utcnow()
+                db.session.commit()
+                logger.debug(f"Updated existing unrecognized resource: {resource_id}")
+                return
+            
+            # Create new unrecognized resource record
+            unrecognized = UnrecognizedResource(
+                provider_id=self.provider.id,
+                resource_id=resource_id,
+                resource_name=billing_data.get('name', 'Unknown'),
+                resource_type=billing_data.get('type', 'unknown'),
+                service_type=billing_data.get('service_type', 'unknown'),
+                billing_data=json.dumps(billing_data, ensure_ascii=False),
+                user_id=self.provider.user_id,
+                sync_snapshot_id=sync_snapshot_id,
+                discovered_at=datetime.utcnow()
+            )
+            
+            db.session.add(unrecognized)
+            db.session.commit()
+            
+            logger.info(f"Tracked unrecognized resource: {resource_id} ({billing_data.get('type', 'unknown')})")
+            
+        except Exception as e:
+            logger.error(f"Failed to track unrecognized resource {resource_id}: {e}")
+            db.session.rollback()
     
     def _process_vm_resource(self, resource_id: str, billing_data: Dict,
                             sync_snapshot_id: int) -> Optional[Resource]:

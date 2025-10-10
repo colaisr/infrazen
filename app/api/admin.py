@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, redirect, url_for, session, reques
 from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
+from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.api.auth import validate_session
 
 admin_bp = Blueprint('admin', __name__)
@@ -295,3 +296,148 @@ def users_page():
     # Get current user from session
     user = session.get('user', {})
     return render_template('admin/users.html', user=user)
+
+# Unrecognized Resources Management
+
+@admin_bp.route('/unrecognized-resources')
+def list_unrecognized_resources():
+    """List all unrecognized resources (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        provider_filter = request.args.get('provider', '')
+        resource_type_filter = request.args.get('resource_type', '')
+        resolved_filter = request.args.get('resolved', '')
+        
+        query = UnrecognizedResource.query
+        
+        # Apply search filter
+        if search:
+            query = query.filter(
+                db.or_(
+                    UnrecognizedResource.resource_name.contains(search),
+                    UnrecognizedResource.resource_id.contains(search)
+                )
+            )
+        
+        # Apply provider filter
+        if provider_filter:
+            query = query.filter(UnrecognizedResource.provider_id == provider_filter)
+        
+        # Apply resource type filter
+        if resource_type_filter:
+            query = query.filter(UnrecognizedResource.resource_type == resource_type_filter)
+        
+        # Apply resolved filter
+        if resolved_filter == 'true':
+            query = query.filter(UnrecognizedResource.is_resolved == True)
+        elif resolved_filter == 'false':
+            query = query.filter(UnrecognizedResource.is_resolved == False)
+        
+        # Order by discovery date (newest first)
+        query = query.order_by(UnrecognizedResource.discovered_at.desc())
+        
+        # Paginate
+        pagination = query.paginate(
+            page=page, 
+            per_page=per_page, 
+            error_out=False
+        )
+        
+        # Convert to dict format
+        resources = []
+        for resource in pagination.items:
+            resources.append(resource.to_dict())
+        
+        return jsonify({
+            'success': True,
+            'data': resources,
+            'pagination': {
+                'page': pagination.page,
+                'pages': pagination.pages,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to fetch unrecognized resources: {str(e)}'
+        })
+
+@admin_bp.route('/unrecognized-resources/<int:resource_id>', methods=['DELETE'])
+def delete_unrecognized_resource(resource_id):
+    """Delete an unrecognized resource (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        resource = UnrecognizedResource.query.get_or_404(resource_id)
+        
+        db.session.delete(resource)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Unrecognized resource deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete unrecognized resource: {str(e)}'
+        })
+
+@admin_bp.route('/unrecognized-resources/<int:resource_id>/resolve', methods=['POST'])
+def resolve_unrecognized_resource(resource_id):
+    """Mark an unrecognized resource as resolved (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        data = request.get_json()
+        resolution_notes = data.get('resolution_notes', '') if data else ''
+        
+        resource = UnrecognizedResource.query.get_or_404(resource_id)
+        
+        resource.is_resolved = True
+        resource.resolved_at = datetime.utcnow()
+        resource.resolved_by = session.get('user', {}).get('id')
+        resource.resolution_notes = resolution_notes
+        resource.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Unrecognized resource marked as resolved'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to resolve unrecognized resource: {str(e)}'
+        })
+
+@admin_bp.route('/unrecognized-resources-page')
+def unrecognized_resources_page():
+    """Unrecognized resources management page"""
+    admin_check = require_admin()
+    if admin_check:
+        return redirect(url_for('main.dashboard'))
+    
+    # Get current user from session
+    user = session.get('user', {})
+    return render_template('admin/unrecognized_resources.html', user=user)

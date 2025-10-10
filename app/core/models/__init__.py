@@ -15,6 +15,7 @@ from .logs import ResourceLog, ResourceComponent
 from .costs import CostAllocation, CostTrend
 from .recommendations import OptimizationRecommendation
 from .sync import SyncSnapshot, ResourceState
+from .unrecognized_resource import UnrecognizedResource
 
 __all__ = [
     'db',
@@ -31,5 +32,6 @@ __all__ = [
     'CostTrend',
     'OptimizationRecommendation',
     'SyncSnapshot',
-    'ResourceState'
+    'ResourceState',
+    'UnrecognizedResource'
 ]
