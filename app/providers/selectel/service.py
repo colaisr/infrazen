@@ -227,12 +227,13 @@ class SelectelService:
                         if generic.status == 'DELETED_BILLED':
                             zombie_resources.append(generic)
             
-            # PHASE 7: Get statistics for active servers (OPTIONAL - skip for faster syncs)
-            # Performance stats collection is expensive (2 API calls per server)
-            # Only collect if explicitly enabled or periodically
-            collect_stats = False  # Set to True to enable stats collection
+            # PHASE 7: Get statistics for active servers (OPTIONAL - controlled by provider settings)
+            # Performance stats collection makes 2 API calls per server (CPU + Memory)
+            # Can be enabled via provider_metadata['collect_performance_stats'] = True
+            provider_metadata = json.loads(self.provider.provider_metadata) if self.provider.provider_metadata else {}
+            collect_stats = provider_metadata.get('collect_performance_stats', False)
             
-            logger.info(f"PHASE 7: Performance statistics {'ENABLED' if collect_stats else 'DISABLED (for speed)'}")
+            logger.info(f"PHASE 7: Performance statistics {'ENABLED' if collect_stats else 'DISABLED (set in provider settings)'}")
             active_servers = [vm for vm in unified_vms.values() if vm.status != 'DELETED_BILLED']
             if active_servers and collect_stats:
                 try:
@@ -404,8 +405,25 @@ class SelectelService:
         Try to enrich with OpenStack details, fallback to billing-only for zombies
         """
         try:
-            # Try to get full details from OpenStack
-            server_details = self._fetch_server_from_openstack(resource_id)
+            # Extract project and region from billing data to avoid brute-force search
+            billing_project_id = billing_data.get('project_id')
+            billing_region_raw = billing_data.get('region')
+            
+            # Convert billing availability zone (ru-7b) to OpenStack region (ru-7)
+            # Billing uses zones like "ru-7b", "ru-8a", OpenStack uses "ru-7", "ru-8"
+            # Pattern: ru-{number}{letter} -> ru-{number}
+            # Only remove last char if it's a letter AND preceded by a digit
+            billing_region = billing_region_raw
+            if billing_region_raw and len(billing_region_raw) > 2:
+                if billing_region_raw[-1].isalpha() and billing_region_raw[-2].isdigit():
+                    billing_region = billing_region_raw[:-1]
+            
+            # Try to get full details from OpenStack (using billing location hint)
+            server_details = self._fetch_server_from_openstack(
+                resource_id, 
+                billing_project_id=billing_project_id,
+                billing_region=billing_region
+            )
             
             if server_details:
                 # Active VM - full details available
@@ -907,18 +925,45 @@ class SelectelService:
             logger.error(f"Error processing {service_type} {resource_id}: {e}")
             return None
     
-    def _fetch_server_from_openstack(self, server_id: str) -> Optional[Dict]:
-        """Fetch server details from OpenStack APIs across all regions and projects"""
+    def _fetch_server_from_openstack(self, server_id: str, billing_project_id: str = None, billing_region: str = None) -> Optional[Dict]:
+        """
+        Fetch server details from OpenStack APIs
+        
+        Uses project_id and region from billing API if available to avoid brute-force search
+        Falls back to multi-project/region search if billing info not provided
+        """
         try:
+            # OPTIMIZATION: If we have project/region from billing, try that first
+            if billing_project_id and billing_region:
+                logger.debug(f"Trying server {server_id} in billing-provided project {billing_project_id} region {billing_region}")
+                try:
+                    servers = self.client.get_openstack_servers(region=billing_region, project_id=billing_project_id)
+                    for server in servers:
+                        if server['id'] == server_id:
+                            logger.info(f"✅ Found server {server_id} using billing-provided location")
+                            server['project_id'] = billing_project_id
+                            # Get project name from billing
+                            projects = self.client.get_all_projects_from_billing()
+                            for p in projects:
+                                if p.get('id') == billing_project_id:
+                                    server['project_name'] = p.get('name')
+                                    break
+                            return server
+                except Exception as e:
+                    logger.warning(f"Server {server_id} not found at billing location: {e}")
+            
+            # FALLBACK: Brute-force search across all projects/regions
+            logger.debug(f"Falling back to brute-force search for server {server_id}")
+            
             # Discover all projects from billing
             projects = self.client.get_all_projects_from_billing()
             if not projects:
-                logger.warning("No projects discovered from billing, falling back to legacy method")
-                projects = [{'id': None, 'name': 'default'}]  # Will use default token
+                logger.warning("No projects discovered from billing, using default")
+                projects = [{'id': None, 'name': 'default'}]
             
             # Get available regions
             regions = self.client.get_available_regions()
-            logger.debug(f"Searching for server {server_id} across {len(projects)} projects and {len(regions)} regions")
+            logger.debug(f"Searching across {len(projects)} projects and {len(regions)} regions")
             
             # Try each project/region combination
             for project in projects:
@@ -931,7 +976,6 @@ class SelectelService:
                         for server in servers:
                             if server['id'] == server_id:
                                 logger.info(f"Found server {server_id} in project '{project_name}' region {region}")
-                                # Store project info in server metadata
                                 server['project_id'] = project_id
                                 server['project_name'] = project_name
                                 return server

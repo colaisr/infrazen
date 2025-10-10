@@ -878,6 +878,11 @@ class SelectelClient:
                 cost_kopecks = item.get('value', 0)
                 period = item.get('period', '')
                 region = item.get('metric', {}).get('region', 'unknown')
+                
+                # Extract project information from billing API
+                project = item.get('project', {})
+                resource_project_id = project.get('id')
+                resource_project_name = project.get('name')
 
                 if not obj_id:
                     continue
@@ -911,7 +916,9 @@ class SelectelClient:
                             'total_kopecks': 0,
                             'attached_volumes': [],
                             'is_unified': False,
-                            'region': region
+                            'region': region,
+                            'project_id': resource_project_id,
+                            'project_name': resource_project_name
                         }
                     else:
                         # This is a child being added to parent, parent info not yet available
@@ -923,7 +930,9 @@ class SelectelClient:
                             'total_kopecks': 0,
                             'attached_volumes': [],
                             'is_unified': True,
-                            'region': region
+                            'region': region,
+                            'project_id': resource_project_id,
+                            'project_name': resource_project_name
                         }
                     period_costs[unified_id] = {}
 
