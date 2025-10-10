@@ -68,6 +68,7 @@ def add_connection():
         service_username = request.form.get('service_username')
         service_password = request.form.get('service_password')
         auto_sync = request.form.get('auto_sync') == 'on'
+        collect_performance_stats = request.form.get('collect_performance_stats') == 'on'
         
         # Handle sync interval conversion
         sync_interval_value = request.form.get('sync_interval', 'daily')
@@ -100,6 +101,10 @@ def add_connection():
         # Extract account_id from API response
         account_id = test_result.get('account_info', {}).get('name', '')
         
+        # Prepare provider metadata with settings
+        provider_metadata = test_result.get('account_info', {})
+        provider_metadata['collect_performance_stats'] = collect_performance_stats
+        
         # Create provider record
         provider = CloudProvider(
             user_id=user_id,
@@ -111,7 +116,7 @@ def add_connection():
                 'service_username': service_username,
                 'service_password': service_password
             }),
-            provider_metadata=json.dumps(test_result.get('account_info', {})),
+            provider_metadata=json.dumps(provider_metadata),
             is_active=True,
             auto_sync=auto_sync,
             sync_interval=sync_interval
@@ -191,8 +196,9 @@ def edit_connection(provider_id):
         if not provider:
             return jsonify({'success': False, 'message': 'Provider not found'}), 404
         
-        # Parse credentials
+        # Parse credentials and metadata
         credentials = json.loads(provider.credentials)
+        provider_metadata = json.loads(provider.provider_metadata) if provider.provider_metadata else {}
         
         # Return provider data for editing
         provider_data = {
@@ -204,6 +210,7 @@ def edit_connection(provider_id):
             'service_username': credentials.get('service_username', ''),
             'service_password': credentials.get('service_password', ''),
             'auto_sync': provider.auto_sync,
+            'collect_performance_stats': provider_metadata.get('collect_performance_stats', True),  # Default to True
             'sync_interval': provider.sync_interval,
             'is_active': provider.is_active
         }
@@ -246,6 +253,7 @@ def update_connection(provider_id):
         service_username = request.form.get('service_username')
         service_password = request.form.get('service_password')
         auto_sync = request.form.get('auto_sync') == 'on'
+        collect_performance_stats = request.form.get('collect_performance_stats') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
         # Validate required fields
@@ -283,6 +291,12 @@ def update_connection(provider_id):
         account_info = test_client.get_account_info()
         account_id = account_info.get('account', {}).get('name', '') if account_info else ''
         
+        # Prepare provider metadata with settings
+        # Preserve existing metadata and update with new settings
+        existing_metadata = json.loads(provider.provider_metadata) if provider.provider_metadata else {}
+        updated_metadata = {**existing_metadata, **test_result.get('account_info', {})}
+        updated_metadata['collect_performance_stats'] = collect_performance_stats
+        
         # Update provider record
         provider.connection_name = connection_name
         provider.account_id = account_id
@@ -291,7 +305,7 @@ def update_connection(provider_id):
             'service_username': service_username,
             'service_password': service_password
         })
-        provider.provider_metadata = json.dumps(test_result.get('account_info', {}))
+        provider.provider_metadata = json.dumps(updated_metadata)
         provider.auto_sync = auto_sync
         provider.sync_interval = sync_interval_seconds
         
