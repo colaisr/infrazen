@@ -887,18 +887,14 @@ class SelectelClient:
                 if not obj_id:
                     continue
 
-                # Detect project ID (parent of top-level resources)
-                if parent_id and not project_id and len(parent_id) == 32:
-                    project_id = parent_id
-
                 # Determine unified resource ID
                 # If parent_id is a VM (not project), this is an attached volume
-                # Otherwise, it's a standalone resource (VM or detached volume)
-                if parent_id and parent_id != project_id:
+                # Use resource_project_id from billing API to identify projects accurately
+                if parent_id and parent_id != resource_project_id:
                     # This is a child resource (volume attached to VM)
                     unified_id = parent_id  # Group under parent VM
                 else:
-                    # This is a parent/standalone resource
+                    # This is a parent/standalone resource (parent_id is empty or equals project_id)
                     unified_id = obj_id
 
                 # Initialize unified resource
