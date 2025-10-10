@@ -1732,6 +1732,23 @@ Fixed critical issues in the Selectel volume sync process to ensure accurate res
    - **Zombie VM Detection**: System correctly identifies resources billed but not in OpenStack (e.g., Winona, Annemarie)
    - **Impact**: Confirmed billing-first sync approach accurately detects deleted resources still incurring costs
 
+9. **Multi-Project OpenStack Discovery (October 2025)**
+   - **Issue**: Winona VM incorrectly marked as zombie (DELETED_BILLED) despite being active
+   - **Root Cause**: IAM tokens scoped to single project, unable to see resources in other projects
+   - **Discovery**: Billing API revealed Winona in "My First Project" while Rhiannon in "second project"
+   - **Solution**: Implemented multi-project support for OpenStack resource discovery
+   - **Technical Implementation**:
+     - Added `get_all_projects_from_billing()` - discovers all projects from billing data
+     - Added `_get_project_scoped_token(project_id)` - generates IAM tokens per project
+     - Modified `get_openstack_servers()` - accepts `project_id` parameter
+     - Updated `_fetch_server_from_openstack()` - searches across all projects and regions
+     - Added project metadata storage (`project_id`, `project_name`) in resource configuration
+   - **Validation Results**:
+     - ✅ Winona: RUNNING in "My First Project" (ru-3) - 1 vCPU, 1024 MB RAM
+     - ✅ Rhiannon: RUNNING in "second project" (ru-8) - 1 vCPU, 1024 MB RAM
+     - ✅ Annemarie: Correctly identified as zombie (DELETED_BILLED)
+   - **Impact**: Full support for multi-tenant Selectel environments with resources across multiple projects
+
 ## 12. Beget Cloud API Enrichment Analysis
 
 ### 12.1. Current Data Collection & Storage Architecture
