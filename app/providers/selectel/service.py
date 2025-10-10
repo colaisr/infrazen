@@ -575,8 +575,22 @@ class SelectelService:
             - is_orphan: bool
         """
         try:
-            # Try to get volume details from OpenStack
-            volume_details = self._fetch_volume_from_openstack(resource_id)
+            # Extract project and region from billing data to optimize OpenStack search
+            billing_project_id = billing_data.get('project_id')
+            billing_region_raw = billing_data.get('region')
+            
+            # Convert billing availability zone (ru-7b) to OpenStack region (ru-7)
+            billing_region = billing_region_raw
+            if billing_region_raw and len(billing_region_raw) > 2:
+                if billing_region_raw[-1].isalpha() and billing_region_raw[-2].isdigit():
+                    billing_region = billing_region_raw[:-1]
+            
+            # Try to get volume details from OpenStack (using billing location hint)
+            volume_details = self._fetch_volume_from_openstack(
+                resource_id,
+                billing_project_id=billing_project_id,
+                billing_region=billing_region
+            )
             
             if volume_details:
                 # Volume exists in OpenStack
@@ -1041,34 +1055,63 @@ class SelectelService:
             logger.error(f"Error fetching server {server_id}: {e}")
             return None
     
-    def _fetch_volume_from_openstack(self, volume_id: str) -> Optional[Dict]:
-        """Fetch volume details from OpenStack APIs"""
+    def _fetch_volume_from_openstack(self, volume_id: str, billing_project_id: str = None, billing_region: str = None) -> Optional[Dict]:
+        """
+        Fetch volume details from OpenStack APIs
+        
+        Uses project_id and region from billing API if available to avoid brute-force search
+        Falls back to multi-project/region search if billing info not provided
+        """
         try:
-            # Ensure regions are discovered before searching
+            # OPTIMIZATION: If we have project/region from billing, try that first
+            if billing_project_id and billing_region:
+                logger.debug(f"Trying volume {volume_id} in billing-provided project {billing_project_id} region {billing_region}")
+                try:
+                    volumes = self.client.get_openstack_volumes(billing_project_id, region=billing_region)
+                    for volume in volumes:
+                        if volume['id'] == volume_id:
+                            logger.info(f"✅ Found volume {volume_id} using billing-provided location")
+                            return volume
+                except Exception as e:
+                    logger.warning(f"Volume {volume_id} not found at billing location: {e}")
+            
+            # FALLBACK: Brute-force search across all projects/regions
+            logger.debug(f"Falling back to brute-force search for volume {volume_id}")
+            
+            # Ensure regions are discovered
             if not self.client.regions:
                 try:
                     self.client.get_available_regions()
                 except Exception as e:
                     logger.warning(f"Failed to discover regions: {e}")
             
-            projects = self.client.get_projects()
-            project_id = projects[0]['id'] if projects else None
+            # Get all projects from billing
+            projects = self.client.get_all_projects_from_billing()
+            if not projects:
+                logger.warning("No projects discovered from billing")
+                return None
             
-            if project_id:
-                # Use discovered regions, fallback to known regions
-                regions_to_try = list(self.client.regions.keys()) if self.client.regions else ['ru-3', 'ru-7', 'ru-1']
+            # Use discovered regions, fallback to known regions
+            regions_to_try = list(self.client.regions.keys()) if self.client.regions else ['ru-3', 'ru-7', 'ru-8']
+            
+            for project in projects:
+                project_id = project.get('id')
+                project_name = project.get('name', 'Unknown')
                 
                 for region in regions_to_try:
                     try:
                         volumes = self.client.get_openstack_volumes(project_id, region=region)
                         for volume in volumes:
                             if volume['id'] == volume_id:
-                                logger.debug(f"Found volume {volume_id} in region {region}")
+                                logger.info(f"Found volume {volume_id} in project '{project_name}' region {region}")
                                 return volume
                     except Exception as e:
-                        logger.debug(f"Volume {volume_id} not in region {region}: {e}")
+                        logger.debug(f"Volume {volume_id} not in project '{project_name}' region {region}: {e}")
                         continue
+            
+            logger.warning(f"Volume {volume_id} not found in any project/region combination")
             return None
+            
         except Exception as e:
             logger.error(f"Error fetching volume {volume_id}: {e}")
             return None
