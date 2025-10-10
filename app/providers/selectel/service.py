@@ -605,13 +605,31 @@ class SelectelService:
                 # Zombie volume - deleted but still billed
                 logger.warning(f"Zombie volume: {resource_id} ({billing_data['name']})")
                 
+                # Extract volume size and creation timestamp from billing data if available
+                # For volumes, the size is typically in the metrics under volume_gigabytes_universal
+                volume_size_gb = None
+                created_at = None
+                if 'metrics' in billing_data:
+                    # Look for volume size in metrics
+                    for metric_id, metric_value in billing_data['metrics'].items():
+                        if 'volume_gigabytes' in metric_id:
+                            # For zombie volumes, we need to make a direct billing API call to get the size
+                            # since the processed billing data doesn't include the raw metric.quantity
+                            size_and_timestamp = self._get_volume_details_from_billing_api(resource_id)
+                            if size_and_timestamp:
+                                volume_size_gb = size_and_timestamp.get('size_gb')
+                                created_at = size_and_timestamp.get('created_at')
+                            break
+                
                 resource = self._create_resource(
                     resource_type='volume',
                     resource_id=resource_id,
                     name=billing_data['name'],
                     metadata={
                         'billing': billing_data,
-                        'is_zombie': True
+                        'is_zombie': True,
+                        'size_gb': volume_size_gb,
+                        'created_at': created_at
                     },
                     sync_snapshot_id=sync_snapshot_id,
                     region='unknown',
@@ -633,6 +651,68 @@ class SelectelService:
                 
         except Exception as e:
             logger.error(f"Error processing volume {resource_id}: {e}")
+            return None
+    
+    def _get_volume_details_from_billing_api(self, volume_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get volume size and creation timestamp from billing API by making a direct call
+        
+        Args:
+            volume_id: Volume ID to get details for
+            
+        Returns:
+            Dict with 'size_gb' and 'created_at' or None if not found
+        """
+        try:
+            from datetime import datetime, timedelta
+            import requests
+            
+            # Get recent billing data
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=24)
+            start_str = start_time.strftime('%Y-%m-%dT%H:00:00')
+            end_str = end_time.strftime('%Y-%m-%dT%H:59:59')
+            
+            billing_url = 'https://api.selectel.ru/v1/cloud_billing/statistic/consumption'
+            params = {
+                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
+                'start': start_str,
+                'end': end_str,
+                'locale': 'ru',
+                'group_type': 'project_object_region_metric',
+                'period_group_type': 'hour'
+            }
+            
+            headers = {
+                'X-Token': self.client.api_key,
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'success':
+                    # Look for the volume in billing data
+                    for item in data.get('data', []):
+                        if item.get('object', {}).get('id') == volume_id:
+                            # Check if this is a volume metric
+                            metric = item.get('metric', {})
+                            if 'quantity' in metric and 'volume_gigabytes' in metric.get('id', ''):
+                                size_gb = metric.get('quantity', 0)
+                                created_at = item.get('provision_start')
+                                
+                                logger.info(f"Found volume details for {volume_id}: {size_gb} GB, created: {created_at}")
+                                
+                                return {
+                                    'size_gb': size_gb,
+                                    'created_at': created_at
+                                }
+            
+            logger.warning(f"Could not find volume details for {volume_id} in billing API")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting volume details for {volume_id}: {e}")
             return None
     
     def _process_file_storage_resource(self, resource_id: str, billing_data: Dict,
