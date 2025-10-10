@@ -1531,3 +1531,48 @@ body {
     min-height: 3rem;
 }
 
+/* Admin Navigation Styles */
+.admin-nav {
+    background: var(--background-white);
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 1.5rem;
+}
+
+.admin-nav-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.admin-nav-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.875rem;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.admin-nav-tab:hover {
+    color: var(--primary-blue);
+    background-color: var(--background-light);
+}
+
+.admin-nav-tab.active {
+    color: var(--primary-blue);
+    border-bottom-color: var(--primary-blue);
+    background-color: var(--background-light);
+}
+
+.admin-nav-tab i {
+    font-size: 1rem;
+    width: 1.25rem;
+    text-align: center;
+}
+

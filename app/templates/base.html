@@ -144,6 +144,38 @@
                 </div>
             </header>
             
+            <!-- Admin Navigation Menu (only show on admin pages) -->
+            {% if request.endpoint and request.endpoint.startswith('admin.') %}
+            <div class="admin-nav">
+                <div class="admin-nav-tabs">
+                    <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-tab {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+                        <i class="fa-solid fa-chart-line"></i>
+                        Dashboard
+                    </a>
+                    <a href="{{ url_for('admin.users_page') }}" class="admin-nav-tab {% if request.endpoint == 'admin.users_page' %}active{% endif %}">
+                        <i class="fa-solid fa-users"></i>
+                        Users
+                    </a>
+                    <a href="#" class="admin-nav-tab {% if request.endpoint == 'admin.system_status' %}active{% endif %}">
+                        <i class="fa-solid fa-server"></i>
+                        System Status
+                    </a>
+                    <a href="#" class="admin-nav-tab {% if request.endpoint == 'admin.providers' %}active{% endif %}">
+                        <i class="fa-solid fa-cloud"></i>
+                        Providers
+                    </a>
+                    <a href="{{ url_for('admin.unrecognized_resources_page') }}" class="admin-nav-tab {% if request.endpoint == 'admin.unrecognized_resources_page' %}active{% endif %}">
+                        <i class="fa-solid fa-question-circle"></i>
+                        Unrecognized Resources
+                    </a>
+                    <a href="#" class="admin-nav-tab {% if request.endpoint == 'admin.system_preferences' %}active{% endif %}">
+                        <i class="fa-solid fa-cog"></i>
+                        System Preferences
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
             <div class="content-body">
                 {% block content %}{% endblock %}
             </div>

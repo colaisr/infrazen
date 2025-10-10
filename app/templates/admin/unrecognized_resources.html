@@ -2,6 +2,9 @@
 
 {% block title %}Unrecognized Resources - Admin Dashboard{% endblock %}
 
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-title">
@@ -10,42 +13,8 @@
     </div>
 </div>
 
-<!-- Admin Navigation Menu -->
-<div class="admin-nav">
-    <div class="admin-nav-tabs">
-        <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-chart-line"></i>
-            Dashboard
-        </a>
-        <a href="{{ url_for('admin.users_page') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-users"></i>
-            Users
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-server"></i>
-            System Status
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cloud"></i>
-            Providers
-        </a>
-        <a href="{{ url_for('admin.unrecognized_resources_page') }}" class="admin-nav-tab active">
-            <i class="fa-solid fa-question-circle"></i>
-            Unrecognized Resources
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cog"></i>
-            System Preferences
-        </a>
-    </div>
-</div>
-
 <div class="admin-content">
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-12">
-
-            <!-- Filters -->
+    <!-- Filters -->
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="row">
@@ -437,8 +406,5 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 </script>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}

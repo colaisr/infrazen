@@ -2,41 +2,14 @@
 
 {% block title %}Admin Dashboard - InfraZen{% endblock %}
 
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-title">
         <h1>Admin Dashboard</h1>
         <p>System administration and management</p>
-    </div>
-</div>
-
-<!-- Admin Navigation Menu -->
-<div class="admin-nav">
-    <div class="admin-nav-tabs">
-        <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-tab active">
-            <i class="fa-solid fa-chart-line"></i>
-            Dashboard
-        </a>
-        <a href="{{ url_for('admin.users_page') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-users"></i>
-            Users
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-server"></i>
-            System Status
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cloud"></i>
-            Providers
-        </a>
-        <a href="{{ url_for('admin.unrecognized_resources_page') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-question-circle"></i>
-            Unrecognized Resources
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cog"></i>
-            System Preferences
-        </a>
     </div>
 </div>
 
@@ -163,48 +136,6 @@ function loadAdminStats() {
 </script>
 
 <style>
-/* Admin Navigation */
-.admin-nav {
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-}
-
-.admin-nav-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.admin-nav-tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem 1.5rem;
-    text-decoration: none;
-    color: var(--text-secondary);
-    font-weight: 500;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    flex: 1;
-    justify-content: center;
-}
-
-.admin-nav-tab:hover {
-    color: var(--primary-blue);
-    background: var(--background-light);
-}
-
-.admin-nav-tab.active {
-    color: var(--primary-blue);
-    border-bottom-color: var(--primary-blue);
-    background: var(--background-light);
-}
-
-.admin-nav-tab i {
-    font-size: 1rem;
-}
 
 /* Stats Grid */
 .admin-stats-grid {
@@ -317,22 +248,6 @@ function loadAdminStats() {
     font-size: 0.875rem;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .admin-nav-tabs {
-        flex-direction: column;
-    }
-    
-    .admin-nav-tab {
-        justify-content: flex-start;
-        border-bottom: 1px solid var(--border-light);
-        border-right: none;
-    }
-    
-    .admin-nav-tab.active {
-        border-bottom: 1px solid var(--border-light);
-        border-left: 3px solid var(--primary-blue);
-    }
     
     .overview-grid {
         grid-template-columns: 1fr;

@@ -2,6 +2,9 @@
 
 {% block title %}User Management - InfraZen{% endblock %}
 
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="page-title">
@@ -13,36 +16,6 @@
             <i class="fa-solid fa-plus"></i>
             Add User
         </button>
-    </div>
-</div>
-
-<!-- Admin Navigation Menu -->
-<div class="admin-nav">
-    <div class="admin-nav-tabs">
-        <a href="{{ url_for('admin.dashboard') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-chart-line"></i>
-            Dashboard
-        </a>
-        <a href="{{ url_for('admin.users_page') }}" class="admin-nav-tab active">
-            <i class="fa-solid fa-users"></i>
-            Users
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-server"></i>
-            System Status
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cloud"></i>
-            Providers
-        </a>
-        <a href="{{ url_for('admin.unrecognized_resources_page') }}" class="admin-nav-tab">
-            <i class="fa-solid fa-question-circle"></i>
-            Unrecognized Resources
-        </a>
-        <a href="#" class="admin-nav-tab">
-            <i class="fa-solid fa-cog"></i>
-            System Preferences
-        </a>
     </div>
 </div>
 
@@ -403,48 +376,6 @@ function showError(message) {
 </script>
 
 <style>
-/* Admin Navigation */
-.admin-nav {
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    overflow: hidden;
-}
-
-.admin-nav-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.admin-nav-tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem 1.5rem;
-    text-decoration: none;
-    color: var(--text-secondary);
-    font-weight: 500;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    flex: 1;
-    justify-content: center;
-}
-
-.admin-nav-tab:hover {
-    color: var(--primary-blue);
-    background: var(--background-light);
-}
-
-.admin-nav-tab.active {
-    color: var(--primary-blue);
-    border-bottom-color: var(--primary-blue);
-    background: var(--background-light);
-}
-
-.admin-nav-tab i {
-    font-size: 1rem;
-}
 
 .admin-content {
     padding: 2rem;
