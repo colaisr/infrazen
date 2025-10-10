@@ -90,9 +90,9 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # PHASE 1: Get all billed resources (24h window, uses latest hour for hourly cost like Selectel UI)
-            logger.info("PHASE 1: Fetching billing data (24h window, latest hour method matching Selectel UI)")
-            billed_resources = self.client.get_resource_costs(hours=24)
+            # PHASE 1: Get all billed resources (2h window for current active resources only)
+            logger.info("PHASE 1: Fetching billing data (2h window - current active resources only)")
+            billed_resources = self.client.get_resource_costs(hours=2)
             
             # Cache provision dates for all resources (single API call)
             logger.info("Caching provision dates for all resources")
