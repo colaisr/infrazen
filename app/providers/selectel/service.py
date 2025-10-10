@@ -410,6 +410,9 @@ class SelectelService:
                 attached_volumes = server_details.get('attached_volumes', [])
                 total_storage_gb = sum(v.get('size_gb', 0) for v in attached_volumes)
                 
+                # Extract provision date from billing data
+                created_at = self._extract_provision_date_from_billing(resource_id)
+                
                 resource = self._create_resource(
                     resource_type='server',
                     resource_id=resource_id,
@@ -421,7 +424,8 @@ class SelectelService:
                         'ram_mb': ram_mb,
                         'total_storage_gb': total_storage_gb,
                         'ip_addresses': server_details.get('ip_addresses', []),
-                        'attached_volumes': attached_volumes
+                        'attached_volumes': attached_volumes,
+                        'created_at': created_at
                     },
                     sync_snapshot_id=sync_snapshot_id,
                     region=server_details.get('region', 'ru-3'),
@@ -442,6 +446,9 @@ class SelectelService:
                 # Zombie VM - deleted but still billed
                 logger.warning(f"Zombie VM: {resource_id} ({billing_data['name']}) - billed but not in OpenStack")
                 
+                # Extract provision date from billing data
+                created_at = self._extract_provision_date_from_billing(resource_id)
+                
                 resource = self._create_resource(
                     resource_type='server',
                     resource_id=resource_id,
@@ -449,7 +456,8 @@ class SelectelService:
                     metadata={
                         'billing': billing_data,
                         'is_zombie': True,
-                        'note': 'Deleted from OpenStack but still billed'
+                        'note': 'Deleted from OpenStack but still billed',
+                        'created_at': created_at
                     },
                     sync_snapshot_id=sync_snapshot_id,
                     region='unknown',
@@ -569,6 +577,9 @@ class SelectelService:
                 
                 logger.info(f"Creating standalone volume resource: {volume_details.get('name')} (orphan: {is_orphan})")
                 
+                # Extract provision date from billing data
+                created_at = self._extract_provision_date_from_billing(resource_id)
+                
                 resource = self._create_resource(
                     resource_type='volume',
                     resource_id=resource_id,
@@ -578,7 +589,8 @@ class SelectelService:
                         'billing': billing_data,
                         'size_gb': volume_details.get('size'),
                         'volume_type': volume_details.get('volume_type'),
-                        'is_orphan': is_orphan
+                        'is_orphan': is_orphan,
+                        'created_at': created_at
                     },
                     sync_snapshot_id=sync_snapshot_id,
                     region=volume_details.get('region', volume_details.get('availability_zone', 'unknown')),
@@ -619,6 +631,9 @@ class SelectelService:
                             if size_and_timestamp:
                                 volume_size_gb = size_and_timestamp.get('size_gb')
                                 created_at = size_and_timestamp.get('created_at')
+                            else:
+                                # Fallback to just getting the provision date
+                                created_at = self._extract_provision_date_from_billing(resource_id)
                             break
                 
                 resource = self._create_resource(
@@ -713,6 +728,60 @@ class SelectelService:
             
         except Exception as e:
             logger.error(f"Error getting volume details for {volume_id}: {e}")
+            return None
+    
+    def _extract_provision_date_from_billing(self, resource_id: str) -> Optional[str]:
+        """
+        Extract provision_start date from billing API for any resource
+        
+        Args:
+            resource_id: Resource ID to get provision date for
+            
+        Returns:
+            Provision start date string or None if not found
+        """
+        try:
+            from datetime import datetime, timedelta
+            import requests
+            
+            # Get recent billing data
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=24)
+            start_str = start_time.strftime('%Y-%m-%dT%H:00:00')
+            end_str = end_time.strftime('%Y-%m-%dT%H:59:59')
+            
+            billing_url = 'https://api.selectel.ru/v1/cloud_billing/statistic/consumption'
+            params = {
+                'provider_keys': ['vpc', 'mks', 'dbaas', 'craas'],
+                'start': start_str,
+                'end': end_str,
+                'locale': 'ru',
+                'group_type': 'project_object_region_metric',
+                'period_group_type': 'hour'
+            }
+            
+            headers = {
+                'X-Token': self.client.api_key,
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'success':
+                    # Look for the resource in billing data
+                    for item in data.get('data', []):
+                        if item.get('object', {}).get('id') == resource_id:
+                            provision_start = item.get('provision_start')
+                            if provision_start:
+                                logger.debug(f"Found provision date for {resource_id}: {provision_start}")
+                                return provision_start
+            
+            logger.warning(f"Could not find provision date for {resource_id} in billing API")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting provision date for {resource_id}: {e}")
             return None
     
     def _process_file_storage_resource(self, resource_id: str, billing_data: Dict,
