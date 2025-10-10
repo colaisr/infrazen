@@ -224,41 +224,43 @@
             <!-- Resource Specifications -->
             {% if resource.provider_config %}
                 {% set config = resource.get_provider_config() %}
-                {% if config.get('cpu_cores') or config.get('vcpus') or config.get('ram_mb') or config.get('disk_gb') or config.get('total_storage_gb') %}
+                {% set mysql_config = config.get('mysql_config', {}) %}
+                {% if config.get('cpu_cores') or config.get('vcpus') or config.get('ram_mb') or config.get('disk_gb') or config.get('total_storage_gb') or mysql_config.get('cpu_count') or mysql_config.get('memory_mb') or mysql_config.get('disk_size_mb') %}
                 <div class="resource-specs">
                     <div class="specs-header">
                         <span class="specs-title">Характеристики</span>
                     </div>
                     <div class="specs-grid">
-                        {% if config.get('cpu_cores') or config.get('vcpus') %}
+                        {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-microchip"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') }}</span>
+                                <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') }}</span>
                                 <span class="spec-label">vCPU</span>
                             </div>
                         </div>
                         {% endif %}
-                        {% if config.get('ram_mb') %}
+                        {% if config.get('ram_mb') or mysql_config.get('memory_mb') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-memory"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ (config.ram_mb / 1024)|round(1) }} GB</span>
+                                <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) }} GB</span>
                                 <span class="spec-label">RAM</span>
                             </div>
                         </div>
                         {% endif %}
-                        {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') %}
+                        {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') %}
                         <div class="spec-item">
                             <div class="spec-icon">
                                 <i class="fa-solid fa-hdd"></i>
                             </div>
                             <div class="spec-content">
-                                <span class="spec-value">{{ (config.get('total_storage_gb') or config.get('disk_gb') or config.get('billing', {}).get('total_storage_gb', 0))|round(1) }} GB</span>
+                                {% set disk_size = config.get('total_storage_gb') or config.get('disk_gb') or config.get('billing', {}).get('total_storage_gb', 0) or (mysql_config.get('disk_size_mb', 0) / 1024) %}
+                                <span class="spec-value">{{ disk_size|round(1) }} GB</span>
                                 <span class="spec-label">Диск</span>
                             </div>
                         </div>
@@ -282,8 +284,9 @@
             <!-- Resource Usage (if available) -->
             {% if resource.provider_config %}
                 {% set config = resource.get_provider_config() %}
+                {% set mysql_config = config.get('mysql_config', {}) %}
                 {% set tags = resource.get_all_tags() %}
-                {% if config.get('disk_used_gb') or config.get('disk_left_gb') or tags.get('cpu_avg_usage') or tags.get('memory_avg_usage_mb') %}
+                {% if config.get('disk_used_gb') or config.get('disk_left_gb') or tags.get('cpu_avg_usage') or tags.get('memory_avg_usage_mb') or mysql_config.get('disk_used_bytes') or mysql_config.get('disk_left_bytes') %}
                 <div class="resource-usage-collapsible">
                     <div class="usage-header" onclick="toggleUsageInfo('{{ resource.id }}')">
                         <i class="fa-solid fa-chart-line"></i>
@@ -323,6 +326,18 @@
                                 <div class="usage-fill" style="width: {{ ((config.disk_used_gb / (config.disk_used_gb + config.disk_left_gb)) * 100)|round(1) }}%"></div>
                             </div>
                             <div class="usage-text">{{ config.disk_used_gb|round(1) }} GB / {{ (config.disk_used_gb + config.disk_left_gb)|round(1) }} GB</div>
+                        </div>
+                        {% elif mysql_config.get('disk_used_bytes') and mysql_config.get('disk_left_bytes') %}
+                        <div class="usage-item">
+                            <div class="usage-label">HD</div>
+                            <div class="usage-bar">
+                                {% set disk_used_gb = (mysql_config.get('disk_used_bytes', 0)|int) / (1024**3) %}
+                                {% set disk_left_gb = (mysql_config.get('disk_left_bytes', 0)|int) / (1024**3) %}
+                                {% set disk_total_gb = disk_used_gb + disk_left_gb %}
+                                {% set usage_percent = (disk_used_gb / disk_total_gb * 100) if disk_total_gb > 0 else 0 %}
+                                <div class="usage-fill" style="width: {{ usage_percent|round(1) }}%"></div>
+                            </div>
+                            <div class="usage-text">{{ disk_used_gb|round(2) }} GB / {{ disk_total_gb|round(1) }} GB</div>
                         </div>
                         {% endif %}
                     </div>

@@ -1398,6 +1398,153 @@ class BegetAPIClient:
             'provider_config': service
         }
     
+    def get_s3_quota(self) -> Dict:
+        """Get S3 storage quota information"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/cloud/s3/quota"
+            
+            logger.info(f"Fetching S3 quota from: {url}")
+            
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved S3 quota from {url}")
+                
+                return result
+                    
+            except Exception as e:
+                logger.error(f"Failed to fetch S3 quota from {url}: {e}")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"S3 quota fetch failed: {e}")
+            return {}
+
+    def get_s3_traffic_statistics(self, service_id: str, period: str = 'MONTH') -> Dict:
+        """Get S3 traffic usage statistics"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/cloud/s3/{service_id}/statistic/traffic-usage"
+            params = {
+                'service_id': service_id,
+                'period': period
+            }
+            
+            logger.info(f"Fetching S3 traffic statistics from: {url}")
+            
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved S3 traffic statistics from {url}")
+                
+                return result
+                    
+            except Exception as e:
+                logger.error(f"Failed to fetch S3 traffic statistics from {url}: {e}")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"S3 traffic statistics fetch failed: {e}")
+            return {}
+
+    def get_s3_request_statistics(self, service_id: str, period: str = 'MONTH') -> Dict:
+        """Get S3 request count statistics"""
+        try:
+            if not self.access_token:
+                self.authenticate()
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}',
+                'Accept': 'application/json, text/plain, */*',
+                'User-Agent': 'InfraZen/1.0'
+            }
+            
+            url = f"{self.api_url}/v1/cloud/s3/{service_id}/statistic/count-request"
+            params = {
+                'service_id': service_id,
+                'period': period
+            }
+            
+            logger.info(f"Fetching S3 request statistics from: {url}")
+            
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=30)
+                response.raise_for_status()
+                
+                result = response.json()
+                logger.info(f"Successfully retrieved S3 request statistics from {url}")
+                
+                return result
+                    
+            except Exception as e:
+                logger.error(f"Failed to fetch S3 request statistics from {url}: {e}")
+                return {}
+                
+        except Exception as e:
+            logger.error(f"S3 request statistics fetch failed: {e}")
+            return {}
+
+    def get_all_s3_statistics(self, s3_services: List[Dict], period: str = 'MONTH') -> Dict:
+        """Get comprehensive S3 statistics for all services"""
+        try:
+            s3_statistics = {}
+            quota_data = self.get_s3_quota()
+            
+            for service in s3_services:
+                service_id = service.get('id')
+                service_name = service.get('name', 'Unknown')
+                
+                if service_id:
+                    try:
+                        traffic_stats = self.get_s3_traffic_statistics(service_id, period)
+                        request_stats = self.get_s3_request_statistics(service_id, period)
+                        
+                        s3_statistics[service_id] = {
+                            'vps_name': service_name,
+                            'service_id': service_id,
+                            'traffic_statistics': traffic_stats,
+                            'request_statistics': request_stats,
+                            'quota_data': quota_data
+                        }
+                        
+                        logger.debug(f"Collected S3 statistics for {service_name}")
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to collect S3 statistics for {service_name}: {e}")
+            
+            return {
+                'total_s3_services': len(s3_services),
+                's3_with_statistics': len(s3_statistics),
+                's3_statistics': s3_statistics,
+                'global_quota': quota_data,
+                'period': period
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to collect S3 statistics: {e}")
+            return {}
+    
     def get_vps_cpu_statistics(self, vps_id: str, period: str = 'HOUR') -> Dict:
         """Get CPU statistics for a specific VPS"""
         try:

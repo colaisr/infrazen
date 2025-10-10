@@ -125,7 +125,7 @@ class BegetProviderPlugin(ProviderPlugin):
 
             # PHASE 3: Resource Processing and Unification
             self.logger.info("Phase 3: Processing and unifying resources")
-            unified_resources, cpu_statistics, memory_statistics = self._process_paid_resources(paid_resources)
+            unified_resources, cpu_statistics, memory_statistics, s3_statistics = self._process_paid_resources(paid_resources)
 
             # PHASE 4: Cost Validation
             self.logger.info("Phase 4: Validating costs against account billing")
@@ -142,6 +142,7 @@ class BegetProviderPlugin(ProviderPlugin):
                 'billing_validation': billing_validation,
                 'cpu_statistics': cpu_statistics,
                 'memory_statistics': memory_statistics,
+                's3_statistics': s3_statistics,
                 'sync_timestamp': datetime.now().isoformat(),
                 'billing_first_phases': {
                     'phase_1_billing_collected': True,
@@ -279,10 +280,15 @@ class BegetProviderPlugin(ProviderPlugin):
             for service in cloud_services:
                 daily_cost = service.get('daily_cost', 0)
                 monthly_cost = service.get('monthly_cost', 0)
+                service_type = service.get('service_type', '')
 
-                if daily_cost > 0 or monthly_cost > 0:
+                # Include paid services and S3 storage (even if free, as it's a trackable resource)
+                if daily_cost > 0 or monthly_cost > 0 or service_type == 'Storage':
                     paid_cloud_services.append(service)
-                    self.logger.debug(f"Including paid cloud service: {service.get('name')} - {daily_cost} RUB/day")
+                    if daily_cost > 0 or monthly_cost > 0:
+                        self.logger.debug(f"Including paid cloud service: {service.get('name')} - {daily_cost} RUB/day")
+                    else:
+                        self.logger.debug(f"Including S3 storage resource: {service.get('name')} - free but trackable")
                 else:
                     self.logger.debug(f"Skipping free cloud service: {service.get('name')}")
 
@@ -351,14 +357,33 @@ class BegetProviderPlugin(ProviderPlugin):
             except Exception as e:
                 self.logger.warning(f"Failed to collect CPU/memory statistics: {e}")
 
-        # Process cloud services
+        # Process cloud services and collect S3 statistics
+        s3_services_for_stats = []
         for service in paid_resources['cloud_services']:
             try:
                 unified_service = self._create_unified_cloud_service(service)
                 if unified_service:
                     unified_resources.append(unified_service)
+                    # Collect S3 services for statistics
+                    if service.get('service_type') == 'Storage':
+                        s3_services_for_stats.append(service)
             except Exception as e:
                 self.logger.warning(f"Failed to process paid cloud service {service.get('name', 'unknown')}: {e}")
+
+        # Collect S3 statistics
+        s3_statistics = {}
+        if s3_services_for_stats:
+            try:
+                self.logger.info("Collecting S3 statistics...")
+                s3_statistics = self.client.get_all_s3_statistics(s3_services_for_stats, period='MONTH')
+                
+                self.logger.info(f"S3 statistics collected for {s3_statistics.get('s3_with_statistics', 0)} services")
+                
+                # Attach S3 statistics to storage resources
+                self._attach_s3_stats_to_resources(unified_resources, s3_statistics)
+                
+            except Exception as e:
+                self.logger.warning(f"Failed to collect S3 statistics: {e}")
 
         # Process paid domains
         for domain in paid_resources['paid_domains']:
@@ -370,7 +395,7 @@ class BegetProviderPlugin(ProviderPlugin):
                 self.logger.warning(f"Failed to process paid domain {domain.get('name', 'unknown')}: {e}")
 
         self.logger.info(f"Unified {len(unified_resources)} paid resources")
-        return unified_resources, cpu_statistics, memory_statistics
+        return unified_resources, cpu_statistics, memory_statistics, s3_statistics
 
     def _validate_costs_against_billing(self, total_calculated_cost: float, account_billing: Dict) -> Dict[str, Any]:
         """Phase 4: Validate calculated costs against account billing"""
@@ -445,6 +470,80 @@ class BegetProviderPlugin(ProviderPlugin):
             
         except Exception as e:
             self.logger.warning(f"Failed to attach performance statistics: {e}")
+
+    def _attach_s3_stats_to_resources(self, unified_resources: List[ProviderResource], s3_statistics: Dict):
+        """Attach S3 statistics to storage resources for UI display"""
+        try:
+            s3_stats_data = s3_statistics.get('s3_statistics', {})
+            global_quota = s3_statistics.get('global_quota', {})
+            
+            for resource in unified_resources:
+                if resource.resource_type == 'storage':
+                    service_id = resource.resource_id
+                    
+                    # Attach S3 statistics
+                    if service_id in s3_stats_data:
+                        stats_data = s3_stats_data[service_id]
+                        traffic_stats = stats_data.get('traffic_statistics', {})
+                        request_stats = stats_data.get('request_statistics', {})
+                        
+                        # Process traffic statistics
+                        if traffic_stats:
+                            data_rx = traffic_stats.get('data_rx', {})
+                            data_tx = traffic_stats.get('data_tx', {})
+                            
+                            if data_rx and data_tx:
+                                rx_values = data_rx.get('value', [])
+                                tx_values = data_tx.get('value', [])
+                                
+                                # Calculate totals and averages
+                                total_rx = sum(rx_values) if rx_values else 0
+                                total_tx = sum(tx_values) if tx_values else 0
+                                total_traffic = total_rx + total_tx
+                                
+                                resource.tags.update({
+                                    's3_total_traffic_bytes': str(total_traffic),
+                                    's3_rx_bytes': str(total_rx),
+                                    's3_tx_bytes': str(total_tx),
+                                    's3_traffic_period': s3_statistics.get('period', 'MONTH'),
+                                    's3_traffic_raw_data': json.dumps(traffic_stats)
+                                })
+                        
+                        # Process request statistics
+                        if request_stats:
+                            method_get = request_stats.get('method_get', {})
+                            method_post = request_stats.get('method_post', {})
+                            method_put = request_stats.get('method_put', {})
+                            method_delete = request_stats.get('method_delete', {})
+                            
+                            # Calculate total requests
+                            total_requests = 0
+                            if method_get:
+                                total_requests += sum(method_get.get('value', []))
+                            if method_post:
+                                total_requests += sum(method_post.get('value', []))
+                            if method_put:
+                                total_requests += sum(method_put.get('value', []))
+                            if method_delete:
+                                total_requests += sum(method_delete.get('value', []))
+                            
+                            resource.tags.update({
+                                's3_total_requests': str(total_requests),
+                                's3_requests_period': s3_statistics.get('period', 'MONTH'),
+                                's3_requests_raw_data': json.dumps(request_stats)
+                            })
+                        
+                        # Attach global quota data
+                        if global_quota:
+                            resource.tags.update({
+                                's3_quota_used_bytes': str(global_quota.get('used_size', 0)),
+                                's3_quota_raw_data': json.dumps(global_quota)
+                            })
+                            
+            self.logger.info(f"Attached S3 statistics to {len([r for r in unified_resources if r.resource_type == 'storage'])} storage resources")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to attach S3 statistics: {e}")
 
     def _create_unified_vps(self, vps_data: Dict[str, Any]) -> ProviderResource:
         """Create unified resource for VPS server"""
@@ -633,6 +732,13 @@ class BegetProviderPlugin(ProviderPlugin):
             resource_type = 'cloud_service'
             service_name_display = 'Cloud Service'
 
+        # Calculate effective cost
+        daily_cost = float(service_data.get('daily_cost', 0))
+        
+        # For S3 storage with zero cost, set a minimal cost to indicate it's tracked
+        if service_type == 'Storage' and daily_cost == 0:
+            daily_cost = 0.01  # Minimal cost to indicate resource is tracked
+        
         unified_resource = ProviderResource(
             resource_id=str(service_data.get('id', service_data.get('name', ''))),
             resource_name=service_name,
@@ -640,7 +746,7 @@ class BegetProviderPlugin(ProviderPlugin):
             service_name=service_name_display,
             region='global',  # Beget is global
             status=service_data.get('status', 'unknown'),
-            effective_cost=float(service_data.get('daily_cost', 0)),  # Use daily cost as primary
+            effective_cost=daily_cost,
             currency='RUB',
             billing_period='daily',  # Cloud services use daily billing
             provider_config=service_data,
