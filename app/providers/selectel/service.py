@@ -227,10 +227,14 @@ class SelectelService:
                         if generic.status == 'DELETED_BILLED':
                             zombie_resources.append(generic)
             
-            # PHASE 7: Get statistics for active servers
-            logger.info("PHASE 7: Fetching performance statistics")
+            # PHASE 7: Get statistics for active servers (OPTIONAL - skip for faster syncs)
+            # Performance stats collection is expensive (2 API calls per server)
+            # Only collect if explicitly enabled or periodically
+            collect_stats = False  # Set to True to enable stats collection
+            
+            logger.info(f"PHASE 7: Performance statistics {'ENABLED' if collect_stats else 'DISABLED (for speed)'}")
             active_servers = [vm for vm in unified_vms.values() if vm.status != 'DELETED_BILLED']
-            if active_servers:
+            if active_servers and collect_stats:
                 try:
                     server_data_list = []
                     for vm in active_servers:
