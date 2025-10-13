@@ -1,0 +1,73 @@
+/* Form Components */
+
+/* Form Groups */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Input Fields */
+.input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.input:focus {
+    border-color: var(--primary-blue);
+    outline: none;
+}
+
+.input:disabled {
+    background-color: var(--background-gray);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+/* Select Fields */
+.select {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    background-color: white;
+    cursor: pointer;
+}
+
+/* Textarea */
+.textarea {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Form Validation */
+.input.error {
+    border-color: var(--error-red);
+}
+
+.form-error {
+    color: var(--error-red);
+    font-size: 0.75rem;
+    margin-top: var(--spacing-xs);
+}
+
+.form-help {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-top: var(--spacing-xs);
+}
