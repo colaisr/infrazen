@@ -3104,5 +3104,479 @@ class UnrecognizedResource:
 - ✅ **Integration**: Seamless integration with existing sync process
 - ✅ **Error Handling**: Graceful handling of zombie volumes and API failures
 
-## 17. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, and the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking.
+## 17. Multi-Provider Price Comparison & Optimization Strategy 🎯 PLANNED (October 2025)
+
+### 17.1. Vision & Business Value
+
+InfraZen will provide intelligent cross-provider price comparison capabilities, enabling customers to identify cost optimization opportunities by comparing their current cloud resources against similar offerings from other providers. This feature delivers:
+
+- **Immediate Cost Savings**: Identify 20-40% savings opportunities by switching providers or resource types
+- **Data-Driven Decision Making**: Quantified comparisons based on actual specifications (CPU, RAM, storage, region)
+- **Competitive Intelligence**: Track pricing trends across Russian cloud market
+- **Migration Planning**: Smart recommendations with confidence scores and migration effort indicators
+
+### 17.2. Core Architecture Strategy
+
+#### **17.2.1. Price Storage Structure**
+
+**Dual-Layer Storage Approach:**
+1. **SKU-Level Prices**: Store provider-specific product names and prices (e.g., "Beget VPS-S" = 150 RUB/month)
+2. **Specification-Based Prices**: Normalized resource specifications for cross-provider matching
+
+**Specification Schema:**
+```
+Core Specifications (Phase 1):
+- CPU cores (integer)
+- RAM GB (integer)
+- Storage GB (integer)
+- Storage type (SSD/HDD/NVMe)
+- Region (normalized: MSK, SPB, etc.)
+- Resource type (vm, volume, database, etc.)
+
+Extended Specifications (Future):
+- CPU type (Intel/AMD, generation)
+- Network bandwidth
+- Backup options
+- High availability features
+```
+
+**Price History Tracking:**
+- Track all price changes over time for trend analysis
+- Enable "Beget raised VPS-S price from 140 to 150 RUB on Oct 1st" insights
+- Support FinOps cost forecasting with historical data
+
+#### **17.2.2. Universal Resource Taxonomy**
+
+**Standardized Resource Types:**
+- `server` - Virtual machines, VPS, compute instances
+- `volume` - Block storage, disks
+- `database` - Managed databases (PostgreSQL, MySQL, etc.)
+- `storage` - Object storage (S3-compatible)
+- `network` - Load balancers, floating IPs
+- `kubernetes` - Managed Kubernetes clusters
+- `backup` - Backup services
+- `other` - Specialized services
+
+**Provider Mapping:**
+- Each provider's specific resource types map to universal taxonomy
+- Enables apples-to-apples comparison across providers
+- Foundation for intelligent matching algorithm
+
+#### **17.2.3. Price Collection Architecture**
+
+**Provider-Specific Collection Methods:**
+
+**Beget:**
+- Initial: Manual mapping from website pricing pages
+- Phase 2: Web scraping of pricing pages
+- Phase 3: HAR file analysis of pricing calculator (if available)
+- Fallback: Manual updates from support communications
+
+**Selectel:**
+- Primary: Extract from actual customer billing data (100% accurate for used resources)
+- Secondary: Official price list from website/API (for unused resource types)
+- Hybrid approach ensures completeness and accuracy
+
+**Future Providers (AWS, Azure, Yandex Cloud, VK Cloud):**
+- Official pricing APIs where available
+- Web scraping for Russian-specific pricing
+- HAR file analysis of pricing calculators
+- Manual validation for complex pricing models
+
+**Update Frequency:**
+- Daily scheduled updates (2 AM default)
+- Manual trigger capability for immediate updates
+- Price change detection and notifications
+
+#### **17.2.4. Smart Matching Algorithm**
+
+**Similarity Score-Based Matching (Recommended Approach):**
+
+```
+Match Quality Calculation:
+- CPU similarity: 0-30 points (exact match = 30, ±1 core = 25, ±2 cores = 15)
+- RAM similarity: 0-30 points (exact match = 30, within 25% = 20, within 50% = 10)
+- Storage similarity: 0-20 points (exact match = 20, within 40% = 15)
+- Region match: 0-20 points (exact region = 20, same country = 10, different = 0)
+
+Total Score: 0-100
+- 90-100: Excellent match (highlight green)
+- 70-89: Good match (show with confidence)
+- 50-69: Fair match (show with caveats)
+- <50: Poor match (hide by default)
+```
+
+**Why Similarity Score vs. Exact Match:**
+- Providers rarely offer identical specifications
+- Range-based matching too broad, returns irrelevant results
+- Score provides confidence level for each recommendation
+- Flexible enough to find useful alternatives, strict enough to avoid bad suggestions
+
+**Alternative Matching Modes:**
+- **Exact Match**: For users who want only identical specs
+- **Closest Higher**: Show next tier up (e.g., upgrade path)
+- **Closest Lower**: Show downgrade options (cost reduction)
+- **Best Value**: Highest spec per RUB ratio
+
+### 17.3. Data Models & Database Schema
+
+**Provider Prices Table:**
+```sql
+CREATE TABLE provider_prices (
+    id SERIAL PRIMARY KEY,
+    provider VARCHAR(50) NOT NULL,              -- 'beget', 'selectel', 'aws', etc.
+    resource_type VARCHAR(100) NOT NULL,        -- Universal taxonomy type
+    provider_sku VARCHAR(200),                  -- Provider-specific SKU/plan name
+    region VARCHAR(50),                         -- Normalized region code
+    
+    -- Core specifications
+    cpu_cores INTEGER,
+    ram_gb INTEGER,
+    storage_gb INTEGER,
+    storage_type VARCHAR(20),                   -- 'SSD', 'HDD', 'NVMe'
+    
+    -- Extended specifications (JSON for flexibility)
+    extended_specs JSONB,
+    
+    -- Pricing
+    hourly_cost DECIMAL(10, 4),
+    monthly_cost DECIMAL(10, 2),
+    currency VARCHAR(3) DEFAULT 'RUB',
+    
+    -- Commitment pricing (future)
+    yearly_cost DECIMAL(10, 2),
+    three_year_cost DECIMAL(10, 2),
+    commitment_discount_percent DECIMAL(5, 2),
+    
+    -- Metadata
+    last_updated TIMESTAMP DEFAULT NOW(),
+    confidence_score DECIMAL(3, 2),             -- 0.0 to 1.0 data quality
+    source VARCHAR(50),                         -- 'billing_api', 'official_price_list', 'scraped', 'manual'
+    source_url TEXT,
+    notes TEXT,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_provider_prices_lookup ON provider_prices(provider, resource_type, cpu_cores, ram_gb);
+CREATE INDEX idx_provider_prices_region ON provider_prices(region, resource_type);
+CREATE INDEX idx_provider_prices_updated ON provider_prices(last_updated DESC);
+```
+
+**Price History Table:**
+```sql
+CREATE TABLE price_history (
+    id SERIAL PRIMARY KEY,
+    price_id INTEGER REFERENCES provider_prices(id),
+    old_monthly_cost DECIMAL(10, 2),
+    new_monthly_cost DECIMAL(10, 2),
+    change_percent DECIMAL(6, 2),
+    change_date TIMESTAMP DEFAULT NOW(),
+    change_reason VARCHAR(200),                 -- 'market_adjustment', 'promotion', 'hardware_upgrade'
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Optimization Recommendations Table:**
+```sql
+CREATE TABLE optimization_recommendations (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    current_resource_id INTEGER REFERENCES resources(id),
+    recommended_price_id INTEGER REFERENCES provider_prices(id),
+    
+    similarity_score DECIMAL(5, 2),             -- 0-100 match quality
+    monthly_savings DECIMAL(10, 2),
+    annual_savings DECIMAL(10, 2),
+    savings_percent DECIMAL(6, 2),
+    
+    migration_effort VARCHAR(20),               -- 'easy', 'medium', 'hard'
+    migration_notes TEXT,
+    
+    status VARCHAR(20) DEFAULT 'pending',       -- 'pending', 'accepted', 'rejected', 'completed'
+    user_feedback TEXT,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 17.4. Implementation Phases
+
+#### **Phase 1: Foundation (Weeks 1-2)**
+- ✅ **Database Models**: Create price storage tables and relationships
+- ✅ **Base Provider Extension**: Add `get_pricing_data()` method to provider base class
+- ✅ **Price Update Service**: Scheduler service for daily price updates
+- ✅ **Manual Trigger**: Admin interface to manually trigger price updates
+
+#### **Phase 2: Beget Price Collection (Weeks 3-4)**
+- ✅ **Beget Price Mapping**: Manually map all Beget products (VPS, hosting, VDS, storage)
+- ✅ **Initial Data Load**: Populate database with Beget pricing
+- ✅ **Beget Provider Extension**: Implement `get_pricing_data()` for Beget
+- ✅ **Validation**: Compare scraped prices against Beget website
+
+#### **Phase 3: Selectel Price Collection (Weeks 5-6)**
+- ✅ **Billing Data Extraction**: Extract pricing from existing Selectel billing data
+- ✅ **Official Price List**: Scrape Selectel pricing pages for unused resources
+- ✅ **Data Merging**: Combine billing data (high confidence) with official prices
+- ✅ **Selectel Provider Extension**: Implement `get_pricing_data()` for Selectel
+
+#### **Phase 4: Matching Engine (Weeks 7-8)**
+- ✅ **Similarity Algorithm**: Implement score-based matching logic
+- ✅ **Specification Normalization**: Normalize resource specs across providers
+- ✅ **Match Quality Filters**: Filter by minimum similarity score
+- ✅ **Testing**: Validate with real Beget vs Selectel comparisons
+
+#### **Phase 5: UI & User Experience (Weeks 9-10)**
+- ✅ **Cost Optimization Page**: New page showing all resources with recommendations
+- ✅ **Comparison View**: Side-by-side resource comparison interface
+- ✅ **Savings Summary**: Dashboard widget showing total potential savings
+- ✅ **Filters & Controls**: Filter by provider, resource type, savings threshold
+
+#### **Phase 6: Advanced Features (Weeks 11-12)**
+- ✅ **Migration Planning**: Generate migration plans with step-by-step guides
+- ✅ **Price Alerts**: Notify when prices change or better options become available
+- ✅ **Trend Analysis**: Show pricing trends over time
+- ✅ **Bulk Actions**: Accept/reject multiple recommendations
+
+### 17.5. User Experience Design
+
+#### **17.5.1. Cost Optimization Page**
+
+**Main Interface:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Cost Optimization Opportunities                                │
+│                                                                  │
+│  💰 Potential Monthly Savings: 15,240 ₽ (34%)                  │
+│  📊 67 Resources Analyzed  |  23 Opportunities Found            │
+│                                                                  │
+│  Filters: [All Providers ▼] [All Types ▼] [Min Savings: 10%]   │
+│  Show: [✓ Only Cheaper] [ ] All Similar [ ] Same Provider      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Resource: web-server-01 (Beget VPS-L)                         │
+│  Current: 2 CPU, 4GB RAM, 50GB SSD | Moscow | 350₽/mo         │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ 💚 Best Match (Score: 95)                      -120₽ (34%)│ │
+│  │ Selectel Cloud VPS | 2 CPU, 4GB, 50GB SSD | MSK | 230₽/mo│ │
+│  │ Migration: Easy | Yearly Savings: 1,440₽                  │ │
+│  │ [View Details] [Create Migration Plan] [Dismiss]          │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐ │
+│  │ ⚡ Alternative Option (Score: 85)             -80₽ (23%) │ │
+│  │ Selectel Cloud VPS | 2 CPU, 8GB, 100GB SSD | MSK | 270₽ │ │
+│  │ Migration: Medium | More resources for same price         │ │
+│  │ [View Details] [Create Migration Plan] [Dismiss]          │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Resource: database-prod-01 (Beget MySQL)                      │
+│  Current: 2 CPU, 8GB RAM, 100GB SSD | Moscow | 580₽/mo        │
+│  [Find Alternatives ▼]                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### **17.5.2. Detailed Comparison View**
+
+**Side-by-Side Comparison:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Current Resource vs. Recommended Alternative                   │
+├──────────────────────────────┬──────────────────────────────────┤
+│  CURRENT: Beget VPS-L        │  RECOMMENDED: Selectel Cloud VPS │
+│  ✓ Active                    │  💰 34% Cheaper                  │
+├──────────────────────────────┼──────────────────────────────────┤
+│  Specifications              │  Specifications                  │
+│  • 2 CPU Cores               │  • 2 CPU Cores         [✓ Match]│
+│  • 4GB RAM                   │  • 4GB RAM             [✓ Match]│
+│  • 50GB SSD Storage          │  • 50GB SSD Storage    [✓ Match]│
+│  • Moscow Region             │  • Moscow Region       [✓ Match]│
+├──────────────────────────────┼──────────────────────────────────┤
+│  Pricing                     │  Pricing                         │
+│  • 350₽/month                │  • 230₽/month                    │
+│  • 4,200₽/year               │  • 2,760₽/year                   │
+│                              │  • Save 1,440₽/year              │
+├──────────────────────────────┼──────────────────────────────────┤
+│  Features                    │  Features                        │
+│  • 99.9% SLA                 │  • 99.95% SLA          [✓ Better]│
+│  • Daily backups             │  • Snapshot backups    [= Same]  │
+│  • 24/7 Support              │  • 24/7 Support        [= Same]  │
+├──────────────────────────────┴──────────────────────────────────┤
+│  Migration Effort: Easy                                         │
+│  • API-compatible (OpenStack)                                   │
+│  • Estimated downtime: <30 minutes                              │
+│  • Migration guide available                                    │
+│                                                                  │
+│  [✓ Accept Recommendation] [Create Migration Plan] [Dismiss]   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### **17.5.3. Dashboard Integration**
+
+**Savings Widget:**
+```
+┌──────────────────────────────────────┐
+│  💰 Cost Optimization                │
+├──────────────────────────────────────┤
+│  Potential Monthly Savings           │
+│  15,240 ₽ (34%)                      │
+│                                       │
+│  Top Opportunities:                  │
+│  1. web-server-01    -120₽  [View]  │
+│  2. database-prod-01  -95₽  [View]  │
+│  3. storage-backup    -80₽  [View]  │
+│                                       │
+│  [View All Opportunities →]          │
+└──────────────────────────────────────┘
+```
+
+### 17.6. Technical Implementation Details
+
+#### **17.6.1. Provider Base Class Extension**
+
+```python
+class ProviderBase:
+    def get_pricing_data(self) -> List[PriceRecord]:
+        """
+        Fetch current pricing data from provider
+        Returns list of PriceRecord objects with:
+        - provider, resource_type, specs, pricing, metadata
+        
+        Implementation method varies by provider:
+        - API calls (if available)
+        - Web scraping (most Russian providers)
+        - Billing data extraction (Selectel, Beget)
+        - Manual data (fallback)
+        """
+        raise NotImplementedError
+```
+
+#### **17.6.2. Price Update Scheduler**
+
+```python
+class PriceUpdateService:
+    def daily_update(self):
+        """
+        Run daily at 2 AM to update all provider prices
+        1. Fetch new prices from each provider
+        2. Compare with existing prices
+        3. Log price changes to history
+        4. Update price records
+        5. Generate change notifications
+        """
+        pass
+    
+    def manual_update(self, provider: str = None):
+        """
+        Manually trigger price update
+        Optional provider filter for single-provider updates
+        """
+        pass
+```
+
+#### **17.6.3. Matching Engine**
+
+```python
+class ResourceMatcher:
+    def find_similar_resources(
+        self, 
+        source_resource: Resource,
+        min_score: float = 70.0,
+        max_results: int = 10
+    ) -> List[MatchResult]:
+        """
+        Find similar resources from other providers
+        Returns list of matches sorted by similarity score
+        Each match includes:
+        - target provider price record
+        - similarity score (0-100)
+        - savings amount and percentage
+        - migration effort estimate
+        """
+        pass
+    
+    def calculate_similarity(
+        self,
+        source: ResourceSpec,
+        target: ResourceSpec
+    ) -> float:
+        """
+        Calculate similarity score (0-100)
+        Based on CPU, RAM, storage, region matching
+        """
+        pass
+```
+
+### 17.7. Future Enhancements
+
+#### **17.7.1. Long-Term Commitment Pricing**
+- Track yearly and 3-year commitment discounts
+- Calculate ROI for commitment vs. on-demand
+- Alert when commitment makes financial sense
+
+#### **17.7.2. Multi-Currency Support**
+- Handle USD, EUR pricing for international providers
+- Real-time exchange rate updates
+- Normalize all comparisons to user's preferred currency
+
+#### **17.7.3. Advanced Matching**
+- ML-based similarity learning from user feedback
+- Performance benchmarking integration
+- Workload-aware recommendations (CPU-intensive vs. storage-heavy)
+
+#### **17.7.4. Provider Expansion**
+- AWS (pricing API + Russian region focus)
+- Azure (pricing API + Russian region focus)
+- Yandex Cloud (billing API + price list)
+- VK Cloud (web scraping)
+- Cloud.ru (web scraping)
+- International providers (as needed)
+
+### 17.8. Key Design Decisions & Rationale
+
+#### **Decision 1: Both SKU-Level and Spec-Based Storage**
+**Rationale:** SKU-level provides exact product mapping (useful for known migrations), while spec-based enables smart cross-provider matching. Both are needed for comprehensive comparison.
+
+#### **Decision 2: Similarity Score Over Exact Match**
+**Rationale:** Providers rarely offer identical specs. Similarity scoring provides flexibility while maintaining quality through configurable minimum score thresholds.
+
+#### **Decision 3: Price History Tracking**
+**Rationale:** Historical data enables trend analysis, forecasting, and competitive intelligence. Minimal storage overhead, high business value for FinOps.
+
+#### **Decision 4: Start with Core Specs, Extend Later**
+**Rationale:** CPU, RAM, Storage, Region provide 80% of matching accuracy. Extended specs (CPU type, network, etc.) can be added incrementally as needed without schema changes (JSONB field).
+
+#### **Decision 5: Daily Price Updates**
+**Rationale:** Cloud pricing changes infrequently (monthly/quarterly). Daily updates provide freshness without excessive API calls or scraping. Manual trigger available for urgent updates.
+
+#### **Decision 6: Hybrid Data Sources (Billing + Official + Scraped)**
+**Rationale:** Maximizes data quality and coverage. Billing data = 100% accurate for used resources. Official price lists = complete coverage. Web scraping = fallback when APIs unavailable.
+
+### 17.9. Success Metrics
+
+**Technical Metrics:**
+- Price data freshness: <24 hours for 95% of records
+- Match quality: Average similarity score >85 for accepted recommendations
+- Data coverage: 100% of user resources matched with alternatives
+
+**Business Metrics:**
+- Average savings identified: 25-35% per resource
+- Recommendation acceptance rate: >40%
+- Actual savings realized: >15% of total cloud spend
+- Time to first recommendation: <5 minutes after connection
+
+### 17.10. Implementation Status
+
+- 🎯 **Status**: Planned - Architecture and strategy defined
+- 📅 **Timeline**: 10-12 weeks from kickoff
+- 🚀 **Next Step**: Create database models and base provider extensions
+- ✅ **Prerequisites**: Existing provider architecture, resource tracking, billing data
+
+---
+
+## 18. Referencing this Document
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking, and the comprehensive multi-provider price comparison strategy for cost optimization.
