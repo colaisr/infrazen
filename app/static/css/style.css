@@ -1839,7 +1839,7 @@ body {
     gap: 0.5rem;
 }
 
-.action-btn {
+.admin-content .action-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1852,32 +1852,32 @@ body {
     font-size: 0.75rem;
 }
 
-.action-btn.view-btn {
+.admin-content .action-btn.view-btn {
     background: rgba(59, 130, 246, 0.1);
     color: var(--primary-blue);
 }
 
-.action-btn.view-btn:hover {
+.admin-content .action-btn.view-btn:hover {
     background: var(--primary-blue);
     color: white;
 }
 
-.action-btn.resolve-btn {
+.admin-content .action-btn.resolve-btn {
     background: rgba(16, 185, 129, 0.1);
     color: var(--success-green);
 }
 
-.action-btn.resolve-btn:hover {
+.admin-content .action-btn.resolve-btn:hover {
     background: var(--success-green);
     color: white;
 }
 
-.action-btn.delete-btn {
+.admin-content .action-btn.delete-btn {
     background: rgba(239, 68, 68, 0.1);
     color: var(--error-red);
 }
 
-.action-btn.delete-btn:hover {
+.admin-content .action-btn.delete-btn:hover {
     background: var(--error-red);
     color: white;
 }
