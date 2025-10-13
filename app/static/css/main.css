@@ -3,6 +3,7 @@
 /* Core Styles */
 @import url('./core/variables.css');
 @import url('./core/reset.css');
+@import url('./core/utilities.css');
 
 /* Components */
 @import url('./components/buttons.css');
@@ -11,6 +12,7 @@
 @import url('./components/tables.css');
 @import url('./components/modals.css');
 @import url('./components/navigation.css');
+@import url('./components/badges.css');
 
 /* Layouts */
 @import url('./layouts/admin.css');
