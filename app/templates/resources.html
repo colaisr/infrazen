@@ -66,20 +66,20 @@
     <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
     {% for provider in providers %}
     <div class="provider-section">
-            <div class="provider-info" onclick="toggleProviderSection('{{ provider.id }}')">
-                <div class="provider-icon">
-                    {% if provider.provider_type == 'beget' %}
-                        <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 3rem; height: 3rem; object-fit: contain;">
-                    {% elif provider.provider_type == 'yandex' %}
-                        <i class="fas fa-cloud" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
-                    {% elif provider.provider_type == 'selectel' %}
-                        <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 3rem; height: 3rem; object-fit: contain;">
-                    {% else %}
-                        <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
-                    {% endif %}
-                </div>
-                <div class="provider-content-info">
-                    <div class="provider-details">
+            <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
+                <div class="provider-left">
+                    <div class="provider-icon">
+                        {% if provider.provider_type == 'beget' %}
+                            <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 3rem; height: 3rem; object-fit: contain;">
+                        {% elif provider.provider_type == 'yandex' %}
+                            <i class="fas fa-cloud" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
+                        {% elif provider.provider_type == 'selectel' %}
+                            <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 3rem; height: 3rem; object-fit: contain;">
+                        {% else %}
+                            <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
+                        {% endif %}
+                    </div>
+                    <div class="provider-details-inline">
                         <div class="provider-type">{{ provider.provider_type|upper }}</div>
                         <div class="provider-name">{{ provider.connection_name or provider.provider_type|title }}</div>
                         <div class="provider-sync">
@@ -90,14 +90,12 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="provider-stats">
-                        <div class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</div>
-                        <div class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</div>
-                    </div>
                 </div>
-            </div>
-            <div class="provider-actions">
-                <i class="fa-solid fa-chevron-down provider-chevron" id="provider-chevron-{{ provider.id }}"></i>
+                <div class="provider-right">
+                    <div class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</div>
+                    <div class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</div>
+                    <i class="fa-solid fa-chevron-down provider-chevron" id="provider-chevron-{{ provider.id }}"></i>
+                </div>
             </div>
         </div>
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
@@ -437,8 +435,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1.5rem;
-    background: var(--background-light);
+    padding: 1rem 1.25rem;
+    background: var(--background-white);
     border-bottom: 1px solid var(--border-light);
     cursor: pointer;
     transition: background-color 0.2s ease;
@@ -449,12 +447,12 @@
     background: var(--background-gray);
 }
 
-.provider-info {
+.provider-left {
     display: flex;
     align-items: center;
     gap: 1rem;
     flex: 1;
-    padding-top: 0;
+    min-width: 0;
 }
 
 .provider-icon {
@@ -482,27 +480,16 @@
     transform: scale(1.5) !important;
 }
 
-.provider-content-info {
-    flex: 1;
-    min-width: 0;
+.provider-details-inline {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.provider-details {
-    display: flex;
-    flex-direction: row;
     align-items: center;
     gap: 0.75rem;
     flex: 1;
+    min-width: 0;
 }
 
-.provider-stats {
+.provider-right {
     display: flex;
-    flex-direction: row;
     align-items: center;
     gap: 0.75rem;
     flex-shrink: 0;
