@@ -79,11 +79,12 @@
                     {% endif %}
                 </div>
                 <div class="provider-details">
-                    <div class="provider-type">{{ provider.provider_type|upper }}</div>
-                    <div class="provider-name">
-                        {{ provider.connection_name or provider.provider_type|title }}
-                        <span class="provider-last-sync">
-                            • Последняя синхронизация: 
+                    <div class="provider-header-info">
+                        <div class="provider-type">{{ provider.provider_type|upper }}</div>
+                        <div class="provider-name">{{ provider.connection_name or provider.provider_type|title }}</div>
+                    </div>
+                    <div class="provider-meta">
+                        <span class="provider-sync">
                             {% if provider.details.last_sync %}
                                 {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
                             {% else %}
@@ -487,9 +488,25 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.provider-header-info {
+    display: flex;
     align-items: center;
     gap: 0.75rem;
+}
+
+.provider-meta {
+    display: flex;
+    align-items: center;
+}
+
+.provider-sync {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 400;
 }
 
 .provider-name {
@@ -507,8 +524,7 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 500;
-    margin-right: 0.5rem;
-    display: inline;
+    flex-shrink: 0;
 }
 
 .provider-last-sync {
