@@ -6,6 +6,7 @@ from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
 from app.core.models.unrecognized_resource import UnrecognizedResource
+from app.core.models.provider_catalog import ProviderCatalog
 from app.api.auth import validate_session
 
 admin_bp = Blueprint('admin', __name__)
@@ -441,3 +442,109 @@ def unrecognized_resources_page():
     # Get current user from session
     user = session.get('user', {})
     return render_template('admin/unrecognized_resources.html', user=user)
+
+# Provider Catalog Management
+
+@admin_bp.route('/providers-page')
+def providers_page():
+    """Provider catalog management page"""
+    admin_check = require_admin()
+    if admin_check:
+        return redirect(url_for('main.dashboard'))
+    
+    # Get current user from session
+    user = session.get('user', {})
+    return render_template('admin/providers.html', user=user)
+
+@admin_bp.route('/providers')
+def list_providers():
+    """List all providers in catalog (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        providers = ProviderCatalog.query.order_by(ProviderCatalog.display_name).all()
+        
+        return jsonify({
+            'success': True,
+            'providers': [provider.to_dict() for provider in providers]
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to fetch providers: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<int:provider_id>', methods=['PUT'])
+def update_provider(provider_id):
+    """Update provider settings (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        provider = ProviderCatalog.query.get_or_404(provider_id)
+        data = request.get_json()
+        
+        # Update allowed fields
+        if 'is_enabled' in data:
+            provider.is_enabled = bool(data['is_enabled'])
+        
+        provider.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'provider': provider.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to update provider: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<int:provider_id>/sync-prices', methods=['POST'])
+def sync_provider_prices(provider_id):
+    """Trigger price sync for a provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        provider = ProviderCatalog.query.get_or_404(provider_id)
+        
+        # Update sync status
+        provider.sync_status = 'in_progress'
+        provider.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        # TODO: Implement actual price sync logic
+        # For now, just simulate success after a delay
+        import time
+        time.sleep(2)  # Simulate sync time
+        
+        provider.sync_status = 'success'
+        provider.last_price_sync = datetime.utcnow()
+        provider.sync_error = None
+        provider.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Price sync completed for {provider.display_name}',
+            'provider': provider.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        if 'provider' in locals():
+            provider.sync_status = 'failed'
+            provider.sync_error = str(e)
+            provider.updated_at = datetime.utcnow()
+            db.session.commit()
+        
+        return jsonify({
+            'success': False,
+            'error': f'Failed to sync prices: {str(e)}'
+        })

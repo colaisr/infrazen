@@ -14,6 +14,7 @@ from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot
 from app.core.models.user import User
+from app.core.models.provider_catalog import ProviderCatalog
 
 main_bp = Blueprint('main', __name__)
 
@@ -172,12 +173,16 @@ def connections():
                 }
             })
     
+    # Get enabled providers from catalog for "Available Providers" section
+    enabled_providers = ProviderCatalog.query.filter_by(is_enabled=True).all()
+    
     return render_template('connections.html', 
                         user=user,
                         active_page='connections',
                         page_title='Подключения облаков',
                         page_subtitle='Управление подключениями к облачным провайдерам',
                         providers=providers,
+                        enabled_providers=enabled_providers,
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/resources')

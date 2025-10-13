@@ -3578,5 +3578,83 @@ class ResourceMatcher:
 
 ---
 
-## 18. Referencing this Document
+## 18. CSS Architecture & Styling Conventions ✅ IMPLEMENTED (Phases 1–3)
+
+### 18.1. Goals
+- Isolation and predictability: avoid global bleed and regressions between pages
+- Composability: reusable components (buttons, cards, tables, modals, navigation, badges)
+- Page/layout scoping: local overrides without affecting other screens
+- Progressive migration: keep `legacy.css` while extracting components safely
+
+### 18.2. Directory Structure
+```
+app/static/css/
+  main.css                    # Entry point (imports below in strict order)
+  core/
+    variables.css            # Colors, spacing, radii, shadows
+    reset.css                # Normalize/reset
+    utilities.css            # Small helpers (spacing, display, flex, text)
+  components/
+    buttons.css              # Primary/secondary/danger/sizes/loading/icon
+    forms.css                # Inputs, selects, textareas, validation
+    cards.css                # Base cards + provider/resource variants
+    tables.css               # Admin/generic tables, row states
+    modals.css               # Modal shell and sizes
+    navigation.css           # Sidebar/header/breadcrumbs/provider header
+    badges.css               # Status/role/provider/type badges, filter pills
+  layouts/
+    admin.css                # Admin layout (placeholder)
+    dashboard.css            # Dashboard layout (placeholder)
+    connections.css          # Connections layout (placeholder)
+  pages/
+    admin/
+      users.css              # Users page (placeholder)
+      unrecognized-resources.css  # Unrecognized resources page (placeholder)
+  features/
+    charts.css               # Charts (placeholder)
+    drag-drop.css            # Drag & drop (placeholder)
+  legacy.css                 # Legacy rules; gradually emptied
+```
+
+### 18.3. Import Order (in `main.css`)
+1) Core (`variables`, `reset`, `utilities`)
+2) Components (buttons, forms, cards, tables, modals, navigation, badges)
+3) Layouts (admin, dashboard, connections)
+4) Pages (scoped page-specific rules only)
+5) Features (charts, drag-drop)
+6) Legacy (kept last to minimize influence; new code must not depend on it)
+
+### 18.4. Conventions
+- Use readable class names (e.g., `provider-header`, `provider-left`, `provider-right`, `provider-name`)
+- Scope component rules; avoid global bare selectors
+- Page tweaks live under a page root (e.g., `.resources-content`, `.admin-content`)
+- Prefer utilities from `utilities.css` for micro-spacing/align/text helpers
+- Avoid inline styles; add to the correct component/page file when feasible
+
+### 18.5. Provider Card Header – Final Spec (Resources page)
+- Single-row header with three parts:
+  - Left: `provider-icon` (logo)
+  - Middle (grows): `provider-details-inline` → `provider-type` (UPPER), `provider-name`, `provider-sync`
+  - Right (fixed): `provider-daily-cost`, `provider-resource-count`, chevron
+- Flex rules:
+  - Container: `display:flex; align-items:center; justify-content:space-between;`
+  - Middle: `flex:1; min-width:0;` (expands and truncates safely)
+  - Right: `flex-shrink:0;` (stays on one line)
+- Visuals: cost in primary blue and semibold; metadata in secondary color
+- Behavior: entire header clickable to expand/collapse provider section
+
+### 18.6. Migration Plan
+- Phase 1: Core foundation (done)
+- Phase 2: Component extraction (done)
+- Phase 3: Buttons, badges, utilities (done)
+- Phase 4: Migrate remaining legacy rules and retire `legacy.css` (next)
+
+### 18.7. Guardrails
+- No global overrides impacting unrelated pages
+- Stable component contracts; additive changes preferred
+- Import order and page scoping prevent regressions
+
+---
+
+## 19. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking, and the comprehensive multi-provider price comparison strategy for cost optimization.

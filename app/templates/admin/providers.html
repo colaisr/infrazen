@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}Провайдеры - InfraZen FinOps Platform{% endblock %}
+
+{% block page_title %}Управление провайдерами - Каталог облачных провайдеров для сравнения цен{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="admin-content">
+    <div class="admin-header">
+        <div class="admin-header-left">
+            <h1>Каталог провайдеров</h1>
+            <p>Управление доступными облачными провайдерами для сравнения цен и оптимизации</p>
+        </div>
+        <div class="admin-header-actions">
+            <button class="btn btn-primary" onclick="syncAllPrices()">
+                <i class="fa-solid fa-arrows-rotate"></i>
+                Синхронизировать все цены
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-cloud"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="totalProviders">-</h3>
+                <p>Всего провайдеров</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="enabledProviders">-</h3>
+                <p>Активных</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="syncedProviders">-</h3>
+                <p>С актуальными ценами</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+                <h3 id="failedProviders">-</h3>
+                <p>Ошибки синхронизации</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Providers Table -->
+    <div class="admin-table-container">
+        <div class="table-header">
+            <h2>Список провайдеров</h2>
+            <div class="table-actions">
+                <div class="search-box">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" id="providerSearch" placeholder="Поиск провайдеров..." onkeyup="filterProviders()">
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="admin-table" id="providersTable">
+                <thead>
+                    <tr>
+                        <th>Провайдер</th>
+                        <th>Тип</th>
+                        <th>Статус</th>
+                        <th>Метод получения цен</th>
+                        <th>Последняя синхронизация</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="providersTableBody">
+                    <!-- Providers will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let providers = [];
+
+// Load providers on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadProviders();
+});
+
+function loadProviders() {
+    fetch('/api/admin/providers')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                providers = data.providers;
+                renderProviders();
+                updateStatistics();
+            } else {
+                showError('Ошибка загрузки провайдеров: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading providers:', error);
+            showError('Ошибка загрузки провайдеров');
+        });
+}
+
+function renderProviders() {
+    const tbody = document.getElementById('providersTableBody');
+    tbody.innerHTML = '';
+    
+    providers.forEach(provider => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <div class="provider-info">
+                    <div class="provider-logo">
+                        ${provider.logo_url ? 
+                            `<img src="${provider.logo_url}" alt="${provider.display_name}" style="width: 32px; height: 32px; object-fit: contain;">` :
+                            `<i class="fa-solid fa-cloud" style="font-size: 1.5rem; color: var(--text-secondary);"></i>`
+                        }
+                    </div>
+                    <div class="provider-details">
+                        <div class="provider-name">${provider.display_name}</div>
+                        <div class="provider-description">${provider.description || ''}</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="badge badge-secondary">${provider.provider_type.toUpperCase()}</span>
+            </td>
+            <td>
+                <label class="switch">
+                    <input type="checkbox" ${provider.is_enabled ? 'checked' : ''} 
+                           onchange="toggleProvider(${provider.id}, this.checked)">
+                    <span class="slider"></span>
+                </label>
+                <span class="status-text">${provider.is_enabled ? 'Включен' : 'Отключен'}</span>
+            </td>
+            <td>
+                <span class="badge badge-info">${provider.pricing_method}</span>
+                ${provider.has_pricing_api ? '<i class="fa-solid fa-check-circle text-success ml-1" title="Есть API"></i>' : ''}
+            </td>
+            <td>
+                <div class="sync-status">
+                    <span class="sync-status-badge sync-${provider.sync_status}">
+                        ${getSyncStatusText(provider.sync_status)}
+                    </span>
+                    <div class="sync-time">
+                        ${provider.last_price_sync ? 
+                            new Date(provider.last_price_sync).toLocaleString('ru-RU') : 
+                            'Никогда'
+                        }
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="action-buttons">
+                    <button class="action-btn sync-btn" onclick="syncProviderPrices(${provider.id})" 
+                            title="Синхронизировать цены">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                    </button>
+                    <a href="${provider.website_url}" target="_blank" class="action-btn view-btn" 
+                       title="Открыть сайт провайдера">
+                        <i class="fa-solid fa-external-link-alt"></i>
+                    </a>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateStatistics() {
+    const total = providers.length;
+    const enabled = providers.filter(p => p.is_enabled).length;
+    const synced = providers.filter(p => p.sync_status === 'success').length;
+    const failed = providers.filter(p => p.sync_status === 'failed').length;
+    
+    document.getElementById('totalProviders').textContent = total;
+    document.getElementById('enabledProviders').textContent = enabled;
+    document.getElementById('syncedProviders').textContent = synced;
+    document.getElementById('failedProviders').textContent = failed;
+}
+
+function getSyncStatusText(status) {
+    const statusMap = {
+        'never': 'Не синхронизировался',
+        'success': 'Успешно',
+        'failed': 'Ошибка',
+        'in_progress': 'Синхронизация...'
+    };
+    return statusMap[status] || status;
+}
+
+function toggleProvider(providerId, isEnabled) {
+    fetch(`/api/admin/providers/${providerId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_enabled: isEnabled })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update local data
+            const provider = providers.find(p => p.id === providerId);
+            if (provider) {
+                provider.is_enabled = isEnabled;
+                updateStatistics();
+            }
+            showSuccess(`Провайдер ${isEnabled ? 'включен' : 'отключен'}`);
+        } else {
+            showError('Ошибка обновления провайдера: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating provider:', error);
+        showError('Ошибка обновления провайдера');
+    });
+}
+
+function syncProviderPrices(providerId) {
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider) return;
+    
+    // Update UI to show loading
+    provider.sync_status = 'in_progress';
+    renderProviders();
+    
+    fetch(`/api/admin/providers/${providerId}/sync-prices`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update local data
+            provider.sync_status = 'success';
+            provider.last_price_sync = new Date().toISOString();
+            provider.sync_error = null;
+            renderProviders();
+            updateStatistics();
+            showSuccess(data.message);
+        } else {
+            provider.sync_status = 'failed';
+            provider.sync_error = data.error;
+            renderProviders();
+            showError('Ошибка синхронизации: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error syncing prices:', error);
+        provider.sync_status = 'failed';
+        provider.sync_error = error.message;
+        renderProviders();
+        showError('Ошибка синхронизации цен');
+    });
+}
+
+function syncAllPrices() {
+    const enabledProviders = providers.filter(p => p.is_enabled);
+    if (enabledProviders.length === 0) {
+        showWarning('Нет активных провайдеров для синхронизации');
+        return;
+    }
+    
+    if (confirm(`Синхронизировать цены для ${enabledProviders.length} провайдеров?`)) {
+        enabledProviders.forEach(provider => {
+            syncProviderPrices(provider.id);
+        });
+    }
+}
+
+function filterProviders() {
+    const searchTerm = document.getElementById('providerSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('#providersTableBody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Utility functions
+function showSuccess(message) {
+    // Simple success notification
+    const notification = document.createElement('div');
+    notification.className = 'notification notification-success';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function showError(message) {
+    // Simple error notification
+    const notification = document.createElement('div');
+    notification.className = 'notification notification-error';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+function showWarning(message) {
+    // Simple warning notification
+    const notification = document.createElement('div');
+    notification.className = 'notification notification-warning';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 4000);
+}
+</script>
+
+<style>
+.provider-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.provider-logo {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-light);
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.provider-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.provider-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.provider-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    margin-right: 8px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--success-green);
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.status-text {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.sync-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sync-status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sync-never {
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--text-secondary);
+}
+
+.sync-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-green);
+}
+
+.sync-failed {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error-red);
+}
+
+.sync-in_progress {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-blue);
+}
+
+.sync-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sync-btn {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-blue);
+}
+
+.sync-btn:hover {
+    background: var(--primary-blue);
+    color: white;
+}
+
+.view-btn {
+    background: rgba(107, 114, 128, 0.1);
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.view-btn:hover {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.notification-success {
+    background: var(--success-green);
+    color: white;
+}
+
+.notification-error {
+    background: var(--error-red);
+    color: white;
+}
+
+.notification-warning {
+    background: var(--warning-orange);
+    color: white;
+}
+</style>
+{% endblock %}

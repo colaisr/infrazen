@@ -160,7 +160,7 @@
                         <i class="fa-solid fa-server"></i>
                         System Status
                     </a>
-                    <a href="#" class="admin-nav-tab {% if request.endpoint == 'admin.providers' %}active{% endif %}">
+                    <a href="{{ url_for('admin.providers_page') }}" class="admin-nav-tab {% if request.endpoint == 'admin.providers_page' %}active{% endif %}">
                         <i class="fa-solid fa-cloud"></i>
                         Providers
                     </a>
