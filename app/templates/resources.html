@@ -66,34 +66,35 @@
     <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
     {% for provider in providers %}
     <div class="provider-section">
-        <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
-                <div class="provider-logo">
+        <div class="provider-info" onclick="toggleProviderSection('{{ provider.id }}')">
+                <div class="provider-icon">
                     {% if provider.provider_type == 'beget' %}
-                        <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" class="provider-icon-img">
+                        <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 3rem; height: 3rem; object-fit: contain;">
                     {% elif provider.provider_type == 'yandex' %}
-                        <i class="fas fa-cloud provider-icon-fa"></i>
+                        <i class="fas fa-cloud" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% elif provider.provider_type == 'selectel' %}
-                        <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" class="provider-icon-img">
+                        <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 3rem; height: 3rem; object-fit: contain;">
                     {% else %}
-                        <i class="fas fa-box provider-icon-fa"></i>
+                        <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                     {% endif %}
                 </div>
-                <div class="provider-title">
-                    <span class="provider-type">{{ provider.provider_type|upper }}</span>
-                    <span class="provider-name">{{ provider.connection_name or provider.provider_type|title }}</span>
-                </div>
-                <div class="provider-meta">
-                    <span class="provider-sync">
-                        {% if provider.details.last_sync %}
-                            {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
-                        {% else %}
-                            Никогда
-                        {% endif %}
-                    </span>
+                <div class="provider-details">
+                    <div class="provider-type">{{ provider.provider_type|upper }}</div>
+                    <div class="provider-name">
+                        {{ provider.connection_name or provider.provider_type|title }}
+                        <span class="provider-last-sync">
+                            • Последняя синхронизация: 
+                            {% if provider.details.last_sync %}
+                                {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
+                            {% else %}
+                                Никогда
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
                 <div class="provider-stats">
-                    <span class="provider-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
-                    <span class="provider-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
+                    <span class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
+                    <span class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
                 </div>
             </div>
             <div class="provider-actions">
@@ -1349,108 +1350,3 @@ document.addEventListener('DOMContentLoaded', function() {
     </script>
 {% endblock %}
 
-<style>
-/* Professional Provider Header - Single Row Layout */
-.provider-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: var(--background-white);
-    border: 1px solid var(--border-light);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-bottom: 1rem;
-}
-
-.provider-header:hover {
-    border-color: var(--primary-blue);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-}
-
-.provider-logo {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--background-light);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.provider-icon-img {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-    max-width: 100%;
-    max-height: 100%;
-}
-
-.provider-icon-fa {
-    font-size: 1.25rem;
-    color: var(--text-secondary);
-}
-
-.provider-title {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
-}
-
-.provider-type {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.provider-name {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.provider-meta {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-}
-
-.provider-sync {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.provider-stats {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.provider-cost {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--primary-blue);
-    white-space: nowrap;
-}
-
-.provider-count {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    white-space: nowrap;
-}
-</style>
