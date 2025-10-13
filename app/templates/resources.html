@@ -66,7 +66,7 @@
     <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
     {% for provider in providers %}
     <div class="provider-section">
-        <div class="provider-info" onclick="toggleProviderSection('{{ provider.id }}')">
+            <div class="provider-info" onclick="toggleProviderSection('{{ provider.id }}')">
                 <div class="provider-icon">
                     {% if provider.provider_type == 'beget' %}
                         <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 3rem; height: 3rem; object-fit: contain;">
@@ -88,10 +88,8 @@
                             Никогда
                         {% endif %}
                     </div>
-                </div>
-                <div class="provider-stats">
-                    <span class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
-                    <span class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</span>
+                    <div class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</div>
+                    <div class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</div>
                 </div>
             </div>
             <div class="provider-actions">
@@ -490,6 +488,20 @@
 }
 
 .provider-sync {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 400;
+    flex-shrink: 0;
+}
+
+.provider-daily-cost {
+    font-size: 0.875rem;
+    color: var(--primary-blue);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.provider-resource-count {
     font-size: 0.75rem;
     color: var(--text-secondary);
     font-weight: 400;
