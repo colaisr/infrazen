@@ -80,8 +80,8 @@
                     {% endif %}
                 </div>
                 <div class="provider-details">
-                    <div class="provider-type">{{ provider.provider_type|upper }}</div>
                     <div class="provider-name">
+                        <span class="provider-type">{{ provider.provider_type|upper }}</span>
                         {{ provider.connection_name or provider.provider_type|title }}
                         <span class="provider-last-sync">
                             • Последняя синхронизация: 
@@ -506,8 +506,8 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 500;
-    margin-top: 0;
-    margin-bottom: 0.25rem;
+    margin-right: 0.5rem;
+    display: inline;
 }
 
 .provider-last-sync {
