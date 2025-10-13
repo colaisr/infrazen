@@ -2995,5 +2995,114 @@ Both Beget and Selectel providers now have complete feature parity with unified 
 - **Improved UX**: Intuitive settings interface and navigation
 - **Admin Efficiency**: Streamlined user management with better error handling
 
-## 16. Referencing this Document
-Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, and complete feature parity between Beget and Selectel providers with full FinOps capabilities.
+## 16. Enhanced Unrecognized Resource Tracking System ✅ IMPLEMENTED (October 2025)
+
+### 16.1. Overview
+The InfraZen platform implements a sophisticated unrecognized resource tracking system that automatically detects and monitors resources that appear in billing data but are not yet properly categorized by the platform. This system ensures complete cost visibility while providing a feedback mechanism for continuous platform improvement.
+
+### 16.2. Key Features
+
+#### 16.2.1. Smart Resource Type Inference
+**Automatic Detection from Metrics:**
+- **Load Balancers**: `load_balancers_*` → `network_load_balancer` → `load_balancer`
+- **Volumes**: `volume_*` → `volume_universal` → `volume`
+- **File Storage**: `share_*` → `share_basic` → `file_storage`
+- **Databases**: `dbaas_*` → `dbaas_postgresql` → `database`
+- **Kubernetes**: `mks_*` → `mks_cluster` → `kubernetes_cluster`
+- **Container Registry**: `craas_*` → `craas_registry` → `container_registry`
+- **S3 Storage**: `s3_*` → `s3_storage` → `s3_bucket`
+- **Network Resources**: `network_*` → `network_floating_ip` → `floating_ip`
+- **Backup**: `backup_*` → `backup_storage` → `backup`
+
+#### 16.2.2. Complete History Tracking
+**No Deduplication Logic:**
+- ✅ **Every sync creates new records** - full audit trail
+- ✅ **Multiple syncs** = **multiple entries** for same resources
+- ✅ **Complete history** of when unrecognized resources appeared
+- ✅ **Frequency tracking** across multiple syncs
+- ✅ **Pattern analysis** for platform improvement
+
+#### 16.2.3. Admin Interface Integration
+**Comprehensive Management Dashboard:**
+- **Location**: `/api/admin/unrecognized-resources-page`
+- **Features**:
+  - Filter by provider, resource type, resolved status
+  - Search by resource name or ID
+  - View raw billing data for analysis
+  - Mark resources as resolved with notes
+  - Delete false positives
+- **Real-time Updates**: New unrecognized resources appear automatically
+
+### 16.3. Technical Implementation
+
+#### 16.3.1. Billing-First Approach
+**Priority on Cost Visibility:**
+- ✅ **All resources with costs are captured** - regardless of OpenStack status
+- ✅ **Zombie resource detection** - deleted resources still in billing
+- ✅ **Orphan resource identification** - standalone resources flagged
+- ✅ **Real-time snapshot** - uses current moment data for accuracy
+
+#### 16.3.2. Intelligent Categorization
+**Two-Phase Processing:**
+1. **Phase 1**: Infer resource type from billing metrics
+2. **Phase 2**: Map to normalized service types
+3. **Fallback**: Track as unrecognized if inference fails
+
+#### 16.3.3. Database Schema
+**UnrecognizedResource Model:**
+```python
+class UnrecognizedResource:
+    - provider_id: Link to cloud provider
+    - resource_id: Unique resource identifier
+    - resource_name: Human-readable name
+    - resource_type: Inferred from metrics
+    - service_type: Billing API service type
+    - billing_data: Full raw billing data (JSON)
+    - sync_snapshot_id: Link to sync snapshot
+    - discovered_at: Timestamp of discovery
+    - is_resolved: Resolution status
+    - resolution_notes: Admin notes
+```
+
+### 16.4. Business Value
+
+#### 16.4.1. Platform Improvement
+- **Gap Identification**: Automatically identifies missing resource type support
+- **Continuous Learning**: System improves with each new resource type discovered
+- **Development Prioritization**: Data-driven decisions on which resource types to support next
+
+#### 16.4.2. Cost Visibility
+- **Complete Coverage**: No resources missed due to categorization gaps
+- **Historical Analysis**: Track resource type evolution over time
+- **Budget Accuracy**: All costs accounted for, even for unsupported resource types
+
+#### 16.4.3. Operational Excellence
+- **Proactive Monitoring**: Detect new resource types before they impact FinOps
+- **Audit Trail**: Complete history of resource discovery and resolution
+- **Admin Efficiency**: Streamlined workflow for resolving unrecognized resources
+
+### 16.5. Usage Workflow
+
+#### 16.5.1. Automatic Detection
+1. **Sync Process**: Resources with `"type": "unknown"` in billing data
+2. **Inference Engine**: Attempts to infer type from metrics
+3. **Categorization**: Maps to normalized service types
+4. **Tracking**: Records unrecognized resources for admin review
+
+#### 16.5.2. Admin Resolution
+1. **Review Dashboard**: Admin checks unrecognized resources
+2. **Analyze Billing Data**: Understand what resource actually is
+3. **Add Mapping**: Update `SERVICE_TYPE_MAPPING` with new resource types
+4. **Mark Resolved**: Update status with resolution notes
+5. **Future Syncs**: Resources now properly categorized
+
+### 16.6. Implementation Status ✅ COMPLETED
+- ✅ **Smart Resource Type Inference**: Automatic detection from billing metrics
+- ✅ **Complete History Tracking**: No deduplication, full audit trail
+- ✅ **Admin Interface**: Comprehensive management dashboard
+- ✅ **Database Schema**: Optimized for tracking and resolution
+- ✅ **Integration**: Seamless integration with existing sync process
+- ✅ **Error Handling**: Graceful handling of zombie volumes and API failures
+
+## 17. Referencing this Document
+Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, and the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking.

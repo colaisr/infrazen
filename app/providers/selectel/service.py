@@ -434,10 +434,21 @@ class SelectelService:
         
         for resource_id, billing_data in billed_resources.items():
             obj_type = billing_data.get('type', 'unknown')
+            
+            # If type is unknown, try to infer from metrics
+            if obj_type == 'unknown':
+                inferred_type = self._infer_resource_type_from_metrics(billing_data)
+                if inferred_type:
+                    obj_type = inferred_type
+                    # Update the billing data with inferred type
+                    billing_data['type'] = obj_type
+            
             normalized_type = SERVICE_TYPE_MAPPING.get(obj_type, 'other_service')
             
             # Track unrecognized resource types for platform improvement
-            if obj_type not in SERVICE_TYPE_MAPPING and obj_type != 'unknown':
+            # Track ALL resources that fall into 'other_service' category (not in our mapping)
+            # This helps identify gaps in provider coverage for future development
+            if normalized_type == 'other_service':
                 self._track_unrecognized_resource(
                     resource_id=resource_id,
                     billing_data=billing_data,
@@ -456,6 +467,52 @@ class SelectelService:
         logger.info(f"Grouped into {len(grouped)} service types: {list(grouped.keys())}")
         return grouped
     
+    def _infer_resource_type_from_metrics(self, billing_data: Dict) -> Optional[str]:
+        """
+        Infer resource type from billing metrics when type is unknown.
+        This helps identify resource types that Selectel billing API doesn't properly categorize.
+        """
+        metrics = billing_data.get('metrics', {})
+        
+        # Load Balancer detection
+        if any(key.startswith('load_balancers_') for key in metrics.keys()):
+            return 'network_load_balancer'
+        
+        # Volume detection  
+        if any(key.startswith('volume_') for key in metrics.keys()):
+            return 'volume_universal'  # Default to universal volume
+        
+        # File Storage detection
+        if any(key.startswith('share_') for key in metrics.keys()):
+            return 'share_basic'  # Default to basic share
+        
+        # Database detection
+        if any(key.startswith('dbaas_') for key in metrics.keys()):
+            return 'dbaas_postgresql'  # Default to PostgreSQL
+        
+        # Kubernetes detection
+        if any(key.startswith('mks_') for key in metrics.keys()):
+            return 'mks_cluster'
+        
+        # Container Registry detection
+        if any(key.startswith('craas_') for key in metrics.keys()):
+            return 'craas_registry'
+        
+        # S3 detection
+        if any(key.startswith('s3_') for key in metrics.keys()):
+            return 's3_storage'
+        
+        # Network detection
+        if any(key.startswith('network_') for key in metrics.keys()):
+            return 'network_floating_ip'  # Default to floating IP
+        
+        # Backup detection
+        if any(key.startswith('backup_') for key in metrics.keys()):
+            return 'backup_storage'
+        
+        # If no metrics match, return None (will stay as other_service)
+        return None
+    
     def _track_unrecognized_resource(self, resource_id: str, billing_data: Dict, sync_snapshot_id: int = None):
         """
         Track unrecognized resource types for platform improvement
@@ -466,24 +523,8 @@ class SelectelService:
             sync_snapshot_id: ID of the current sync snapshot
         """
         try:
-            # Check if we already tracked this resource type recently (avoid duplicates)
-            existing = UnrecognizedResource.query.filter_by(
-                provider_id=self.provider.id,
-                resource_id=resource_id,
-                is_resolved=False
-            ).first()
-            
-            if existing:
-                # Update the existing record with latest billing data
-                existing.billing_data = json.dumps(billing_data, ensure_ascii=False)
-                existing.discovered_at = datetime.utcnow()
-                existing.sync_snapshot_id = sync_snapshot_id
-                existing.updated_at = datetime.utcnow()
-                db.session.commit()
-                logger.debug(f"Updated existing unrecognized resource: {resource_id}")
-                return
-            
-            # Create new unrecognized resource record
+            # Create new unrecognized resource record for every occurrence
+            # This allows tracking the full history across multiple syncs
             unrecognized = UnrecognizedResource(
                 provider_id=self.provider.id,
                 resource_id=resource_id,
