@@ -6,20 +6,14 @@
 {% block page_subtitle %}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title">
-        <h1>User Management</h1>
-        <p>Manage users, roles, and permissions</p>
-    </div>
-    <div class="page-actions">
+<div class="admin-content">
+    <!-- Page Actions -->
+    <div class="page-actions" style="margin-bottom: 1.5rem;">
         <button onclick="createUser()" class="btn btn-primary">
             <i class="fa-solid fa-plus"></i>
             Add User
         </button>
     </div>
-</div>
-
-<div class="admin-content">
     <!-- Search and Filters -->
     <div class="admin-filters">
         <div class="search-box">

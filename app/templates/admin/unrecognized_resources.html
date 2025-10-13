@@ -6,105 +6,87 @@
 {% block page_subtitle %}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-title">
-        <h1>Unrecognized Resources</h1>
-        <p>Resources that appear in billing data but are not recognized by our platform</p>
-    </div>
-</div>
-
 <div class="admin-content">
-    <!-- Filters -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label for="search">Search</label>
-                                <input type="text" class="form-control" id="search" placeholder="Resource name or ID">
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="provider-filter">Provider</label>
-                                <select class="form-control" id="provider-filter">
-                                    <option value="">All Providers</option>
-                                    <option value="1">Beget</option>
-                                    <option value="2">Selectel</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="resource-type-filter">Resource Type</label>
-                                <select class="form-control" id="resource-type-filter">
-                                    <option value="">All Types</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="form-group">
-                                <label for="resolved-filter">Status</label>
-                                <select class="form-control" id="resolved-filter">
-                                    <option value="">All</option>
-                                    <option value="false">Unresolved</option>
-                                    <option value="true">Resolved</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <div>
-                                    <button class="btn btn-primary" onclick="loadUnrecognizedResources()">Filter</button>
-                                    <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Compact Filters -->
+    <div class="compact-filters">
+        <div class="filters-container">
+            <div class="filter-group">
+                <input type="text" class="filter-input" id="search" placeholder="Search resources..." />
+                <i class="fas fa-search filter-icon"></i>
             </div>
+            
+            <div class="filter-group">
+                <select class="filter-select" id="provider-filter">
+                    <option value="">All Providers</option>
+                    <option value="1">Beget</option>
+                    <option value="2">Selectel</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <select class="filter-select" id="resource-type-filter">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <select class="filter-select" id="resolved-filter">
+                    <option value="">All Status</option>
+                    <option value="false">Unresolved</option>
+                    <option value="true">Resolved</option>
+                </select>
+            </div>
+            
+            <div class="filter-actions">
+                <button class="btn btn-primary btn-sm" onclick="loadUnrecognizedResources()">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="clearFilters()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+            </div>
+        </div>
+        
+        <div class="view-controls">
+            <div class="results-info" id="results-info">
+                <!-- Results count will be shown here -->
+            </div>
+        </div>
+    </div>
 
-            <!-- Unrecognized Resources Table -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Unrecognized Resources</h5>
-                </div>
-                <div class="card-body">
-                    <div id="loading" class="text-center py-4" style="display: none;">
-                        <div class="spinner-border" role="status">
-                            <span class="sr-only">Loading...</span>
-                        </div>
-                    </div>
-                    
-                    <div id="error-message" class="alert alert-danger" style="display: none;"></div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-striped" id="unrecognized-resources-table">
-                            <thead>
-                                <tr>
-                                    <th>Resource Name</th>
-                                    <th>Resource Type</th>
-                                    <th>Provider</th>
-                                    <th>User</th>
-                                    <th>Discovered</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="unrecognized-resources-tbody">
-                                <!-- Data will be loaded here -->
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination -->
-                    <nav id="pagination-nav" style="display: none;">
-                        <ul class="pagination justify-content-center" id="pagination">
-                            <!-- Pagination will be generated here -->
-                        </ul>
-                    </nav>
-                </div>
+    <!-- Resources Container -->
+    <div class="resources-container">
+        <div id="loading" class="loading-state" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading resources...</p>
+        </div>
+        
+        <div id="error-message" class="error-state" style="display: none;"></div>
+        
+        <!-- Table View -->
+        <div class="modern-table">
+            <table class="resources-table" id="unrecognized-resources-table">
+                <thead>
+                    <tr>
+                        <th class="col-resource">Resource</th>
+                        <th class="col-type">Type</th>
+                        <th class="col-provider">Provider</th>
+                        <th class="col-user">User</th>
+                        <th class="col-discovered">Discovered</th>
+                        <th class="col-status">Status</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="unrecognized-resources-tbody">
+                    <!-- Data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="pagination-container" id="pagination-nav" style="display: none;">
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be generated here -->
             </div>
         </div>
     </div>
@@ -192,6 +174,7 @@ function loadUnrecognizedResources(page = 1) {
             if (data.success) {
                 displayUnrecognizedResources(data.data);
                 updatePagination(data.pagination);
+                updateResultsInfo(data.pagination);
             } else {
                 showError(data.error || 'Failed to load unrecognized resources');
             }
@@ -208,8 +191,12 @@ function displayUnrecognizedResources(resources) {
     if (resources.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center text-muted py-4">
-                    No unrecognized resources found
+                <td colspan="7" class="empty-state-cell">
+                    <div class="empty-results">
+                        <i class="fas fa-search"></i>
+                        <h3>No unrecognized resources found</h3>
+                        <p>Try adjusting your filters or check back later for new discoveries.</p>
+                    </div>
                 </td>
             </tr>
         `;
@@ -217,55 +204,50 @@ function displayUnrecognizedResources(resources) {
     }
     
     tbody.innerHTML = resources.map(resource => `
-        <tr>
-            <td>
-                <div>
-                    <strong>${resource.resource_name || 'Unknown'}</strong>
-                    <br>
-                    <small class="text-muted">ID: ${resource.resource_id}</small>
+        <tr class="resource-row">
+            <td class="col-resource">
+                <div class="resource-info">
+                    <div class="resource-name">${resource.resource_name || 'Unknown'}</div>
+                    <div class="resource-id">ID: ${resource.resource_id}</div>
                 </div>
             </td>
-            <td>
-                <span class="badge badge-info">${resource.resource_type || 'unknown'}</span>
+            <td class="col-type">
+                <span class="resource-type-badge">${resource.resource_type || 'unknown'}</span>
             </td>
-            <td>
-                <div>
-                    ${resource.provider ? resource.provider.provider_type.toUpperCase() : 'Unknown'}
-                    <br>
-                    <small class="text-muted">${resource.provider ? resource.provider.connection_name : ''}</small>
+            <td class="col-provider">
+                <div class="provider-info">
+                    <div class="provider-name">${resource.provider ? resource.provider.provider_type.toUpperCase() : 'Unknown'}</div>
+                    <div class="provider-connection">${resource.provider ? resource.provider.connection_name : ''}</div>
                 </div>
             </td>
-            <td>
-                <div>
-                    ${resource.user ? resource.user.email : 'Unknown'}
-                    <br>
-                    <small class="text-muted">${resource.user ? (resource.user.first_name + ' ' + resource.user.last_name).trim() : ''}</small>
+            <td class="col-user">
+                <div class="user-info">
+                    <div class="user-email">${resource.user ? resource.user.email : 'Unknown'}</div>
+                    <div class="user-name">${resource.user ? (resource.user.first_name + ' ' + resource.user.last_name).trim() : ''}</div>
                 </div>
             </td>
-            <td>
-                <div>
-                    ${new Date(resource.discovered_at).toLocaleDateString()}
-                    <br>
-                    <small class="text-muted">${new Date(resource.discovered_at).toLocaleTimeString()}</small>
+            <td class="col-discovered">
+                <div class="discovery-info">
+                    <div class="discovery-date">${new Date(resource.discovered_at).toLocaleDateString()}</div>
+                    <div class="discovery-time">${new Date(resource.discovered_at).toLocaleTimeString()}</div>
                 </div>
             </td>
-            <td>
-                ${resource.is_resolved 
-                    ? '<span class="badge badge-success">Resolved</span>' 
-                    : '<span class="badge badge-warning">Unresolved</span>'
-                }
+            <td class="col-status">
+                <span class="status-badge ${resource.is_resolved ? 'resolved' : 'unresolved'}">
+                    ${resource.is_resolved ? 'Resolved' : 'Unresolved'}
+                </span>
             </td>
-            <td>
-                <div class="btn-group" role="group">
-                    <button class="btn btn-sm btn-info" onclick="viewBillingData(${resource.id}, \`${escapeHtml(resource.billing_data)}\`)">
+            <td class="col-actions">
+                <div class="action-buttons">
+                    <button class="action-btn view-btn" onclick="viewBillingData(${resource.id}, \`${escapeHtml(resource.billing_data)}\`)" title="View billing data">
                         <i class="fas fa-eye"></i>
                     </button>
                     ${!resource.is_resolved ? `
-                        <button class="btn btn-sm btn-success" onclick="openResolveModal(${resource.id})">
+                        <button class="action-btn resolve-btn" onclick="openResolveModal(${resource.id})" title="Mark as resolved">
                             <i class="fas fa-check"></i>
                         </button>
                     ` : ''}
-                    <button class="btn btn-sm btn-danger" onclick="deleteResource(${resource.id})">
+                    <button class="action-btn delete-btn" onclick="deleteResource(${resource.id})" title="Delete resource">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -273,6 +255,7 @@ function displayUnrecognizedResources(resources) {
         </tr>
     `).join('');
 }
+
 
 function updatePagination(pagination) {
     const nav = document.getElementById('pagination-nav');
@@ -398,6 +381,19 @@ function showError(message) {
 function showSuccess(message) {
     // You can implement a toast notification here
     alert(message); // Simple alert for now
+}
+
+
+function updateResultsInfo(pagination) {
+    const resultsInfo = document.getElementById('results-info');
+    const start = (pagination.page - 1) * pagination.per_page + 1;
+    const end = Math.min(pagination.page * pagination.per_page, pagination.total);
+    
+    if (pagination.total === 0) {
+        resultsInfo.innerHTML = 'No results found';
+    } else {
+        resultsInfo.innerHTML = `Showing ${start}-${end} of ${pagination.total} resources`;
+    }
 }
 
 function escapeHtml(text) {
