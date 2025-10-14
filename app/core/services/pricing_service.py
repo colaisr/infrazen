@@ -55,15 +55,19 @@ class PricingService:
                 logger.info(f"Created new price record for {price_data['provider']} {price_data['resource_type']}")
             
             # Track price change in history
-            if old_monthly_cost is not None and price_data.get('monthly_cost') != old_monthly_cost:
+            new_monthly_cost = price_data.get('monthly_cost')
+
+            if old_monthly_cost is not None and new_monthly_cost is not None and old_monthly_cost != new_monthly_cost:
+                old_val = float(old_monthly_cost)
+                new_val = float(new_monthly_cost)
                 change_percent = None
-                if old_monthly_cost and old_monthly_cost > 0:
-                    change_percent = ((price_data.get('monthly_cost', 0) - old_monthly_cost) / old_monthly_cost) * 100
-                
+                if old_val:
+                    change_percent = ((new_val - old_val) / old_val) * 100
+
                 price_history = PriceHistory(
                     price_id=price_record.id,
                     old_monthly_cost=old_monthly_cost,
-                    new_monthly_cost=price_data.get('monthly_cost'),
+                    new_monthly_cost=new_monthly_cost,
                     change_percent=change_percent,
                     change_reason='price_update'
                 )
@@ -81,17 +85,47 @@ class PricingService:
     @staticmethod
     def bulk_save_price_data(price_data_list: List[Dict[str, Any]]) -> List[ProviderPrice]:
         """
-        Save multiple price records in batch
-        
+        Save multiple price records in batch. Existing records for the same provider
+        (and optionally resource type/region) are removed before inserting the fresh
+        dataset to ensure the table reflects only the latest snapshot.
+
         Args:
             price_data_list: List of price data dictionaries
-            
+
         Returns:
             List[ProviderPrice]: List of saved price records
         """
-        saved_records = []
-        
+        saved_records: List[ProviderPrice] = []
+
+        if not price_data_list:
+            logger.warning("bulk_save_price_data called with empty payload")
+            return saved_records
+
+        provider = price_data_list[0].get("provider")
+        if not provider:
+            raise ValueError("Pricing payload missing 'provider'")
+
+        resource_type = price_data_list[0].get("resource_type")
+        region = price_data_list[0].get("region")
+
         try:
+            # Remove previous snapshot for this provider (optionally scoped by resource type/region)
+            query = ProviderPrice.query.filter_by(provider=provider)
+            if resource_type:
+                query = query.filter_by(resource_type=resource_type)
+            if region:
+                query = query.filter_by(region=region)
+
+            deleted = query.delete(synchronize_session=False)
+            if deleted:
+                logger.info(
+                    "Removed %d existing price records for provider=%s resource_type=%s region=%s",
+                    deleted,
+                    provider,
+                    resource_type,
+                    region,
+                )
+
             for price_data in price_data_list:
                 record = PricingService.save_price_data(price_data)
                 saved_records.append(record)

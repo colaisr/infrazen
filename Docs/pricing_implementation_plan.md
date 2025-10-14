@@ -5,7 +5,7 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
 
 ## **Original Simple Plan (6 Steps)**
 
-### **Step 1: Data Structure** 🔄 NEXT
+### **Step 1: Data Structure** ✅ COMPLETED
 - Create database models for price storage (not simplified)
 - `ProviderPrice` table for storing provider-specific pricing
 - `PriceHistory` table for tracking price changes over time
@@ -14,9 +14,10 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
 - Extend provider base class with `get_pricing_data()` method
 - Can be scheduled daily (initially triggered manually)
 
-### **Step 3: Start with Beget**
-- Get pricelist for Beget first (simpler provider with fewer offerings)
-- Manually map all Beget products (VPS, hosting, VDS, storage)
+### **Step 3: Start with Beget** ✅ COMPLETED (Phase 1)
+- Automated pricing sync using configurator API (HAR-derived endpoints)
+- Credential-backed sync from admin provider card (uses stored admin creds)
+- Provider prices table now populated only with latest snapshot on each run
 
 ### **Step 4: Then Selectel**
 - Get pricelist for Selectel
@@ -32,8 +33,16 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
 - Filter connections page to show only enabled providers
 
 ## **Current Status**
-- ✅ **Step 6 COMPLETED** - Provider catalog system working
-- 🔄 **Ready for Step 1** - Create price storage data structure
+- ✅ **Step 1 COMPLETED** – Pricing tables & SQLAlchemy models in place
+- ✅ **Step 3 Phase 1 COMPLETED** – Beget pricing sync automated (API configurator)
+- ✅ **Step 6 COMPLETED** – Provider catalog system working
+- 🔄 **Next:** Extend Beget coverage to additional service groups (high_cpu, storage, etc.) and move on to Selectel implementation (Step 4)
+
+**Latest Progress (Oct 14, 2025):**
+- Added `BegetPricingClient` to gather VPS pricing matrix via configurator API with admin auth fallback
+- `PriceUpdateService` now loads admin credentials and replaces previous price snapshots before saving new data
+- `PricingService.bulk_save_price_data` deletes existing provider rows before inserting fresh records; converts Decimal values safely for change history
+- Admin sync now populates ~650 Beget VPS combinations and clears manual fallback data automatically
 
 ## **Key Architecture Decisions**
 

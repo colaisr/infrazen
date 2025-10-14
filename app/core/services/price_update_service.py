@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 from app.core.database import db
 from app.core.services.pricing_service import PricingService
 from app.core.models.provider_catalog import ProviderCatalog
+from app.core.models.provider_admin_credentials import ProviderAdminCredentials
 from app.providers.plugin_system import ProviderPluginManager
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,27 @@ class PriceUpdateService:
                     'provider': provider_type
                 }
             
+            # Load admin credentials for provider pricing (if available)
+            credentials: Dict[str, Any] = {}
+            config: Dict[str, Any] = {}
+            admin_credentials = ProviderAdminCredentials.query.filter_by(provider_type=provider_type).first()
+            if admin_credentials:
+                try:
+                    credentials = admin_credentials.get_credentials() or {}
+                    if admin_credentials.config_data:
+                        config = admin_credentials.config_data
+                except Exception as cred_error:
+                    logger.warning(
+                        "Failed to decode admin credentials for %s: %s",
+                        provider_type,
+                        cred_error
+                    )
+            else:
+                logger.warning("No admin credentials configured for provider %s", provider_type)
+
             # Get pricing data from provider
             try:
-                # Create plugin instance (we need credentials, but for pricing we can use empty)
-                plugin_instance = plugin_class(0, {}, {})
+                plugin_instance = plugin_class(0, credentials, config)
                 pricing_data = plugin_instance.get_pricing_data()
                 if not pricing_data:
                     error_msg = f"No pricing data returned from {provider_type}"

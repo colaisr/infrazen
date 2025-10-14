@@ -4,7 +4,7 @@ Wraps existing Beget functionality in the new plugin architecture
 """
 import logging
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 from ..plugin_system import ProviderPlugin, SyncResult
@@ -12,6 +12,187 @@ from ..beget.client import BegetAPIClient
 from ..resource_registry import resource_registry, ProviderResource
 
 logger = logging.getLogger(__name__)
+
+
+class BegetPricingClient:
+    """Collect VPS pricing via Beget's configurator endpoints."""
+
+    BASE_URL = "https://api.beget.com/v1"
+    DEFAULT_SOFTWARE_ID = 6153
+    CONFIG_GROUPS = ["normal_cpu"]
+    MAX_VALUES_PER_DIM = 6
+
+    def __init__(self, access_token: Optional[str] = None):
+        self.session = self._create_session(access_token)
+
+    @staticmethod
+    def _create_session(access_token: Optional[str]):
+        import requests
+
+        session = requests.Session()
+        session.headers.update(
+            {
+                "Origin": "https://cp.beget.com",
+                "Referer": "https://cp.beget.com/",
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            }
+        )
+
+        if access_token:
+            session.headers["Authorization"] = f"Bearer {access_token}"
+
+        return session
+
+    def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        import requests
+
+        url = f"{self.BASE_URL}/{endpoint.lstrip('/')}"
+        response = self.session.get(url, params=params, timeout=30)
+        response.raise_for_status()
+        return response.json()
+
+    def collect_vps_prices(self) -> List[Dict[str, Any]]:
+        regions = self._fetch_regions()
+        pricing_records: List[Dict[str, Any]] = []
+
+        for region in regions:
+            region_id = region.get("id")
+            if not region_id or not region.get("available", True):
+                continue
+
+            for group in self.CONFIG_GROUPS:
+                info = self._fetch_configurator_info(region_id, group)
+                if not info or not info.get("settings"):
+                    continue
+
+                grid = self._build_grid(info["settings"])
+                pricing_records.extend(self._collect_grid_prices(region_id, group, grid))
+
+        return pricing_records
+
+    def _fetch_regions(self) -> List[Dict[str, Any]]:
+        try:
+            data = self._get("vps/region")
+            return data.get("regions", [])
+        except Exception as exc:
+            logger.warning("Failed to fetch regions: %s", exc)
+            return []
+
+    def _fetch_configurator_info(self, region: str, group: str) -> Optional[Dict[str, Any]]:
+        try:
+            return self._get("vps/configurator/info", params={"region": region, "configuration_group": group})
+        except Exception as exc:
+            logger.debug("Configurator info missing for region=%s group=%s: %s", region, group, exc)
+            return None
+
+    @staticmethod
+    def _generate_values(setting: Dict[str, Any]) -> List[int]:
+        available = setting.get("available_range", {})
+        minimum = available.get("min")
+        maximum = available.get("max")
+        step = setting.get("step", 1)
+        if minimum is None or maximum is None or step <= 0:
+            return []
+        values = list(range(minimum, maximum + 1, step))
+        return BegetPricingClient._sample_values(values)
+
+    @staticmethod
+    def _sample_values(values: List[int]) -> List[int]:
+        if len(values) <= BegetPricingClient.MAX_VALUES_PER_DIM:
+            return values
+
+        max_count = BegetPricingClient.MAX_VALUES_PER_DIM
+        last_index = len(values) - 1
+        indices = {0, last_index}
+
+        if max_count > 2:
+            for i in range(1, max_count - 1):
+                idx = round(i * last_index / (max_count - 1))
+                indices.add(idx)
+
+        sampled = [values[i] for i in sorted(indices)]
+        return sampled
+
+    def _build_grid(self, settings: Dict[str, Any]) -> Dict[str, List[int]]:
+        return {
+            "cpu": self._generate_values(settings.get("cpu_settings", {})),
+            "memory": self._generate_values(settings.get("memory_settings", {})),
+            "disk": self._generate_values(settings.get("disk_settings", {})),
+        }
+
+    def _collect_grid_prices(
+        self,
+        region: str,
+        group: str,
+        grid: Dict[str, List[int]],
+    ) -> List[Dict[str, Any]]:
+        records: List[Dict[str, Any]] = []
+
+        for cpu in grid.get("cpu", []):
+            for memory in grid.get("memory", []):
+                for disk in grid.get("disk", []):
+                    params = {
+                        "params.cpu_count": cpu,
+                        "params.memory": memory,
+                        "params.disk_size": disk,
+                        "region": region,
+                        "configuration_group": group,
+                        "software_id": self.DEFAULT_SOFTWARE_ID,
+                    }
+
+                    try:
+                        data = self._get("vps/configurator/calculation", params=params)
+                        success = data.get("success", {})
+                        price_day = success.get("price_day")
+                        price_month = success.get("price_month")
+
+                        records.append(
+                            {
+                                "provider": "beget",
+                                "resource_type": "server",
+                                "provider_sku": self._build_sku(region, group, cpu, memory, disk),
+                                "region": region,
+                                "cpu_cores": cpu,
+                                "ram_gb": memory / 1024 if memory else None,
+                                "storage_gb": disk / 1024 if disk else None,
+                                "storage_type": "SSD",
+                                "extended_specs": {
+                                    "configuration_group": group,
+                                    "ram_mb": memory,
+                                    "disk_mb": disk,
+                                },
+                                "hourly_cost": (price_day / 24) if price_day else None,
+                                "monthly_cost": price_month,
+                                "currency": "RUB",
+                                "confidence_score": 0.95,
+                                "source": "api_configurator",
+                                "source_url": "https://cp.beget.com/cloud/servers",
+                                "notes": f"Configurator pricing (group={group})",
+                            }
+                        )
+                    except Exception as exc:
+                        logger.debug(
+                            "Configurator pricing failed for region=%s group=%s cpu=%s memory=%s disk=%s: %s",
+                            region,
+                            group,
+                            cpu,
+                            memory,
+                            disk,
+                            exc,
+                        )
+
+        return records
+
+    @staticmethod
+    def _build_sku(region: str, group: str, cpu: int, memory: int, disk: int) -> str:
+        return f"{region}-{group}-{cpu}cpu-{memory // 1024}gb-{disk // 1024}gb"
 
 
 class BegetProviderPlugin(ProviderPlugin):
@@ -800,27 +981,36 @@ class BegetProviderPlugin(ProviderPlugin):
         """
         try:
             self.logger.info("Starting Beget pricing data collection")
-            
-            pricing_data = []
-            
-            # Get VPS pricing from the API
-            try:
-                vps_plans = self.client.get_vps_plans()
-                if vps_plans:
-                    for plan in vps_plans:
-                        pricing_record = self._create_vps_pricing_record(plan)
-                        if pricing_record:
-                            pricing_data.append(pricing_record)
-                            
-            except Exception as e:
-                self.logger.warning(f"Failed to get VPS pricing: {e}")
-            
-            # Add manual pricing data for known Beget offerings
-            # This is based on current Beget pricing as of 2025
-            manual_pricing = self._get_manual_beget_pricing()
-            pricing_data.extend(manual_pricing)
-            
-            self.logger.info(f"Collected {len(pricing_data)} pricing records from Beget")
+            pricing_data: List[Dict[str, Any]] = []
+
+            access_token = None
+            if self.client.username and self.client.password:
+                try:
+                    if self.client.authenticate():
+                        access_token = self.client.access_token
+                        self.logger.info("Authenticated Beget API client for pricing collection")
+                except Exception as auth_error:
+                    self.logger.warning("Beget pricing authentication failed: %s", auth_error)
+
+            pricing_client = BegetPricingClient(access_token)
+            configurator_pricing = pricing_client.collect_vps_prices()
+            pricing_data.extend(configurator_pricing)
+
+            if configurator_pricing:
+                self.logger.info(
+                    "Collected %d pricing records from configurator",
+                    len(configurator_pricing),
+                )
+            else:
+                self.logger.warning("Configurator pricing unavailable; using manual fallback")
+                manual_pricing = self._get_manual_beget_pricing()
+                pricing_data.extend(manual_pricing)
+                self.logger.info(
+                    "Added %d manual pricing records for Beget",
+                    len(manual_pricing),
+                )
+
+            self.logger.info("Total Beget pricing records collected: %d", len(pricing_data))
             return pricing_data
             
         except Exception as e:
