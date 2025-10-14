@@ -118,25 +118,23 @@
         <div class="modal-body">
             <div id="credentialsForm">
                 <div class="form-group">
-                    <label for="credentialType">Тип учетных данных</label>
-                    <select id="credentialType" class="form-control">
-                        <option value="bearer_token">Bearer Token</option>
-                        <option value="session_cookie">Session Cookie</option>
-                        <option value="api_key">API Key</option>
-                        <option value="basic_auth">Basic Auth</option>
-                        <option value="jwt">JWT Token</option>
-                    </select>
-        </div>
+                    <label for="credentialUsername">Имя пользователя *</label>
+                    <input type="text" id="credentialUsername" class="form-control" placeholder="your_beget_username" />
+                </div>
 
                 <div class="form-group">
-                    <label for="credentialData">Данные (JSON формат)</label>
-                    <textarea id="credentialData" class="form-control" rows="6" placeholder='{"token": "your_token_here", "other_data": "..."}'></textarea>
-                    <small class="form-text">Введите учетные данные в формате JSON. Они будут зашифрованы.</small>
-    </div>
+                    <label for="credentialPassword">Пароль *</label>
+                    <div class="password-input-container">
+                        <input type="password" id="credentialPassword" class="form-control" placeholder="••••••••" />
+                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility()">
+                            <i class="fa-solid fa-eye" id="passwordToggleIcon"></i>
+                        </button>
+                    </div>
+                </div>
 
                 <div class="form-group">
-                    <label for="credentialDescription">Описание</label>
-                    <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания или описание этих учетных данных..."></textarea>
+                    <label for="credentialDescription">Описание (необязательно)</label>
+                    <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания о системных учетных данных для получения цен..."></textarea>
                 </div>
 
                 <div class="form-group">
@@ -144,7 +142,7 @@
                         <input type="checkbox" id="credentialActive" checked> 
                         Активно
                     </label>
-            </div>
+                </div>
 
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="saveCredentials()">
@@ -525,8 +523,8 @@ function openCredentialsModal(providerType) {
     currentProviderType = providerType;
     
     // Reset form
-    document.getElementById('credentialType').value = 'bearer_token';
-    document.getElementById('credentialData').value = '';
+    document.getElementById('credentialUsername').value = '';
+    document.getElementById('credentialPassword').value = '';
     document.getElementById('credentialDescription').value = '';
     document.getElementById('credentialActive').checked = true;
     document.getElementById('credentialsStatus').style.display = 'none';
@@ -554,10 +552,16 @@ function loadCredentials(providerType) {
             if (data.success && data.credentials) {
                 currentCredentials = data.credentials;
                 
-                // Populate form
-                document.getElementById('credentialType').value = data.credentials.credential_type || 'bearer_token';
-                document.getElementById('credentialDescription').value = data.credentials.description || '';
-                document.getElementById('credentialActive').checked = data.credentials.is_active !== false;
+                // Try to populate form from stored credentials
+                try {
+                    const storedCredentials = data.credentials.credentials || {};
+                    document.getElementById('credentialUsername').value = storedCredentials.username || '';
+                    document.getElementById('credentialPassword').value = storedCredentials.password || '';
+                    document.getElementById('credentialDescription').value = data.credentials.description || '';
+                    document.getElementById('credentialActive').checked = data.credentials.is_active !== false;
+                } catch (e) {
+                    console.warn('Could not parse stored credentials:', e);
+                }
                 
                 // Enable test and delete buttons
                 document.getElementById('testCredentialsBtn').disabled = false;
@@ -582,27 +586,25 @@ function loadCredentials(providerType) {
 function saveCredentials() {
     if (!currentProviderType) return;
     
-    const credentialType = document.getElementById('credentialType').value;
-    const credentialDataText = document.getElementById('credentialData').value.trim();
-    const description = document.getElementById('credentialDescription').value;
+    const username = document.getElementById('credentialUsername').value.trim();
+    const password = document.getElementById('credentialPassword').value.trim();
+    const description = document.getElementById('credentialDescription').value.trim();
     const isActive = document.getElementById('credentialActive').checked;
     
-    // Validate JSON
-    let credentials;
-    try {
-        if (credentialDataText) {
-            credentials = JSON.parse(credentialDataText);
-        } else {
-            showCredentialsStatus('Пожалуйста, введите данные учетных записей', 'error');
-            return;
-        }
-    } catch (e) {
-        showCredentialsStatus('Неверный формат JSON: ' + e.message, 'error');
+    // Validate required fields
+    if (!username || !password) {
+        showCredentialsStatus('Пожалуйста, заполните имя пользователя и пароль', 'error');
         return;
     }
     
+    // Create credentials object (same structure as user connections)
+    const credentials = {
+        username: username,
+        password: password
+    };
+    
     const payload = {
-        credential_type: credentialType,
+        credential_type: 'basic_auth',  // Standard for username/password
         credentials: credentials,
         description: description,
         is_active: isActive
@@ -706,6 +708,19 @@ function showCredentialsStatus(message, type) {
     statusDiv.innerText = message;
     statusDiv.className = 'credentials-status ' + type;
     statusDiv.style.display = 'block';
+}
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('credentialPassword');
+    const toggleIcon = document.getElementById('passwordToggleIcon');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.className = 'fa-solid fa-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.className = 'fa-solid fa-eye';
+    }
 }
 
 // Close modals when clicking outside
@@ -1233,6 +1248,36 @@ input:checked + .slider:before {
 
 .form-actions .btn {
     flex: 1;
+}
+
+/* Password Input Container */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container .form-control {
+    padding-right: 45px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.05);
 }
 </style>
 {% endblock %}
