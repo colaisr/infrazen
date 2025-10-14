@@ -540,12 +540,14 @@ function loadCredentials(providerType) {
     fetch(`/api/admin/providers/${providerType}/credentials`)
         .then(response => response.json())
         .then(data => {
+            console.log('Credentials API response:', data);
             if (data.success && data.credentials) {
                 currentCredentials = data.credentials;
                 
                 // Populate form from stored credentials
                 try {
                     const storedCredentials = data.credentials.credentials || {};
+                    console.log('Stored credentials:', storedCredentials);
                     document.getElementById('credentialUsername').value = storedCredentials.username || '';
                     document.getElementById('credentialPassword').value = storedCredentials.password || '';
                     document.getElementById('credentialDescription').value = data.credentials.description || '';
