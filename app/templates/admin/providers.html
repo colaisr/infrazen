@@ -179,7 +179,6 @@ function loadProviders() {
             if (data && data.success) {
                 providers = data.providers || [];
                 renderProviders();
-                updateStatistics();
                 applyProviderFilters();
             } else {
                 // Only show error if we truly have no data to display
@@ -266,17 +265,6 @@ function renderProviders() {
     });
 }
 
-function updateStatistics() {
-    const total = providers.length;
-    const enabled = providers.filter(p => p.is_enabled).length;
-    const synced = providers.filter(p => p.sync_status === 'success').length;
-    const failed = providers.filter(p => p.sync_status === 'failed').length;
-    
-    document.getElementById('totalProviders').textContent = total;
-    document.getElementById('enabledProviders').textContent = enabled;
-    document.getElementById('syncedProviders').textContent = synced;
-    document.getElementById('failedProviders').textContent = failed;
-}
 
 function getSyncStatusText(status) {
     const statusMap = {
@@ -303,7 +291,6 @@ function toggleProvider(providerId, isEnabled) {
             const provider = providers.find(p => p.id === providerId);
             if (provider) {
                 provider.is_enabled = isEnabled;
-                updateStatistics();
             }
             showSuccess(`Провайдер ${isEnabled ? 'включен' : 'отключен'}`);
         } else {
@@ -335,7 +322,6 @@ function syncProviderPrices(providerId) {
             provider.last_price_sync = new Date().toISOString();
             provider.sync_error = null;
             renderProviders();
-            updateStatistics();
             showSuccess(data.message);
         } else {
             provider.sync_status = 'failed';
