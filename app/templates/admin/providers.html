@@ -524,6 +524,10 @@ function openCredentialsModal(providerType) {
     
     // Show modal
     document.getElementById('credentialsModal').style.display = 'block';
+    
+    // Add event listeners to enable test button when form has data
+    document.getElementById('credentialUsername').addEventListener('input', checkTestButtonState);
+    document.getElementById('credentialPassword').addEventListener('input', checkTestButtonState);
 }
 
 function closeCredentialsModal() {
@@ -557,7 +561,8 @@ function loadCredentials(providerType) {
             } else {
                 // No credentials exist
                 currentCredentials = null;
-                document.getElementById('testCredentialsBtn').disabled = true;
+                // Check if form has data to enable test button
+                checkTestButtonState();
                 showCredentialsStatus('Учетные данные не настроены', 'info');
             }
         })
@@ -627,25 +632,66 @@ function saveCredentials() {
 }
 
 function testCredentials() {
-    if (!currentProviderType || !currentCredentials) return;
+    if (!currentProviderType) return;
     
-    showCredentialsStatus('Тестирование учетных данных...', 'info');
+    // Get current form data
+    const username = document.getElementById('credentialUsername').value.trim();
+    const password = document.getElementById('credentialPassword').value.trim();
     
-    fetch(`/api/admin/providers/${currentProviderType}/credentials/test`, {
-        method: 'POST'
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showCredentialsStatus('✓ Тестирование успешно!', 'success');
-            } else {
-                showCredentialsStatus('✗ Тест не прошел: ' + (data.error || 'Неизвестная ошибка'), 'error');
-            }
+    if (!username || !password) {
+        showCredentialsStatus('Пожалуйста, заполните имя пользователя и пароль для тестирования', 'error');
+        return;
+    }
+    
+    showCredentialsStatus('Тестирование подключения...', 'info');
+    
+    // Test connection using the same logic as user connections
+    const testEndpoint = currentProviderType === 'selectel' ? '/api/providers/selectel/test' : '/api/providers/beget/test';
+    
+    fetch(testEndpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
         })
-        .catch(error => {
-            console.error('Error testing credentials:', error);
-            showCredentialsStatus('Ошибка при тестировании учетных данных', 'error');
-        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message with account info
+            let message = '✅ Подключение успешно установлено!';
+            
+            if (data.account_info) {
+                const account = data.account_info;
+                const accountName = account.name || account.customer_login || account.username || 'Unknown';
+                const customerId = account.customer_id || account.id || '';
+                
+                if (customerId && customerId !== accountName) {
+                    message = `✅ Подключение успешно! Аккаунт: ${accountName} (ID: ${customerId})`;
+                } else {
+                    message = `✅ Подключение успешно! Аккаунт: ${accountName}`;
+                }
+            }
+            
+            showCredentialsStatus(message, 'success');
+        } else {
+            let errorMessage = '❌ ' + (data.error || 'Ошибка подключения');
+            
+            // Add helpful information for authentication errors
+            if (data.error && data.error.includes('Authentication failed')) {
+                errorMessage += '<br><br><strong>Возможные причины:</strong><br>• Проверьте правильность имени пользователя и пароля<br>• Убедитесь, что API доступ включен в панели управления Beget<br>• Используйте пароль API, а не пароль от аккаунта';
+            }
+            
+            showCredentialsStatus(errorMessage, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error testing credentials:', error);
+        showCredentialsStatus('❌ Ошибка тестирования подключения', 'error');
+    });
 }
 
 
@@ -667,6 +713,15 @@ function togglePasswordVisibility() {
         passwordInput.type = 'password';
         toggleIcon.className = 'fa-solid fa-eye';
     }
+}
+
+function checkTestButtonState() {
+    const username = document.getElementById('credentialUsername').value.trim();
+    const password = document.getElementById('credentialPassword').value.trim();
+    const testBtn = document.getElementById('testCredentialsBtn');
+    
+    // Enable test button if both fields have data
+    testBtn.disabled = !(username && password);
 }
 
 // Close modals when clicking outside
