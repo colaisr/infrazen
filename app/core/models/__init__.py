@@ -17,6 +17,7 @@ from .recommendations import OptimizationRecommendation
 from .sync import SyncSnapshot, ResourceState
 from .unrecognized_resource import UnrecognizedResource
 from .provider_catalog import ProviderCatalog
+from .pricing import ProviderPrice, PriceHistory, PriceComparisonRecommendation
 
 __all__ = [
     'db',
@@ -35,5 +36,8 @@ __all__ = [
     'SyncSnapshot',
     'ResourceState',
     'UnrecognizedResource',
-    'ProviderCatalog'
+    'ProviderCatalog',
+    'ProviderPrice',
+    'PriceHistory',
+    'PriceComparisonRecommendation'
 ]

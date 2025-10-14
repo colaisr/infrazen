@@ -43,6 +43,37 @@ class BaseProvider(ABC):
         """Get cost data for the account in a date range"""
         pass
     
+    @abstractmethod
+    def get_pricing_data(self) -> List[Dict[str, Any]]:
+        """
+        Get current pricing data from provider
+        
+        Returns:
+            List[Dict]: List of pricing records with standardized format:
+            {
+                'provider': str,           # Provider name (e.g., 'beget', 'selectel')
+                'resource_type': str,      # Universal taxonomy type (e.g., 'server', 'volume')
+                'provider_sku': str,       # Provider-specific SKU/plan name
+                'region': str,             # Normalized region code
+                'cpu_cores': int,          # CPU cores
+                'ram_gb': int,             # RAM in GB
+                'storage_gb': int,         # Storage in GB
+                'storage_type': str,       # 'SSD', 'HDD', 'NVMe'
+                'extended_specs': dict,    # Additional specifications (JSON)
+                'hourly_cost': decimal,    # Hourly cost
+                'monthly_cost': decimal,   # Monthly cost
+                'currency': str,           # Currency code (default: 'RUB')
+                'yearly_cost': decimal,    # Yearly cost (optional)
+                'three_year_cost': decimal,# Three-year cost (optional)
+                'commitment_discount_percent': decimal, # Discount percentage (optional)
+                'confidence_score': float, # Data quality score (0.0-1.0)
+                'source': str,             # 'billing_api', 'official_price_list', 'scraped', 'manual'
+                'source_url': str,         # Source URL (optional)
+                'notes': str               # Additional notes (optional)
+            }
+        """
+        pass
+    
     def validate_credentials(self) -> bool:
         """Validate provider credentials format"""
         required_fields = self.get_required_credentials()
@@ -60,6 +91,7 @@ class BaseProvider(ABC):
             'supports_resources': True,
             'supports_metrics': True,
             'supports_cost_data': True,
+            'supports_pricing_data': True,  # New capability
             'supports_logs': False,  # Override in specific providers
             'last_updated': datetime.now().isoformat()
         }

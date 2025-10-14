@@ -791,3 +791,198 @@ class BegetProviderPlugin(ProviderPlugin):
         })
 
         return unified_resource
+
+    def get_pricing_data(self) -> List[Dict[str, Any]]:
+        """
+        Get current pricing data from Beget for price comparison
+        
+        Returns standardized pricing data for cross-provider comparison
+        """
+        try:
+            self.logger.info("Starting Beget pricing data collection")
+            
+            pricing_data = []
+            
+            # Get VPS pricing from the API
+            try:
+                vps_plans = self.client.get_vps_plans()
+                if vps_plans:
+                    for plan in vps_plans:
+                        pricing_record = self._create_vps_pricing_record(plan)
+                        if pricing_record:
+                            pricing_data.append(pricing_record)
+                            
+            except Exception as e:
+                self.logger.warning(f"Failed to get VPS pricing: {e}")
+            
+            # Add manual pricing data for known Beget offerings
+            # This is based on current Beget pricing as of 2025
+            manual_pricing = self._get_manual_beget_pricing()
+            pricing_data.extend(manual_pricing)
+            
+            self.logger.info(f"Collected {len(pricing_data)} pricing records from Beget")
+            return pricing_data
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get Beget pricing data: {e}")
+            return []
+
+    def _create_vps_pricing_record(self, plan_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create standardized pricing record from VPS plan data"""
+        try:
+            # Extract specifications
+            config = plan_data.get('configuration', {})
+            cpu_cores = config.get('cpu_count', 0)
+            ram_mb = config.get('memory', 0)
+            ram_gb = ram_mb / 1024 if ram_mb > 0 else 0
+            disk_gb = config.get('disk_gb', 0)
+            
+            # Extract pricing
+            monthly_cost = float(plan_data.get('monthly_cost', 0))
+            daily_cost = monthly_cost / 30 if monthly_cost > 0 else 0
+            
+            if monthly_cost <= 0:
+                return None  # Skip free plans
+                
+            return {
+                'provider': 'beget',
+                'resource_type': 'server',
+                'provider_sku': plan_data.get('name', f'VPS-{cpu_cores}C-{int(ram_gb)}G'),
+                'region': 'global',
+                'cpu_cores': int(cpu_cores),
+                'ram_gb': int(ram_gb),
+                'storage_gb': int(disk_gb),
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'bandwidth_gb': plan_data.get('bandwidth_gb', 0),
+                    'software': plan_data.get('software', ''),
+                    'backup_enabled': plan_data.get('backup_enabled', False)
+                },
+                'hourly_cost': daily_cost / 24,
+                'monthly_cost': monthly_cost,
+                'currency': 'RUB',
+                'confidence_score': 0.9,  # High confidence from API
+                'source': 'billing_api',
+                'source_url': 'https://beget.com/vps',
+                'notes': f"Beget VPS plan: {plan_data.get('name', 'Unknown')}"
+            }
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to create VPS pricing record: {e}")
+            return None
+
+    def _get_manual_beget_pricing(self) -> List[Dict[str, Any]]:
+        """Get manual pricing data for Beget offerings not available via API"""
+        # Based on current Beget pricing (October 2025)
+        # These are fallback prices when API data is not available
+        
+        return [
+            # VPS Plans
+            {
+                'provider': 'beget',
+                'resource_type': 'server',
+                'provider_sku': 'VPS-S',
+                'region': 'global',
+                'cpu_cores': 1,
+                'ram_gb': 1,
+                'storage_gb': 10,
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'bandwidth_gb': 1000,
+                    'backup_enabled': True
+                },
+                'hourly_cost': 0.83,  # 25 RUB/day / 24
+                'monthly_cost': 600.0,
+                'currency': 'RUB',
+                'confidence_score': 0.7,  # Manual data
+                'source': 'manual',
+                'source_url': 'https://beget.com/vps',
+                'notes': 'Beget VPS-S plan (manual pricing)'
+            },
+            {
+                'provider': 'beget',
+                'resource_type': 'server',
+                'provider_sku': 'VPS-M',
+                'region': 'global',
+                'cpu_cores': 2,
+                'ram_gb': 2,
+                'storage_gb': 20,
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'bandwidth_gb': 2000,
+                    'backup_enabled': True
+                },
+                'hourly_cost': 1.67,  # 50 RUB/day / 24
+                'monthly_cost': 1200.0,
+                'currency': 'RUB',
+                'confidence_score': 0.7,
+                'source': 'manual',
+                'source_url': 'https://beget.com/vps',
+                'notes': 'Beget VPS-M plan (manual pricing)'
+            },
+            {
+                'provider': 'beget',
+                'resource_type': 'server',
+                'provider_sku': 'VPS-L',
+                'region': 'global',
+                'cpu_cores': 2,
+                'ram_gb': 4,
+                'storage_gb': 50,
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'bandwidth_gb': 5000,
+                    'backup_enabled': True
+                },
+                'hourly_cost': 2.33,  # 70 RUB/day / 24
+                'monthly_cost': 2100.0,
+                'currency': 'RUB',
+                'confidence_score': 0.7,
+                'source': 'manual',
+                'source_url': 'https://beget.com/vps',
+                'notes': 'Beget VPS-L plan (manual pricing)'
+            },
+            {
+                'provider': 'beget',
+                'resource_type': 'server',
+                'provider_sku': 'VPS-XL',
+                'region': 'global',
+                'cpu_cores': 4,
+                'ram_gb': 8,
+                'storage_gb': 100,
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'bandwidth_gb': 10000,
+                    'backup_enabled': True
+                },
+                'hourly_cost': 4.17,  # 125 RUB/day / 24
+                'monthly_cost': 3750.0,
+                'currency': 'RUB',
+                'confidence_score': 0.7,
+                'source': 'manual',
+                'source_url': 'https://beget.com/vps',
+                'notes': 'Beget VPS-XL plan (manual pricing)'
+            },
+            
+            # Storage Plans
+            {
+                'provider': 'beget',
+                'resource_type': 'storage',
+                'provider_sku': 'S3-Storage',
+                'region': 'global',
+                'cpu_cores': None,
+                'ram_gb': None,
+                'storage_gb': 1000,  # Per GB pricing
+                'storage_type': 'SSD',
+                'extended_specs': {
+                    'storage_type': 'S3-compatible',
+                    'api_access': True
+                },
+                'hourly_cost': 0.0,  # Pay-per-use
+                'monthly_cost': 50.0,  # Per GB per month
+                'currency': 'RUB',
+                'confidence_score': 0.8,
+                'source': 'manual',
+                'source_url': 'https://beget.com/cloud',
+                'notes': 'Beget S3 storage (per GB pricing)'
+            }
+        ]

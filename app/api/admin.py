@@ -3,11 +3,14 @@ Admin API routes for user management and impersonation
 """
 from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, flash
 from datetime import datetime
+import logging
 from app.core.database import db
 from app.core.models.user import User
 from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.core.models.provider_catalog import ProviderCatalog
 from app.api.auth import validate_session
+
+logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -515,36 +518,117 @@ def sync_provider_prices(provider_id):
     try:
         provider = ProviderCatalog.query.get_or_404(provider_id)
         
-        # Update sync status
-        provider.sync_status = 'in_progress'
-        provider.updated_at = datetime.utcnow()
-        db.session.commit()
+        # Import price update service
+        from app.core.services.price_update_service import PriceUpdateService
+        price_update_service = PriceUpdateService()
         
-        # TODO: Implement actual price sync logic
-        # For now, just simulate success after a delay
-        import time
-        time.sleep(2)  # Simulate sync time
+        # Sync prices for this provider
+        result = price_update_service.sync_provider_prices(provider.provider_type)
         
-        provider.sync_status = 'success'
-        provider.last_price_sync = datetime.utcnow()
-        provider.sync_error = None
-        provider.updated_at = datetime.utcnow()
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Price sync completed for {provider.display_name}',
-            'provider': provider.to_dict()
-        })
+        if result['success']:
+            # Refresh provider data from database
+            db.session.refresh(provider)
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'provider': provider.to_dict(),
+                'records_synced': result.get('records_synced', 0)
+            })
+        else:
+            # Refresh provider data to get updated sync status
+            db.session.refresh(provider)
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'provider': provider.to_dict()
+            })
+            
     except Exception as e:
-        db.session.rollback()
-        if 'provider' in locals():
-            provider.sync_status = 'failed'
-            provider.sync_error = str(e)
-            provider.updated_at = datetime.utcnow()
-            db.session.commit()
-        
+        logger.error(f"Error in sync_provider_prices: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'Failed to sync prices: {str(e)}'
+        })
+
+@admin_bp.route('/providers/sync-all-prices', methods=['POST'])
+def sync_all_provider_prices():
+    """Trigger price sync for all enabled providers (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        # Import price update service
+        from app.core.services.price_update_service import PriceUpdateService
+        price_update_service = PriceUpdateService()
+        
+        # Sync prices for all enabled providers
+        result = price_update_service.sync_all_enabled_providers()
+        
+        return jsonify(result)
+            
+    except Exception as e:
+        logger.error(f"Error in sync_all_provider_prices: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to sync all prices: {str(e)}'
+        })
+
+@admin_bp.route('/pricing/statistics', methods=['GET'])
+def get_pricing_statistics():
+    """Get pricing system statistics (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.services.price_update_service import PriceUpdateService
+        price_update_service = PriceUpdateService()
+        
+        statistics = price_update_service.get_pricing_statistics()
+        
+        return jsonify({
+            'success': True,
+            'statistics': statistics
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting pricing statistics: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get pricing statistics: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<int:provider_id>/pricing', methods=['GET'])
+def get_provider_pricing(provider_id):
+    """Get pricing data for a specific provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        provider = ProviderCatalog.query.get_or_404(provider_id)
+        
+        # Import pricing service
+        from app.core.services.pricing_service import PricingService
+        pricing_service = PricingService()
+        
+        # Get pricing data for this provider
+        pricing_data = pricing_service.get_prices_by_provider(provider.provider_type)
+        
+        # Convert to dict format for JSON response
+        pricing_list = [price.to_dict() for price in pricing_data]
+        
+        return jsonify({
+            'success': True,
+            'pricing': pricing_list,
+            'provider': provider.to_dict(),
+            'total_records': len(pricing_list)
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting provider pricing: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get pricing data: {str(e)}'
         })

@@ -92,6 +92,24 @@
     </div>
 </div>
 
+<!-- Pricing Modal -->
+<div id="pricingModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="pricingModalTitle">Цены провайдера</h2>
+            <span class="close" onclick="closePricingModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="pricingContent">
+                <div class="loading-spinner">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    Загрузка цен...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let providers = [];
 
@@ -173,10 +191,10 @@ function renderProviders() {
                             title="Синхронизировать цены">
                         <i class="fa-solid fa-arrows-rotate"></i>
                     </button>
-                    <a href="${provider.website_url}" target="_blank" class="action-btn view-btn" 
-                       title="Открыть сайт провайдера">
-                        <i class="fa-solid fa-external-link-alt"></i>
-                    </a>
+                    <button class="action-btn pricing-btn" onclick="viewProviderPricing(${provider.id})" 
+                            title="Просмотреть цены">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </button>
                 </div>
             </td>
         `;
@@ -279,9 +297,150 @@ function syncAllPrices() {
     }
     
     if (confirm(`Синхронизировать цены для ${enabledProviders.length} провайдеров?`)) {
+        // Update all enabled providers to in_progress status
         enabledProviders.forEach(provider => {
-            syncProviderPrices(provider.id);
+            provider.sync_status = 'in_progress';
         });
+        renderProviders();
+        
+        fetch('/api/admin/providers/sync-all-prices', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Refresh providers data
+                loadProviders();
+                showSuccess(data.message);
+            } else {
+                // Refresh providers data to get updated status
+                loadProviders();
+                showError('Ошибка синхронизации: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error syncing all prices:', error);
+            // Refresh providers data to get updated status
+            loadProviders();
+            showError('Ошибка синхронизации всех цен');
+        });
+    }
+}
+
+function viewProviderPricing(providerId) {
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider) return;
+    
+    // Show modal
+    document.getElementById('pricingModal').style.display = 'block';
+    document.getElementById('pricingModalTitle').textContent = `Цены ${provider.display_name}`;
+    
+    // Show loading
+    document.getElementById('pricingContent').innerHTML = `
+        <div class="loading-spinner">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            Загрузка цен...
+        </div>
+    `;
+    
+    // Fetch pricing data
+    fetch(`/api/admin/providers/${providerId}/pricing`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayPricingData(data.pricing);
+            } else {
+                document.getElementById('pricingContent').innerHTML = `
+                    <div class="error-message">
+                        <i class="fa-solid fa-exclamation-triangle"></i>
+                        Ошибка загрузки цен: ${data.error}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading pricing:', error);
+            document.getElementById('pricingContent').innerHTML = `
+                <div class="error-message">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    Ошибка загрузки цен
+                </div>
+            `;
+        });
+}
+
+function displayPricingData(pricing) {
+    if (!pricing || pricing.length === 0) {
+        document.getElementById('pricingContent').innerHTML = `
+            <div class="no-data">
+                <i class="fa-solid fa-info-circle"></i>
+                Нет данных о ценах для этого провайдера
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="pricing-summary">
+            <div class="summary-card">
+                <h3>Всего планов: ${pricing.length}</h3>
+                <p>Последнее обновление: ${new Date().toLocaleString('ru-RU')}</p>
+            </div>
+        </div>
+        
+        <div class="pricing-table-container">
+            <table class="pricing-table">
+                <thead>
+                    <tr>
+                        <th>Тип ресурса</th>
+                        <th>SKU</th>
+                        <th>CPU</th>
+                        <th>RAM</th>
+                        <th>Хранилище</th>
+                        <th>Месячная цена</th>
+                        <th>Источник</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    pricing.forEach(price => {
+        const cpuDisplay = price.cpu_cores ? `${price.cpu_cores} ядер` : '-';
+        const ramDisplay = price.ram_gb ? `${price.ram_gb} GB` : '-';
+        const storageDisplay = price.storage_gb ? `${price.storage_gb} GB ${price.storage_type}` : '-';
+        const sourceBadge = price.source === 'manual' ? 'manual' : 'api';
+        
+        html += `
+            <tr>
+                <td><span class="resource-type">${price.resource_type}</span></td>
+                <td><strong>${price.provider_sku}</strong></td>
+                <td>${cpuDisplay}</td>
+                <td>${ramDisplay}</td>
+                <td>${storageDisplay}</td>
+                <td><strong>${price.monthly_cost} ${price.currency}</strong></td>
+                <td><span class="source-badge ${sourceBadge}">${price.source}</span></td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    document.getElementById('pricingContent').innerHTML = html;
+}
+
+function closePricingModal() {
+    document.getElementById('pricingModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('pricingModal');
+    if (event.target === modal) {
+        closePricingModal();
     }
 }
 
@@ -500,6 +659,170 @@ input:checked + .slider:before {
 .view-btn:hover {
     background: var(--text-secondary);
     color: white;
+}
+
+.pricing-btn {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success-green);
+}
+
+.pricing-btn:hover {
+    background: var(--success-green);
+    color: white;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 1200px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.close {
+    color: white;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    opacity: 0.7;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.loading-spinner i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.error-message, .no-data {
+    text-align: center;
+    padding: 40px;
+    color: #dc3545;
+}
+
+.error-message i, .no-data i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.pricing-summary {
+    margin-bottom: 20px;
+}
+
+.summary-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.summary-card h3 {
+    margin: 0 0 5px 0;
+    color: #28a745;
+}
+
+.summary-card p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.pricing-table-container {
+    overflow-x: auto;
+}
+
+.pricing-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.pricing-table th {
+    background-color: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    color: #495057;
+}
+
+.pricing-table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.pricing-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.resource-type {
+    background-color: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.source-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.source-badge.manual {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.source-badge.api {
+    background-color: #d1ecf1;
+    color: #0c5460;
 }
 
 .notification {
