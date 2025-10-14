@@ -13,7 +13,7 @@
             <div class="filter-group">
                 <input type="text" class="filter-input" id="provider-search" placeholder="Поиск провайдеров..." onkeyup="applyProviderFilters()" />
                 <i class="fas fa-search filter-icon"></i>
-            </div>
+        </div>
 
             <div class="filter-group">
                 <select class="filter-select" id="status-filter" onchange="applyProviderFilters()">
@@ -60,20 +60,20 @@
                 </button>
                 <button class="btn btn-primary btn-sm" onclick="syncAllPrices()">
                     <i class="fa-solid fa-arrows-rotate"></i> Синхронизировать все
-                </button>
-            </div>
+            </button>
         </div>
+    </div>
 
         <div class="view-controls">
             <div class="results-info" id="providers-results-info"></div>
-        </div>
-    </div>
+            </div>
+            </div>
 
     <!-- Modern Table (matches master/components) -->
     <div class="modern-table">
         <table class="resources-table" id="providersTable">
-            <thead>
-                <tr>
+                <thead>
+                    <tr>
                     <th class="col-resource">Провайдер</th>
                     <th class="col-type">Тип</th>
                     <th class="col-provider">Метод цен</th>
@@ -81,14 +81,14 @@
                     <th class="col-discovered">Статус</th>
                     <th class="col-status">Синхр. статус</th>
                     <th class="col-actions">Действия</th>
-                </tr>
-            </thead>
-            <tbody id="providersTableBody">
-                <!-- Providers will be loaded here -->
-            </tbody>
-        </table>
-    </div>
-</div>
+                    </tr>
+                </thead>
+                <tbody id="providersTableBody">
+                    <!-- Providers will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+            </div>
 
 <!-- Pricing Modal -->
 <div id="pricingModal" class="modal" style="display: none;">
@@ -96,13 +96,72 @@
         <div class="modal-header">
             <h2 id="pricingModalTitle">Цены провайдера</h2>
             <span class="close" onclick="closePricingModal()">&times;</span>
-        </div>
+            </div>
         <div class="modal-body">
             <div id="pricingContent">
                 <div class="loading-spinner">
                     <i class="fa-solid fa-spinner fa-spin"></i>
                     Загрузка цен...
+        </div>
+            </div>
+            </div>
+        </div>
+            </div>
+
+<!-- Credentials Modal -->
+<div id="credentialsModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="credentialsModalTitle">Учетные данные для получения цен</h2>
+            <span class="close" onclick="closeCredentialsModal()">&times;</span>
+            </div>
+        <div class="modal-body">
+            <div id="credentialsForm">
+                <div class="form-group">
+                    <label for="credentialType">Тип учетных данных</label>
+                    <select id="credentialType" class="form-control">
+                        <option value="bearer_token">Bearer Token</option>
+                        <option value="session_cookie">Session Cookie</option>
+                        <option value="api_key">API Key</option>
+                        <option value="basic_auth">Basic Auth</option>
+                        <option value="jwt">JWT Token</option>
+                    </select>
+        </div>
+
+                <div class="form-group">
+                    <label for="credentialData">Данные (JSON формат)</label>
+                    <textarea id="credentialData" class="form-control" rows="6" placeholder='{"token": "your_token_here", "other_data": "..."}'></textarea>
+                    <small class="form-text">Введите учетные данные в формате JSON. Они будут зашифрованы.</small>
+    </div>
+
+                <div class="form-group">
+                    <label for="credentialDescription">Описание</label>
+                    <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания или описание этих учетных данных..."></textarea>
                 </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="credentialActive" checked> 
+                        Активно
+                    </label>
+            </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveCredentials()">
+                        <i class="fa-solid fa-save"></i> Сохранить
+                    </button>
+                    <button class="btn btn-secondary" onclick="testCredentials()" id="testCredentialsBtn" disabled>
+                        <i class="fa-solid fa-vial"></i> Тестировать
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteCredentials()" id="deleteCredentialsBtn" disabled>
+                        <i class="fa-solid fa-trash"></i> Удалить
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeCredentialsModal()">
+                        <i class="fa-solid fa-times"></i> Отмена
+                    </button>
+        </div>
+        
+                <div id="credentialsStatus" class="credentials-status" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -148,7 +207,7 @@ function loadProviders() {
         .catch(error => {
             console.error('Error loading providers:', error);
             if (!providers || providers.length === 0) {
-                showError('Ошибка загрузки провайдеров');
+            showError('Ошибка загрузки провайдеров');
             }
         });
 }
@@ -210,6 +269,9 @@ function renderProviders() {
                     </button>
                     <button class="action-btn pricing-btn" onclick="viewProviderPricing(${provider.id})" title="Просмотреть цены">
                         <i class="fa-solid fa-chart-line"></i>
+                    </button>
+                    <button class="action-btn settings-btn" onclick="openCredentialsModal('${provider.provider_type}')" title="Настроить учетные данные">
+                        <i class="fa-solid fa-gear"></i>
                     </button>
                 </div>
             </td>
@@ -365,7 +427,7 @@ function viewProviderPricing(providerId) {
         .then(data => {
             if (data.success) {
                 displayPricingData(data.pricing);
-            } else {
+        } else {
                 document.getElementById('pricingContent').innerHTML = `
                     <div class="error-message">
                         <i class="fa-solid fa-exclamation-triangle"></i>
@@ -452,11 +514,211 @@ function closePricingModal() {
     document.getElementById('pricingModal').style.display = 'none';
 }
 
-// Close modal when clicking outside
+// ==========================================
+// Provider Credentials Management
+// ==========================================
+
+let currentProviderType = null;
+let currentCredentials = null;
+
+function openCredentialsModal(providerType) {
+    currentProviderType = providerType;
+    
+    // Reset form
+    document.getElementById('credentialType').value = 'bearer_token';
+    document.getElementById('credentialData').value = '';
+    document.getElementById('credentialDescription').value = '';
+    document.getElementById('credentialActive').checked = true;
+    document.getElementById('credentialsStatus').style.display = 'none';
+    
+    // Update modal title
+    document.getElementById('credentialsModalTitle').innerText = `Учетные данные: ${providerType}`;
+    
+    // Load existing credentials
+    loadCredentials(providerType);
+    
+    // Show modal
+    document.getElementById('credentialsModal').style.display = 'block';
+}
+
+function closeCredentialsModal() {
+    document.getElementById('credentialsModal').style.display = 'none';
+    currentProviderType = null;
+    currentCredentials = null;
+}
+
+function loadCredentials(providerType) {
+    fetch(`/api/admin/providers/${providerType}/credentials`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.credentials) {
+                currentCredentials = data.credentials;
+                
+                // Populate form
+                document.getElementById('credentialType').value = data.credentials.credential_type || 'bearer_token';
+                document.getElementById('credentialDescription').value = data.credentials.description || '';
+                document.getElementById('credentialActive').checked = data.credentials.is_active !== false;
+                
+                // Enable test and delete buttons
+                document.getElementById('testCredentialsBtn').disabled = false;
+                document.getElementById('deleteCredentialsBtn').disabled = false;
+                
+                // Show status message
+                showCredentialsStatus(`Найдены существующие учетные данные (обновлено: ${new Date(data.credentials.updated_at).toLocaleString('ru-RU')})`, 'info');
+            } else {
+                // No credentials exist
+                currentCredentials = null;
+                document.getElementById('testCredentialsBtn').disabled = true;
+                document.getElementById('deleteCredentialsBtn').disabled = true;
+                showCredentialsStatus('Учетные данные не настроены', 'info');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading credentials:', error);
+            showCredentialsStatus('Ошибка загрузки учетных данных', 'error');
+        });
+}
+
+function saveCredentials() {
+    if (!currentProviderType) return;
+    
+    const credentialType = document.getElementById('credentialType').value;
+    const credentialDataText = document.getElementById('credentialData').value.trim();
+    const description = document.getElementById('credentialDescription').value;
+    const isActive = document.getElementById('credentialActive').checked;
+    
+    // Validate JSON
+    let credentials;
+    try {
+        if (credentialDataText) {
+            credentials = JSON.parse(credentialDataText);
+        } else {
+            showCredentialsStatus('Пожалуйста, введите данные учетных записей', 'error');
+            return;
+        }
+    } catch (e) {
+        showCredentialsStatus('Неверный формат JSON: ' + e.message, 'error');
+        return;
+    }
+    
+    const payload = {
+        credential_type: credentialType,
+        credentials: credentials,
+        description: description,
+        is_active: isActive
+    };
+    
+    showCredentialsStatus('Сохранение...', 'info');
+    
+    fetch(`/api/admin/providers/${currentProviderType}/credentials`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showCredentialsStatus('Учетные данные успешно сохранены!', 'success');
+                currentCredentials = data.credentials;
+                
+                // Enable test and delete buttons
+                document.getElementById('testCredentialsBtn').disabled = false;
+                document.getElementById('deleteCredentialsBtn').disabled = false;
+                
+                // Reload providers to update UI
+                setTimeout(() => {
+                    loadProviders();
+                }, 1000);
+            } else {
+                showCredentialsStatus('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving credentials:', error);
+            showCredentialsStatus('Ошибка при сохранении учетных данных', 'error');
+        });
+}
+
+function testCredentials() {
+    if (!currentProviderType || !currentCredentials) return;
+    
+    showCredentialsStatus('Тестирование учетных данных...', 'info');
+    
+    fetch(`/api/admin/providers/${currentProviderType}/credentials/test`, {
+        method: 'POST'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showCredentialsStatus('✓ Тестирование успешно!', 'success');
+            } else {
+                showCredentialsStatus('✗ Тест не прошел: ' + (data.error || 'Неизвестная ошибка'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error testing credentials:', error);
+            showCredentialsStatus('Ошибка при тестировании учетных данных', 'error');
+        });
+}
+
+function deleteCredentials() {
+    if (!currentProviderType || !currentCredentials) return;
+    
+    if (!confirm('Вы уверены, что хотите удалить эти учетные данные?')) {
+        return;
+    }
+    
+    showCredentialsStatus('Удаление...', 'info');
+    
+    fetch(`/api/admin/providers/${currentProviderType}/credentials`, {
+        method: 'DELETE'
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showCredentialsStatus('Учетные данные успешно удалены', 'success');
+                currentCredentials = null;
+                
+                // Reset form
+                document.getElementById('credentialData').value = '';
+                document.getElementById('testCredentialsBtn').disabled = true;
+                document.getElementById('deleteCredentialsBtn').disabled = true;
+                
+                // Reload providers
+                setTimeout(() => {
+                    loadProviders();
+                    closeCredentialsModal();
+                }, 1500);
+            } else {
+                showCredentialsStatus('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting credentials:', error);
+            showCredentialsStatus('Ошибка при удалении учетных данных', 'error');
+        });
+}
+
+function showCredentialsStatus(message, type) {
+    const statusDiv = document.getElementById('credentialsStatus');
+    statusDiv.innerText = message;
+    statusDiv.className = 'credentials-status ' + type;
+    statusDiv.style.display = 'block';
+}
+
+// Close modals when clicking outside
 window.onclick = function(event) {
-    const modal = document.getElementById('pricingModal');
-    if (event.target === modal) {
+    const pricingModal = document.getElementById('pricingModal');
+    const credentialsModal = document.getElementById('credentialsModal');
+    
+    if (event.target === pricingModal) {
         closePricingModal();
+    }
+    
+    if (event.target === credentialsModal) {
+        closeCredentialsModal();
     }
 }
 
@@ -708,6 +970,16 @@ input:checked + .slider:before {
     color: white;
 }
 
+.settings-btn {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.settings-btn:hover {
+    background: #6c757d;
+    color: white;
+}
+
 /* Modal Styles */
 .modal {
     position: fixed;
@@ -887,6 +1159,80 @@ input:checked + .slider:before {
 .notification-warning {
     background: var(--warning-orange);
     color: white;
+}
+
+/* Credentials Status */
+.credentials-status {
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 16px;
+    font-size: 14px;
+}
+
+.credentials-status.success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success-green);
+    border: 1px solid var(--success-green);
+}
+
+.credentials-status.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--error-red);
+    border: 1px solid var(--error-red);
+}
+
+.credentials-status.info {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary-blue);
+    border: 1px solid var(--primary-blue);
+}
+
+/* Form Styles for Credentials Modal */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.form-actions .btn {
+    flex: 1;
 }
 </style>
 {% endblock %}

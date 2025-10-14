@@ -8,6 +8,7 @@ from app.core.database import db
 from app.core.models.user import User
 from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.core.models.provider_catalog import ProviderCatalog
+from app.core.models.provider_admin_credentials import ProviderAdminCredentials
 from app.api.auth import validate_session
 
 logger = logging.getLogger(__name__)
@@ -631,4 +632,182 @@ def get_provider_pricing(provider_id):
         return jsonify({
             'success': False,
             'error': f'Failed to get pricing data: {str(e)}'
+        })
+
+# ==========================================
+# Provider Admin Credentials Management
+# ==========================================
+
+@admin_bp.route('/providers/<string:provider_type>/credentials', methods=['GET'])
+def get_provider_credentials(provider_type):
+    """Get admin credentials for a provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        credentials = ProviderAdminCredentials.query.filter_by(provider_type=provider_type).first()
+        
+        if not credentials:
+            return jsonify({
+                'success': True,
+                'credentials': None,
+                'message': 'No credentials configured for this provider'
+            })
+        
+        return jsonify({
+            'success': True,
+            'credentials': credentials.to_dict(include_credentials=False)
+        })
+            
+    except Exception as e:
+        logger.error(f"Error getting provider credentials: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get credentials: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<string:provider_type>/credentials', methods=['POST'])
+def create_provider_credentials(provider_type):
+    """Create or update admin credentials for a provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'})
+        
+        # Check if credentials already exist
+        credentials = ProviderAdminCredentials.query.filter_by(provider_type=provider_type).first()
+        
+        if credentials:
+            # Update existing credentials
+            credentials.credential_type = data.get('credential_type', credentials.credential_type)
+            credentials.description = data.get('description', credentials.description)
+            credentials.is_active = data.get('is_active', credentials.is_active)
+            credentials.config_data = data.get('config_data', credentials.config_data)
+            
+            # Update credentials if provided
+            if 'credentials' in data:
+                credentials.set_credentials(data['credentials'])
+            
+            # Update expiration if provided
+            if 'expires_at' in data and data['expires_at']:
+                credentials.expires_at = datetime.fromisoformat(data['expires_at'])
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Credentials updated successfully',
+                'credentials': credentials.to_dict(include_credentials=False)
+            })
+        else:
+            # Create new credentials
+            if 'credential_type' not in data or 'credentials' not in data:
+                return jsonify({
+                    'success': False,
+                    'error': 'credential_type and credentials are required'
+                })
+            
+            credentials = ProviderAdminCredentials(
+                provider_type=provider_type,
+                credential_type=data['credential_type'],
+                description=data.get('description', ''),
+                is_active=data.get('is_active', True),
+                config_data=data.get('config_data', {})
+            )
+            
+            # Set encrypted credentials
+            credentials.set_credentials(data['credentials'])
+            
+            # Set expiration if provided
+            if 'expires_at' in data and data['expires_at']:
+                credentials.expires_at = datetime.fromisoformat(data['expires_at'])
+            
+            db.session.add(credentials)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Credentials created successfully',
+                'credentials': credentials.to_dict(include_credentials=False)
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating provider credentials: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to create credentials: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<string:provider_type>/credentials', methods=['DELETE'])
+def delete_provider_credentials(provider_type):
+    """Delete admin credentials for a provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        credentials = ProviderAdminCredentials.query.filter_by(provider_type=provider_type).first()
+        
+        if not credentials:
+            return jsonify({
+                'success': False,
+                'error': 'No credentials found for this provider'
+            })
+        
+        db.session.delete(credentials)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Credentials deleted successfully'
+        })
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting provider credentials: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete credentials: {str(e)}'
+        })
+
+@admin_bp.route('/providers/<string:provider_type>/credentials/test', methods=['POST'])
+def test_provider_credentials(provider_type):
+    """Test admin credentials for a provider (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        credentials = ProviderAdminCredentials.query.filter_by(provider_type=provider_type).first()
+        
+        if not credentials:
+            return jsonify({
+                'success': False,
+                'error': 'No credentials found for this provider'
+            })
+        
+        # Mark as used
+        credentials.mark_used()
+        db.session.commit()
+        
+        # TODO: Implement actual credential testing based on provider type
+        # For now, just return success
+        return jsonify({
+            'success': True,
+            'message': 'Credentials test successful (placeholder)',
+            'tested_at': datetime.utcnow().isoformat()
+        })
+            
+    except Exception as e:
+        logger.error(f"Error testing provider credentials: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to test credentials: {str(e)}'
         })

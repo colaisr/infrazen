@@ -18,6 +18,7 @@ from .sync import SyncSnapshot, ResourceState
 from .unrecognized_resource import UnrecognizedResource
 from .provider_catalog import ProviderCatalog
 from .pricing import ProviderPrice, PriceHistory, PriceComparisonRecommendation
+from .provider_admin_credentials import ProviderAdminCredentials
 
 __all__ = [
     'db',
@@ -39,5 +40,6 @@ __all__ = [
     'ProviderCatalog',
     'ProviderPrice',
     'PriceHistory',
-    'PriceComparisonRecommendation'
+    'PriceComparisonRecommendation',
+    'ProviderAdminCredentials'
 ]
