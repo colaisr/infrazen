@@ -508,6 +508,7 @@ let currentProviderType = null;
 let currentCredentials = null;
 
 function openCredentialsModal(providerType) {
+    console.log('Opening credentials modal for:', providerType);
     currentProviderType = providerType;
     
     // Reset form
@@ -524,6 +525,7 @@ function openCredentialsModal(providerType) {
     
     // Show modal
     document.getElementById('credentialsModal').style.display = 'block';
+    console.log('Modal should be visible now');
     
     // Add event listeners to enable test button when form has data
     document.getElementById('credentialUsername').addEventListener('input', checkTestButtonState);
