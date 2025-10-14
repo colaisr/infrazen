@@ -24,6 +24,43 @@ class SelectelPricingClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
+    @staticmethod
+    def _map_resource_type(resource_key: str) -> str:
+        """Map Selectel billing resource keys to our taxonomy resource_type."""
+        if not resource_key:
+            return "unknown"
+
+        rk = resource_key.lower()
+        # Compute / VM related
+        if rk.startswith("compute_"):
+            return "server"
+        # Block/File storage
+        if rk.startswith("volume_") or rk.startswith("share_"):
+            return "volume"
+        if rk.startswith("snapshot_") or rk.startswith("volume_backup"):
+            return "snapshot"
+        # Databases
+        if rk.startswith("dbaas_"):
+            return "database"
+        # Kubernetes
+        if rk.startswith("mks_") or rk.startswith("k8s_"):
+            return "kubernetes"
+        # Network
+        if rk.startswith("network_") or rk.startswith("exttraffic") or rk.startswith("floatingip"):
+            return "network"
+        # Load balancers
+        if rk.startswith("load_balancer") or rk.startswith("load_balancers_"):
+            return "load_balancer"
+        # Images / Licenses / Software
+        if rk.startswith("image_"):
+            return "image"
+        if rk.startswith("license_"):
+            return "license"
+        # AI/inference
+        if rk.startswith("inference_"):
+            return "ai_service"
+        return "unknown"
+
     def get_vpc_prices(self) -> List[Dict[str, Any]]:
         response = requests.get(
             f"{self.BASE_URL}/vpc/prices",
@@ -39,18 +76,20 @@ class SelectelPricingClient:
         data = response.json()
         prices = []
         for item in data.get("prices", []):
+            resource_key = item.get("resource", "")
+            mapped_type = self._map_resource_type(resource_key)
             prices.append(
                 {
                     "provider": "selectel",
-                    "resource_type": "server" if item.get("resource", "").startswith("compute") else "unknown",
-                    "provider_sku": f"{item.get('resource')}:{item.get('group')}",
+                    "resource_type": mapped_type,
+                    "provider_sku": f"{resource_key}:{item.get('group')}",
                     "region": item.get("group"),
                     "cpu_cores": None,
                     "ram_gb": None,
                     "storage_gb": None,
                     "storage_type": None,
                     "extended_specs": {
-                        "resource": item.get("resource"),
+                        "resource": resource_key,
                         "unit": item.get("unit"),
                     },
                     "hourly_cost": None,
@@ -276,14 +315,16 @@ class SelectelProviderPlugin(ProviderPlugin):
                 self.logger.warning("No API key provided for Selectel pricing fetch")
                 return []
 
-            # Prefer grid pricing with normalized CPU/RAM/Disk fields
+            # Collect grid pricing with normalized CPU/RAM/Disk fields
             grid = self.grid_pricing_client.get_grid_prices()
-            if grid:
-                self.logger.info("Collected %d Selectel grid pricing records", len(grid))
-                return grid
+            self.logger.info("Collected %d Selectel grid pricing records", len(grid))
 
-            # Fallback to raw price matrix rows if grid failed
-            return self.pricing_client.get_vpc_prices()
+            # Also collect raw unit prices across services (volumes, network, dbaas, etc.)
+            raw = self.pricing_client.get_vpc_prices()
+            self.logger.info("Collected %d Selectel raw unit price records", len(raw))
+
+            # Combine so UI can filter by resource_type across categories
+            return (grid or []) + (raw or [])
         except Exception as exc:
             self.logger.error("Failed to collect Selectel pricing: %s", exc, exc_info=True)
             return []

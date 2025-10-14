@@ -416,16 +416,25 @@ function displayPricingData(pricing) {
         return;
     }
     
+    const resourceTypes = Array.from(new Set(pricing.map(p => p.resource_type || 'unknown'))).sort();
+
     let html = `
         <div class="pricing-summary">
             <div class="summary-card">
                 <h3>Всего планов: ${pricing.length}</h3>
                 <p>Последнее обновление: ${new Date().toLocaleString('ru-RU')}</p>
             </div>
+            <div class="summary-card">
+                <label for="resourceTypeFilter"><strong>Фильтр по типу ресурса</strong></label>
+                <select id="resourceTypeFilter" class="form-control">
+                    <option value="__all__">Все</option>
+                    ${resourceTypes.map(rt => `<option value="${rt}">${rt}</option>`).join('')}
+                </select>
+            </div>
         </div>
         
         <div class="pricing-table-container">
-            <table class="pricing-table">
+            <table class="pricing-table" id="pricingTable">
                 <thead>
                     <tr>
                         <th>Тип ресурса</th>
@@ -466,6 +475,17 @@ function displayPricingData(pricing) {
     `;
     
     document.getElementById('pricingContent').innerHTML = html;
+
+    // Attach filter logic
+    const filterSelect = document.getElementById('resourceTypeFilter');
+    filterSelect.addEventListener('change', () => {
+        const value = filterSelect.value;
+        const rows = document.querySelectorAll('#pricingTable tbody tr');
+    rows.forEach(row => {
+            const rt = row.querySelector('.resource-type')?.textContent || 'unknown';
+            row.style.display = (value === '__all__' || rt === value) ? '' : 'none';
+        });
+    });
 }
 
 function closePricingModal() {
@@ -537,7 +557,7 @@ function loadCredentials(providerType) {
                 
                 // Show status message
                 showCredentialsStatus(`Найдены существующие учетные данные (обновлено: ${new Date(data.credentials.updated_at).toLocaleString('ru-RU')})`, 'info');
-            } else {
+        } else {
                 // No credentials exist
                 currentCredentials = null;
                 // Check if form has data to enable test button
