@@ -657,7 +657,7 @@ def get_provider_credentials(provider_type):
         
         return jsonify({
             'success': True,
-            'credentials': credentials.to_dict(include_credentials=False)
+            'credentials': credentials.to_dict(include_credentials=True)
         })
             
     except Exception as e:

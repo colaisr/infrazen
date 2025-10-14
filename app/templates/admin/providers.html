@@ -543,18 +543,18 @@ function loadCredentials(providerType) {
             if (data.success && data.credentials) {
                 currentCredentials = data.credentials;
                 
-                // Try to populate form from stored credentials
+                // Populate form from stored credentials
                 try {
                     const storedCredentials = data.credentials.credentials || {};
                     document.getElementById('credentialUsername').value = storedCredentials.username || '';
                     document.getElementById('credentialPassword').value = storedCredentials.password || '';
                     document.getElementById('credentialDescription').value = data.credentials.description || '';
+                    
+                    // Enable test button since we have credentials
+                    document.getElementById('testCredentialsBtn').disabled = false;
                 } catch (e) {
                     console.warn('Could not parse stored credentials:', e);
                 }
-                
-                // Enable test button
-                document.getElementById('testCredentialsBtn').disabled = false;
                 
                 // Show status message
                 showCredentialsStatus(`Найдены существующие учетные данные (обновлено: ${new Date(data.credentials.updated_at).toLocaleString('ru-RU')})`, 'info');
