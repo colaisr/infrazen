@@ -45,9 +45,9 @@ class ProviderAdminCredentials(db.Model):
         # In production, this should be stored in environment variables
         key = os.getenv('CREDENTIALS_ENCRYPTION_KEY')
         if not key:
-            # Generate a key for development (in production, this should be pre-configured)
-            # This is a simple implementation - in production use a proper key management system
-            key = base64.urlsafe_b64encode(b'InfraZen_Secret_Key_32_Bytes!')
+            # Generate a proper 32-byte key for development
+            # In production, this should be pre-configured and stored securely
+            key = Fernet.generate_key()
         return key
     
     def encrypt_credentials(self, credentials_dict: dict) -> str:
