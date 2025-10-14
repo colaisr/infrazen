@@ -117,26 +117,12 @@
                 </div>
         <div class="modal-body">
             <div id="credentialsForm">
-                <div class="form-group">
-                    <label for="credentialUsername">Имя пользователя *</label>
-                    <input type="text" id="credentialUsername" class="form-control" placeholder="your_beget_username" />
-                </div>
+                <div id="credentialsFieldsContainer"></div>
 
-                <div class="form-group">
-                    <label for="credentialPassword">Пароль *</label>
-                    <div class="password-input-container">
-                        <input type="password" id="credentialPassword" class="form-control" placeholder="••••••••" />
-                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility()">
-                            <i class="fa-solid fa-eye" id="passwordToggleIcon"></i>
-                        </button>
-            </div>
-        </div>
-        
                 <div class="form-group">
                     <label for="credentialDescription">Описание (необязательно)</label>
                     <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания о системных учетных данных для получения цен..."></textarea>
-        </div>
-
+            </div>
 
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="saveCredentials()">
@@ -492,15 +478,25 @@ function closePricingModal() {
 
 let currentProviderType = null;
 let currentCredentials = null;
+const providerCredentialFields = {
+    beget: [
+        { id: 'credentialUsername', label: 'Имя пользователя *', type: 'text', placeholder: 'your_beget_username', required: true },
+        { id: 'credentialPassword', label: 'Пароль *', type: 'password', placeholder: '••••••••', required: true }
+    ],
+    selectel: [
+        { id: 'credentialApiKey', label: 'API Key *', type: 'text', placeholder: 'geKYksHLzAeQQLakNjyWnmTLJ_478587', required: true },
+        { id: 'credentialServiceUsername', label: 'Service Username *', type: 'text', placeholder: 'InfraZen', required: true },
+        { id: 'credentialServicePassword', label: 'Service Password *', type: 'password', placeholder: '••••••••', required: true }
+    ]
+};
 
 function openCredentialsModal(providerType) {
     currentProviderType = providerType;
     
     // Reset form
-    document.getElementById('credentialUsername').value = '';
-    document.getElementById('credentialPassword').value = '';
     document.getElementById('credentialDescription').value = '';
     document.getElementById('credentialsStatus').style.display = 'none';
+    renderCredentialFields(providerType);
     
     // Update modal title
     document.getElementById('credentialsModalTitle').innerText = `Учетные данные: ${providerType}`;
@@ -511,9 +507,7 @@ function openCredentialsModal(providerType) {
     // Show modal
     document.getElementById('credentialsModal').style.display = 'block';
     
-    // Add event listeners to enable test button when form has data
-    document.getElementById('credentialUsername').addEventListener('input', checkTestButtonState);
-    document.getElementById('credentialPassword').addEventListener('input', checkTestButtonState);
+    attachFieldListeners();
 }
 
 function closeCredentialsModal() {
@@ -532,8 +526,7 @@ function loadCredentials(providerType) {
                 // Populate form from stored credentials
                 try {
                     const storedCredentials = data.credentials.credentials || {};
-                    document.getElementById('credentialUsername').value = storedCredentials.username || '';
-                    document.getElementById('credentialPassword').value = storedCredentials.password || '';
+                    populateCredentialFields(providerType, storedCredentials);
                     document.getElementById('credentialDescription').value = data.credentials.description || '';
                     
                     // Enable test button since we have credentials
@@ -560,26 +553,18 @@ function loadCredentials(providerType) {
 
 function saveCredentials() {
     if (!currentProviderType) return;
-    
-    const username = document.getElementById('credentialUsername').value.trim();
-    const password = document.getElementById('credentialPassword').value.trim();
+    const fieldValues = getCredentialFieldValues(currentProviderType);
     const description = document.getElementById('credentialDescription').value.trim();
     
     // Validate required fields
-    if (!username || !password) {
-        showCredentialsStatus('Пожалуйста, заполните имя пользователя и пароль', 'error');
+    if (!fieldValues.isValid) {
+        showCredentialsStatus(fieldValues.error || 'Пожалуйста, заполните обязательные поля', 'error');
         return;
     }
     
-    // Create credentials object (same structure as user connections)
-    const credentials = {
-        username: username,
-        password: password
-    };
-    
     const payload = {
         credential_type: 'basic_auth',  // Standard for username/password
-        credentials: credentials,
+        credentials: fieldValues.values,
         description: description,
         is_active: true  // Always active when saved
     };
@@ -620,11 +605,9 @@ function testCredentials() {
     if (!currentProviderType) return;
     
     // Get current form data
-    const username = document.getElementById('credentialUsername').value.trim();
-    const password = document.getElementById('credentialPassword').value.trim();
-    
-    if (!username || !password) {
-        showCredentialsStatus('Пожалуйста, заполните имя пользователя и пароль для тестирования', 'error');
+    const fieldValues = getCredentialFieldValues(currentProviderType);
+    if (!fieldValues.isValid) {
+        showCredentialsStatus(fieldValues.error || 'Заполните обязательные поля для тестирования', 'error');
         return;
     }
     
@@ -638,10 +621,7 @@ function testCredentials() {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            username: username,
-            password: password
-        })
+        body: JSON.stringify(fieldValues.values)
     })
     .then(response => response.json())
     .then(data => {
@@ -687,10 +667,10 @@ function showCredentialsStatus(message, type) {
     statusDiv.style.display = 'block';
 }
 
-function togglePasswordVisibility() {
-    const passwordInput = document.getElementById('credentialPassword');
-    const toggleIcon = document.getElementById('passwordToggleIcon');
-    
+function togglePasswordVisibility(fieldId, iconId) {
+    const passwordInput = document.getElementById(fieldId);
+    const toggleIcon = document.getElementById(iconId);
+    if (!passwordInput || !toggleIcon) return;
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
         toggleIcon.className = 'fa-solid fa-eye-slash';
@@ -701,12 +681,105 @@ function togglePasswordVisibility() {
 }
 
 function checkTestButtonState() {
-    const username = document.getElementById('credentialUsername').value.trim();
-    const password = document.getElementById('credentialPassword').value.trim();
+    const fieldValues = getCredentialFieldValues(currentProviderType, false);
     const testBtn = document.getElementById('testCredentialsBtn');
-    
-    // Enable test button if both fields have data
-    testBtn.disabled = !(username && password);
+    testBtn.disabled = !fieldValues.isValid;
+}
+
+function renderCredentialFields(providerType) {
+    const container = document.getElementById('credentialsFieldsContainer');
+    container.innerHTML = '';
+    const fields = providerCredentialFields[providerType] || [];
+    fields.forEach(field => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-group';
+        const label = document.createElement('label');
+        label.setAttribute('for', field.id);
+        label.textContent = field.label;
+        wrapper.appendChild(label);
+
+        if (field.type === 'password') {
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'password-input-container';
+            const input = document.createElement('input');
+            input.type = 'password';
+            input.id = field.id;
+            input.className = 'form-control';
+            input.placeholder = field.placeholder || '';
+            input.dataset.required = field.required ? 'true' : 'false';
+            containerDiv.appendChild(input);
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'password-toggle';
+            const iconId = `${field.id}Toggle`;
+            toggleBtn.innerHTML = `<i class="fa-solid fa-eye" id="${iconId}"></i>`;
+            toggleBtn.addEventListener('click', () => togglePasswordVisibility(field.id, iconId));
+            containerDiv.appendChild(toggleBtn);
+
+            wrapper.appendChild(containerDiv);
+        } else {
+            const input = document.createElement('input');
+            input.type = field.type || 'text';
+            input.id = field.id;
+            input.className = 'form-control';
+            input.placeholder = field.placeholder || '';
+            input.dataset.required = field.required ? 'true' : 'false';
+            wrapper.appendChild(input);
+        }
+
+        container.appendChild(wrapper);
+    });
+}
+
+function attachFieldListeners() {
+    const container = document.getElementById('credentialsFieldsContainer');
+    container.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', checkTestButtonState);
+    });
+}
+
+function populateCredentialFields(providerType, storedCredentials) {
+    const fields = providerCredentialFields[providerType] || [];
+    fields.forEach(field => {
+        const input = document.getElementById(field.id);
+        if (input) {
+            const key = fieldIdToKey(field.id);
+            input.value = storedCredentials[key] || '';
+        }
+    });
+}
+
+function fieldIdToKey(fieldId) {
+    switch (fieldId) {
+        case 'credentialUsername':
+            return 'username';
+        case 'credentialPassword':
+            return 'password';
+        case 'credentialApiKey':
+            return 'api_key';
+        case 'credentialServiceUsername':
+            return 'service_username';
+        case 'credentialServicePassword':
+            return 'service_password';
+        default:
+            return fieldId;
+    }
+}
+
+function getCredentialFieldValues(providerType, showError = true) {
+    const fields = providerCredentialFields[providerType] || [];
+    const values = {};
+    for (const field of fields) {
+        const input = document.getElementById(field.id);
+        if (!input) continue;
+        const key = fieldIdToKey(field.id);
+        values[key] = input.value.trim();
+        if (field.required && !values[key]) {
+            return { isValid: false, error: showError ? `Заполните поле "${field.label}"` : null };
+        }
+    }
+    return { isValid: true, values };
 }
 
 // Close modals when clicking outside
