@@ -137,12 +137,6 @@
                     <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания о системных учетных данных для получения цен..."></textarea>
                 </div>
 
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="credentialActive" checked> 
-                        Активно
-                    </label>
-                </div>
 
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="saveCredentials()">
@@ -150,12 +144,6 @@
                     </button>
                     <button class="btn btn-secondary" onclick="testCredentials()" id="testCredentialsBtn" disabled>
                         <i class="fa-solid fa-vial"></i> Тестировать
-                    </button>
-                    <button class="btn btn-danger" onclick="deleteCredentials()" id="deleteCredentialsBtn" disabled>
-                        <i class="fa-solid fa-trash"></i> Удалить
-                    </button>
-                    <button class="btn btn-secondary" onclick="closeCredentialsModal()">
-                        <i class="fa-solid fa-times"></i> Отмена
                     </button>
         </div>
         
@@ -526,7 +514,6 @@ function openCredentialsModal(providerType) {
     document.getElementById('credentialUsername').value = '';
     document.getElementById('credentialPassword').value = '';
     document.getElementById('credentialDescription').value = '';
-    document.getElementById('credentialActive').checked = true;
     document.getElementById('credentialsStatus').style.display = 'none';
     
     // Update modal title
@@ -558,14 +545,12 @@ function loadCredentials(providerType) {
                     document.getElementById('credentialUsername').value = storedCredentials.username || '';
                     document.getElementById('credentialPassword').value = storedCredentials.password || '';
                     document.getElementById('credentialDescription').value = data.credentials.description || '';
-                    document.getElementById('credentialActive').checked = data.credentials.is_active !== false;
                 } catch (e) {
                     console.warn('Could not parse stored credentials:', e);
                 }
                 
-                // Enable test and delete buttons
+                // Enable test button
                 document.getElementById('testCredentialsBtn').disabled = false;
-                document.getElementById('deleteCredentialsBtn').disabled = false;
                 
                 // Show status message
                 showCredentialsStatus(`Найдены существующие учетные данные (обновлено: ${new Date(data.credentials.updated_at).toLocaleString('ru-RU')})`, 'info');
@@ -573,7 +558,6 @@ function loadCredentials(providerType) {
                 // No credentials exist
                 currentCredentials = null;
                 document.getElementById('testCredentialsBtn').disabled = true;
-                document.getElementById('deleteCredentialsBtn').disabled = true;
                 showCredentialsStatus('Учетные данные не настроены', 'info');
             }
         })
@@ -589,7 +573,6 @@ function saveCredentials() {
     const username = document.getElementById('credentialUsername').value.trim();
     const password = document.getElementById('credentialPassword').value.trim();
     const description = document.getElementById('credentialDescription').value.trim();
-    const isActive = document.getElementById('credentialActive').checked;
     
     // Validate required fields
     if (!username || !password) {
@@ -607,7 +590,7 @@ function saveCredentials() {
         credential_type: 'basic_auth',  // Standard for username/password
         credentials: credentials,
         description: description,
-        is_active: isActive
+        is_active: true  // Always active when saved
     };
     
     showCredentialsStatus('Сохранение...', 'info');
@@ -665,43 +648,6 @@ function testCredentials() {
         });
 }
 
-function deleteCredentials() {
-    if (!currentProviderType || !currentCredentials) return;
-    
-    if (!confirm('Вы уверены, что хотите удалить эти учетные данные?')) {
-        return;
-    }
-    
-    showCredentialsStatus('Удаление...', 'info');
-    
-    fetch(`/api/admin/providers/${currentProviderType}/credentials`, {
-        method: 'DELETE'
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showCredentialsStatus('Учетные данные успешно удалены', 'success');
-                currentCredentials = null;
-                
-                // Reset form
-                document.getElementById('credentialData').value = '';
-                document.getElementById('testCredentialsBtn').disabled = true;
-                document.getElementById('deleteCredentialsBtn').disabled = true;
-                
-                // Reload providers
-                setTimeout(() => {
-                    loadProviders();
-                    closeCredentialsModal();
-                }, 1500);
-            } else {
-                showCredentialsStatus('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting credentials:', error);
-            showCredentialsStatus('Ошибка при удалении учетных данных', 'error');
-        });
-}
 
 function showCredentialsStatus(message, type) {
     const statusDiv = document.getElementById('credentialsStatus');
