@@ -63,7 +63,6 @@
         <th>Заголовок</th>
         <th>Ресурс</th>
         <th>Экономия/мес</th>
-        <th>Доверие</th>
         <th>Статус</th>
         <th>Создано</th>
         <th>Действия</th>
@@ -135,7 +134,6 @@ function rowTemplate(rec){
     <td><a href="#" class="openModal">${rec.title}</a></td>
     <td>${res}</td>
     <td>${formatMoney(rec.estimated_monthly_savings)}</td>
-    <td>${Math.round((rec.confidence_score||0)*100)}%</td>
     <td>${statusBadge(rec.status)}</td>
     <td>${created}</td>
     <td style="white-space:nowrap;display:flex;gap:6px;">

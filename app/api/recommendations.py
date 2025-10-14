@@ -42,7 +42,6 @@ def _serialize(rec: OptimizationRecommendation):
         'estimated_monthly_savings': rec.estimated_monthly_savings or rec.potential_savings or 0.0,
         'estimated_one_time_savings': rec.estimated_one_time_savings or 0.0,
         'currency': rec.currency,
-        'confidence_score': rec.confidence_score,
         'first_seen_at': rec.first_seen_at.isoformat() if rec.first_seen_at else None,
         'created_at': rec.created_at.isoformat() if rec.created_at else None,
         'seen_at': rec.seen_at.isoformat() if rec.seen_at else None,
@@ -68,7 +67,7 @@ def list_recommendations():
     resource_type = request.args.get('resource_type')
     min_savings = _parse_float(request.args.get('min_savings'))
     max_savings = _parse_float(request.args.get('max_savings'))
-    min_conf = _parse_float(request.args.get('min_conf'))
+    # confidence filter removed
     q = request.args.get('q')
     date_from = request.args.get('from')
     date_to = request.args.get('to')
@@ -90,8 +89,7 @@ def list_recommendations():
         query = query.filter((OptimizationRecommendation.estimated_monthly_savings >= min_savings) | (OptimizationRecommendation.potential_savings >= min_savings))
     if max_savings is not None:
         query = query.filter((OptimizationRecommendation.estimated_monthly_savings <= max_savings) | (OptimizationRecommendation.potential_savings <= max_savings))
-    if min_conf is not None:
-        query = query.filter(OptimizationRecommendation.confidence_score >= min_conf)
+    # confidence filter removed
     if q:
         like = f"%{q}%"
         query = query.filter(or_(OptimizationRecommendation.title.ilike(like), OptimizationRecommendation.description.ilike(like), OptimizationRecommendation.resource_name.ilike(like)))
@@ -125,7 +123,6 @@ def list_recommendations():
         'potential_savings': OptimizationRecommendation.potential_savings,
         'created_at': OptimizationRecommendation.created_at,
         'severity': OptimizationRecommendation.severity,
-        'confidence_score': OptimizationRecommendation.confidence_score,
     }
     if field in sortable:
         query = query.order_by(direction(sortable[field]))
