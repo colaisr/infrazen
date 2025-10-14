@@ -18,6 +18,26 @@
 {% endblock %}
 
 {% block content %}
+<style>
+  .rec-list { display: flex; flex-direction: column; gap: 10px; }
+  .rec-card { border: 1px solid #e0e3e7; border-radius: 12px; padding: 12px 14px; background: #fff; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .rec-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .sev-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .sev-critical { background:#d93025; } .sev-high{ background:#ea4335;} .sev-medium{ background:#f9ab00;} .sev-low{ background:#34a853;} .sev-info{ background:#5f6368;}
+  .rec-title { font-weight: 600; color:#1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi { align-self: start; padding: 6px 10px; background:#eff6ff; color:#1a73e8; border:1px solid #dbeafe; border-radius: 999px; font-weight:600; }
+  .rec-context { display:flex; flex-wrap: wrap; gap:6px; }
+  .chip { padding: 2px 8px; border-radius: 999px; border:1px solid #e5e7eb; color:#374151; background:#f9fafb; font-size: 12px; }
+  .rec-body { color:#374151; line-height: 1.4; }
+  .rec-actions { display:flex; align-items:center; gap:6px; justify-content: flex-end; }
+  .rec-footer { display:flex; align-items:center; justify-content: space-between; color:#6b7280; font-size: 12px; margin-top: 6px; }
+  .link-btn { color:#1a73e8; background:none; border:none; padding:0; cursor:pointer; }
+  .btn-icon { padding: 4px 8px; border:1px solid #e5e7eb; border-radius: 8px; background:#fff; }
+  .rec-details { display:none; padding-top: 8px; border-top:1px dashed #e5e7eb; margin-top: 6px; }
+  .rec-split { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 960px) { .rec-card{ grid-template-columns: 1fr; } .rec-split{ grid-template-columns:1fr; } }
+</style>
+
 <div class="filters" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 0.75rem;">
     <input id="search" class="input" placeholder="Поиск..." />
     <select id="provider" class="input">
@@ -54,23 +74,7 @@
     </select>
 </div>
 
-<div style="overflow:auto;">
-  <table class="table" id="recsTable">
-    <thead>
-      <tr>
-        <th><input type="checkbox" id="selectAll" /></th>
-        <th>Важность</th>
-        <th>Заголовок</th>
-        <th>Ресурс</th>
-        <th>Экономия/мес</th>
-        <th>Статус</th>
-        <th>Создано</th>
-        <th>Действия</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
+<div class="rec-list" id="recsList"></div>
 
 <div id="recModal" class="modal" style="display:none;">
   <div class="modal-content">
@@ -109,10 +113,10 @@ async function fetchProviders(){
   } catch(e) {}
 }
 
-function sevBadge(sev){
-  const colors = {critical:'#d93025', high:'#ea4335', medium:'#f9ab00', low:'#34a853', info:'#5f6368'};
-  const c = colors[sev]||'#5f6368';
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${c}20;color:${c};text-transform:capitalize;">${sev||'n/a'}</span>`;
+function sevClass(sev){
+  return {
+    critical:'sev-critical', high:'sev-high', medium:'sev-medium', low:'sev-low', info:'sev-info'
+  }[sev] || 'sev-info';
 }
 
 function statusBadge(st){
@@ -125,31 +129,45 @@ function formatMoney(v){
   const n = Number(v||0); return new Intl.NumberFormat('ru-RU', {style:'currency', currency:'RUB', maximumFractionDigits:0}).format(n);
 }
 
-function rowTemplate(rec){
-  const res = `${rec.resource_name||'-'} • ${rec.resource_type||''} • ${rec.provider_code||''}`;
+function cardTemplate(rec){
   const created = rec.created_at? new Date(rec.created_at).toLocaleString('ru-RU') : '';
-  return `<tr data-id="${rec.id}">
-    <td><input type="checkbox" class="rowCheck" /></td>
-    <td>${sevBadge(rec.severity)}</td>
-    <td><a href="#" class="openModal">${rec.title}</a></td>
-    <td>${res}</td>
-    <td>${formatMoney(rec.estimated_monthly_savings)}</td>
-    <td>${statusBadge(rec.status)}</td>
-    <td>${created}</td>
-    <td style="white-space:nowrap;display:flex;gap:6px;">
-      <button class="btn btn-secondary btn-xs act" data-act="seen">👁</button>
-      <button class="btn btn-primary btn-xs act" data-act="implemented">✅</button>
-      <button class="btn btn-secondary btn-xs act" data-act="snooze">⏱</button>
-      <button class="btn btn-secondary btn-xs act" data-act="dismiss">🗑</button>
-    </td>
-  </tr>`;
+  const sev = `<span class="sev-dot ${sevClass(rec.severity)}"></span>`;
+  const ctx = [rec.provider_code, rec.resource_name, rec.resource_type].filter(Boolean);
+  const chips = ctx.map(x=>`<span class="chip">${x}</span>`).join('');
+  const id = rec.id;
+  return `<div class="rec-card" data-id="${id}">
+    <div class="rec-head">
+      ${sev}
+      <div class="rec-title" title="${rec.title}">${rec.title}</div>
+    </div>
+    <div class="kpi">Экономия/мес: ${formatMoney(rec.estimated_monthly_savings)}</div>
+
+    <div class="rec-context">${chips}</div>
+    <div class="rec-actions">
+      <input type="checkbox" class="rowCheck" />
+      <button class="btn-icon act" data-act="seen" title="Отметить просмотренной">👁</button>
+      <button class="btn-icon act" data-act="implemented" title="Отметить внедрённой">✅</button>
+      <button class="btn-icon act" data-act="snooze" title="Отложить">⏱</button>
+      <button class="btn-icon act" data-act="dismiss" title="Скрыть">🗑</button>
+    </div>
+
+    <div class="rec-body">${(rec.description||'').slice(0,220)}${(rec.description||'').length>220?'…':''}
+      <button class="link-btn more" data-id="${id}">Подробнее</button>
+    </div>
+    <div class="rec-details" id="details-${id}"></div>
+
+    <div class="rec-footer">
+      <span>${statusBadge(rec.status)}</span>
+      <span>${created}</span>
+    </div>
+  </div>`;
 }
 
 async function load(){
   const res = await fetch('/api/recommendations?'+buildQuery());
   const data = await res.json();
-  const tbody = qs('#recsTable tbody');
-  tbody.innerHTML = (data.items||[]).map(rowTemplate).join('');
+  const list = qs('#recsList');
+  list.innerHTML = (data.items||[]).map(cardTemplate).join('');
   enableBulkButtons();
 }
 
@@ -182,40 +200,35 @@ qs('#refreshBtn').addEventListener('click', ()=>load());
 qs('#selectAll').addEventListener('change', (e)=>{ qsa('.rowCheck').forEach(cb=>cb.checked=e.target.checked); enableBulkButtons(); });
 document.addEventListener('change', (e)=>{ if(e.target.classList.contains('rowCheck')) enableBulkButtons(); });
 document.addEventListener('click', (e)=>{
-  if(e.target.classList.contains('act')){ e.preventDefault(); const id = e.target.closest('tr').dataset.id; actOne(id, e.target.dataset.act); }
-  if(e.target.classList.contains('openModal')){ e.preventDefault(); const id = e.target.closest('tr').dataset.id; openModal(id); }
+  if(e.target.classList.contains('act')){ e.preventDefault(); const id = e.target.closest('.rec-card').dataset.id; actOne(id, e.target.dataset.act); }
+  if(e.target.classList.contains('more')){ e.preventDefault(); const id = e.target.dataset.id; toggleDetails(id); }
 });
 
-async function openModal(id){
+async function toggleDetails(id){
+  const box = qs(`#details-${id}`);
+  if(!box) return;
+  if(box.dataset.loaded === '1'){
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    return;
+  }
   const res = await fetch(`/api/recommendations/${id}`);
   const rec = await res.json();
-  qs('#modalTitle').textContent = rec.title;
-  const body = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  const insights = rec.insights || '';
+  const metrics = rec.metrics_snapshot || '';
+  box.innerHTML = `
+    <div class="rec-split">
       <div>
-        <div><strong>Тип:</strong> ${rec.recommendation_type}</div>
-        <div><strong>Важность:</strong> ${rec.severity}</div>
-        <div><strong>Статус:</strong> ${rec.status}</div>
-        <div><strong>Ресурс:</strong> ${rec.resource_name||''} • ${rec.resource_type||''}</div>
-        <div><strong>Экономия/мес:</strong> ${formatMoney(rec.estimated_monthly_savings)}</div>
-        <div><strong>Описание:</strong> ${rec.description||''}</div>
+        <div style="font-weight:600; margin-bottom:4px;">Пояснения</div>
+        <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${insights}</pre>
       </div>
       <div>
-        <div><strong>Пояснения:</strong></div>
-        <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${rec.insights||''}</pre>
+        <div style="font-weight:600; margin-bottom:4px;">Метрики</div>
+        <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${metrics}</pre>
       </div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:6px;">
-      <button class="btn btn-primary" onclick="actOne(${id}, 'implemented')">Отметить внедрённой</button>
-      <button class="btn btn-secondary" onclick="actOne(${id}, 'seen')">Отметить просмотренной</button>
-      <button class="btn btn-secondary" onclick="actOne(${id}, 'snooze')">Отложить</button>
-      <button class="btn btn-secondary" onclick="actOne(${id}, 'dismiss')">Скрыть</button>
     </div>`;
-  qs('#modalBody').innerHTML = body;
-  qs('#recModal').style.display = 'block';
+  box.dataset.loaded = '1';
+  box.style.display = 'block';
 }
-qs('#modalClose').addEventListener('click', ()=> qs('#recModal').style.display = 'none');
-
 // Init
 (async function(){
   await fetchProviders();
