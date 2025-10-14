@@ -2,7 +2,7 @@
 
 {% block title %}Провайдеры - InfraZen FinOps Platform{% endblock %}
 
-{% block page_title %}Управление провайдерами - Каталог облачных провайдеров для сравнения цен{% endblock %}
+{% block page_title %}{% endblock %}
 {% block page_subtitle %}{% endblock %}
 
 {% block content %}
@@ -118,19 +118,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadProviders() {
     fetch('/api/admin/providers')
-        .then(response => response.json())
+        .then(async response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            // Ensure JSON response (avoid HTML redirects parsing errors)
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error('Unexpected response (not JSON)');
+            }
+            return response.json();
+        })
         .then(data => {
-            if (data.success) {
-                providers = data.providers;
+            if (data && data.success) {
+                providers = data.providers || [];
                 renderProviders();
                 updateStatistics();
+                applyProviderFilters();
             } else {
-                showError('Ошибка загрузки провайдеров: ' + data.error);
+                // Only show error if we truly have no data to display
+                if (!providers || providers.length === 0) {
+                    showError('Ошибка загрузки провайдеров' + (data && data.error ? (': ' + data.error) : ''));
+                } else {
+                    console.warn('Provider load returned non-success but existing data present.');
+                }
             }
         })
         .catch(error => {
             console.error('Error loading providers:', error);
-            showError('Ошибка загрузки провайдеров');
+            if (!providers || providers.length === 0) {
+                showError('Ошибка загрузки провайдеров');
+            }
         });
 }
 
