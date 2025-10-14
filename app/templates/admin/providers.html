@@ -613,9 +613,8 @@ function saveCredentials() {
                 showCredentialsStatus('Учетные данные успешно сохранены!', 'success');
                 currentCredentials = data.credentials;
                 
-                // Enable test and delete buttons
+                // Enable test button
                 document.getElementById('testCredentialsBtn').disabled = false;
-                document.getElementById('deleteCredentialsBtn').disabled = false;
                 
                 // Reload providers to update UI
                 setTimeout(() => {
