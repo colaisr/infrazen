@@ -5,9 +5,6 @@ Stores system-level credentials for fetching pricing data from providers
 from datetime import datetime
 from app.core.database import db
 import json
-import base64
-from cryptography.fernet import Fernet
-import os
 
 class ProviderAdminCredentials(db.Model):
     """
@@ -21,7 +18,7 @@ class ProviderAdminCredentials(db.Model):
     
     # Credential information
     credential_type = db.Column(db.String(50), nullable=False)  # 'bearer_token', 'session_cookie', 'api_key', 'basic_auth', 'jwt'
-    credentials = db.Column(db.Text, nullable=False)  # Encrypted JSON containing credential data
+    credentials = db.Column(db.Text, nullable=False)  # JSON-encoded credentials (same as user system)
     
     # Metadata
     description = db.Column(db.Text)  # Admin notes about these credentials
@@ -39,62 +36,17 @@ class ProviderAdminCredentials(db.Model):
     def __repr__(self):
         return f'<ProviderAdminCredentials {self.provider_type} ({self.credential_type})>'
     
-    @staticmethod
-    def _get_encryption_key():
-        """Get or generate encryption key for credentials"""
-        # In production, this should be stored in environment variables
-        key = os.getenv('CREDENTIALS_ENCRYPTION_KEY')
-        if not key:
-            # Generate a proper 32-byte key for development
-            # In production, this should be pre-configured and stored securely
-            key = Fernet.generate_key()
-        return key
-    
-    def encrypt_credentials(self, credentials_dict: dict) -> str:
-        """Encrypt credentials dictionary and return encrypted string"""
+    def get_credentials(self) -> dict:
+        """Get parsed credentials (same as user system)"""
         try:
-            key = self._get_encryption_key()
-            cipher = Fernet(key)
-            
-            # Convert dict to JSON string
-            credentials_json = json.dumps(credentials_dict)
-            
-            # Encrypt
-            encrypted = cipher.encrypt(credentials_json.encode())
-            
-            # Return base64 encoded string
-            return base64.urlsafe_b64encode(encrypted).decode()
-        except Exception as e:
-            raise ValueError(f"Failed to encrypt credentials: {str(e)}")
-    
-    def decrypt_credentials(self) -> dict:
-        """Decrypt stored credentials and return as dictionary"""
-        try:
-            if not self.credentials:
-                return {}
-            
-            key = self._get_encryption_key()
-            cipher = Fernet(key)
-            
-            # Decode base64
-            encrypted = base64.urlsafe_b64decode(self.credentials.encode())
-            
-            # Decrypt
-            decrypted = cipher.decrypt(encrypted)
-            
-            # Parse JSON
-            return json.loads(decrypted.decode())
-        except Exception as e:
-            raise ValueError(f"Failed to decrypt credentials: {str(e)}")
+            return json.loads(self.credentials) if self.credentials else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
     
     def set_credentials(self, credentials_dict: dict):
-        """Set credentials by encrypting the provided dictionary"""
-        self.credentials = self.encrypt_credentials(credentials_dict)
+        """Set credentials from dictionary (same as user system)"""
+        self.credentials = json.dumps(credentials_dict)
         self.updated_at = datetime.utcnow()
-    
-    def get_credentials(self) -> dict:
-        """Get decrypted credentials as dictionary"""
-        return self.decrypt_credentials()
     
     def mark_used(self):
         """Mark credentials as recently used"""
