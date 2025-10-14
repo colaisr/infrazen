@@ -21,7 +21,7 @@
                     <option value="enabled">Включен</option>
                     <option value="disabled">Отключен</option>
                 </select>
-            </div>
+        </div>
 
             <div class="filter-group">
                 <select class="filter-select" id="api-filter" onchange="applyProviderFilters()">
@@ -29,7 +29,7 @@
                     <option value="api">Есть API цен</option>
                     <option value="no_api">Без API</option>
                 </select>
-            </div>
+    </div>
 
             <div class="filter-group">
                 <select class="filter-select" id="method-filter" onchange="applyProviderFilters()">
@@ -62,12 +62,12 @@
                     <i class="fa-solid fa-arrows-rotate"></i> Синхронизировать все
             </button>
         </div>
-    </div>
+            </div>
 
         <div class="view-controls">
             <div class="results-info" id="providers-results-info"></div>
             </div>
-            </div>
+        </div>
 
     <!-- Modern Table (matches master/components) -->
     <div class="modern-table">
@@ -87,7 +87,7 @@
                     <!-- Providers will be loaded here -->
                 </tbody>
             </table>
-        </div>
+            </div>
             </div>
 
 <!-- Pricing Modal -->
@@ -96,17 +96,17 @@
         <div class="modal-header">
             <h2 id="pricingModalTitle">Цены провайдера</h2>
             <span class="close" onclick="closePricingModal()">&times;</span>
-            </div>
+        </div>
         <div class="modal-body">
             <div id="pricingContent">
                 <div class="loading-spinner">
                     <i class="fa-solid fa-spinner fa-spin"></i>
                     Загрузка цен...
+            </div>
+            </div>
+            </div>
         </div>
-            </div>
-            </div>
-        </div>
-            </div>
+    </div>
 
 <!-- Credentials Modal -->
 <div id="credentialsModal" class="modal" style="display: none;">
@@ -114,7 +114,7 @@
         <div class="modal-header">
             <h2 id="credentialsModalTitle">Учетные данные для получения цен</h2>
             <span class="close" onclick="closeCredentialsModal()">&times;</span>
-            </div>
+                </div>
         <div class="modal-body">
             <div id="credentialsForm">
                 <div class="form-group">
@@ -129,13 +129,13 @@
                         <button type="button" class="password-toggle" onclick="togglePasswordVisibility()">
                             <i class="fa-solid fa-eye" id="passwordToggleIcon"></i>
                         </button>
-                    </div>
-                </div>
-
+            </div>
+        </div>
+        
                 <div class="form-group">
                     <label for="credentialDescription">Описание (необязательно)</label>
                     <textarea id="credentialDescription" class="form-control" rows="2" placeholder="Примечания о системных учетных данных для получения цен..."></textarea>
-                </div>
+        </div>
 
 
                 <div class="form-actions">
@@ -494,7 +494,6 @@ let currentProviderType = null;
 let currentCredentials = null;
 
 function openCredentialsModal(providerType) {
-    console.log('Opening credentials modal for:', providerType);
     currentProviderType = providerType;
     
     // Reset form
@@ -511,7 +510,6 @@ function openCredentialsModal(providerType) {
     
     // Show modal
     document.getElementById('credentialsModal').style.display = 'block';
-    console.log('Modal should be visible now');
     
     // Add event listeners to enable test button when form has data
     document.getElementById('credentialUsername').addEventListener('input', checkTestButtonState);
@@ -528,14 +526,12 @@ function loadCredentials(providerType) {
     fetch(`/api/admin/providers/${providerType}/credentials`)
         .then(response => response.json())
         .then(data => {
-            console.log('Credentials API response:', data);
             if (data.success && data.credentials) {
                 currentCredentials = data.credentials;
                 
                 // Populate form from stored credentials
                 try {
                     const storedCredentials = data.credentials.credentials || {};
-                    console.log('Stored credentials:', storedCredentials);
                     document.getElementById('credentialUsername').value = storedCredentials.username || '';
                     document.getElementById('credentialPassword').value = storedCredentials.password || '';
                     document.getElementById('credentialDescription').value = data.credentials.description || '';
