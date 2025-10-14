@@ -19,9 +19,10 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
 - Credential-backed sync from admin provider card (uses stored admin creds)
 - Provider prices table now populated only with latest snapshot on each run
 
-### **Step 4: Then Selectel**
-- Get pricelist for Selectel
-- Extract pricing from existing billing data + official price lists
+### **Step 4: Then Selectel** ✅ COMPLETED (VPC baseline)
+- Implemented automated pricing sync using VPC billing matrix
+- Added grid synthesis (CPU/RAM/Storage/Region) to form VM-like offers
+- Stores both grid VM offers and raw unit prices (cores/ram/volumes/network, etc.)
 
 ### **Step 5: UI for Smart Matching**
 - Implement UI for smart matching to compare resources
@@ -34,15 +35,18 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
 
 ## **Current Status**
 - ✅ **Step 1 COMPLETED** – Pricing tables & SQLAlchemy models in place
-- ✅ **Step 3 Phase 1 COMPLETED** – Beget pricing sync automated (API configurator)
-- ✅ **Step 6 COMPLETED** – Provider catalog system working
-- 🔄 **Next:** Extend Beget coverage to additional service groups (high_cpu, storage, etc.) and move on to Selectel implementation (Step 4)
+- ✅ **Step 3 Phase 1 COMPLETED** – Beget VPS pricing sync automated (configurator API)
+- ✅ **Step 4 COMPLETED (baseline)** – Selectel VPC pricing integrated: grid VM offers + unit prices
+- ✅ **Step 6 COMPLETED** – Provider catalog + admin UI (sync + pricing modal + admin credentials)
+- 🔄 **Next:** Enrich Selectel with flavor-aligned SKUs and DBaaS/MKS catalogs; expand Beget beyond VPS if needed
 
 **Latest Progress (Oct 14, 2025):**
-- Added `BegetPricingClient` to gather VPS pricing matrix via configurator API with admin auth fallback
-- `PriceUpdateService` now loads admin credentials and replaces previous price snapshots before saving new data
-- `PricingService.bulk_save_price_data` deletes existing provider rows before inserting fresh records; converts Decimal values safely for change history
-- Admin sync now populates ~650 Beget VPS combinations and clears manual fallback data automatically
+- Beget: `BegetPricingClient` collecting VPS prices via configurator; synced grid of CPU/RAM/Disk/Region; old snapshots removed before insert
+- Selectel: VPC billing matrix ingested; grid synthesis generates ~3,200 VM configs with specs; raw unit prices (~800) also stored (volumes/network/images/licenses/etc.)
+- Provider price source tagging: `selectel_vpc_grid`, `selectel_vpc_api`, `api_configurator` (Beget)
+- Resource type mapping added (server, volume, snapshot, network, load_balancer, image, license, ai_service, unknown)
+- Admin pricing modal: resource-type filter; displays CPU/RAM/Storage when available
+- Sync flow: always deletes old provider prices before saving fresh data; price history entries recorded on change
 
 ## **Key Architecture Decisions**
 
@@ -72,8 +76,8 @@ Create intelligent cross-provider price comparison capabilities to identify 20-4
   - <50: Poor match (hide by default)
 
 ### **Price Collection Methods**
-- **Beget**: Manual mapping → Web scraping → HAR file analysis
-- **Selectel**: Extract from billing data (100% accurate) + Official price lists
+- **Beget**: HAR file analysis → VPS configurator API (info + calculation) → grid sampling
+- **Selectel**: VPC billing matrix (public API, auth via API key) → grid synthesis; raw unit-price rows retained for non-VM resources; flavor API planned (requires IAM)
 - **Future Providers**: Official APIs + Web scraping + Manual validation
 
 ## **Database Schema**
@@ -133,7 +137,9 @@ CREATE TABLE price_history (
 ```
 
 ## **Next Action**
-Create `ProviderPrice` and `PriceHistory` database models to start storing pricing data for Beget and Selectel comparison.
+- Selectel: add flavor-aligned SKUs (OpenStack IAM token flow); add DBaaS/MKS endpoints; refine unknown resource mappings
+- Beget: consider additional configuration groups (e.g., high_cpu) if applicable
+- UI: add quick filters for source and region; add comparisons view against user resources
 
 ## **Implementation Notes**
 - Start with Beget due to simpler offerings
