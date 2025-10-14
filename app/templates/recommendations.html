@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+
+{% block title %}Рекомендации - InfraZen{% endblock %}
+
+{% block page_title %}Рекомендации{% endblock %}
+{% block page_subtitle %}Оптимизация расходов и рекомендации{% endblock %}
+
+{% block header_actions %}
+<div style="display: flex; gap: 1rem; align-items: center;">
+    <button id="refreshBtn" class="btn btn-secondary" style="padding: 0.5rem 1rem;">🔄 Обновить</button>
+    <div style="display:flex; gap:0.5rem;">
+        <button id="bulkImplement" class="btn btn-primary" disabled>Отметить внедрёнными</button>
+        <button id="bulkDismiss" class="btn btn-secondary" disabled>Скрыть</button>
+    </div>
+    <button id="exportCsv" class="btn btn-secondary">Экспорт CSV</button>
+    <a href="/connections" class="btn btn-link">К подключениями</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+<div class="filters" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 0.75rem;">
+    <input id="search" class="input" placeholder="Поиск..." />
+    <select id="provider" class="input">
+        <option value="">Провайдер</option>
+    </select>
+    <select id="status" class="input">
+        <option value="">Статус</option>
+        <option value="pending">Новые</option>
+        <option value="seen">Просмотрены</option>
+        <option value="snoozed">Отложены</option>
+        <option value="implemented">Внедрены</option>
+        <option value="dismissed">Скрыты</option>
+    </select>
+    <select id="severity" class="input">
+        <option value="">Важность</option>
+        <option value="critical">Критическая</option>
+        <option value="high">Высокая</option>
+        <option value="medium">Средняя</option>
+        <option value="low">Низкая</option>
+        <option value="info">Инфо</option>
+    </select>
+    <select id="type" class="input">
+        <option value="">Тип</option>
+        <option value="rightsizing">Изменить размер</option>
+        <option value="shutdown">Остановить</option>
+        <option value="migrate">Миграция</option>
+        <option value="cleanup">Очистить</option>
+    </select>
+    <select id="resource_type" class="input">
+        <option value="">Тип ресурса</option>
+        <option value="VM">VM</option>
+        <option value="volume">Том</option>
+        <option value="bucket">Хранилище</option>
+    </select>
+</div>
+
+<div style="overflow:auto;">
+  <table class="table" id="recsTable">
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="selectAll" /></th>
+        <th>Важность</th>
+        <th>Заголовок</th>
+        <th>Ресурс</th>
+        <th>Экономия/мес</th>
+        <th>Доверие</th>
+        <th>Статус</th>
+        <th>Создано</th>
+        <th>Действия</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div id="recModal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <div style="display:flex; justify-content: space-between; align-items:center;">
+      <h3 id="modalTitle">Рекомендация</h3>
+      <button id="modalClose" class="btn btn-secondary">Закрыть</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+  <div class="modal-backdrop"></div>
+  </div>
+
+<script>
+const qs = (s, el=document) => el.querySelector(s);
+const qsa = (s, el=document) => Array.from(el.querySelectorAll(s));
+const state = { page: 1, page_size: 25, order_by: '-estimated_monthly_savings' };
+
+function buildQuery(){
+  const params = new URLSearchParams();
+  ['q','provider','status','severity','type','resource_type'].forEach(k=>{
+    const v = qs('#'+k)?.value?.trim(); if(v) params.set(k, v);
+  });
+  params.set('page', state.page); params.set('page_size', state.page_size); params.set('order_by', state.order_by);
+  history.replaceState(null, '', '?'+params.toString());
+  return params.toString();
+}
+
+async function fetchProviders(){
+  try {
+    const res = await fetch('/api/providers');
+    const data = await res.json();
+    const sel = qs('#provider');
+    (data.providers || []).forEach(p=>{
+      const o = document.createElement('option'); o.value = p.id; o.textContent = p.provider_type || p.code || p.name; sel.appendChild(o);
+    });
+  } catch(e) {}
+}
+
+function sevBadge(sev){
+  const colors = {critical:'#d93025', high:'#ea4335', medium:'#f9ab00', low:'#34a853', info:'#5f6368'};
+  const c = colors[sev]||'#5f6368';
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${c}20;color:${c};text-transform:capitalize;">${sev||'n/a'}</span>`;
+}
+
+function statusBadge(st){
+  const colors = {pending:'#1a73e8', seen:'#5f6368', snoozed:'#a142f4', implemented:'#34a853', dismissed:'#9aa0a6'};
+  const c = colors[st]||'#5f6368';
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${c}20;color:${c};text-transform:capitalize;">${st}</span>`;
+}
+
+function formatMoney(v){
+  const n = Number(v||0); return new Intl.NumberFormat('ru-RU', {style:'currency', currency:'RUB', maximumFractionDigits:0}).format(n);
+}
+
+function rowTemplate(rec){
+  const res = `${rec.resource_name||'-'} • ${rec.resource_type||''} • ${rec.provider_code||''}`;
+  const created = rec.created_at? new Date(rec.created_at).toLocaleString('ru-RU') : '';
+  return `<tr data-id="${rec.id}">
+    <td><input type="checkbox" class="rowCheck" /></td>
+    <td>${sevBadge(rec.severity)}</td>
+    <td><a href="#" class="openModal">${rec.title}</a></td>
+    <td>${res}</td>
+    <td>${formatMoney(rec.estimated_monthly_savings)}</td>
+    <td>${Math.round((rec.confidence_score||0)*100)}%</td>
+    <td>${statusBadge(rec.status)}</td>
+    <td>${created}</td>
+    <td style="white-space:nowrap;display:flex;gap:6px;">
+      <button class="btn btn-secondary btn-xs act" data-act="seen">👁</button>
+      <button class="btn btn-primary btn-xs act" data-act="implemented">✅</button>
+      <button class="btn btn-secondary btn-xs act" data-act="snooze">⏱</button>
+      <button class="btn btn-secondary btn-xs act" data-act="dismiss">🗑</button>
+    </td>
+  </tr>`;
+}
+
+async function load(){
+  const res = await fetch('/api/recommendations?'+buildQuery());
+  const data = await res.json();
+  const tbody = qs('#recsTable tbody');
+  tbody.innerHTML = (data.items||[]).map(rowTemplate).join('');
+  enableBulkButtons();
+}
+
+async function actOne(id, action, extra={}){
+  const res = await fetch(`/api/recommendations/${id}/action`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action, ...extra})});
+  if(res.ok) await load();
+}
+
+function selectedIds(){
+  return qsa('.rowCheck:checked').map(cb=>cb.closest('tr').dataset.id);
+}
+
+async function actBulk(action){
+  const ids = selectedIds(); if(!ids.length) return;
+  const res = await fetch('/api/recommendations/bulk', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ids, action})});
+  if(res.ok) await load();
+}
+
+function enableBulkButtons(){
+  const has = selectedIds().length>0;
+  qs('#bulkImplement').disabled = !has;
+  qs('#bulkDismiss').disabled = !has;
+}
+
+// Events
+['#search','#provider','#status','#severity','#type','#resource_type'].forEach(sel=>{
+  qs(sel).addEventListener('change', ()=>{state.page=1; load();});
+});
+qs('#refreshBtn').addEventListener('click', ()=>load());
+qs('#selectAll').addEventListener('change', (e)=>{ qsa('.rowCheck').forEach(cb=>cb.checked=e.target.checked); enableBulkButtons(); });
+document.addEventListener('change', (e)=>{ if(e.target.classList.contains('rowCheck')) enableBulkButtons(); });
+document.addEventListener('click', (e)=>{
+  if(e.target.classList.contains('act')){ e.preventDefault(); const id = e.target.closest('tr').dataset.id; actOne(id, e.target.dataset.act); }
+  if(e.target.classList.contains('openModal')){ e.preventDefault(); const id = e.target.closest('tr').dataset.id; openModal(id); }
+});
+
+async function openModal(id){
+  const res = await fetch(`/api/recommendations/${id}`);
+  const rec = await res.json();
+  qs('#modalTitle').textContent = rec.title;
+  const body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <div><strong>Тип:</strong> ${rec.recommendation_type}</div>
+        <div><strong>Важность:</strong> ${rec.severity}</div>
+        <div><strong>Статус:</strong> ${rec.status}</div>
+        <div><strong>Ресурс:</strong> ${rec.resource_name||''} • ${rec.resource_type||''}</div>
+        <div><strong>Экономия/мес:</strong> ${formatMoney(rec.estimated_monthly_savings)}</div>
+        <div><strong>Описание:</strong> ${rec.description||''}</div>
+      </div>
+      <div>
+        <div><strong>Пояснения:</strong></div>
+        <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${rec.insights||''}</pre>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:6px;">
+      <button class="btn btn-primary" onclick="actOne(${id}, 'implemented')">Отметить внедрённой</button>
+      <button class="btn btn-secondary" onclick="actOne(${id}, 'seen')">Отметить просмотренной</button>
+      <button class="btn btn-secondary" onclick="actOne(${id}, 'snooze')">Отложить</button>
+      <button class="btn btn-secondary" onclick="actOne(${id}, 'dismiss')">Скрыть</button>
+    </div>`;
+  qs('#modalBody').innerHTML = body;
+  qs('#recModal').style.display = 'block';
+}
+qs('#modalClose').addEventListener('click', ()=> qs('#recModal').style.display = 'none');
+
+// Init
+(async function(){
+  await fetchProviders();
+  const urlp = new URLSearchParams(location.search);
+  ['q','provider','status','severity','type','resource_type'].forEach(k=>{ if(urlp.get(k)) qs('#'+k).value = urlp.get(k);});
+  await load();
+})();
+</script>
+{% endblock %}
+
+

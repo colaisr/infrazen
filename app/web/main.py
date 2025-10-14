@@ -281,20 +281,13 @@ def recommendations():
     
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
-    
-    if is_demo_user:
-        # Demo user: show mock data
-        overview = get_overview()
-    else:
-        # Real user: show real database data
-        overview = get_real_user_overview(user['id'])
-    
-    return render_template('page.html', 
+
+    # Render real recommendations page; data will be fetched via API from client-side JS
+    return render_template('recommendations.html', 
                         user=user,
                         active_page='recommendations',
                         page_title='Рекомендации',
                         page_subtitle='Оптимизация расходов и рекомендации',
-                        overview=overview,
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/business_context')
