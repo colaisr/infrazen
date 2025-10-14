@@ -6,12 +6,155 @@ import logging
 from typing import Dict, List, Any
 from datetime import datetime
 
+import requests
+import requests
+
 from ..plugin_system import ProviderPlugin, SyncResult
 from ..selectel.client import SelectelClient
 from ..resource_registry import resource_registry, ProviderResource
 
 logger = logging.getLogger(__name__)
 
+
+class SelectelPricingClient:
+    """Collect Selectel VPC pricing via public billing API."""
+
+    BASE_URL = "https://api.selectel.ru/v2/billing"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def get_vpc_prices(self) -> List[Dict[str, Any]]:
+        response = requests.get(
+            f"{self.BASE_URL}/vpc/prices",
+            headers={
+                "X-Token": self.api_key,
+                "Accept": "application/json, text/plain, */*",
+                "User-Agent": "InfraZenPricing/1.0",
+            },
+            params={"currency": "rub"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        prices = []
+        for item in data.get("prices", []):
+            prices.append(
+                {
+                    "provider": "selectel",
+                    "resource_type": "server" if item.get("resource", "").startswith("compute") else "unknown",
+                    "provider_sku": f"{item.get('resource')}:{item.get('group')}",
+                    "region": item.get("group"),
+                    "cpu_cores": None,
+                    "ram_gb": None,
+                    "storage_gb": None,
+                    "storage_type": None,
+                    "extended_specs": {
+                        "resource": item.get("resource"),
+                        "unit": item.get("unit"),
+                    },
+                    "hourly_cost": None,
+                    "monthly_cost": item.get("value"),
+                    "currency": data.get("currency", "rub").upper(),
+                    "source": "selectel_vpc_api",
+                    "notes": "Selectel VPC billing price entry",
+                }
+            )
+        return prices
+
+
+class SelectelGridPricingClient:
+    """Build grid pricing (CPU/RAM/Disk) from Selectel VPC billing matrix."""
+
+    BASE_URL = "https://api.selectel.ru/v2/billing"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def _fetch_price_map(self) -> Dict[str, Dict[str, Any]]:
+        response = requests.get(
+            f"{self.BASE_URL}/vpc/prices",
+            headers={
+                "X-Token": self.api_key,
+                "Accept": "application/json, text/plain, */*",
+                "User-Agent": "InfraZenPricing/1.0",
+            },
+            params={"currency": "rub"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        prices = response.json().get("prices", [])
+        price_map: Dict[str, Dict[str, Any]] = {}
+        for p in prices:
+            price_map[f"{p.get('resource')}:{p.get('group')}"] = p
+        return price_map
+
+    @staticmethod
+    def _regions_from_price_map(price_map: Dict[str, Dict[str, Any]]) -> List[str]:
+        regions = set()
+        for key in price_map.keys():
+            if key.startswith("compute_cores:"):
+                regions.add(key.split(":", 1)[1])
+        return sorted(regions)
+
+    @staticmethod
+    def _get_price(price_map: Dict[str, Dict[str, Any]], resource: str, region: str, multiplier: float = 1.0) -> float:
+        entry = price_map.get(f"{resource}:{region}")
+        if not entry:
+            return 0.0
+        return float(entry.get("value", 0.0)) * float(multiplier)
+
+    def get_grid_prices(self) -> List[Dict[str, Any]]:
+        if not self.api_key:
+            return []
+
+        price_map = self._fetch_price_map()
+        regions = self._regions_from_price_map(price_map)
+
+        # Balanced sampling grid
+        vcpus_list = [1, 2, 4, 8, 16, 32]
+        ram_gb_list = [1, 2, 4, 8, 16, 32, 64]
+        disk_gb_list = [10, 50, 100, 200]
+
+        records: List[Dict[str, Any]] = []
+        for region in regions:
+            for vcpus in vcpus_list:
+                for ram_gb in ram_gb_list:
+                    for disk_gb in disk_gb_list:
+                        cpu_cost = self._get_price(price_map, "compute_cores", region, vcpus)
+                        ram_cost = self._get_price(price_map, "compute_ram", region, ram_gb * 1024)
+                        storage_cost = self._get_price(price_map, "volume_gigabytes_universal", region, disk_gb)
+                        total_monthly = cpu_cost + ram_cost + storage_cost
+
+                        provider_sku = f"v{vcpus}-r{ram_gb}-d{disk_gb}:{region}"
+
+                        records.append(
+                            {
+                                "provider": "selectel",
+                                "resource_type": "server",
+                                "provider_sku": provider_sku,
+                                "region": region,
+                                "cpu_cores": vcpus,
+                                "ram_gb": float(ram_gb),
+                                "storage_gb": float(disk_gb),
+                                "storage_type": "universal",
+                                "extended_specs": {
+                                    "pricing_method": "grid_from_matrix",
+                                    "components": {
+                                        "cpu_monthly": round(cpu_cost, 2),
+                                        "ram_monthly": round(ram_cost, 2),
+                                        "storage_monthly": round(storage_cost, 2),
+                                    },
+                                },
+                                "hourly_cost": None,
+                                "monthly_cost": round(total_monthly, 2),
+                                "currency": "RUB",
+                                "source": "selectel_vpc_grid",
+                                "notes": "Generated from VPC billing matrix",
+                            }
+                        )
+
+        return records
 
 class SelectelProviderPlugin(ProviderPlugin):
     """Selectel provider plugin implementation"""
@@ -27,6 +170,8 @@ class SelectelProviderPlugin(ProviderPlugin):
 
         # Initialize Selectel client
         self.client = SelectelClient(credentials_with_account)
+        self.pricing_client = SelectelPricingClient(credentials.get('api_key', ''))
+        self.grid_pricing_client = SelectelGridPricingClient(credentials.get('api_key', ''))
 
     def get_provider_type(self) -> str:
         return "selectel"
@@ -124,6 +269,24 @@ class SelectelProviderPlugin(ProviderPlugin):
                 'message': f'Connection test failed: {str(e)}',
                 'timestamp': datetime.now().isoformat()
             }
+
+    def get_pricing_data(self) -> List[Dict[str, Any]]:
+        try:
+            if not self.pricing_client.api_key:
+                self.logger.warning("No API key provided for Selectel pricing fetch")
+                return []
+
+            # Prefer grid pricing with normalized CPU/RAM/Disk fields
+            grid = self.grid_pricing_client.get_grid_prices()
+            if grid:
+                self.logger.info("Collected %d Selectel grid pricing records", len(grid))
+                return grid
+
+            # Fallback to raw price matrix rows if grid failed
+            return self.pricing_client.get_vpc_prices()
+        except Exception as exc:
+            self.logger.error("Failed to collect Selectel pricing: %s", exc, exc_info=True)
+            return []
 
     def sync_resources(self) -> SyncResult:
         """Perform billing-first sync for Selectel"""

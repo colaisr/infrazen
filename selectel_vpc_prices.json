@@ -1,0 +1,5108 @@
+[
+  {
+    "resource": "compute_cores",
+    "group": "ru-1a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-1b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-1c",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-2a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-2b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-2c",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-3a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-3b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-7a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-8a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-9a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "uz-1a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-2c",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-1b",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-2c",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-3b",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-7a",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-9a",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-1b",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-2c",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-3b",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-7a",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-9a",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-1b",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-2c",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-3b",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-7a",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-9a",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-1a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-1b",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-1c",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-2a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-2b",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-2c",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-3a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-3b",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-7a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-8a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-9a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "uz-1a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-2c",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-1a",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-1b",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-1c",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-2b",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-3a",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-7a",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "ru-2c",
+    "value": 3840,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "ru-7a",
+    "value": 3840,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "ru-9a",
+    "value": 3840,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-1a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-1b",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-1c",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-2a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-2b",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-2c",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-3a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-3b",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-7a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-8a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-9a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "uz-1a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-1a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-1b",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-1c",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-2a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-2b",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-2c",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-3a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-3b",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-7a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-8a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-9a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "uz-1a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-1a",
+    "value": 5.1,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-1b",
+    "value": 5.1,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-1c",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-2a",
+    "value": 5.1,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-2b",
+    "value": 5.1,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-2c",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-3a",
+    "value": 5.1,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-3b",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-7a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-8a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-9a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "uz-1a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-1a",
+    "value": 2.576184,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-1b",
+    "value": 2.576184,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-1c",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-2a",
+    "value": 2.576184,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-2b",
+    "value": 2.576184,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-2c",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-3a",
+    "value": 2.576184,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-3b",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-7a",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-8a",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-9a",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "uz-1a",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-1",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-2",
+    "value": 1.632,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-3",
+    "value": 1.632,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-7",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-8",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-9",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "uz-1",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "uz-1a",
+    "value": 0.501832,
+    "unit": "GB"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-1",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-2",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-3",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-7",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-8",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-9",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "uz-1",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "uz-1",
+    "value": 107.2,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-1",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-2",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-3",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-7",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-8",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-9",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "uz-1",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-1",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-2",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-3",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-7",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-8",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-9",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "uz-1",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-1",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-2",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-3",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-7",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-8",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-9",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "uz-1",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-8a",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2000",
+    "group": "ru-7a",
+    "value": 1700,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2",
+    "group": "ru-7a",
+    "value": 2850,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000",
+    "group": "ru-7a",
+    "value": 6850,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-3",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-8",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-7",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-8",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-9",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-7",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-9",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-3",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "uz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-3",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "uz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-7",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "ru-9",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "uz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "ru-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "ru-8",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-8a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-9a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-2b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-2c",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-7a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-3b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-7a",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_t4_preemptible",
+    "group": "ru-7a",
+    "value": 1152,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2_preemptible",
+    "group": "ru-7a",
+    "value": 855,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20_preemptible",
+    "group": "ru-7a",
+    "value": 8.96,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10_preemptible",
+    "group": "ru-7a",
+    "value": 4.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-8a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-8a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-7a",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_preemptible",
+    "group": "ru-7a",
+    "value": 7883.04,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2000_preemptible",
+    "group": "ru-7a",
+    "value": 510,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000_preemptible",
+    "group": "ru-7a",
+    "value": 2055,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50_preemptible",
+    "group": "ru-7a",
+    "value": 13.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-7a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-7a",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_a30_preemptible",
+    "group": "ru-7a",
+    "value": 2763,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-9a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-9a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "gis-1",
+    "value": 1.39552,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "gis-1",
+    "value": 239.008,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "gis-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "gis-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "gis-1",
+    "value": 34.272,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "gis-1a",
+    "value": 0.044625,
+    "unit": "MB"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "gis-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "gis-1",
+    "value": 445.76,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "gis-1a",
+    "value": 2.14368,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-3b",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "uz-1",
+    "value": 0.06,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "gis-1a",
+    "value": 143.616,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "gis-1a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "uz-1a",
+    "value": 2.410958904,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "uz-1a",
+    "value": 4.821917808,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "uz-1a",
+    "value": 0.2191780822,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "gis-1",
+    "value": 741.664,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "gis-1a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "gis-1a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "kz-1a",
+    "value": 90.74,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "kz-1",
+    "value": 24.329,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "kz-1a",
+    "value": 0.986,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "kz-1a",
+    "value": 2.959,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "kz-1",
+    "value": 0.19531,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "kz-1a",
+    "value": 0.03965,
+    "unit": "MB"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "kz-1",
+    "value": 444.164,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "kz-1",
+    "value": 105.83,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "kz-1a",
+    "value": 4.438,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "kz-1a",
+    "value": 2.301,
+    "unit": "GB"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "kz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "kz-1",
+    "value": 1.973,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "kz-1",
+    "value": 888.329,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "kz-1",
+    "value": 222.082,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "kz-1a",
+    "value": 1.973,
+    "unit": "GB"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "kz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "kz-1",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ke-1",
+    "value": 0.09766,
+    "unit": "MB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ke-1",
+    "value": 2.466,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ke-1",
+    "value": 537.863,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ke-1",
+    "value": 1075.726,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ke-1",
+    "value": 268.932,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ke-1",
+    "value": 20.274,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ke-1",
+    "value": 87.534,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ke-1a",
+    "value": 109.315,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ke-1a",
+    "value": 0.04912,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ke-1a",
+    "value": 1.233,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ke-1a",
+    "value": 2.466,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ke-1a",
+    "value": 5.425,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ke-1a",
+    "value": 3.123,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ke-1a",
+    "value": 3.616,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_nvlink_preemptible",
+    "group": "ru-7a",
+    "value": 7883.04,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-1c",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-3a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-3a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-3b",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-1b",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-1c",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2b",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2c",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2c",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2c",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-7a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-8a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2b",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2b",
+    "value": 5.1,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-3a",
+    "value": 5.1,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-7a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2c",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-3b",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-8a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "kz-1a",
+    "value": 1.973,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-1a",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-1b",
+    "value": 5.1,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-1c",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-1a",
+    "value": 7.65,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-1a",
+    "value": 5.1,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-1b",
+    "value": 1.275,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-7a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "uz-1a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ke-1a",
+    "value": 2.466,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2a",
+    "value": 5.1,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-3b",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-9a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "gis-1a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-3b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-7a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-9a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-9a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "uz-1a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "uz-1a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ke-1a",
+    "value": 3.616,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-8a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-8a",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-9a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "gis-1a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "gis-1a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "kz-1a",
+    "value": 4.438,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ke-1a",
+    "value": 5.425,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "kz-1a",
+    "value": 2.959,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-3a-83671",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-3-52833",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-9a-76241",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2c-83671",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-3-52833",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2c-236061",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-7a-143084",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-9a-76241",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-9a-76241",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-9a-170930",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-9a-170930",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2-73401",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2-73401",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2-73401",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-7a-243996",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-7a-243996",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-3a-83671",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-3-52833",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-9a-52130",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-9a-52130",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2c-236061",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-9a-76241",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2c-83671",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2c-83671",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-3a-83671",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-2b-83671",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-2b-83671",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2b-83671",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2b-83671",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-7a-164186",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2-73401",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-3a-83671",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-9a-52130",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2c-236061",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-7a-143084",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-3-52833",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-9a-52130",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-7a-164186",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-7a-164186",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-2c-83671",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-7a-164186",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-2c-236061",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-7a-143084",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-7a-143084",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-9a-170930",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-9a-170930",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-7a-243996",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-7a-243996",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "uz-2",
+    "value": 0.06,
+    "unit": "MB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "uz-2",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "license_windows_2012_standard",
+    "group": "uz-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2016_standard",
+    "group": "uz-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "license_windows_2019_standard",
+    "group": "uz-2",
+    "value": 0,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "uz-2",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "uz-2",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "uz-2",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "uz-2",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "uz-2",
+    "value": 107.2,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "uz-2a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "uz-2a",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "uz-2a",
+    "value": 0.2191780822,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "uz-2a",
+    "value": 4.821917808,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "uz-2a",
+    "value": 2.410958904,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "uz-2a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "uz-2a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "uz-2a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "uz-2a",
+    "value": 0.501832,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "uz-2a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "uz-2a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "uz-2a",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "uz-2a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "uz-2",
+    "value": 278.72,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "uz-1",
+    "value": 278.72,
+    "unit": "item"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ke-1a",
+    "value": 3.432,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "kz-1a",
+    "value": 0.434,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "kz-1a",
+    "value": 2.808,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "kz-1a",
+    "value": 3.988,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080",
+    "group": "ru-9a",
+    "value": 1448.096,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_nvlink",
+    "group": "ru-7a",
+    "value": 19708,
+    "unit": "item"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ke-1a",
+    "value": 0.542,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ke-1a",
+    "value": 4.874,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-9a",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx2080ti",
+    "group": "ru-7b",
+    "value": 1720,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx2080ti_preemptible",
+    "group": "ru-7b",
+    "value": 516,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-7b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ru-7b",
+    "value": 17.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10_preemptible",
+    "group": "ru-7b",
+    "value": 4.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ru-7b",
+    "value": 35.84,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20_preemptible",
+    "group": "ru-7b",
+    "value": 8.96,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ru-7b",
+    "value": 53.92,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50_preemptible",
+    "group": "ru-7b",
+    "value": 13.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-7b",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000",
+    "group": "ru-7b",
+    "value": 6850,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000_preemptible",
+    "group": "ru-7b",
+    "value": 2055,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-7b",
+    "value": 0.031875,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-7b",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-7b",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-7b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-7b",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-7b",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-7b",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-7b",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-7b",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-7b",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-7b",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-7b",
+    "value": 1.232032854209,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "ke-1a",
+    "value": 22,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "ke-1a",
+    "value": 44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "ke-1a",
+    "value": 66,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2c-236061",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-9a-170930",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-9a-52130",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-9a-76241",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7a-143084",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7a-164186",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7a-243996",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7a-307331",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "private_zone_ru_9a_52130",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "private_zone_ru_9a_76241",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2-73401",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2b-83671",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2c-83671",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-3-52833",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-3a-83671",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-9a-170930",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-9a-52130",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-9a-76241",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7a-143084",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7a-164186",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7a-243996",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7a-307331",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "private_zone_ru_9a_52130",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "private_zone_ru_9a_76241",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2-73401",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2b-83671",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2c-83671",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-3-52833",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-3a-83671",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx4090",
+    "group": "ru-7b",
+    "value": 6720,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-1",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-1a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-8a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "gis-1a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx4090_preemptible",
+    "group": "ru-7b",
+    "value": 2016.21,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-1a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-2a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "gis-1a",
+    "value": 143.62,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated_preemptible",
+    "group": "ru-7a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated_preemptible",
+    "group": "ru-7b",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-1b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2c",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-3b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-7b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-3a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-3",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-7",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-1c",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-2b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-8a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-9a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-1c",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "uz-1a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ke-1a",
+    "value": 109.32,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "kz-1",
+    "value": 1375.55,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ke-1",
+    "value": 1679.3,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-9a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-9a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-2",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-9",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-1a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-3a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "gis-1a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-1b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-1c",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-2b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-2c",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-3b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-8",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "uz-1",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-1b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-2c",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-3a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-3b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-7a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-7a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "uz-2",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-7b",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "ru-8a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "kz-1a",
+    "value": 90.74,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "uz-1a",
+    "value": 18,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10",
+    "group": "kz-1a",
+    "value": 18,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "kz-1a",
+    "value": 54,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50",
+    "group": "uz-1a",
+    "value": 54,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "kz-1a",
+    "value": 36,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20",
+    "group": "uz-1a",
+    "value": 36,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100",
+    "group": "ru-7a",
+    "value": 18394,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a30",
+    "group": "ru-7a",
+    "value": 5137,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100",
+    "group": "ru-9a",
+    "value": 18394,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-3b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-3b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-7b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-7b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "gis-1a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-1c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-1b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-1a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-9c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-9a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-2c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-9b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-7a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-3a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-8a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-7b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-2b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-3b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-2a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-7a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-1c",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-2b",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-9c",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-2c",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-9a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-1b",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "gis-1a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "kz-1a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-2a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-1b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ke-1a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-7b",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-8a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-3b",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-3a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-1a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-1a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "uz-1a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-9b",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "uz-2a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-9b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-7a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-8a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-1c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-9a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-2b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-2a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-7b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-3b",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-9c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "gis-1a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-2c",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-3a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_gpu_a100_80",
+    "group": "ru-7b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "uz-2a",
+    "value": 1.67,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "kz-1a",
+    "value": 2.35,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_high_freq_preemptible",
+    "group": "ru-2c",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq_preemptible",
+    "group": "ru-3b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local_gpu_a100_80",
+    "group": "ru-7b",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "uz-1a",
+    "value": 1.67,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_high_freq_preemptible",
+    "group": "ru-7b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq_preemptible",
+    "group": "ru-8a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq_preemptible",
+    "group": "ru-9a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-2c",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "ru-3b",
+    "value": 3840,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-3b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-7b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ke-1a",
+    "value": 3.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-8a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-9a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_gpu_a100_80",
+    "group": "ru-7b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "uz-2a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ke-1a",
+    "value": 3.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "uz-2a",
+    "value": 1.67,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "uz-1a",
+    "value": 1.67,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "kz-1a",
+    "value": 2.35,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "uz-1a",
+    "value": 161.989,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "kz-1",
+    "value": 1291.13,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "uz-1a",
+    "value": 0.0353,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_6000_ada",
+    "group": "ru-7b",
+    "value": 15070,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2000",
+    "group": "ru-7b",
+    "value": 1700,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a2000_preemptible",
+    "group": "ru-7b",
+    "value": 510,
+    "unit": "item"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "gis-2",
+    "value": 1.39552,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "gis-2",
+    "value": 445.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "gis-2",
+    "value": 741.664,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "gis-2",
+    "value": 239.008,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "gis-2",
+    "value": 34.272,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "gis-2a",
+    "value": 143.616,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_dedicated",
+    "group": "gis-2a",
+    "value": 143.62,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "gis-2a",
+    "value": 0.044625,
+    "unit": "MB"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "gis-2a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "gis-2a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "gis-2a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "gis-2a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_6000_ada_preemptible",
+    "group": "ru-7b",
+    "value": 7535,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "gis-2a",
+    "value": 2.5408,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "gis-2a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "gis-2a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "gis-2a",
+    "value": 5.3664,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "gis-2a",
+    "value": 2.14368,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "gis-2a",
+    "value": 2.5408,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "gis-2a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "gis-2a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "gis-2a",
+    "value": 189.95,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "gis-2a",
+    "value": 0.05,
+    "unit": "MB"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-1",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-2",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-2",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-2",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-3",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-7",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-7",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-7",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-7",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-7",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "gis-1",
+    "value": 0.1095,
+    "unit": "MB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "gis-1",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "gis-2",
+    "value": 10404.912,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "gis-2",
+    "value": 2508.60624,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "gis-2",
+    "value": 534.644992,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "gis-2",
+    "value": 205.624608,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "gis-2",
+    "value": 0.1095,
+    "unit": "MB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "gis-2",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "gis-2",
+    "value": 5140.627968,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "gis-2",
+    "value": 1192.655744,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_80",
+    "group": "ru-7b",
+    "value": 26027,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_80_preemptible",
+    "group": "ru-7b",
+    "value": 13013.6986,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_gpu_a100_80_preemptible",
+    "group": "ru-7b",
+    "value": 59.3603,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_gpu_a100_80_preemptible",
+    "group": "ru-7b",
+    "value": 0.0191,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_gigabytes_local_gpu_a100_80_preemptible",
+    "group": "ru-7b",
+    "value": 0.7658,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_a100",
+    "group": "ru-6a",
+    "value": 18394,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-2a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-2a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-2b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-2b",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_h200",
+    "group": "ru-7b",
+    "value": 53424.6575,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_gpu_h200",
+    "group": "ru-7b",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_gpu_h200",
+    "group": "ru-7b",
+    "value": 0.0383,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_gigabytes_local_gpu_h200",
+    "group": "ru-7b",
+    "value": 1.5312,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores",
+    "group": "ru-6a",
+    "value": 89.76,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "ru-6a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-6a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_gpu_a100_80",
+    "group": "ru-6a",
+    "value": 118.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_gpu_a100_80_preemptible",
+    "group": "ru-6a",
+    "value": 59.36,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram",
+    "group": "ru-6a",
+    "value": 0.03,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "ru-6a",
+    "value": 0.04,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-6a",
+    "value": 0.01,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_gpu_a100_80",
+    "group": "ru-6a",
+    "value": 0.038281,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_gpu_a100_80_preemptible",
+    "group": "ru-6a",
+    "value": 0.02,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_high_freq_preemptible",
+    "group": "ru-6a",
+    "value": 0.04,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_preemptible",
+    "group": "ru-6a",
+    "value": 7883.04,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000",
+    "group": "ru-6a",
+    "value": 6850,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local_gpu_a100_80_preemptible",
+    "group": "ru-6a",
+    "value": 0.77,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_single_2_1024",
+    "group": "ru-6",
+    "value": 170.72,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a30_preemptible",
+    "group": "ru-6a",
+    "value": 2763,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000_preemptible",
+    "group": "ru-6a",
+    "value": 2055,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "ru-6a",
+    "value": 3840,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4_preemptible",
+    "group": "ru-6a",
+    "value": 1152,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx2080ti_preemptible",
+    "group": "ru-6a",
+    "value": 516,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx4090_preemptible",
+    "group": "ru-6a",
+    "value": 2016.21,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_80",
+    "group": "ru-6a",
+    "value": 26027,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a100_80_preemptible",
+    "group": "ru-6a",
+    "value": 13013.7,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_6000_ada",
+    "group": "ru-6a",
+    "value": 15070,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx2080ti",
+    "group": "ru-6a",
+    "value": 1720,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_rtx4090",
+    "group": "ru-6a",
+    "value": 6720,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-6a",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local_gpu_a100_80",
+    "group": "ru-6a",
+    "value": 1.53,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-6a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-6a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal2",
+    "group": "ru-6a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_totaliops_universal2",
+    "group": "ru-6a",
+    "value": 0.04,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_basic",
+    "group": "ru-6a",
+    "value": 0.9968,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_basicssd",
+    "group": "ru-6a",
+    "value": 1.23,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local",
+    "group": "ru-6a",
+    "value": 1.53,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-6a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_fast",
+    "group": "ru-6a",
+    "value": 5.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal",
+    "group": "ru-6a",
+    "value": 2.54,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_2048",
+    "group": "ru-6",
+    "value": 529.76,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_4_8192",
+    "group": "ru-6",
+    "value": 1240.32,
+    "unit": "item"
+  },
+  {
+    "resource": "network_floatingips",
+    "group": "ru-6",
+    "value": 24.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-6",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_6000_ada_preemptible",
+    "group": "ru-6a",
+    "value": 7535,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_fast",
+    "group": "ru-6a",
+    "value": 5.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_universal",
+    "group": "ru-6a",
+    "value": 2.54,
+    "unit": "GB*H"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-6a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_universal2",
+    "group": "ru-6a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "snapshot_gigabytes_basicssd",
+    "group": "ru-6a",
+    "value": 1.23,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-6",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-6",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-6",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "snapshot_gigabytes_basic",
+    "group": "ru-6a",
+    "value": 1.28,
+    "unit": "GB"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-6",
+    "value": 1.23,
+    "unit": "MB"
+  },
+  {
+    "resource": "image_gigabytes",
+    "group": "ru-6",
+    "value": 1,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_2_1024",
+    "group": "ru-6",
+    "value": 318.4,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-6",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-6",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-6",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_7",
+    "group": "ru-6a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_7",
+    "group": "ru-6a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "uz-1",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-1",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-1",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-1",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-1",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-1",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-1",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-2",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-2",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-2",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-2",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-3",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-3",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-3",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-3",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-3",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-3",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-7",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-7",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-8",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-8",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-8",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "ru-9",
+    "value": 1792,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-9",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-9",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-9",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-1a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-1a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-1b",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-1c",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-1c",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-2a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-2a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-2b",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-2b",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-2c",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-3a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-3a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-3b",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-7a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-7a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-7b",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-8a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-8a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "gis-1",
+    "value": 10404.912,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_26",
+    "group": "gis-1",
+    "value": 2508.60624,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "gis-1",
+    "value": 1192.655744,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "gis-1",
+    "value": 534.644992,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "gis-1",
+    "value": 205.624608,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-8",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_27",
+    "group": "ru-8",
+    "value": 852,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_28",
+    "group": "ru-8",
+    "value": 382,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_29",
+    "group": "ru-8",
+    "value": 147,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_24",
+    "group": "ru-9",
+    "value": 7432,
+    "unit": "item"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "ru-9",
+    "value": 3672,
+    "unit": "item"
+  },
+  {
+    "resource": "exttraffic",
+    "group": "ru-9",
+    "value": 0.078,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-1b",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-2c",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-3b",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-7b",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "ru-9a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "ru-9a",
+    "value": 0.55,
+    "unit": "GB"
+  },
+  {
+    "resource": "network_subnets_25",
+    "group": "gis-1",
+    "value": 5140.627968,
+    "unit": "item"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "gis-1a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "gis-1a",
+    "value": 0.77,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_basic",
+    "group": "gis-2a",
+    "value": 0.37,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_backups_gigabytes",
+    "group": "gis-2a",
+    "value": 0.77,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "gis-1a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "gis-2a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-1a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-1b",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-1c",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-2a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-2b",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-2c",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-3a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-3b",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-7a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-7b",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-8a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_universal",
+    "group": "ru-9a",
+    "value": 1.45,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "gis-1a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "gis-2a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-1a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-1b",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-1c",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-2a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-2b",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-2c",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-3a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-3b",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-7a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-7b",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-8a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "share_gigabytes_fast",
+    "group": "ru-9a",
+    "value": 2.42,
+    "unit": "GB"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-1",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-2",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-3",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-7",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-8",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "load_balancers_active_standby_12_8192",
+    "group": "ru-9",
+    "value": 2676.48,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-1a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-1b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-1c",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-2a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-2b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-3a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-9a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-3b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-2c",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-7b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-3b",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-7a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-8a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "gis-1a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_orel_1_8",
+    "group": "ru-6a",
+    "value": 248,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-1a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-1b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-1c",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-2a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-2b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-2c",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-3a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-7a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-7b",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "gis-1a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-8a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-9a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "image_astralinux_voronezh_1_8",
+    "group": "ru-6a",
+    "value": 304,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000",
+    "group": "uz-2a",
+    "value": 6716.9233,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-8a",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-8a",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-3a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-3b",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-3a",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-3b",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-3b",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-3a",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-3a",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-3b",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_cores_percent_10_preemptible",
+    "group": "ru-3b",
+    "value": 4.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20_preemptible",
+    "group": "ru-3b",
+    "value": 8.96,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50_preemptible",
+    "group": "ru-3b",
+    "value": 13.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-1a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-1b",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-1a",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-1b",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "volume_gigabytes_local_preemptible",
+    "group": "ru-1c",
+    "value": 0.6,
+    "unit": "GB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-1a",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-1b",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-1c",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-1a",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_ram_preemptible",
+    "group": "ru-1c",
+    "value": 0.007996,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-1b",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_gtx1080_preemptible",
+    "group": "ru-1c",
+    "value": 434.4288,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_10_preemptible",
+    "group": "ru-1b",
+    "value": 4.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_20_preemptible",
+    "group": "ru-1b",
+    "value": 8.96,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_percent_50_preemptible",
+    "group": "ru-1b",
+    "value": 13.48,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_preemptible",
+    "group": "ru-8a",
+    "value": 22.44,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_t4_preemptible",
+    "group": "ru-3b",
+    "value": 1152,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_pci_gpu_a5000",
+    "group": "kz-1a",
+    "value": 7721.02,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_cores_high_freq",
+    "group": "kz-1a",
+    "value": 221.5977,
+    "unit": "item"
+  },
+  {
+    "resource": "compute_ram_high_freq",
+    "group": "kz-1a",
+    "value": 0.0376,
+    "unit": "MB"
+  },
+  {
+    "resource": "compute_pci_gpu_t4",
+    "group": "gis-2a",
+    "value": 5376,
+    "unit": "item"
+  }
+]
