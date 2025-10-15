@@ -16,6 +16,10 @@ from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot, ResourceState
 from app.core.models.recommendations import OptimizationRecommendation
+from app.core.models.tags import ResourceTag
+from app.core.models.metrics import ResourceMetric, ResourceUsageSummary
+from app.core.models.logs import ResourceLog, ResourceComponent
+from app.core.models.costs import CostAllocation, CostTrend
 
 def seed_demo_user():
     """
@@ -43,11 +47,20 @@ def seed_demo_user():
             # Delete recommendations for these providers/resources
             res_ids = [rid for (rid,) in db.session.query(Resource.id).filter(Resource.provider_id.in_(provider_ids)).all()]
             if res_ids:
+                # Child tables referencing resources (no ON DELETE CASCADE in MySQL schema)
+                ResourceTag.query.filter(ResourceTag.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                ResourceMetric.query.filter(ResourceMetric.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                ResourceUsageSummary.query.filter(ResourceUsageSummary.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                ResourceLog.query.filter(ResourceLog.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                ResourceComponent.query.filter(ResourceComponent.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                CostAllocation.query.filter(CostAllocation.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                CostTrend.query.filter(CostTrend.resource_id.in_(res_ids)).delete(synchronize_session=False)
+                db.session.commit()
                 OptimizationRecommendation.query.filter(OptimizationRecommendation.resource_id.in_(res_ids)).delete(synchronize_session=False)
                 db.session.commit()
             OptimizationRecommendation.query.filter(OptimizationRecommendation.provider_id.in_(provider_ids)).delete(synchronize_session=False)
             db.session.commit()
-            # Delete resources (cascades tags/metrics via ORM)
+            # Delete resources (safe after child tables)
             Resource.query.filter(Resource.provider_id.in_(provider_ids)).delete(synchronize_session=False)
             db.session.commit()
             # Delete providers

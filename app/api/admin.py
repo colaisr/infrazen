@@ -6,6 +6,8 @@ from datetime import datetime
 import logging
 from app.core.database import db
 from app.core.models.user import User
+from app.core.models.provider import CloudProvider
+from app.core.models.resource import Resource
 from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.core.models.provider_catalog import ProviderCatalog
 from app.core.models.provider_admin_credentials import ProviderAdminCredentials
@@ -834,6 +836,14 @@ def reseed_demo_user():
         
         # Call the seeding function
         demo_user = seed_demo_user()
+
+        # Compute fresh counts for response
+        provider_count = CloudProvider.query.filter_by(user_id=demo_user.id).count()
+        resource_count = (
+            Resource.query.join(CloudProvider, Resource.provider_id == CloudProvider.id)
+            .filter(CloudProvider.user_id == demo_user.id)
+            .count()
+        )
         
         return jsonify({
             'success': True,
@@ -841,8 +851,8 @@ def reseed_demo_user():
             'demo_user': {
                 'id': demo_user.id,
                 'email': demo_user.email,
-                'providers': 2,
-                'resources': 7
+                'providers': provider_count,
+                'resources': resource_count
             }
         })
         
