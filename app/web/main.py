@@ -130,9 +130,9 @@ def connections():
             if last_snapshot:
                 # Use cost from sync snapshot if available (billing-first approach)
                 if last_snapshot.total_monthly_cost and last_snapshot.total_monthly_cost > 0:
-                    # Use validated cost from sync snapshot
-                    total_monthly_cost = last_snapshot.total_monthly_cost
-                    total_daily_cost = total_monthly_cost / 30  # Convert monthly to daily
+                    # Use validated cost from sync snapshot (stored as daily cost)
+                    total_daily_cost = last_snapshot.total_monthly_cost
+                    total_monthly_cost = total_daily_cost * 30  # Convert daily to monthly
                 else:
                     # Fallback to resource-based calculation for old syncs
                     provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
