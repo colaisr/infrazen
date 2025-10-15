@@ -1260,6 +1260,28 @@ body {
     padding: 0.125rem 0.375rem;
     border-radius: 0.25rem;
     margin-top: 0.25rem;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.impersonation-warning:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+    transform: translateY(-1px);
+}
+
+.impersonation-warning:active {
+    transform: translateY(0);
+}
+
+.impersonation-warning span {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Admin Table Styles */
