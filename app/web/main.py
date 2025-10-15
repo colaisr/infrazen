@@ -129,7 +129,13 @@ def connections():
             
             if last_snapshot:
                 # Use cost from sync snapshot if available (billing-first approach)
-                sync_config = json.loads(last_snapshot.sync_config) if last_snapshot.sync_config else {}
+                sync_config = {}
+                if last_snapshot.sync_config:
+                    try:
+                        sync_config = json.loads(last_snapshot.sync_config)
+                    except Exception:
+                        # Malformed JSON in sync_config should not break the page
+                        sync_config = {}
                 # Support both 'total_cost' (old) and 'total_daily_cost' (new Selectel format)
                 total_cost_from_sync = sync_config.get('total_daily_cost', sync_config.get('total_cost', 0))
                 
