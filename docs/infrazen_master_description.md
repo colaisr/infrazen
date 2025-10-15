@@ -661,7 +661,7 @@ CREATE TABLE resource_states (
 - **Resource Prioritization:** Resources with performance data displayed first for optimal user experience
 - **Real-time Data:** Live integration with performance graphs, cost tracking, and resource status
 - **Responsive Design:** Mobile-friendly interface that adapts to different screen sizes
-- **SQLite Compatibility:** Fixed floating point precision issues for large user IDs in SQLite database
+- **Database Compatibility:** Fixed floating point precision issues for large user IDs in MySQL database
 
 ### 7.1.3 Dashboard Highlights ✅ IMPLEMENTED
 - **Top Controls:** Date-range selector (7/30/90 days, 1 year), manual refresh, and export actions aligned to the header for fast reporting.
@@ -850,7 +850,7 @@ InfraZen/
 │       ├── login.html          # Login page
 │       └── index.html          # Landing page
 ├── instance/                   # Instance folder (database, logs)
-│   └── dev.db                  # SQLite database
+│   └── (MySQL database)        # MySQL database via connection string
 ├── tests/                      # Test suite (future)
 ├── docker/                     # Docker configuration (future)
 ├── run.py                      # Application entry point
@@ -889,7 +889,7 @@ InfraZen/
 
 #### 13.4.5 Current System Status ✅ PRODUCTION READY
 - **✅ Server Stability**: Flask development server running reliably on port 5001
-- **✅ Database Integrity**: Fresh SQLite database with proper schema and all required columns
+- **✅ Database Integrity**: Fresh MySQL database with proper schema and all required columns
 - **✅ Authentication Flow**: Google OAuth working with demo user fallback
 - **✅ Provider Management**: Full CRUD operations for Beget and Selectel connections
 - **✅ Dashboard Functionality**: Mock data display for demo users, real data for authenticated users
@@ -2581,7 +2581,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 **Backend Architecture**:
 - **Resource Grouping**: Resources grouped by `provider.id` in `resources_by_provider` dictionary
 - **Provider Data**: Enhanced provider information with resource counts and status
-- **SQLite Compatibility**: Fixed floating point precision issues for large user IDs
+- **Database Compatibility**: Fixed floating point precision issues for large user IDs
 - **Data Flow**: Database → Flask → Template → UI with proper error handling
 
 **Frontend Implementation**:
@@ -2592,7 +2592,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 
 **Database Integration**:
 - **User ID Handling**: Robust comparison using `int(float(p.user_id)) == int(float(user_id))`
-- **Provider Queries**: All providers fetched and filtered in Python to avoid SQLite precision issues
+- **Provider Queries**: All providers fetched and filtered in Python for consistent data handling
 - **Resource Prioritization**: Resources with performance data displayed first
 - **Metadata Access**: Latest snapshot metadata for performance visualization
 
@@ -2620,7 +2620,7 @@ The InfraZen platform now features a completely reorganized resources page that 
 - ✅ **Provider Grouping**: Resources organized by cloud provider in collapsible sections
 - ✅ **Summary Statistics**: Aggregated cost and resource counts across all providers
 - ✅ **Interactive UI**: Smooth expand/collapse animations with professional styling
-- ✅ **SQLite Compatibility**: Fixed floating point precision issues for large user IDs
+- ✅ **Database Compatibility**: Fixed floating point precision issues for large user IDs
 - ✅ **Resource Prioritization**: Performance data resources displayed first
 - ✅ **Real-time Integration**: Live performance graphs and cost tracking
 - ✅ **Responsive Design**: Mobile-friendly interface with proper scaling

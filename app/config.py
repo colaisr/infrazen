@@ -12,7 +12,7 @@ class Config:
     """Base configuration"""
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'mysql+pymysql://infrazen_user:infrazen_password@localhost:3306/infrazen_dev?charset=utf8mb4'
     
     # MySQL-specific configuration
     # Connection pool settings for MySQL
@@ -41,9 +41,9 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
-    # Default to SQLite for local dev, but support MySQL via DATABASE_URL
+    # Default to local MySQL for development
     # Example MySQL URL: mysql+pymysql://infrazen_user:password@localhost:3306/infrazen_dev?charset=utf8mb4
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///instance/dev.db'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'mysql+pymysql://infrazen_user:infrazen_password@localhost:3306/infrazen_dev?charset=utf8mb4'
     SQLALCHEMY_ECHO = True
 
 class ProductionConfig(Config):
@@ -62,5 +62,5 @@ class ProductionConfig(Config):
 class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://infrazen_user:infrazen_password@localhost:3306/infrazen_test?charset=utf8mb4'
     WTF_CSRF_ENABLED = False

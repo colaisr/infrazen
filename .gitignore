@@ -35,8 +35,6 @@ instance/
 
 # Database
 *.db
-*.sqlite
-*.sqlite3
 
 # Environment variables
 .env
@@ -47,7 +45,6 @@ instance/
 config.env
 config.env.*
 .ssh/
-sqlite_export.json
 
 # IDE
 .vscode/

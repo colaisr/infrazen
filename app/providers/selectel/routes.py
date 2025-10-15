@@ -144,7 +144,7 @@ def sync_resources(provider_id):
         
         user_id = session['user']['id']
         
-        # Handle SQLite precision issue with user ID comparison
+        # Handle user ID comparison
         all_providers = CloudProvider.query.filter_by(provider_type='selectel').all()
         provider = None
         for p in all_providers:

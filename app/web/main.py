@@ -105,7 +105,7 @@ def connections():
     else:
         # Real user: show only real database connections using unified models
         
-        # Get real providers from database (handle SQLite precision issue)
+        # Get real providers from database
         all_providers = CloudProvider.query.all()
         user_id_int = int(float(user['id']))
         cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
@@ -206,7 +206,7 @@ def resources():
     else:
         # Real user: show real database data
         try:
-            # Use the string user_id directly since it's stored as floating point in SQLite
+            # Use the string user_id directly
             user_id_str = user['id']
             resources = get_real_user_resources(user_id_str)
             providers = get_real_user_providers(user_id_str)

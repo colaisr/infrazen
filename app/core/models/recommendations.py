@@ -32,7 +32,7 @@ class OptimizationRecommendation(BaseModel):
     currency = db.Column(db.String(3), default='RUB')
     confidence_score = db.Column(db.Float, default=0.0)  # 0-1 confidence in recommendation
 
-    # Detailed insights/inputs (JSON encoded as text for SQLite compatibility)
+    # Detailed insights/inputs (JSON encoded as text)
     metrics_snapshot = db.Column(db.Text)
     insights = db.Column(db.Text)
 
