@@ -913,7 +913,8 @@ class SelectelService:
                 'Accept': 'application/json'
             }
             
-            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            # Increase timeout to tolerate slower billing API in production
+            response = requests.get(billing_url, params=params, headers=headers, timeout=90)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('status') == 'success':
@@ -972,7 +973,8 @@ class SelectelService:
                 'Accept': 'application/json'
             }
             
-            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            # Increase timeout to tolerate slower billing API in production
+            response = requests.get(billing_url, params=params, headers=headers, timeout=90)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('status') == 'success':
