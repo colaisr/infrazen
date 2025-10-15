@@ -108,6 +108,106 @@ SAMPLES = [
         'estimated_monthly_savings': 2100, 'confidence_score': 0.6,
         'metrics_snapshot': {'match_score': 0.86},
     },
+    # Additional 10 to reach 20 total
+    {
+        'source': 'seed_shutdown_dev_env',
+        'recommendation_type': 'shutdown',
+        'title': 'Остановить dev-среду на ночь и выходные',
+        'description': 'Dev-инстансы без трафика с 20:00 до 08:00 и в выходные.',
+        'severity': 'medium', 'category': 'cost',
+        'estimated_monthly_savings': 1100, 'confidence_score': 0.7,
+        'metrics_snapshot': {'work_hours': '8-20', 'days': 'Mon-Fri'},
+    },
+    {
+        'source': 'seed_unused_ip',
+        'recommendation_type': 'cleanup',
+        'title': 'Освободить неиспользуемый публичный IP',
+        'description': 'Адрес не привязан к ресурсам, тарифицируется отдельно.',
+        'severity': 'low', 'category': 'cost',
+        'estimated_monthly_savings': 150, 'confidence_score': 0.65,
+        'metrics_snapshot': {'attached': False},
+    },
+    {
+        'source': 'seed_lb_downsize',
+        'recommendation_type': 'rightsizing',
+        'title': 'Понизить тариф балансировщика нагрузки',
+        'description': 'Средний трафик ниже 10% от лимита текущего плана.',
+        'severity': 'medium', 'category': 'cost',
+        'estimated_monthly_savings': 400, 'confidence_score': 0.68,
+        'metrics_snapshot': {'avg_rps': 12, 'plan_rps_cap': 200},
+    },
+    {
+        'source': 'seed_merge_volumes',
+        'recommendation_type': 'migrate',
+        'title': 'Объединить малые тома для снижения накладных расходов',
+        'description': 'Несколько томов < 20 ГБ могут быть объединены в один.',
+        'severity': 'low', 'category': 'cost',
+        'estimated_monthly_savings': 260, 'confidence_score': 0.6,
+        'metrics_snapshot': {'volumes': 3, 'avg_size_gb': 12},
+    },
+    {
+        'source': 'seed_switch_disk_type',
+        'recommendation_type': 'migrate',
+        'title': 'Сменить тип диска на стандартный',
+        'description': 'IOPS/latency требования низкие — премиум-диск избыточен.',
+        'severity': 'medium', 'category': 'cost',
+        'estimated_monthly_savings': 980, 'confidence_score': 0.7,
+        'metrics_snapshot': {'iops_avg': 150, 'disk_type': 'premium'},
+    },
+    {
+        'source': 'seed_remove_old_images',
+        'recommendation_type': 'cleanup',
+        'title': 'Удалить неиспользуемые образы (>90 дней)',
+        'description': 'Образы не запускались в течение 3 месяцев.',
+        'severity': 'low', 'category': 'cost',
+        'estimated_monthly_savings': 320, 'confidence_score': 0.62,
+        'metrics_snapshot': {'images': 4, 'oldest_days': 120},
+    },
+    {
+        'source': 'seed_db_downsize',
+        'recommendation_type': 'rightsizing',
+        'title': 'Уменьшить конфигурацию БД (RAM/CPU)',
+        'description': 'Нагрузка БД стабильно низкая, буферная кеш не заполняется.',
+        'severity': 'high', 'category': 'cost',
+        'estimated_monthly_savings': 2400, 'confidence_score': 0.66,
+        'metrics_snapshot': {'cpu_avg': 0.09, 'mem_avg': 0.28},
+    },
+    {
+        'source': 'seed_auto_scaling',
+        'recommendation_type': 'commitment',
+        'title': 'Включить авто-масштабирование вместо фиксированных VM',
+        'description': 'Нагрузка по часам/дням меняется, выгоднее авто-скейлинг.',
+        'severity': 'medium', 'category': 'cost',
+        'estimated_monthly_savings': 1300, 'confidence_score': 0.58,
+        'metrics_snapshot': {'variance': 0.4},
+    },
+    {
+        'source': 'seed_k8s_rightsize',
+        'recommendation_type': 'rightsizing',
+        'title': 'Правильный размер узлов Kubernetes (завышены ресурсы)',
+        'description': 'Запросы/лимиты значительно превышают фактическое потребление.',
+        'severity': 'high', 'category': 'cost',
+        'estimated_monthly_savings': 1750, 'confidence_score': 0.64,
+        'metrics_snapshot': {'requests_cpu': 16, 'used_cpu': 6},
+    },
+    {
+        'source': 'seed_object_cold',
+        'recommendation_type': 'migrate',
+        'title': 'Перевести нечасто используемые объекты в холодное хранилище',
+        'description': 'Чтение реже 1 раза в 60 дней, выгоднее cold-tier.',
+        'severity': 'low', 'category': 'cost',
+        'estimated_monthly_savings': 540, 'confidence_score': 0.6,
+        'metrics_snapshot': {'access_per_60d': 0},
+    },
+    {
+        'source': 'seed_log_retention',
+        'recommendation_type': 'cleanup',
+        'title': 'Сократить ретеншн логов до 14 дней',
+        'description': 'Объём логов быстро растёт, аналитика за 90 дней не используется.',
+        'severity': 'medium', 'category': 'cost',
+        'estimated_monthly_savings': 670, 'confidence_score': 0.63,
+        'metrics_snapshot': {'retention_days': 90, 'suggested': 14},
+    },
 ]
 
 
@@ -157,7 +257,7 @@ def main():
             rec.first_seen_at = datetime.utcnow() - timedelta(days=1)
             db.session.add(rec)
         db.session.commit()
-        print('✅ Seeded 10 sample recommendations')
+        print('✅ Seeded 20 sample recommendations')
 
 
 if __name__ == '__main__':

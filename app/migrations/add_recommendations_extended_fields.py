@@ -8,8 +8,21 @@ from app.core.database import db
 
 def _column_exists(connection, table_name: str, column_name: str) -> bool:
     try:
-        result = connection.exec_driver_sql(f"PRAGMA table_info({table_name})").fetchall()
-        return any(row[1] == column_name for row in result)
+        dialect = db.engine.dialect.name
+        if dialect == 'sqlite':
+            result = connection.exec_driver_sql(f"PRAGMA table_info({table_name})").fetchall()
+            return any(row[1] == column_name for row in result)
+        elif dialect == 'mysql':
+            sql = (
+                "SELECT COLUMN_NAME FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = :t AND column_name = :c"
+            )
+            result = connection.execute(db.text(sql), {"t": table_name, "c": column_name}).fetchone()
+            return result is not None
+        else:
+            # Fallback attempt
+            result = connection.exec_driver_sql(f"PRAGMA table_info({table_name})").fetchall()
+            return any(row[1] == column_name for row in result)
     except Exception:
         return False
 

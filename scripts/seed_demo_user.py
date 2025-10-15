@@ -209,9 +209,19 @@ def seed_demo_user():
     
     # Helper to add resources
     def add_resources(resource_defs):
+        created = []
         for r in resource_defs:
-            db.session.add(Resource(**r))
+            res = Resource(**r)
+            # Set daily cost baseline from effective monthly cost for UI consistency
+            try:
+                if res.effective_cost and res.effective_cost > 0:
+                    res.set_daily_cost_baseline(res.effective_cost, 'monthly', 'recurring')
+            except Exception:
+                pass
+            db.session.add(res)
+            created.append(res)
         db.session.commit()
+        return created
 
     print("🔄 Creating resources for all connections...")
 
