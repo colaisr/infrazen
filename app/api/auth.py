@@ -73,14 +73,40 @@ def google_auth():
         
         # Handle demo login
         if is_demo or token == 'demo-token':
+            # Ensure a real DB-backed demo user exists and log in as that user
+            demo_email = 'demo@infrazen.com'
+            user = User.find_by_email(demo_email)
+            if not user:
+                # Create a minimal demo user if missing
+                user = User(
+                    email=demo_email,
+                    first_name='Demo',
+                    last_name='User',
+                    role='user',
+                    is_active=True,
+                    is_verified=True,
+                    created_by_admin=True,
+                    admin_notes='Auto-created demo user'
+                )
+                db.session.add(user)
+                db.session.commit()
+                # Set a simple password for completeness
+                try:
+                    user.set_password('demo')
+                except Exception:
+                    pass
+            # Update login info and store full session with db_id to make pages use real DB flow
+            user.update_login_info()
             session['user'] = {
-                'id': 'demo-user-123',
-                'email': 'demo@infrazen.com',
-                'name': 'Demo User',
-                'initials': 'DU',
-                'picture': '',
-                'role': 'demo',
-                'is_admin': True,
+                'id': str(user.id),
+                'db_id': user.id,
+                'google_id': user.google_id,
+                'email': user.email,
+                'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
+                'initials': user.get_initials(),
+                'picture': user.google_picture or '',
+                'role': user.role,
+                'is_admin': True,  # keep admin capabilities for demo walkthrough
                 'permissions': {
                     'manage_users': True,
                     'impersonate_users': True,

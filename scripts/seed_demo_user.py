@@ -98,323 +98,385 @@ def seed_demo_user():
     print(f"✅ Demo user created (ID: {demo_user.id})")
     
     # Create Beget provider
-    print("🔄 Creating Beget provider connection...")
-    beget_provider = CloudProvider(
+    print("🔄 Creating provider connections (4 total)...")
+    # Beget Prod
+    beget_prod = CloudProvider(
         user_id=demo_user.id,
         provider_type='beget',
-        connection_name='Beget VPS Demo',
-        account_id='demo_beget',
+        connection_name='Beget Prod',
+        account_id='demo_beget_prod',
         api_endpoint=None,
-        credentials=json.dumps({
-            'login': 'demo_beget',
-            'password': '***DEMO***'
-        }),
+        credentials=json.dumps({'login': 'demo_beget_prod', 'password': '***DEMO***'}),
         is_active=True,
         last_sync=datetime.now() - timedelta(hours=2),
         sync_status='success',
         auto_sync=True,
         sync_interval='daily'
     )
-    db.session.add(beget_provider)
+    db.session.add(beget_prod)
     db.session.commit()
     
-    print(f"✅ Beget provider created (ID: {beget_provider.id})")
-    
-    # Create Selectel provider
-    print("🔄 Creating Selectel provider connection...")
-    selectel_provider = CloudProvider(
+    # Beget Dev
+    beget_dev = CloudProvider(
+        user_id=demo_user.id,
+        provider_type='beget',
+        connection_name='Beget Dev',
+        account_id='demo_beget_dev',
+        api_endpoint=None,
+        credentials=json.dumps({'login': 'demo_beget_dev', 'password': '***DEMO***'}),
+        is_active=True,
+        last_sync=datetime.now() - timedelta(hours=2),
+        sync_status='success',
+        auto_sync=True,
+        sync_interval='daily'
+    )
+    db.session.add(beget_dev)
+    db.session.commit()
+
+    # Selectel BU-A (prod)
+    selectel_bu_a = CloudProvider(
         user_id=demo_user.id,
         provider_type='selectel',
-        connection_name='Selectel Cloud Demo',
-        account_id='demo_selectel_123',
+        connection_name='Selectel BU-A',
+        account_id='demo_selectel_bu_a',
         api_endpoint=None,
-        credentials=json.dumps({
-            'account_id': 'demo_selectel_123',
-            'api_token': '***DEMO***'
-        }),
+        credentials=json.dumps({'account_id': 'demo_selectel_bu_a', 'api_token': '***DEMO***'}),
         is_active=True,
         last_sync=datetime.now() - timedelta(hours=1),
         sync_status='success',
         auto_sync=True,
         sync_interval='daily'
     )
-    db.session.add(selectel_provider)
+    db.session.add(selectel_bu_a)
+    db.session.commit()
+
+    # Selectel BU-B (dev/stage)
+    selectel_bu_b = CloudProvider(
+        user_id=demo_user.id,
+        provider_type='selectel',
+        connection_name='Selectel BU-B',
+        account_id='demo_selectel_bu_b',
+        api_endpoint=None,
+        credentials=json.dumps({'account_id': 'demo_selectel_bu_b', 'api_token': '***DEMO***'}),
+        is_active=True,
+        last_sync=datetime.now() - timedelta(minutes=45),
+        sync_status='success',
+        auto_sync=True,
+        sync_interval='daily'
+    )
+    db.session.add(selectel_bu_b)
     db.session.commit()
     
-    print(f"✅ Selectel provider created (ID: {selectel_provider.id})")
+    print(f"✅ Providers created (IDs: BegetProd={beget_prod.id}, BegetDev={beget_dev.id}, SelA={selectel_bu_a.id}, SelB={selectel_bu_b.id})")
     
     # Create sync snapshots for Beget
     print("🔄 Creating sync snapshots...")
-    beget_snapshot = SyncSnapshot(
-        provider_id=beget_provider.id,
-        sync_type='full',
-        sync_status='success',
+    snapshots = [
+        SyncSnapshot(
+            provider_id=selectel_bu_a.id,
+            sync_type='full', sync_status='success',
+            sync_started_at=datetime.now() - timedelta(hours=1, minutes=5),
+            sync_completed_at=datetime.now() - timedelta(hours=1),
+            total_resources_found=13, resources_created=13, total_monthly_cost=166600.0
+        ),
+        SyncSnapshot(
+            provider_id=selectel_bu_b.id,
+            sync_type='full', sync_status='success',
+            sync_started_at=datetime.now() - timedelta(minutes=50),
+            sync_completed_at=datetime.now() - timedelta(minutes=45),
+            total_resources_found=12, resources_created=12, total_monthly_cost=104300.0
+        ),
+        SyncSnapshot(
+            provider_id=beget_prod.id,
+            sync_type='full', sync_status='success',
         sync_started_at=datetime.now() - timedelta(hours=2, minutes=5),
         sync_completed_at=datetime.now() - timedelta(hours=2),
-        total_resources_found=5,
-        resources_created=5,
-        resources_updated=0,
-        resources_deleted=0,
-        resources_unchanged=0,
-        total_monthly_cost=660.0
-    )
-    db.session.add(beget_snapshot)
-    
-    # Create sync snapshot for Selectel
-    selectel_snapshot = SyncSnapshot(
-        provider_id=selectel_provider.id,
-        sync_type='full',
-        sync_status='success',
-        sync_started_at=datetime.now() - timedelta(hours=1, minutes=3),
-        sync_completed_at=datetime.now() - timedelta(hours=1),
-        total_resources_found=4,
-        resources_created=4,
-        resources_updated=0,
-        resources_deleted=0,
-        resources_unchanged=0,
-        total_monthly_cost=57450.0
-    )
-    db.session.add(selectel_snapshot)
+            total_resources_found=12, resources_created=12, total_monthly_cost=104250.0
+        ),
+        SyncSnapshot(
+            provider_id=beget_dev.id,
+            sync_type='full', sync_status='success',
+            sync_started_at=datetime.now() - timedelta(hours=1, minutes=20),
+            sync_completed_at=datetime.now() - timedelta(hours=1, minutes=15),
+            total_resources_found=8, resources_created=8, total_monthly_cost=41850.0
+        ),
+    ]
+    for s in snapshots:
+        db.session.add(s)
     db.session.commit()
     
     print("✅ Sync snapshots created")
     
-    # Create Beget resources
-    print("🔄 Creating Beget resources...")
-    
-    beget_resources = [
-        Resource(
-            provider_id=beget_provider.id,
-            resource_id='beget-vps-web-production',
-            resource_type='server',
-            resource_name='vps-web-production',
-            region='ru-msk',
-            status='active',
-            service_name='VPS',
-            effective_cost=660.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'cpu': '4 vCPU',
-                'memory': '8 GB',
-                'storage': '100 GB SSD',
-                'ip': '185.104.114.123',
-                'os': 'Ubuntu 22.04'
-            })
-        ),
-        Resource(
-            provider_id=beget_provider.id,
-            resource_id='beget-domain-infrazen-demo-ru',
-            resource_type='domain',
-            resource_name='infrazen-demo.ru',
-            region='global',
-            status='active',
-            service_name='Domains',
-            effective_cost=50.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'registrar': 'beget',
-                'expiry_date': '2026-03-15',
-                'dns_records': 5
-            })
-        ),
-        Resource(
-            provider_id=beget_provider.id,
-            resource_id='beget-db-mysql-prod',
-            resource_type='database',
-            resource_name='mysql-prod-db',
-            region='ru-msk',
-            status='active',
-            service_name='MySQL Database',
-            effective_cost=0.0,  # Included in VPS
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'engine': 'MySQL 8.0',
-                'size': '15 GB',
-                'connections': 50
-            })
-        )
-    ]
-    
-    for resource in beget_resources:
-        db.session.add(resource)
-    db.session.commit()
+    # Helper to add resources
+    def add_resources(resource_defs):
+        for r in resource_defs:
+            db.session.add(Resource(**r))
+        db.session.commit()
 
-    # Add tags for Beget resources
+    print("🔄 Creating resources for all connections...")
+
+    # Selectel BU-A resources (~166,600 ₽)
+    add_resources([
+        {
+            'provider_id': selectel_bu_a.id,
+            'resource_id': 'sel-a-srv-api-backend-prod-01',
+            'resource_type': 'server', 'resource_name': 'api-backend-prod-01', 'region': 'ru-1', 'status': 'active',
+            'service_name': 'Cloud Servers', 'effective_cost': 28500.0, 'currency': 'RUB', 'billing_period': 'monthly',
+            'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '32 GB', 'storage': '200 GB NVMe', 'os': 'Debian 11'})
+        },
+        {
+            'provider_id': selectel_bu_a.id,
+            'resource_id': 'sel-a-srv-db-postgres-prod-01',
+            'resource_type': 'server', 'resource_name': 'db-postgres-prod-01', 'region': 'ru-2', 'status': 'active',
+            'service_name': 'Cloud Servers', 'effective_cost': 22950.0, 'currency': 'RUB', 'billing_period': 'monthly',
+            'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '64 GB', 'storage': '500 GB SSD', 'os': 'Ubuntu 22.04'})
+        },
+        {
+            'provider_id': selectel_bu_a.id,
+            'resource_id': 'sel-a-vol-postgres-data-01',
+            'resource_type': 'volume', 'resource_name': 'postgres-data-volume', 'region': 'ru-2', 'status': 'active',
+            'service_name': 'Block Storage', 'effective_cost': 4000.0, 'currency': 'RUB', 'billing_period': 'monthly',
+            'provider_config': json.dumps({'size': '500 GB', 'type': 'SSD'})
+        },
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-k8s-worker-01', 'resource_type': 'server', 'resource_name': 'k8s-worker-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 18000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '32 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-k8s-worker-02', 'resource_type': 'server', 'resource_name': 'k8s-worker-02', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 18000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '32 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-k8s-master-01', 'resource_type': 'server', 'resource_name': 'k8s-master-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 12000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-lb-prod-01', 'resource_type': 'load_balancer', 'resource_name': 'lb-prod-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Load Balancer', 'effective_cost': 8000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'plan': 'XL'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-obj-s3-cdn-static', 'resource_type': 'file_storage', 'resource_name': 's3-cdn-static', 'region': 'ru-1', 'status': 'active', 'service_name': 'S3 Object Storage', 'effective_cost': 2000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '250 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-eip-01', 'resource_type': 'ip', 'resource_name': 'eip-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Networking', 'effective_cost': 150.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'type': 'public'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-analytics-etl-01', 'resource_type': 'server', 'resource_name': 'analytics-etl-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 20000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '32 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-cache-redis', 'resource_type': 'server', 'resource_name': 'app-cache-redis', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 6500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '2 vCPU', 'memory': '8 GB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-archive-cold-storage', 'resource_type': 'file_storage', 'resource_name': 'archive-cold-storage', 'region': 'ru-1', 'status': 'active', 'service_name': 'Object Storage', 'effective_cost': 15000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'tier': 'cold', 'size': '10 TB'})},
+        {'provider_id': selectel_bu_a.id, 'resource_id': 'sel-a-snapshot-storage', 'resource_type': 'snapshots', 'resource_name': 'snapshot-storage', 'region': 'ru-1', 'status': 'active', 'service_name': 'Snapshots', 'effective_cost': 11500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'count': 12})},
+    ])
+
+    # Selectel BU-B resources (~104,300 ₽)
+    add_resources([
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-web-frontend-01', 'resource_type': 'server', 'resource_name': 'web-frontend-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 18500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-web-frontend-02', 'resource_type': 'server', 'resource_name': 'web-frontend-02', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 18500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-db-mysql-staging', 'resource_type': 'server', 'resource_name': 'db-mysql-staging', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 12000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-dev-k8s-node-01', 'resource_type': 'server', 'resource_name': 'dev-k8s-node-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 9500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-dev-k8s-node-02', 'resource_type': 'server', 'resource_name': 'dev-k8s-node-02', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 9500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-s3-media-bucket', 'resource_type': 'file_storage', 'resource_name': 's3-media-bucket', 'region': 'ru-1', 'status': 'active', 'service_name': 'Object Storage', 'effective_cost': 5500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '1.2 TB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-test-runner-01', 'resource_type': 'server', 'resource_name': 'test-runner-01', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 6500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-ci-runner-spot', 'resource_type': 'server', 'resource_name': 'ci-runner-spot', 'region': 'ru-1', 'status': 'active', 'service_name': 'Cloud Servers', 'effective_cost': 8500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '8 GB'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-lb-dev', 'resource_type': 'load_balancer', 'resource_name': 'load-balancer-dev', 'region': 'ru-1', 'status': 'active', 'service_name': 'Load Balancer', 'effective_cost': 4000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'plan': 'S'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-vpn-gw', 'resource_type': 'network', 'resource_name': 'vpn-gateway', 'region': 'ru-1', 'status': 'active', 'service_name': 'VPN', 'effective_cost': 3500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'type': 'site2site'})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-pg-backup-volume', 'resource_type': 'volume', 'resource_name': 'pg-backup-volume', 'region': 'ru-1', 'status': 'active', 'service_name': 'Block Storage', 'effective_cost': 6500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '1 TB', 'attached_to': None})},
+        {'provider_id': selectel_bu_b.id, 'resource_id': 'sel-b-egress-and-ips', 'resource_type': 'network', 'resource_name': 'misc-egress-and-ips', 'region': 'ru-1', 'status': 'active', 'service_name': 'Networking', 'effective_cost': 1800.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'egress_tb': 0.5})},
+    ])
+
+    # Beget Prod resources (~104,250 ₽)
+    add_resources([
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-app-01', 'resource_type': 'server', 'resource_name': 'vps-app-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 12500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB', 'storage': '100 GB SSD'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-app-02', 'resource_type': 'server', 'resource_name': 'vps-app-02', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 12500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB', 'storage': '100 GB SSD'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-db-01', 'resource_type': 'server', 'resource_name': 'vps-db-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 18000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '8 vCPU', 'memory': '32 GB'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-cache-01', 'resource_type': 'server', 'resource_name': 'vps-cache-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 7000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '2 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-batch-01', 'resource_type': 'server', 'resource_name': 'vps-batch-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 9000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-vps-mq-01', 'resource_type': 'server', 'resource_name': 'vps-mq-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 8500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '2 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-domain', 'resource_type': 'domain', 'resource_name': 'infrazen-demo.ru', 'region': 'global', 'status': 'active', 'service_name': 'Domains', 'effective_cost': 50.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'registrar': 'beget'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-obj-storage', 'resource_type': 'file_storage', 'resource_name': 'obj-storage-prod', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Object Storage', 'effective_cost': 6000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '2 TB'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-backup-service', 'resource_type': 'backup', 'resource_name': 'backup-service', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Backups', 'effective_cost': 10000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'policy': 'daily'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-lb-service', 'resource_type': 'load_balancer', 'resource_name': 'lb-service', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Load Balancer', 'effective_cost': 6600.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'plan': 'M'})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-nat-firewall', 'resource_type': 'network', 'resource_name': 'nat-firewall', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Firewall', 'effective_cost': 4800.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'rules': 25})},
+        {'provider_id': beget_prod.id, 'resource_id': 'beget-prod-extra-volumes', 'resource_type': 'volume', 'resource_name': 'extra-volumes', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Block Storage', 'effective_cost': 9300.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'volumes': 3, 'total_size_gb': 180})},
+    ])
+
+    # Beget Dev resources (~41,850 ₽)
+    add_resources([
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-vps-01', 'resource_type': 'server', 'resource_name': 'dev-vps-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 8000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-vps-02', 'resource_type': 'server', 'resource_name': 'dev-vps-02', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 8000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-db-01', 'resource_type': 'server', 'resource_name': 'dev-db-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 9000.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '16 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-stage-web-01', 'resource_type': 'server', 'resource_name': 'stage-web-01', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 7500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-s3-bucket', 'resource_type': 'file_storage', 'resource_name': 's3-dev-bucket', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Object Storage', 'effective_cost': 2800.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '300 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-ci-dev-runner', 'resource_type': 'server', 'resource_name': 'ci-dev-runner', 'region': 'ru-msk', 'status': 'active', 'service_name': 'VPS', 'effective_cost': 5500.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'cpu': '4 vCPU', 'memory': '8 GB'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-public-ip', 'resource_type': 'ip', 'resource_name': 'dev-public-ip', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Networking', 'effective_cost': 150.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'type': 'public'})},
+        {'provider_id': beget_dev.id, 'resource_id': 'beget-dev-logs-storage', 'resource_type': 'file_storage', 'resource_name': 'dev-logs-storage', 'region': 'ru-msk', 'status': 'active', 'service_name': 'Object Storage', 'effective_cost': 1900.0, 'currency': 'RUB', 'billing_period': 'monthly', 'provider_config': json.dumps({'size': '500 GB'})},
+    ])
+
+    # Tags for key resources
     try:
-        beget_server = Resource.query.filter_by(provider_id=beget_provider.id, resource_name='vps-web-production').first()
-        if beget_server:
-            beget_server.add_tag('env', 'production')
-            beget_server.add_tag('app', 'web')
-        beget_domain = Resource.query.filter_by(provider_id=beget_provider.id, resource_name='infrazen-demo.ru').first()
-        if beget_domain:
-            beget_domain.add_tag('type', 'primary')
-        beget_db = Resource.query.filter_by(provider_id=beget_provider.id, resource_name='mysql-prod-db').first()
-        if beget_db:
-            beget_db.add_tag('env', 'production')
+        # Selectel BU-A
+        for name, tags in [
+            ('api-backend-prod-01', {'env': 'production', 'tier': 'api'}),
+            ('db-postgres-prod-01', {'env': 'production', 'tier': 'database'}),
+            ('postgres-data-volume', {'type': 'storage'}),
+            ('s3-cdn-static', {'type': 'cdn', 'public': 'true'}),
+        ]:
+            r = Resource.query.filter_by(provider_id=selectel_bu_a.id, resource_name=name).first()
+            if r:
+                for k, v in tags.items():
+                    r.add_tag(k, v)
+
+        # Selectel BU-B
+        for name, tags in [
+            ('web-frontend-01', {'env': 'staging', 'tier': 'web'}),
+            ('web-frontend-02', {'env': 'staging', 'tier': 'web'}),
+            ('db-mysql-staging', {'env': 'staging', 'tier': 'database'}),
+            ('s3-media-bucket', {'type': 'media'}),
+        ]:
+            r = Resource.query.filter_by(provider_id=selectel_bu_b.id, resource_name=name).first()
+            if r:
+                for k, v in tags.items():
+                    r.add_tag(k, v)
+
+        # Beget Prod
+        for name, tags in [
+            ('vps-app-01', {'env': 'production', 'app': 'web'}),
+            ('vps-app-02', {'env': 'production', 'app': 'web'}),
+            ('vps-db-01', {'env': 'production', 'tier': 'database'}),
+        ]:
+            r = Resource.query.filter_by(provider_id=beget_prod.id, resource_name=name).first()
+            if r:
+                for k, v in tags.items():
+                    r.add_tag(k, v)
+
+        # Beget Dev
+        for name, tags in [
+            ('dev-vps-01', {'env': 'development'}),
+            ('dev-vps-02', {'env': 'development'}),
+        ]:
+            r = Resource.query.filter_by(provider_id=beget_dev.id, resource_name=name).first()
+            if r:
+                for k, v in tags.items():
+                    r.add_tag(k, v)
         db.session.commit()
     except Exception:
         db.session.rollback()
-    print(f"✅ Created {len(beget_resources)} Beget resources")
+    print("✅ Resources and tags created")
     
-    # Create Selectel resources
-    print("🔄 Creating Selectel resources...")
-    
-    selectel_resources = [
-        Resource(
-            provider_id=selectel_provider.id,
-            resource_id='sel-server-api-backend-prod-01',
-            resource_type='server',
-            resource_name='api-backend-prod-01',
-            region='ru-1',
-            status='active',
-            service_name='Cloud Servers',
-            effective_cost=28500.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'cpu': '8 vCPU',
-                'memory': '32 GB',
-                'storage': '200 GB NVMe',
-                'flavor': 'SL1.4XL',
-                'ip': '92.223.65.45',
-                'os': 'Debian 11'
-            })
-        ),
-        Resource(
-            provider_id=selectel_provider.id,
-            resource_id='sel-server-db-postgres-prod-01',
-            resource_type='server',
-            resource_name='db-postgres-prod-01',
-            region='ru-2',
-            status='active',
-            service_name='Cloud Servers',
-            effective_cost=22950.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'cpu': '8 vCPU',
-                'memory': '64 GB',
-                'storage': '500 GB SSD',
-                'flavor': 'SL1.MEM.4XL',
-                'ip': '92.223.66.78',
-                'os': 'Ubuntu 22.04'
-            })
-        ),
-        Resource(
-            provider_id=selectel_provider.id,
-            resource_id='sel-volume-postgres-data-01',
-            resource_type='volume',
-            resource_name='postgres-data-volume',
-            region='ru-2',
-            status='active',
-            service_name='Block Storage',
-            effective_cost=4000.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'size': '500 GB',
-                'type': 'SSD',
-                'attached_to': 'db-postgres-prod-01'
-            })
-        ),
-        Resource(
-            provider_id=selectel_provider.id,
-            resource_id='sel-fs-cdn-static-assets',
-            resource_type='file_storage',
-            resource_name='cdn-static-assets',
-            region='ru-1',
-            status='active',
-            service_name='S3 Object Storage',
-            effective_cost=2000.0,
-            currency='RUB',
-            billing_period='monthly',
-            provider_config=json.dumps({
-                'size': '250 GB',
-                'objects': 15000,
-                'traffic': '1.5 TB/month'
-            })
-        )
-    ]
-    
-    for resource in selectel_resources:
-        db.session.add(resource)
-    db.session.commit()
-
-    # Add tags for Selectel resources
-    try:
-        api_srv = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='api-backend-prod-01').first()
-        if api_srv:
-            api_srv.add_tag('env', 'production')
-            api_srv.add_tag('tier', 'api')
-        db_srv = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='db-postgres-prod-01').first()
-        if db_srv:
-            db_srv.add_tag('env', 'production')
-            db_srv.add_tag('tier', 'database')
-        vol = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='postgres-data-volume').first()
-        if vol:
-            vol.add_tag('type', 'storage')
-        s3 = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='cdn-static-assets').first()
-        if s3:
-            s3.add_tag('type', 'cdn')
-            s3.add_tag('public', 'true')
+    # Create ResourceState rows for snapshots so Resources page can resolve items from snapshots
+    print("🔄 Creating resource states for latest snapshots...")
+    def create_states_for_provider(provider, snapshot):
+        resources = Resource.query.filter_by(provider_id=provider.id).all()
+        for r in resources:
+            state = ResourceState(
+                sync_snapshot_id=snapshot.id,
+                resource_id=r.id,
+                provider_resource_id=r.resource_id,
+                resource_type=r.resource_type,
+                resource_name=r.resource_name,
+                state_action='created',
+                previous_state=None,
+                current_state=json.dumps({
+                    'resource_name': r.resource_name,
+                    'status': r.status,
+                    'effective_cost': r.effective_cost,
+                    'region': r.region,
+                    'service_name': r.service_name,
+                    'provider_config': r.get_provider_config(),
+                }),
+                changes_detected=json.dumps({}),
+                service_name=r.service_name,
+                region=r.region,
+                status=r.status,
+                effective_cost=r.effective_cost,
+                has_cost_change=False,
+                has_status_change=False,
+                has_config_change=False,
+            )
+            db.session.add(state)
         db.session.commit()
-    except Exception:
-        db.session.rollback()
-    print(f"✅ Created {len(selectel_resources)} Selectel resources")
-    
-    # Create recommendations
-    print("🔄 Creating cost optimization recommendations...")
-    
-    # Lookup created resources for FKs
-    api_srv = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='api-backend-prod-01').first()
-    db_srv = Resource.query.filter_by(provider_id=selectel_provider.id, resource_name='db-postgres-prod-01').first()
-    beget_server = Resource.query.filter_by(provider_id=beget_provider.id, resource_name='vps-web-production').first()
 
-    recommendations = [
-        OptimizationRecommendation(
-            resource_id=api_srv.id if api_srv else None,
-            provider_id=selectel_provider.id,
-            recommendation_type='rightsizing',
-            category='cost',
-            severity='high',
-            title='Optimize api-backend-prod-01 instance size',
-            description='CPU utilization averages 32% over the past 30 days. Consider downsizing from 8 vCPU to 4 vCPU.',
-            estimated_monthly_savings=12000.0,
-            currency='RUB',
-            confidence_score=0.85,
-            resource_type='server',
-            resource_name='api-backend-prod-01',
-            metrics_snapshot=json.dumps({'cpu_avg': 0.32}),
-            insights=json.dumps({'source': 'seed'}),
-            status='pending'
-        ),
-        OptimizationRecommendation(
-            resource_id=beget_server.id if beget_server else None,
-            provider_id=beget_provider.id,
-            recommendation_type='reserved_instances',
-            category='cost',
-            severity='medium',
-            title='Consider annual VPS plan for cost savings',
-            description='Switch to annual billing to save approximately 20% on VPS hosting costs.',
-            estimated_monthly_savings=132.0,
-            currency='RUB',
-            confidence_score=0.9,
-            resource_type='server',
-            resource_name='vps-web-production',
-            metrics_snapshot=json.dumps({'plan': 'monthly'}),
-            insights=json.dumps({'note': 'demo'}),
-            status='pending'
-        )
+    # Fetch snapshots freshly to ensure IDs
+    sel_a_snap = SyncSnapshot.query.filter_by(provider_id=selectel_bu_a.id).order_by(SyncSnapshot.created_at.desc()).first()
+    sel_b_snap = SyncSnapshot.query.filter_by(provider_id=selectel_bu_b.id).order_by(SyncSnapshot.created_at.desc()).first()
+    beget_prod_snap = SyncSnapshot.query.filter_by(provider_id=beget_prod.id).order_by(SyncSnapshot.created_at.desc()).first()
+    beget_dev_snap = SyncSnapshot.query.filter_by(provider_id=beget_dev.id).order_by(SyncSnapshot.created_at.desc()).first()
+
+    create_states_for_provider(selectel_bu_a, sel_a_snap)
+    create_states_for_provider(selectel_bu_b, sel_b_snap)
+    create_states_for_provider(beget_prod, beget_prod_snap)
+    create_states_for_provider(beget_dev, beget_dev_snap)
+    print("✅ Resource states created")
+
+    # Create recommendations (20, RU)
+    print("🔄 Creating cost optimization recommendations (20)...")
+    def R(p, name):
+        return Resource.query.filter_by(provider_id=p.id, resource_name=name).first()
+
+    recs = [
+        # 1 Resize CPU down
+        {
+            'p': selectel_bu_a, 'name': 'api-backend-prod-01', 'type': 'rightsizing', 'sev': 'high',
+            'title': 'Снизить vCPU для api-backend-prod-01',
+            'desc': 'Средняя загрузка CPU 8% за 30 дней. Рекомендуется уменьшить конфигурацию с 8 до 4 vCPU.',
+            'save': 1800.0, 'metrics': {'cpu_avg': 0.08}
+        },
+        # 2 Stop idle VM
+        {
+            'p': selectel_bu_b, 'name': 'ci-runner-spot', 'type': 'shutdown', 'sev': 'critical',
+            'title': 'Остановить неиспользуемую VM ci-runner-spot',
+            'desc': 'Нет входящего трафика и загрузки CPU за 30 дней.',
+            'save': 3200.0, 'metrics': {'cpu_avg': 0.0, 'net_in': 0}
+        },
+        # 3 Delete unused volume
+        {
+            'p': selectel_bu_b, 'name': 'pg-backup-volume', 'type': 'cleanup', 'sev': 'medium',
+            'title': 'Удалить неиспользуемый том pg-backup-volume',
+            'desc': 'Том не подключён ни к одному инстансу более 45 дней.',
+            'save': 450.0, 'metrics': {'attachments': 0, 'last_used_days': 45}
+        },
+        # 4 Cheaper region
+        {'p': selectel_bu_a, 'name': 'k8s-worker-02', 'type': 'migrate', 'sev': 'low', 'title': 'Перенести k8s-worker-02 в более дешёвый регион', 'desc': 'Стоимость в целевом регионе на ~25% ниже при сопоставимых параметрах.', 'save': 700.0, 'metrics': {'current_region': 'ru-1', 'target_region': 'ru-2'}},
+        # 5 Resize RAM down
+        {'p': selectel_bu_b, 'name': 'db-mysql-staging', 'type': 'rightsizing', 'sev': 'medium', 'title': 'Снизить RAM для db-mysql-staging', 'desc': 'Пиковое использование памяти за 14 дней 38%.', 'save': 900.0, 'metrics': {'mem_avg_gb': 3.1, 'mem_p95_gb': 6.2}},
+        # 6 Storage class switch
+        {'p': selectel_bu_b, 'name': 's3-media-bucket', 'type': 'migrate', 'sev': 'low', 'title': 'Перевести s3-media-bucket в класс хранения «нечастый доступ»', 'desc': 'Доступ реже 1 раза за 30 дней.', 'save': 350.0, 'metrics': {'access_per_30d': 0}},
+        # 7 Old snapshots
+        {'p': selectel_bu_a, 'name': 'snapshot-storage', 'type': 'cleanup', 'sev': 'medium', 'title': 'Удалить устаревшие снапшоты', 'desc': '5 снапшотов старше 60 дней.', 'save': 520.0, 'metrics': {'snapshots': 5, 'oldest_days': 120}},
+        # 8 Shrink volume
+        {'p': selectel_bu_a, 'name': 'postgres-data-volume', 'type': 'rightsizing', 'sev': 'high', 'title': 'Уменьшить том postgres-data-volume', 'desc': 'Использование диска 48% стабильно.', 'save': 600.0, 'metrics': {'disk_used_gb': 240, 'disk_size_gb': 500}},
+        # 9 Commitment
+        {'p': beget_prod, 'name': 'vps-app-01', 'type': 'commitment', 'sev': 'info', 'title': 'Перейти на подписку с коммитом для vps-app-01', 'desc': 'Стабильное использование за 90 дней, коммит даст скидку.', 'save': 800.0, 'metrics': {'lookback_days': 90}},
+        # 10 Cross-provider migrate
+        {'p': selectel_bu_b, 'name': 'web-frontend-01', 'type': 'migrate', 'sev': 'high', 'title': 'Мигрировать web-frontend-01 к более дешёвому провайдеру', 'desc': 'Найдены эквивалентные характеристики с экономией ~22%.', 'save': 2100.0, 'metrics': {'match_score': 0.86}},
+        # 11 Night/weekend shutdown
+        {'p': beget_dev, 'name': 'dev-vps-01', 'type': 'shutdown', 'sev': 'medium', 'title': 'Останавливать dev-vps-01 на ночь и выходные', 'desc': 'Рабочие часы 08:00–20:00 Пн-Пт, вне окна простаивает.', 'save': 1100.0, 'metrics': {'work_hours': '8-20', 'days': 'Mon-Fri'}},
+        # 12 Release unused IP
+        {'p': beget_dev, 'name': 'dev-public-ip', 'type': 'cleanup', 'sev': 'low', 'title': 'Освободить неиспользуемый публичный IP', 'desc': 'IP не привязан к ресурсам, тарифицируется отдельно.', 'save': 150.0, 'metrics': {'attached': False}},
+        # 13 Downsize LB
+        {'p': selectel_bu_a, 'name': 'lb-prod-01', 'type': 'rightsizing', 'sev': 'medium', 'title': 'Понизить тариф балансировщика lb-prod-01', 'desc': 'Средний трафик <10% лимита текущего плана.', 'save': 400.0, 'metrics': {'avg_rps': 12, 'plan_rps_cap': 200}},
+        # 14 Merge small volumes
+        {'p': beget_prod, 'name': 'extra-volumes', 'type': 'migrate', 'sev': 'low', 'title': 'Объединить малые тома для снижения накладных расходов', 'desc': 'Несколько томов <20 ГБ могут быть объединены.', 'save': 260.0, 'metrics': {'volumes': 3, 'avg_size_gb': 12}},
+        # 15 Switch disk type
+        {'p': selectel_bu_a, 'name': 'db-postgres-prod-01', 'type': 'migrate', 'sev': 'medium', 'title': 'Сменить тип диска на стандартный для db-postgres-prod-01', 'desc': 'IOPS/latency низкие — премиум-диск избыточен.', 'save': 980.0, 'metrics': {'iops_avg': 150, 'disk_type': 'premium'}},
+        # 16 Remove old images (use BU-A as placeholder store)
+        {'p': selectel_bu_a, 'name': 's3-cdn-static', 'type': 'cleanup', 'sev': 'low', 'title': 'Удалить неиспользуемые образы (>90 дней)', 'desc': 'Образы не запускались в течение 3 месяцев.', 'save': 320.0, 'metrics': {'images': 4, 'oldest_days': 120}},
+        # 17 Downsize DB
+        {'p': beget_prod, 'name': 'vps-db-01', 'type': 'rightsizing', 'sev': 'high', 'title': 'Уменьшить конфигурацию БД (vps-db-01)', 'desc': 'Нагрузка БД стабильно низкая, буферный кеш не заполняется.', 'save': 2400.0, 'metrics': {'cpu_avg': 0.09, 'mem_avg': 0.28}},
+        # 18 Enable autoscaling
+        {'p': selectel_bu_b, 'name': 'web-frontend-02', 'type': 'commitment', 'sev': 'medium', 'title': 'Включить авто-масштабирование вместо фиксированных VM', 'desc': 'Нагрузка по часам меняется, выгоднее авто-скейлинг.', 'save': 1300.0, 'metrics': {'variance': 0.4}},
+        # 19 Rightsize K8s nodes
+        {'p': selectel_bu_a, 'name': 'k8s-worker-01', 'type': 'rightsizing', 'sev': 'high', 'title': 'Правильный размер узлов Kubernetes', 'desc': 'Requests/limits значительно превышают фактическое потребление.', 'save': 1750.0, 'metrics': {'requests_cpu': 16, 'used_cpu': 6}},
+        # 20 Move cold objects
+        {'p': selectel_bu_a, 'name': 'archive-cold-storage', 'type': 'migrate', 'sev': 'low', 'title': 'Перевести нечасто используемые объекты в холодное хранилище', 'desc': 'Чтение реже 1 раза в 60 дней — cold-tier выгоднее.', 'save': 540.0, 'metrics': {'access_per_60d': 0}},
     ]
-    
-    for rec in recommendations:
-        db.session.add(rec)
-    
+
+    created = 0
+    for rec in recs:
+        res = R(rec['p'], rec['name'])
+        if not res:
+            continue
+        db.session.add(OptimizationRecommendation(
+            resource_id=res.id,
+            provider_id=rec['p'].id,
+            recommendation_type=rec['type'],
+            category='cost',
+            severity=rec['sev'],
+            title=rec['title'],
+            description=rec['desc'],
+            estimated_monthly_savings=rec['save'],
+            currency='RUB',
+            resource_type=res.resource_type,
+            resource_name=res.resource_name,
+            metrics_snapshot=json.dumps(rec.get('metrics', {})),
+            insights=json.dumps({'explanation': 'Автоматически сгенерировано для демо'}),
+            status='pending'
+        ))
+        created += 1
     db.session.commit()
-    print(f"✅ Created {len(recommendations)} recommendations")
+    print(f"✅ Created {created} recommendations")
     
     # Summary
     print("\n" + "="*60)
@@ -423,10 +485,13 @@ def seed_demo_user():
     print(f"Demo User ID: {demo_user.id}")
     print(f"Email: {demo_user.email}")
     print(f"Password: demo")
-    print(f"\nProviders: 2 (Beget, Selectel)")
-    print(f"Resources: {len(beget_resources) + len(selectel_resources)}")
-    print(f"Recommendations: {len(recommendations)}")
-    print(f"Total Monthly Cost: ₽{660 + 57450:,}")
+    total_monthly = 166600 + 104300 + 104250 + 41850
+    print(f"\nProviders: 4 (Selectel BU-A, Selectel BU-B, Beget Prod, Beget Dev)")
+    # Count resources for demo user
+    total_resources = Resource.query.join(CloudProvider, Resource.provider_id == CloudProvider.id).filter(CloudProvider.user_id == demo_user.id).count()
+    print(f"Resources: {total_resources}")
+    print(f"Recommendations: {created}")
+    print(f"Total Monthly Cost: ₽{total_monthly:,}")
     print("="*60)
     
     return demo_user
