@@ -106,14 +106,13 @@ def edit_connection(provider_id):
     """Edit Beget connection"""
     try:
         if 'user' not in session:
-            return redirect(url_for('auth.login'))
+            return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
         user_id = session['user']['id']
         provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
         
         if not provider:
-            flash('Connection not found', 'error')
-            return redirect(url_for('main.connections'))
+            return jsonify({'success': False, 'message': 'Provider not found'}), 404
         
         if request.method == 'POST':
             # Update connection
@@ -125,16 +124,14 @@ def edit_connection(provider_id):
             sync_interval = request.form.get('sync_interval', 'daily')
             
             if not all([connection_name, username, password]):
-                flash('All fields are required', 'error')
-                return redirect(url_for('beget.edit_connection', provider_id=provider_id))
+                return jsonify({'success': False, 'message': 'All fields are required'}), 400
             
             # Test connection first
             client = BegetAPIClient(username, password, api_url)
             test_result = client.test_connection()
             
             if test_result['status'] != 'success':
-                flash(f'Connection test failed: {test_result["message"]}', 'error')
-                return redirect(url_for('beget.edit_connection', provider_id=provider_id))
+                return jsonify({'success': False, 'message': f"Connection test failed: {test_result['message']}"}), 400
             
             # Update provider
             provider.connection_name = connection_name
@@ -149,8 +146,7 @@ def edit_connection(provider_id):
             provider.sync_interval = sync_interval
             
             db.session.commit()
-            flash('Connection updated successfully', 'success')
-            return redirect(url_for('main.connections'))
+            return jsonify({'success': True, 'message': 'Connection updated successfully'})
         
         # GET request - show edit form
         credentials = json.loads(provider.credentials) if provider.credentials else {}
@@ -169,8 +165,7 @@ def edit_connection(provider_id):
         })
         
     except Exception as e:
-        flash(f'Error updating connection: {str(e)}', 'error')
-        return redirect(url_for('main.connections'))
+        return jsonify({'success': False, 'message': f'Error updating connection: {str(e)}'}), 500
 
 @beget_bp.route('/<int:provider_id>/sync', methods=['POST'])
 def sync_connection(provider_id):

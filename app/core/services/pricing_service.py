@@ -110,17 +110,23 @@ class PricingService:
 
         try:
             # Remove previous snapshot for this provider (optionally scoped by resource type/region)
-            query = ProviderPrice.query.filter_by(provider=provider)
+            # We must delete dependent price_history rows first to satisfy FK constraints
+            price_ids_subq = db.session.query(ProviderPrice.id).filter(ProviderPrice.provider == provider)
             if resource_type:
-                query = query.filter_by(resource_type=resource_type)
+                price_ids_subq = price_ids_subq.filter(ProviderPrice.resource_type == resource_type)
             if region:
-                query = query.filter_by(region=region)
+                price_ids_subq = price_ids_subq.filter(ProviderPrice.region == region)
 
-            deleted = query.delete(synchronize_session=False)
+            # Delete history records referencing the target prices
+            history_deleted = db.session.query(PriceHistory).filter(PriceHistory.price_id.in_(price_ids_subq)).delete(synchronize_session=False)
+
+            # Now delete the prices themselves
+            deleted = db.session.query(ProviderPrice).filter(ProviderPrice.id.in_(price_ids_subq.subquery())).delete(synchronize_session=False)
             if deleted:
                 logger.info(
-                    "Removed %d existing price records for provider=%s resource_type=%s region=%s",
+                    "Removed %d price records and %d history rows for provider=%s resource_type=%s region=%s",
                     deleted,
+                    history_deleted,
                     provider,
                     resource_type,
                     region,

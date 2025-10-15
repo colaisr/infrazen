@@ -68,7 +68,7 @@
     {% if providers %}
     <div class="providers-grid">
         {% for provider in providers %}
-        <article class="connection-card">
+        <article class="connection-card" id="provider-{{ provider.id }}" data-provider-type="{{ provider.provider_type }}">
             <div class="card-header">
                 <div class="provider-logo">
                     {% if provider.code == 'yc' %}
@@ -1930,10 +1930,10 @@ function showProviderModalForEdit(connectionData, providerType) {
     changeProvider(); // Trigger the change to show provider-specific fields
     
     // Fill in the existing data after fields are generated
-    // Use a more robust approach to wait for fields
+    // Wait until provider-specific fields are present (supports beget/selectel)
     const waitForFields = () => {
-        const apiKeyField = document.querySelector('input[name="api_key"]');
-        if (apiKeyField) {
+        const readyField = document.querySelector('input[name="api_key"], input[name="username"]');
+        if (readyField) {
             fillEditForm(connectionData);
         } else {
             setTimeout(waitForFields, 50);
@@ -2313,35 +2313,45 @@ window.onclick = function(event) {
 function editConnection(connectionId) {
     // Extract numeric ID and provider type from string like "beget-2" -> ["beget", "2"]
     const parts = connectionId.includes('-') ? connectionId.split('-') : [connectionId];
-    const providerType = parts[0];
-    const numericId = parts[1] || parts[0];
+    const providerType = parts.length === 2 ? parts[0] : (document.querySelector(`#provider-${connectionId}`)?.dataset?.providerType || 'beget');
+    const numericId = parts.length === 2 ? parts[1] : parts[0];
     
     // Show loading state
-    const button = event.target.closest('button');
-    const originalText = button.innerHTML;
-    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Загрузка...</span>';
-    button.disabled = true;
+    const btnEvt = (typeof event !== 'undefined') ? event : null;
+    const button = btnEvt && btnEvt.target ? btnEvt.target.closest('button') : null;
+    const originalText = button ? button.innerHTML : '';
+    if (button) {
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Загрузка...</span>';
+        button.disabled = true;
+    }
     
     // Fetch connection details based on provider type
     const editUrl = `/api/providers/${providerType}/${numericId}/edit`;
+    console.log('Edit URL:', editUrl);
     fetch(editUrl)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Open modal in edit mode
+        .then(async response => {
+            const ct = response.headers.get('content-type') || '';
+            if (!ct.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Unexpected response (${response.status}): ${text.substring(0, 200)}`);
+            }
+            const data = await response.json();
+            if (data && data.success) {
                 showProviderModalForEdit(data.data, providerType);
             } else {
-                showFlashMessage('❌ Ошибка загрузки данных: ' + data.error, 'error');
+                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Неизвестная ошибка';
+                throw new Error(msg);
             }
         })
         .catch(error => {
-            showFlashMessage('❌ Ошибка загрузки данных', 'error');
+            showFlashMessage('❌ Ошибка загрузки данных: ' + (error && error.message ? error.message : ''), 'error');
             console.error('Edit error:', error);
         })
         .finally(() => {
-            // Restore button state
-            button.innerHTML = originalText;
-            button.disabled = false;
+            if (button) {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            }
         });
 }
 
