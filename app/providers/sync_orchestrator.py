@@ -405,6 +405,10 @@ class SyncOrchestrator:
             if hasattr(sync_result, 'resources_synced') and sync_result.resources_synced > 0:
                 sync_snapshot.total_resources_found = sync_result.resources_synced
                 sync_snapshot.resources_created = resources_processed
+                
+                # Set total monthly cost from sync result
+                if hasattr(sync_result, 'total_cost') and sync_result.total_cost is not None:
+                    sync_snapshot.total_monthly_cost = sync_result.total_cost
 
                 # If resource processing failed but sync was successful, mark as partial success
                 if resource_processing_errors and sync_result.success:
