@@ -26,17 +26,75 @@ InfraZen connects to cloud providers via API, automatically ingests billing and 
 - **Typography:** System modern sans-serif family with clear hierarchy, high-contrast text for readability across roles.
 
 ## 6. Platform Architecture & Structure
-- **Prototype Stack:** Flask SSR application rendering Jinja2 templates; Flask serves static assets (CSS/JS/images) alongside HTML.
-- **Application Layout:** Left sidebar navigation, header with module context/actions, dynamic main content area, user profile section anchored to sidebar footer.
-- **Key Directories (prototype):**
-  - `src/main.py` (Flask app & routing)
-  - `src/templates/` (`base.html`, `dashboard.html`, `connections.html`, `resources.html`, `page.html`, `index.html`)
-  - `src/static/` (`css/style.css`, favicon, imagery)
-  - `src/data/mock_data.py` (comprehensive demo data for Yandex Cloud & Selectel)
-  - `src/routes/` (main.py, auth.py, user.py - modular routing)
-  - `src/models/` (user.py - database models)
-- **Data Flow:** Request → Flask route → data retrieval (DB/mocks) → template render with injected metrics → HTML response → optional JS-driven interactivity (charts, forms).
-- **Current Implementation Status:** Demo-ready prototype with working dashboard, connections, and resources pages. **Enhanced User System** with Google OAuth integration, database persistence, and role-based access control fully implemented. Clean separation between demo users (mock data) and real users (database data). Demo user session automatically enabled with realistic Yandex Cloud and Selectel infrastructure data (8 resources, 2 providers, cost analytics, recommendations). Real users see empty state until they add actual cloud connections. Full CRUD operations implemented for cloud provider connections with comprehensive edit functionality, provider pre-selection, and secure credential management. **Complete Admin System** with dashboard, user management, role assignment, impersonation capabilities, and navigation interface.
+
+### **Production Stack**
+- **Backend**: Flask SSR application with Jinja2 templates, Gunicorn WSGI server, MySQL database
+- **Frontend**: Server-side rendered HTML with vanilla JavaScript for interactivity
+- **Infrastructure**: Nginx reverse proxy, systemd service management, HTTPS via Let's Encrypt
+- **Deployment**: Git-based CI/CD with Alembic migrations, zero-downtime reloads
+
+### **Application Layout**
+- Left sidebar navigation with module switching
+- Header with context/actions and user profile
+- Dynamic main content area with real-time data
+- User profile section anchored to sidebar footer
+
+### **Key Directories**
+```
+app/
+├── __init__.py              # Flask application factory
+├── config.py                # Environment-specific configuration
+├── api/                     # RESTful API endpoints
+│   ├── admin.py             # Admin operations
+│   ├── auth.py              # Authentication & OAuth
+│   ├── providers.py         # Provider management
+│   ├── resources.py         # Resource operations
+│   └── recommendations.py   # Optimization recommendations
+├── web/
+│   └── main.py              # Web routes and view logic
+├── templates/               # Jinja2 HTML templates
+│   ├── base.html            # Base layout with sidebar
+│   ├── dashboard.html       # Main dashboard
+│   ├── connections.html     # Cloud provider connections
+│   ├── resources.html       # Resource inventory
+│   ├── recommendations.html # Optimization recommendations
+│   ├── login.html           # Authentication page
+│   └── admin/               # Admin interface templates
+├── static/
+│   ├── css/                 # Modular CSS architecture
+│   ├── favicon.ico
+│   └── provider_logos/      # Cloud provider branding
+├── core/
+│   ├── database.py          # SQLAlchemy setup
+│   ├── models/              # Database models (User, Provider, Resource, etc.)
+│   └── services/            # Business logic (pricing, sync, etc.)
+└── providers/               # Plugin-based provider integrations
+    ├── base/                # Base provider classes
+    ├── plugins/             # Provider implementations (beget.py, selectel.py)
+    ├── beget/               # Beget-specific client and routes
+    ├── selectel/            # Selectel-specific client and routes
+    └── sync_orchestrator.py # Multi-provider sync coordination
+```
+
+### **Data Flow**
+```
+User Request → Nginx → Gunicorn → Flask Route → 
+  → Business Logic (Services/Plugins) → 
+  → Database (MySQL) → 
+  → Template Render → 
+  → HTML Response → 
+  → Client (with Chart.js for visualizations)
+```
+
+### **Current Implementation Status**
+✅ **Production-ready** multi-cloud FinOps platform with:
+- **Authentication**: Google OAuth integration with role-based access control (user/admin/super_admin)
+- **Provider Support**: Beget and Selectel integrations with billing-first sync
+- **Resource Tracking**: Real-time resource inventory with cost analysis and fresh snapshots per sync
+- **Demo System**: Database-backed demo user with 4 providers, ~45 resources, 20 recommendations
+- **Admin Panel**: Complete user management, provider catalog, unrecognized resources tracking
+- **Security**: HTTPS, SSH key auth, environment secrets, database connection pooling
+- **Monitoring**: systemd logs, health checks, graceful deployments
 
 ## 6.1. Enhanced User System & Authentication
 
@@ -728,22 +786,44 @@ CREATE TABLE resource_states (
 - **Add-on Revenue:** Consulting, training, white-label deployments, turnkey implementations.
 - **Scalability:** Pricing scales with infrastructure footprint; ARPU grows alongside client expansion.
 
-## 11. Implementation Roadmap (Prototype Focus)
-1. ✅ Set up Flask foundation with base template & sidebar navigation.
-2. ✅ Implement dashboard view populated by mock data (Rubles currency).
-3. ✅ Build cloud connections interface with provider cards and modal workflow.
-4. ✅ Create comprehensive resources inventory with detailed resource management.
-5. ✅ Implement demo user session with realistic Yandex Cloud and Selectel data.
-6. ✅ Add JSON API endpoints for demo data access.
-7. ✅ Implement Google OAuth authentication with profile integration.
-8. ✅ Separate demo users (mock data) from real users (database data) with conditional UI.
-9. ✅ Implement full CRUD operations for cloud provider connections with edit functionality.
-10. ✅ Add provider pre-selection and comprehensive connection management features.
-11. ✅ Implement provider-grouped resources page with collapsible sections and performance visualization.
-12. 🔄 Introduce cost analytics, budgeting, and recommendations views with placeholder charts (Chart.js/D3).
-13. 🔄 Layer responsive design (mobile-first; collapsible sidebar, grid-based cards).
-14. 🔄 Integrate Telegram bot and notification hooks (future phase).
-15. 🔄 Deploy demo-ready prototype.
+## 11. Implementation Status & Roadmap
+
+### **✅ Completed (Production)**
+1. ✅ Flask foundation with base template & sidebar navigation
+2. ✅ Dashboard view with real-time cost analytics and KPIs
+3. ✅ Cloud connections interface with provider cards and modal workflows
+4. ✅ Comprehensive resources inventory with detailed management
+5. ✅ Demo user system with realistic multi-provider data (Beget, Selectel)
+6. ✅ RESTful API endpoints for all operations
+7. ✅ Google OAuth authentication with role-based access control
+8. ✅ Separation between demo users and real users with conditional UI
+9. ✅ Full CRUD operations for cloud provider connections
+10. ✅ Provider pre-selection and comprehensive connection management
+11. ✅ Provider-grouped resources page with collapsible sections
+12. ✅ VPS performance visualization with Chart.js
+13. ✅ Optimization recommendations system
+14. ✅ Admin panel with user management and impersonation
+15. ✅ MySQL database with Alembic migrations
+16. ✅ Production deployment on Beget VPS with HTTPS
+17. ✅ Git-based CI/CD with zero-downtime deployments
+18. ✅ Fresh snapshot architecture for resource tracking
+19. ✅ Beget and Selectel billing-first integrations
+20. ✅ Unrecognized resource tracking system
+
+### **🔄 In Progress**
+- Enhanced cost analytics and trend visualization
+- Budget tracking and forecasting
+- Multi-provider price comparison
+- Responsive mobile design improvements
+
+### **📋 Planned (Future Phases)**
+- Telegram bot integration for notifications
+- Yandex Cloud provider integration
+- VK Cloud provider integration
+- Advanced FinOps recommendations with AI
+- Multi-currency support beyond RUB
+- Team collaboration features
+- API for third-party integrations
 
 ## 12. Data & Integration Requirements
 - Provider API connectors (Yandex.Cloud, VK Cloud, Selectel, GCP, AWS, Azure for future expansion).
@@ -1066,12 +1146,12 @@ Deep analysis of internal resource components:
 - 🔄 Multi-tenant support for MSPs
 - 🔄 API integrations for third-party tools
 
-## 6.2. Daily Cost Baseline Implementation
+## 13.6. Daily Cost Baseline Implementation
 
-### 6.2.1. FinOps Strategy Overview
+### 13.6.1. FinOps Strategy Overview
 The InfraZen platform implements a **daily cost baseline strategy** for unified cost analysis across all cloud providers. This approach provides FinOps teams with consistent daily metrics for cost optimization, resource right-sizing, and budget forecasting.
 
-### 6.2.2. Database Schema Enhancement
+### 13.6.2. Database Schema Enhancement
 **New Resource Fields:**
 - `daily_cost`: Normalized daily cost for FinOps analysis
 - `original_cost`: Original provider cost (monthly/yearly)
@@ -1086,7 +1166,7 @@ ALTER TABLE resources ADD COLUMN cost_period VARCHAR(20);
 ALTER TABLE resources ADD COLUMN cost_frequency VARCHAR(20);
 ```
 
-### 6.2.3. Cost Normalization Logic
+### 13.6.3. Cost Normalization Logic
 **Automatic Conversion Rules:**
 - **Daily**: Use as-is (22 RUB/day)
 - **Monthly**: Convert to daily (660 RUB ÷ 30 = 22 RUB/day)
@@ -1104,7 +1184,7 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
     else: return original_cost / 30  # default to monthly
 ```
 
-### 6.2.4. Provider Integration
+### 13.6.4. Provider Integration
 **Beget API Enhancement:**
 - Extract `price_day` when available from Beget API
 - Fallback to `price_month ÷ 30` for daily baseline
@@ -1115,7 +1195,7 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
 - `_update_existing_resource()` updates daily costs
 - Automatic cost normalization during sync
 
-### 6.2.5. UI Enhancement
+### 13.6.5. UI Enhancement
 **Resource Cards Display:**
 - **Primary**: Daily cost (22.00 RUB/day) - Prominent display
 - **Secondary**: Monthly cost (660.00 RUB/month) - Reference information
@@ -1139,7 +1219,7 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
 }
 ```
 
-### 6.2.6. FinOps Benefits
+### 13.6.6. FinOps Benefits
 **Strategic Advantages:**
 - ✅ **Unified Comparison**: Compare AWS, Azure, GCP, Beget in daily terms
 - ✅ **Cost Optimization**: "Save 5 RUB/day by switching plans"
@@ -1154,7 +1234,7 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
 - **VPS 2**: 9.73 RUB/day (291.90 RUB/month)
 - **Conversion Accuracy**: 100% (verified)
 
-### 6.2.7. Future Enhancements
+### 13.6.7. Future Enhancements
 **Multi-Provider Support:**
 - AWS EC2 daily cost normalization
 - Azure VM daily cost normalization
@@ -1167,18 +1247,18 @@ def normalize_to_daily_cost(original_cost, period, frequency='recurring'):
 - Budget variance analysis
 - Cost anomaly detection
 
-## 6.3. Beget Account Information Integration
+## 13.7. Beget Account Information Integration
 
-### 6.3.1. Overview
+### 13.7.1. Overview
 The InfraZen platform now integrates with Beget's Account Information API to provide comprehensive account details and FinOps insights directly in the connections interface.
 
-### 6.3.2. API Integration
+### 13.7.2. API Integration
 - **Endpoint**: `https://api.beget.com/api/user/getAccountInfo`
 - **Authentication**: Username/password based
 - **Data Collection**: During sync operations
 - **Storage**: JSON metadata in `cloud_providers.provider_metadata`
 
-### 6.3.3. Account Information Properties
+### 13.7.3. Account Information Properties
 
 #### 6.3.3.1. Basic Account Details
 - **account_id**: User account identifier (e.g., "colaiswv")
@@ -1232,7 +1312,7 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **days_until_block**: Critical alert for account suspension
 - **cost_per_day**: Daily cost baseline for FinOps
 
-### 6.3.4. User Interface Implementation
+### 13.7.4. User Interface Implementation
 
 #### 6.3.4.1. Collapsible Account Information Section
 - **Location**: Below "Добавлен:" line in provider cards
@@ -1257,7 +1337,7 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **Progress Indicators**: Usage vs limits visualization
 - **Icons**: User, server, and service-specific icons
 
-### 6.3.5. Technical Implementation
+### 13.7.5. Technical Implementation
 
 #### 6.3.5.1. Backend Changes
 - **Flask Route**: Added `provider_metadata` to connections route
@@ -1276,7 +1356,7 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **Updates**: Refreshed during each sync operation
 - **Storage**: JSON string with structured account data
 
-### 6.3.6. FinOps Benefits
+### 13.7.6. FinOps Benefits
 
 #### 6.3.6.1. Cost Visibility
 - **Daily Cost Baseline**: Normalized daily costs across all resources
@@ -1296,7 +1376,7 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **Server Information**: Infrastructure health monitoring
 - **Security Status**: Access and control panel availability
 
-### 6.3.7. Integration Points
+### 13.7.7. Integration Points
 
 #### 6.3.7.1. Sync Process
 - **Collection**: Account info gathered during sync
@@ -1310,21 +1390,21 @@ The InfraZen platform now integrates with Beget's Account Information API to pro
 - **Real-time Updates**: Information refreshed on sync
 - **User Experience**: Intuitive expand/collapse interaction
 
-### 6.3.8. Future Enhancements
+### 13.7.8. Future Enhancements
 
 #### 6.3.8.1. Additional Providers
 - **AWS**: Account information integration
 - **Azure**: Subscription and billing details
 - **GCP**: Project and billing account info
 
-## 6.4. Beget Dual-Endpoint Integration
+## 13.8. Beget Dual-Endpoint Integration
 
-### 6.4.1. Overview
+### 13.8.1. Overview
 The InfraZen platform now implements a comprehensive dual-endpoint integration with Beget, combining both legacy and modern API endpoints to provide complete coverage of Beget infrastructure resources. This integration ensures maximum data collection while maintaining reliability through separate error handling for each endpoint.
 
-### 6.4.2. Dual-Endpoint Architecture
+### 13.8.2. Dual-Endpoint Architecture
 
-#### 6.4.2.1. Endpoint Strategy
+#### 13.8.2.1. Endpoint Strategy
 - **Legacy Endpoints**: Account information, domains, databases, FTP, email accounts
 - **Modern VPS API**: VPS server details, infrastructure specifications, admin credentials
 - **Hybrid Authentication**: JWT Bearer tokens for modern endpoints, username/password for legacy
@@ -1338,7 +1418,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **FTP Accounts**: `https://api.beget.com/api/ftp/getList`
 - **Email Accounts**: `https://api.beget.com/api/mail/getList`
 
-### 6.4.3. Enhanced Data Collection
+### 13.8.3. Enhanced Data Collection
 
 #### 6.4.3.1. Account Information (Legacy API)
 - **Account Details**: User ID, status, balance, subscription plans
@@ -1359,7 +1439,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **FTP Services**: FTP accounts, access permissions, storage quotas
 - **Email Services**: Email accounts, mailboxes, forwarding rules
 
-### 6.4.4. Sync Process Implementation
+### 13.8.4. Sync Process Implementation
 
 #### 6.4.4.1. Dual-Endpoint Sync Flow
 1. **Authentication**: JWT Bearer token for modern endpoints, username/password for legacy
@@ -1375,7 +1455,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Partial Success**: System continues with available data
 - **Graceful Degradation**: Fallback to available endpoints
 
-### 6.4.5. Technical Implementation
+### 13.8.5. Technical Implementation
 
 #### 6.4.5.1. BegetAPIClient Enhancements
 - **`get_vps_servers_new_api()`**: Modern VPS API integration
@@ -1395,7 +1475,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Account Metadata**: Complete account information and service limits
 - **Cost Tracking**: Daily and monthly cost baselines for FinOps analysis
 
-### 6.4.6. FinOps Benefits
+### 13.8.6. FinOps Benefits
 
 #### 6.4.6.1. Comprehensive Cost Visibility
 - **VPS Costs**: Per-server daily and monthly costs
@@ -1415,7 +1495,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Access Control**: SSH and admin access management
 - **Cost Analysis**: Detailed cost breakdown and optimization opportunities
 
-### 6.4.7. Integration Results
+### 13.8.7. Integration Results
 
 #### 6.4.7.1. Successful Endpoints
 - **Account Information**: ✅ Complete account details and service limits
@@ -1432,7 +1512,7 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Error Handling**: Graceful degradation with detailed error reporting
 - **Cost Tracking**: Complete cost visibility across all accessible services
 
-### 6.4.8. Future Enhancements
+### 13.8.8. Future Enhancements
 
 #### 6.4.8.1. Additional Endpoints
 - **Logs Access**: System and application logs
@@ -1449,14 +1529,14 @@ The InfraZen platform now implements a comprehensive dual-endpoint integration w
 - **Reporting**: Account information reports
 - **API Access**: Programmatic account information access
 
-## 6.5. Selectel Multi-Region & Volume Integration
+## 13.9. Selectel Multi-Region & Volume Integration
 
-### 6.5.1. Overview
+### 13.9.1. Overview
 The InfraZen platform implements comprehensive multi-region support for Selectel cloud infrastructure, with automated region discovery and standalone volume tracking. This integration ensures complete visibility across all Selectel regions and resource types, including unattached storage volumes that are often missed in traditional cloud inventory systems.
 
-### 6.5.2. Multi-Region Architecture
+### 13.9.2. Multi-Region Architecture
 
-#### 6.5.2.1. Dynamic Region Discovery
+#### 13.9.2.1. Dynamic Region Discovery
 The Selectel integration automatically discovers all available regions from the OpenStack service catalog during authentication:
 
 **Supported Regions:**
@@ -1484,7 +1564,7 @@ All resource types are queried across ALL discovered regions to ensure complete 
 - **Ports**: Network interfaces and IP assignments
 - **Networks**: Virtual network configurations
 
-### 6.5.3. Standalone Volume Support
+### 13.9.3. Standalone Volume Support
 
 #### 6.5.3.1. Problem Statement
 Traditional cloud inventory systems often track only volumes attached to virtual machines, missing standalone storage volumes that continue to incur costs. These unattached volumes represent significant cost optimization opportunities.
@@ -1522,7 +1602,7 @@ Each volume resource captures comprehensive details:
 - Bootable flag
 - Daily, monthly, and hourly costs
 
-### 6.5.4. Technical Implementation
+### 13.9.4. Technical Implementation
 
 #### 6.5.4.1. SelectelClient Enhancements
 **Region Management:**
@@ -1569,7 +1649,7 @@ for volume_data in volumes_list:
     volume_resource.original_cost = cost_data['monthly_cost_rubles']
 ```
 
-### 6.5.5. OpenStack API Integration
+### 13.9.5. OpenStack API Integration
 
 #### 6.5.5.1. Authentication
 **IAM Token Generation:**
@@ -1592,7 +1672,7 @@ for volume_data in volumes_list:
 - `GET /network/v2.0/ports` - Network ports and interfaces
 - `GET /network/v2.0/networks` - Virtual networks
 
-### 6.5.6. Sync Process Flow
+### 13.9.6. Sync Process Flow
 
 #### 6.5.6.1. Multi-Region Sync
 1. **Authentication**: Generate IAM token and extract service catalog
@@ -1615,7 +1695,7 @@ for volume_data in volumes_list:
 - Log warnings for inaccessible regions
 - Fallback to hardcoded region list if discovery fails
 
-### 6.5.7. Benefits & Use Cases
+### 13.9.7. Benefits ### 6.5.7. Benefits & Use Cases Use Cases
 
 #### 6.5.7.1. Cost Optimization
 - **Zombie Volume Detection**: Identify unattached volumes incurring costs
@@ -1629,7 +1709,7 @@ for volume_data in volumes_list:
 - **Capacity Planning**: Analyze resource usage across regions
 - **Compliance**: Ensure resources are deployed in approved regions
 
-### 6.5.8. Future Enhancements
+### 13.9.8. Future Enhancements
 
 #### 6.5.8.1. Additional Resource Types
 - Object Storage (S3-compatible)
@@ -1651,7 +1731,7 @@ for volume_data in volumes_list:
 - Track volume usage patterns for rightsizing
 - Monitor cross-region data transfer costs
 
-### 6.5.9. Implementation Status
+### 13.9.9. Implementation Status
 
 #### 6.5.9.1. Completed Features ✅
 - ✅ Dynamic region discovery from service catalog
@@ -1749,11 +1829,11 @@ Fixed critical issues in the Selectel volume sync process to ensure accurate res
      - ✅ Annemarie: Correctly identified as zombie (DELETED_BILLED)
    - **Impact**: Full support for multi-tenant Selectel environments with resources across multiple projects
 
-## 12. Beget Cloud API Enrichment Analysis
+## 13.10. Beget Cloud API Enrichment Analysis
 
-### 12.1. Current Data Collection & Storage Architecture
+### 13.10.1. Current Data Collection & Storage Architecture
 
-#### 12.1.1. Database Object Dependencies
+#### 13.10.1.1. Database Object Dependencies
 ```
 User (1) → CloudProvider (N) → Resource (N) → ResourceState (N)
                     ↓
@@ -1781,7 +1861,7 @@ User (1) → CloudProvider (N) → Resource (N) → ResourceState (N)
 - **Current**: 2 VPS instances (Objective Perrin, runner rus)
 - **Status**: Both RUNNING
 
-### 12.2. New Cloud Endpoint Discovery (`/v1/cloud`)
+### 13.10.2. New Cloud Endpoint Discovery (`/v1/cloud`)
 
 #### 12.2.1. Cloud Services Available
 **MySQL Cloud Database**
@@ -1805,7 +1885,7 @@ User (1) → CloudProvider (N) → Resource (N) → ResourceState (N)
 - **Cost Breakdown**: Daily and monthly costs per VPS
 - **Admin Access**: SSH, application admin credentials
 
-### 12.3. Enrichment Strategy: Organic Growth Without Duplication
+### 13.10.3. Enrichment Strategy: Organic Growth Without Duplication
 
 #### 12.3.1. Phase 1: New Resource Types (No Conflicts)
 **MySQL Cloud Database**
@@ -1894,7 +1974,7 @@ total_monthly_costs = {
 }
 ```
 
-### 12.4. Implementation Strategy: Zero-Breaking Changes
+### 13.10.4. Implementation Strategy: Zero-Breaking Changes
 
 #### 12.4.1. Additive Approach
 - **New Resources**: Add MySQL Database and S3 Storage as new resource types
@@ -1934,7 +2014,7 @@ def enrich_existing_resources(sync_result):
 - **UI components**: Progressive enhancement
 - **Sync process**: Additive, not replacement
 
-### 12.5. Expected Results After Enrichment
+### 13.10.5. Expected Results After Enrichment
 
 #### 12.5.1. Resource Count
 - **Before**: 6 domains + 2 VPS = 8 resources
@@ -1956,7 +2036,7 @@ def enrich_existing_resources(sync_result):
 - **Database integrity**: Preserved
 - **API compatibility**: Maintained
 
-### 12.6. Implementation Readiness
+### 13.10.6. Implementation Readiness
 
 #### 12.6.1. Technical Prerequisites
 - ✅ Beget API authentication working
@@ -1978,7 +2058,7 @@ def enrich_existing_resources(sync_result):
 - **Performance**: Minimal impact on sync performance
 - **Rollback**: Easy rollback if issues arise
 
-### 12.7. Implementation Results
+### 13.10.7. Implementation Results
 
 #### 12.7.1. Successfully Implemented Features
 - ✅ **Cloud Services Processing**: MySQL Database and S3 Storage integration
@@ -2080,7 +2160,7 @@ def enrich_existing_resources(sync_result):
 - **Resource Tracking**: Complete audit trail of all resource changes
 - **Admin Access**: Centralized management of admin credentials and access
 
-### 12.8. VPS Performance Statistics Integration
+### 13.10.8. VPS Performance Statistics Integration
 
 #### 12.8.1. CPU Usage Statistics
 **API Endpoint**: `/v1/vps/statistic/cpu/{VPS_ID}`
@@ -2185,7 +2265,7 @@ def enrich_existing_resources(sync_result):
 - **Automated Optimization**: Foundation for automated right-sizing recommendations
 - **Cost Intelligence**: Enhanced FinOps capabilities with performance data
 
-### 12.9. Interactive Performance Visualization
+### 13.10.9. Interactive Performance Visualization
 
 #### 12.9.1. Usage Section Implementation
 The platform now features an interactive "Usage" section within each resource card that provides:
@@ -2241,7 +2321,7 @@ The platform now features an interactive "Usage" section within each resource ca
 - **Cost-Performance Correlation**: Link resource costs to actual utilization
 - **Capacity Planning**: Historical data supports future resource allocation
 
-### 12.10. Selectel Provider Integration ✅ COMPLETED
+### 13.10.10. Selectel Provider Integration ✅ COMPLETED
 
 #### 12.10.1. Overview
 The InfraZen platform now includes complete integration with Selectel cloud provider, enabling users to connect, manage, and synchronize Selectel resources through the unified FinOps interface. This integration supports both account-level resources and project-scoped cloud resources (VMs, volumes, networks) through a sophisticated authentication system.
@@ -2436,7 +2516,7 @@ vm_resource = {
 - **Snapshot Management**: Historical data for capacity planning and optimization
 - **Admin Panel Parity**: Resource display matches Selectel's own admin interface
 
-### 12.11. Snapshot-Based Resource Display Architecture ✅ COMPLETED
+### 13.10.11. Snapshot-Based Resource Display Architecture ✅ COMPLETED
 
 #### 12.11.1. Overview
 The InfraZen platform now implements a sophisticated snapshot-based resource display system that shows resources from the latest successful sync snapshot for each provider. This architecture ensures users see the most current resource state while maintaining complete historical data for analysis and optimization.
@@ -2556,7 +2636,7 @@ CREATE TABLE resource_states (
 - **Change Tracking**: Detailed change detection for operational insights
 - **Data Integrity**: No data loss through snapshot-based approach
 
-### 12.12. Provider-Grouped Resources Page Architecture
+### 13.10.12. Provider-Grouped Resources Page Architecture
 
 #### 12.12.1. Overview
 The InfraZen platform now features a completely reorganized resources page that groups resources by cloud provider in collapsible sections, providing better organization, navigation, and user experience for managing multi-cloud infrastructure.
@@ -2651,358 +2731,15 @@ The InfraZen platform now features a completely reorganized resources page that 
 - **Budget Management**: Clear cost visibility for budget planning and forecasting
 - **Multi-Cloud Strategy**: Unified view supports multi-cloud cost optimization
 
-## 13. Recent Development Achievements (Latest Updates)
 
-### 13.1. Selectel Provider Integration ✅ COMPLETED & ENHANCED (October 2025)
-**Major Accomplishments:**
-- **Complete API Integration**: Successfully integrated with Selectel's dual API system (Account/Project APIs + OpenStack APIs)
-- **Dual Authentication System**: Implemented static token (X-Token) + service user credentials for comprehensive access
-- **Cloud Resource Discovery**: Successfully retrieved VMs, volumes, and networks from Selectel's OpenStack infrastructure
-- **IAM Token Generation**: Dynamic IAM token generation with project scoping for secure resource access
-- **Frontend Integration**: Enhanced connection forms with service user credentials and real-time testing
-- **Combined Resource View**: VMs now integrate attached volumes and network information (October 2025 enhancement)
-- **Complete VM Specifications**: Full display of vCPUs, RAM, storage, IPs, and attached volumes
-- **Network Port Integration**: Clean IP address extraction from OpenStack network ports API
-- **Template Compatibility**: Multi-provider field name support (cpu_cores/vcpus, disk_gb/total_storage_gb)
+## 14. Enhanced Unrecognized Resource Tracking System ✅ IMPLEMENTED
 
-### 13.2. Snapshot-Based Architecture ✅ COMPLETED
-**Key Features Implemented:**
-- **Sync Snapshots**: Complete sync history with `SyncSnapshot` model tracking all synchronization operations
-- **Resource States**: `ResourceState` model linking resources to specific snapshots with change tracking
-- **Change Detection**: Automated comparison between resource states (created, updated, deleted, unchanged)
-- **Historical Preservation**: Complete audit trail for FinOps analysis and trend tracking
-- **Snapshot-Based Display**: Resources shown from latest successful sync snapshots
-
-### 13.3. Technical Achievements
-**Database Enhancements:**
-- **Unified Models**: All providers use consistent `CloudProvider`, `Resource`, `SyncSnapshot`, and `ResourceState` models
-- **JSON Serialization**: Flexible storage of resource state changes and provider-specific configurations
-- **Change Tracking**: Detailed change detection with previous/current state comparison
-- **Audit Trail**: Complete history of all resource modifications and sync operations
-
-**API Integration:**
-- **Selectel APIs**: `/accounts`, `/projects`, `/users`, `/roles`, `/v1/jwt`, `/identity/v3/auth/tokens`
-- **OpenStack APIs**: `/compute/v2.1/servers/detail`, `/volume/v3/volumes/detail`, `/network/v2.0/networks`
-- **Beget APIs**: Dual-endpoint integration with legacy and modern VPS APIs
-- **Authentication**: Multiple authentication methods (static tokens, service user credentials, JWT, IAM tokens)
-
-### 13.4. Business Value Delivered
-**FinOps Capabilities:**
-- **Multi-Cloud Support**: Beget and Selectel fully integrated with unified cost tracking
-- **Cost Visibility**: Complete cost breakdown across all providers with daily cost baselines
-- **Resource Management**: Full resource lifecycle management with change tracking
-- **Historical Analysis**: Complete sync history for trend analysis and optimization
-- **Audit Compliance**: Complete audit trail for compliance and governance
-
-**Operational Benefits:**
-- **Unified Interface**: Single interface for multiple cloud providers
-- **Automated Discovery**: Automatic resource detection and tracking
-- **Real-time Sync**: Live resource synchronization with snapshot-based history
-- **Change Tracking**: Detailed change detection for operational insights
-- **Data Integrity**: No data loss through snapshot-based approach
-
-### 13.5. Current System Capabilities
-**Provider Support:**
-- **Beget**: Complete integration with dual-endpoint API, VPS infrastructure, account information, and performance statistics
-- **Selectel**: Complete integration with combined resource architecture
-  - Dual authentication (static token + service user credentials)
-  - Combined VM resources with integrated volumes and network information
-  - Complete VM specifications (vCPUs, RAM, flavor, storage, IPs)
-  - OpenStack API integration for cloud resource discovery
-  - Network port API for clean IP address extraction
-  - Snapshot-based sync with full change tracking
-- **Future Providers**: Architecture ready for AWS, Azure, GCP, Yandex Cloud, VK Cloud integration
-
-**Data Management:**
-- **Snapshot-Based Sync**: Complete sync history with change tracking
-- **Resource States**: Detailed resource lifecycle management
-- **Cost Tracking**: Daily cost baselines across all providers
-- **Performance Monitoring**: CPU and memory usage statistics with Chart.js visualization (Beget)
-- **Historical Data**: Complete audit trail for FinOps analysis
-- **Combined Resources**: Intelligent data merging from multiple API endpoints
-- **Multi-Provider Compatibility**: Template supports different field naming conventions
-
-## 14. October 2025 Enhancement Summary
-
-### 14.1. Selectel Resource Combination Improvements
-**Date**: October 4, 2025
-**Objective**: Improve Selectel resource display to match admin panel and Beget implementation patterns
-
-**Changes Implemented:**
-1. **Client Enhancement** (`app/providers/selectel/client.py`)
-   - Added `get_openstack_ports()` method for network interface data
-   - Added `get_combined_vm_resources()` method for intelligent data merging
-   - Modified `get_all_resources()` to return combined VMs instead of separate resources
-
-2. **Service Enhancement** (`app/providers/selectel/service.py`)
-   - Enhanced metadata storage with complete VM specifications
-   - Removed separate volume and network processing
-   - Integrated volumes and network info into VM resources
-
-3. **Template Enhancement** (`app/templates/resources.html`)
-   - Added support for `vcpus` field (Selectel) in addition to `cpu_cores` (Beget)
-   - Added support for `total_storage_gb` field (Selectel) in addition to `disk_gb` (Beget)
-   - Ensures multi-provider field name compatibility
-
-**Results:**
-- VMs now display complete specifications: vCPUs, RAM, flavor, storage, IPs
-- Volumes integrated into VM resources (not shown separately)
-- Network information integrated (IP addresses, MAC addresses)
-- Resource count reduced from 8 to 4 (cleaner, more accurate view)
-- UI matches Selectel admin panel exactly
-- Consistent with Beget provider implementation
-
-**API Endpoints:**
-- Uses 6 endpoints (same count as before)
-- Replaced `/network/v2.0/networks` with `/network/v2.0/ports` for better IP extraction
-- All other endpoints remain the same
-
-**Technical Details:**
-- Data combination happens in `get_combined_vm_resources()` method
-- Volume mapping: `volume_by_server[server_id]` using `attachments.server_id`
-- Port mapping: `port_by_server[server_id]` using `device_id` and `device_owner`
-- Total storage: Calculated by summing all attached volume sizes
-
-### 14.2. Selectel Statistics Implementation
-**Date**: October 4, 2025
-**Objective**: Add CPU and memory usage statistics for Selectel VMs, matching Beget functionality
-
-**Changes Implemented:**
-1. **Client Enhancement** (`app/providers/selectel/client.py`)
-   - Added `get_server_cpu_statistics()` method to fetch CPU usage data
-   - Added `get_server_memory_statistics()` method to fetch memory usage data
-   - Added `get_all_server_statistics()` method to batch-fetch statistics for all servers
-   - Uses Selectel's Gnocchi API (`/metric/v1/aggregates`) with POST requests
-   - Granularity: 300 seconds (5 minutes, 12 data points per hour)
-   - Data processing: Calculates avg, max, min, trend, and performance tier
-
-2. **Service Enhancement** (`app/providers/selectel/service.py`)
-   - Added `_process_server_statistics()` method to store statistics as resource tags
-   - Integrated statistics fetching during resource sync
-   - Statistics stored in same format as Beget for UI compatibility
-
-3. **Statistics Format** (Beget-compatible)
-   - **CPU Tags**: `cpu_avg_usage`, `cpu_max_usage`, `cpu_min_usage`, `cpu_trend`, `cpu_performance_tier`, `cpu_data_points`, `cpu_period`, `cpu_collection_timestamp`
-   - **Memory Tags**: `memory_avg_usage_mb`, `memory_max_usage_mb`, `memory_min_usage_mb`, `memory_usage_percent`, `memory_trend`, `memory_tier`, `memory_data_points`, `memory_period`, `memory_collection_timestamp`
-
-**Results:**
-- ✅ CPU usage statistics displayed with Chart.js graphs
-- ✅ Memory usage statistics displayed with Chart.js graphs
-- ✅ Performance tiers (LOW/MEDIUM/HIGH) calculated automatically
-- ✅ 100% compatible with existing Beget statistics display code
-- ✅ No template changes needed - uses existing Chart.js rendering
-
-**API Details:**
-- **Endpoint**: `/metric/v1/aggregates` (POST)
-- **Authentication**: X-Auth-Token (IAM token)
-- **Granularity**: 300 seconds (5 minutes) - only supported granularity
-- **Metrics**: 
-  - CPU: `cpu` (percentage)
-  - Memory: `memory.usage` (MB)
-- **Data Points**: 12 per hour (sufficient coverage)
-
-**Limitations:**
-- Selectel only supports 300-second granularity (vs Beget's 60-second)
-- Still provides 12 data points per hour (good coverage)
-- Other granularities (60s, 120s, 180s, 240s, 600s) return 400 Bad Request
-
-### 14.3. Selectel Status Normalization
-**Date**: October 4, 2025
-**Objective**: Normalize Selectel server status to match Beget convention for consistent UI display
-
-**Changes Implemented:**
-1. **Service Enhancement** (`app/providers/selectel/service.py`)
-   - Added status normalization logic in `_create_resource()` method
-   - OpenStack status mapping:
-     - `ACTIVE` → `RUNNING` (matches Beget)
-     - `SHUTOFF` / `STOPPED` → `STOPPED`
-     - `ERROR` / `FAILED` → `ERROR`
-     - Other statuses → uppercased
-   - Status now properly updates during sync operations
-
-**Results:**
-- ✅ Consistent status display across Beget and Selectel providers
-- ✅ Both providers now show `RUNNING` or `STOPPED` states
-- ✅ Status changes detected and tracked in resource states
-- ✅ Beget VPS: `RUNNING` / `STOPPED`
-- ✅ Selectel VMs: `RUNNING` (ACTIVE) / `STOPPED` (SHUTOFF)
-
-**Status Convention:**
-| Provider | Active State | Stopped State | Error State |
-|----------|-------------|---------------|-------------|
-| Beget | RUNNING | STOPPED | ERROR |
-| Selectel (normalized) | RUNNING | STOPPED | ERROR |
-| Selectel (raw OpenStack) | ACTIVE | SHUTOFF | ERROR |
-
-### 14.4. Selectel Cost Tracking Implementation
-**Date**: October 4, 2025
-**Objective**: Implement daily cost tracking for Selectel resources, matching Beget's cost display functionality
-
-**Changes Implemented:**
-1. **Client Enhancement** (`app/providers/selectel/client.py`)
-   - Added `get_resource_costs()` method to fetch consumption data
-   - Uses cloud_billing API (`/v1/cloud_billing/statistic/consumption`)
-   - Fetches 24-hour cost data with hourly granularity
-   - Aggregates VM costs (vCPU + RAM) with attached volume costs
-   - Uses `parent_id` to map volumes to parent VMs
-   - Converts kopecks to rubles (÷100)
-   - Calculates averaged hourly, daily (×24), and monthly (×30) costs
-
-2. **Service Enhancement** (`app/providers/selectel/service.py`)
-   - Added `_update_resource_costs()` method to store costs in database
-   - Integrated cost fetching during resource sync
-   - Updates Resource fields:
-     - `daily_cost`: Daily cost in RUB
-     - `effective_cost`: Same as daily cost (for consistency)
-     - `original_cost`: Monthly projection
-     - `cost_period`: MONTHLY
-     - `cost_frequency`: daily
-     - `currency`: RUB
-   - Stores cost breakdown as tags:
-     - `cost_daily_rubles`
-     - `cost_monthly_rubles`
-     - `cost_hourly_rubles`
-     - `cost_calculation_timestamp`
-
-**Results:**
-- ✅ Daily cost tracking for all Selectel VMs
-- ✅ Includes VM compute costs (vCPU, RAM) + attached volume costs
-- ✅ Same data format as Beget for consistency
-- ✅ Real consumption data from billing API
-- ✅ Example: Doreen VM = 10.37 ₽/day (311.14 ₽/month)
-- ✅ Example: Tilly VM = 10.37 ₽/day (311.14 ₽/month)
-
-**API Details:**
-- **Endpoint**: `/v1/cloud_billing/statistic/consumption` (GET)
-- **Authentication**: X-Token (API key)
-- **Parameters**:
-  - `provider_keys`: vpc, mks, dbaas, craas
-  - `start`/`end`: 24-hour time window
-  - `group_type`: project_object_region_metric
-  - `period_group_type`: hour
-  - `locale`: ru
-- **Response Format**:
-  - `data[]`: Array of consumption records
-  - Each record contains:
-    - `object.id`: Resource ID
-    - `object.parent_id`: For volumes attached to VMs
-    - `metric.id`: Metric type (compute_cores_preemptible, compute_ram_preemptible, volume_gigabytes_universal)
-    - `value`: Cost in kopecks per hour
-    - `period`: Hour timestamp
-- **Cost Calculation**:
-  - Aggregates all metrics for each VM
-  - Includes attached volume costs via parent_id
-  - Averages across all hours in period
-  - Projects to daily and monthly costs
-
-### 14.5. Complete Feature Parity Achieved
-**Beget vs Selectel Comparison:**
-
-| Feature | Beget | Selectel | Status |
-|---------|-------|----------|--------|
-| **Complete Specs** | ✅ vCPUs, RAM, disk | ✅ vCPUs, RAM, storage | ✅ Parity |
-| **Status Display** | ✅ RUNNING/STOPPED | ✅ RUNNING/STOPPED | ✅ Parity |
-| **IP Addresses** | ✅ Yes | ✅ Yes | ✅ Parity |
-| **CPU Statistics** | ✅ ~60-108 points/hour | ✅ 12 points/hour | ✅ Working |
-| **Memory Statistics** | ✅ ~60-108 points/hour | ✅ 12 points/hour | ✅ Working |
-| **Chart.js Graphs** | ✅ Yes | ✅ Yes | ✅ Parity |
-| **Performance Tiers** | ✅ LOW/MED/HIGH | ✅ LOW/MED/HIGH | ✅ Parity |
-| **Data Format** | ✅ Compatible | ✅ Compatible | ✅ Parity |
-| **Combined Resources** | ✅ Single VPS view | ✅ Single VM view | ✅ Parity |
-| **Cost Tracking** | ✅ Daily ₽/day | ✅ Daily ₽/day | ✅ Parity |
-| **Cost Breakdown** | ✅ Tags | ✅ Tags | ✅ Parity |
-| **Currency** | ✅ RUB | ✅ RUB | ✅ Parity |
-
-**Summary:**
-Both Beget and Selectel providers now have complete feature parity with unified data formats, consistent status conventions, comprehensive resource specifications, real-time CPU/memory statistics displayed via Chart.js graphs, and accurate daily cost tracking for FinOps analysis.
-
-## 15. Recent Implementation Updates (October 2025)
-
-### 15.1. Enhanced Authentication & User Management System
-
-#### **Unified Authentication Implementation**
-- **Dual Login Support**: Implemented both Google OAuth and username/password authentication for the same user accounts
-- **Password Management**: Complete password setting and changing functionality with secure hashing
-- **Settings Interface**: Comprehensive user settings page with account management and preferences
-- **Clickable Profile Navigation**: User profile area in sidebar now navigates to settings page
-
-#### **User Interface Improvements**
-- **Tabbed Login Interface**: Users can switch between Google OAuth and username/password login methods
-- **Settings Page**: Full-featured settings interface with:
-  - Account information display (email, name, role, creation date)
-  - Login methods status (Google OAuth enabled/disabled, password set/not set)
-  - Password management forms (set initial password, change existing password)
-  - Account preferences (timezone, currency, language)
-- **Visual Enhancements**: Dark icons for better visibility on light backgrounds
-- **Responsive Design**: Proper text truncation and mobile-friendly layout
-
-#### **Admin System Enhancements**
-- **User Management**: Complete CRUD operations for user management with proper error handling
-- **Role Assignment**: Visual role badges and admin navigation
-- **User Editing**: Fixed JavaScript errors and improved user editing functionality
-- **Success Messages**: Proper success/error messaging for user operations
-
-### 15.2. Technical Implementation Details
-
-#### **New API Endpoints**
-- `POST /api/auth/login-password`: Username/password authentication
-- `POST /api/auth/set-password`: Set initial password for users
-- `POST /api/auth/change-password`: Change existing password with current password verification
-- `GET /api/auth/user-details`: Get comprehensive user information for settings page
-- `GET /api/auth/me`: Get current session information
-
-#### **Database Schema Updates**
-- **Password Support**: Added password hashing and verification methods to User model
-- **Login Method Tracking**: Enhanced session management to track authentication method
-- **User Preferences**: Support for timezone, currency, and language preferences
-
-#### **Frontend Enhancements**
-- **Settings Template**: New comprehensive settings page template (`settings.html`)
-- **Login Template**: Updated with tabbed interface for multiple login methods
-- **CSS Improvements**: Enhanced styling for user profile area and icon visibility
-- **JavaScript Fixes**: Resolved syntax errors and improved user interface interactions
-
-### 15.3. Security & User Experience Improvements
-
-#### **Security Features**
-- **Password Hashing**: Secure password storage using Werkzeug security functions
-- **Password Validation**: Minimum 6-character requirements with strength checking
-- **Current Password Verification**: Required for password changes to prevent unauthorized access
-- **Session Management**: Enhanced session handling with login method tracking
-
-#### **User Experience**
-- **Flexible Authentication**: Users can choose their preferred login method
-- **Seamless Migration**: Google OAuth users can add password authentication without losing access
-- **Visual Feedback**: Clear indication of available login methods and account status
-- **Intuitive Navigation**: Clickable user profile area for easy settings access
-
-### 15.4. Implementation Status Summary
-
-#### **Completed Features ✅**
-- ✅ **Dual Authentication System**: Google OAuth + Username/Password support
-- ✅ **Password Management**: Set and change passwords with secure validation
-- ✅ **Settings Interface**: Complete user account management page
-- ✅ **User Profile Navigation**: Clickable profile area linking to settings
-- ✅ **Admin User Management**: Enhanced user editing and management functionality
-- ✅ **Visual Improvements**: Dark icons for better visibility and responsive design
-- ✅ **Error Handling**: Comprehensive error messages and validation
-- ✅ **JavaScript Fixes**: Resolved syntax errors and improved UI interactions
-
-#### **Business Value Delivered**
-- **Enterprise Ready**: Support for both OAuth and traditional authentication methods
-- **User Flexibility**: Users can choose their preferred login method
-- **Enhanced Security**: Proper password management with secure hashing
-- **Improved UX**: Intuitive settings interface and navigation
-- **Admin Efficiency**: Streamlined user management with better error handling
-
-## 16. Enhanced Unrecognized Resource Tracking System ✅ IMPLEMENTED (October 2025)
-
-### 16.1. Overview
+### 14.1. Overview
 The InfraZen platform implements a sophisticated unrecognized resource tracking system that automatically detects and monitors resources that appear in billing data but are not yet properly categorized by the platform. This system ensures complete cost visibility while providing a feedback mechanism for continuous platform improvement.
 
-### 16.2. Key Features
+### 14.2. Key Features
 
-#### 16.2.1. Smart Resource Type Inference
+#### 14.2.1. Smart Resource Type Inference
 **Automatic Detection from Metrics:**
 - **Load Balancers**: `load_balancers_*` → `network_load_balancer` → `load_balancer`
 - **Volumes**: `volume_*` → `volume_universal` → `volume`
@@ -3014,7 +2751,7 @@ The InfraZen platform implements a sophisticated unrecognized resource tracking 
 - **Network Resources**: `network_*` → `network_floating_ip` → `floating_ip`
 - **Backup**: `backup_*` → `backup_storage` → `backup`
 
-#### 16.2.2. Complete History Tracking
+#### 14.2.2. Complete History Tracking
 **No Deduplication Logic:**
 - ✅ **Every sync creates new records** - full audit trail
 - ✅ **Multiple syncs** = **multiple entries** for same resources
@@ -3022,7 +2759,7 @@ The InfraZen platform implements a sophisticated unrecognized resource tracking 
 - ✅ **Frequency tracking** across multiple syncs
 - ✅ **Pattern analysis** for platform improvement
 
-#### 16.2.3. Admin Interface Integration
+#### 14.2.3. Admin Interface Integration
 **Comprehensive Management Dashboard:**
 - **Location**: `/api/admin/unrecognized-resources-page`
 - **Features**:
@@ -3033,7 +2770,7 @@ The InfraZen platform implements a sophisticated unrecognized resource tracking 
   - Delete false positives
 - **Real-time Updates**: New unrecognized resources appear automatically
 
-### 16.3. Technical Implementation
+### 14.3. Technical Implementation
 
 #### 16.3.1. Billing-First Approach
 **Priority on Cost Visibility:**
@@ -3064,7 +2801,7 @@ class UnrecognizedResource:
     - resolution_notes: Admin notes
 ```
 
-### 16.4. Business Value
+### 14.4. Business Value
 
 #### 16.4.1. Platform Improvement
 - **Gap Identification**: Automatically identifies missing resource type support
@@ -3081,7 +2818,7 @@ class UnrecognizedResource:
 - **Audit Trail**: Complete history of resource discovery and resolution
 - **Admin Efficiency**: Streamlined workflow for resolving unrecognized resources
 
-### 16.5. Usage Workflow
+### 14.5. Usage Workflow
 
 #### 16.5.1. Automatic Detection
 1. **Sync Process**: Resources with `"type": "unknown"` in billing data
@@ -3096,7 +2833,7 @@ class UnrecognizedResource:
 4. **Mark Resolved**: Update status with resolution notes
 5. **Future Syncs**: Resources now properly categorized
 
-### 16.6. Implementation Status ✅ COMPLETED
+### 14.6. Implementation Status ✅ COMPLETED
 - ✅ **Smart Resource Type Inference**: Automatic detection from billing metrics
 - ✅ **Complete History Tracking**: No deduplication, full audit trail
 - ✅ **Admin Interface**: Comprehensive management dashboard
@@ -3104,489 +2841,15 @@ class UnrecognizedResource:
 - ✅ **Integration**: Seamless integration with existing sync process
 - ✅ **Error Handling**: Graceful handling of zombie volumes and API failures
 
-## 17. Multi-Provider Price Comparison & Optimization Strategy 🎯 PLANNED (October 2025)
+## 15. CSS Architecture & Styling Conventions ✅ IMPLEMENTED
 
-### 17.1. Vision & Business Value
-
-InfraZen will provide intelligent cross-provider price comparison capabilities, enabling customers to identify cost optimization opportunities by comparing their current cloud resources against similar offerings from other providers. This feature delivers:
-
-- **Immediate Cost Savings**: Identify 20-40% savings opportunities by switching providers or resource types
-- **Data-Driven Decision Making**: Quantified comparisons based on actual specifications (CPU, RAM, storage, region)
-- **Competitive Intelligence**: Track pricing trends across Russian cloud market
-- **Migration Planning**: Smart recommendations with confidence scores and migration effort indicators
-
-### 17.2. Core Architecture Strategy
-
-#### **17.2.1. Price Storage Structure**
-
-**Dual-Layer Storage Approach:**
-1. **SKU-Level Prices**: Store provider-specific product names and prices (e.g., "Beget VPS-S" = 150 RUB/month)
-2. **Specification-Based Prices**: Normalized resource specifications for cross-provider matching
-
-**Specification Schema:**
-```
-Core Specifications (Phase 1):
-- CPU cores (integer)
-- RAM GB (integer)
-- Storage GB (integer)
-- Storage type (SSD/HDD/NVMe)
-- Region (normalized: MSK, SPB, etc.)
-- Resource type (vm, volume, database, etc.)
-
-Extended Specifications (Future):
-- CPU type (Intel/AMD, generation)
-- Network bandwidth
-- Backup options
-- High availability features
-```
-
-**Price History Tracking:**
-- Track all price changes over time for trend analysis
-- Enable "Beget raised VPS-S price from 140 to 150 RUB on Oct 1st" insights
-- Support FinOps cost forecasting with historical data
-
-#### **17.2.2. Universal Resource Taxonomy**
-
-**Standardized Resource Types:**
-- `server` - Virtual machines, VPS, compute instances
-- `volume` - Block storage, disks
-- `database` - Managed databases (PostgreSQL, MySQL, etc.)
-- `storage` - Object storage (S3-compatible)
-- `network` - Load balancers, floating IPs
-- `kubernetes` - Managed Kubernetes clusters
-- `backup` - Backup services
-- `other` - Specialized services
-
-**Provider Mapping:**
-- Each provider's specific resource types map to universal taxonomy
-- Enables apples-to-apples comparison across providers
-- Foundation for intelligent matching algorithm
-
-#### **17.2.3. Price Collection Architecture**
-
-**Provider-Specific Collection Methods:**
-
-**Beget:**
-- Initial: Manual mapping from website pricing pages
-- Phase 2: Web scraping of pricing pages
-- Phase 3: HAR file analysis of pricing calculator (if available)
-- Fallback: Manual updates from support communications
-
-**Selectel:**
-- Primary: Extract from actual customer billing data (100% accurate for used resources)
-- Secondary: Official price list from website/API (for unused resource types)
-- Hybrid approach ensures completeness and accuracy
-
-**Future Providers (AWS, Azure, Yandex Cloud, VK Cloud):**
-- Official pricing APIs where available
-- Web scraping for Russian-specific pricing
-- HAR file analysis of pricing calculators
-- Manual validation for complex pricing models
-
-**Update Frequency:**
-- Daily scheduled updates (2 AM default)
-- Manual trigger capability for immediate updates
-- Price change detection and notifications
-
-#### **17.2.4. Smart Matching Algorithm**
-
-**Similarity Score-Based Matching (Recommended Approach):**
-
-```
-Match Quality Calculation:
-- CPU similarity: 0-30 points (exact match = 30, ±1 core = 25, ±2 cores = 15)
-- RAM similarity: 0-30 points (exact match = 30, within 25% = 20, within 50% = 10)
-- Storage similarity: 0-20 points (exact match = 20, within 40% = 15)
-- Region match: 0-20 points (exact region = 20, same country = 10, different = 0)
-
-Total Score: 0-100
-- 90-100: Excellent match (highlight green)
-- 70-89: Good match (show with confidence)
-- 50-69: Fair match (show with caveats)
-- <50: Poor match (hide by default)
-```
-
-**Why Similarity Score vs. Exact Match:**
-- Providers rarely offer identical specifications
-- Range-based matching too broad, returns irrelevant results
-- Score provides confidence level for each recommendation
-- Flexible enough to find useful alternatives, strict enough to avoid bad suggestions
-
-**Alternative Matching Modes:**
-- **Exact Match**: For users who want only identical specs
-- **Closest Higher**: Show next tier up (e.g., upgrade path)
-- **Closest Lower**: Show downgrade options (cost reduction)
-- **Best Value**: Highest spec per RUB ratio
-
-### 17.3. Data Models & Database Schema
-
-**Provider Prices Table:**
-```sql
-CREATE TABLE provider_prices (
-    id SERIAL PRIMARY KEY,
-    provider VARCHAR(50) NOT NULL,              -- 'beget', 'selectel', 'aws', etc.
-    resource_type VARCHAR(100) NOT NULL,        -- Universal taxonomy type
-    provider_sku VARCHAR(200),                  -- Provider-specific SKU/plan name
-    region VARCHAR(50),                         -- Normalized region code
-    
-    -- Core specifications
-    cpu_cores INTEGER,
-    ram_gb INTEGER,
-    storage_gb INTEGER,
-    storage_type VARCHAR(20),                   -- 'SSD', 'HDD', 'NVMe'
-    
-    -- Extended specifications (JSON for flexibility)
-    extended_specs JSONB,
-    
-    -- Pricing
-    hourly_cost DECIMAL(10, 4),
-    monthly_cost DECIMAL(10, 2),
-    currency VARCHAR(3) DEFAULT 'RUB',
-    
-    -- Commitment pricing (future)
-    yearly_cost DECIMAL(10, 2),
-    three_year_cost DECIMAL(10, 2),
-    commitment_discount_percent DECIMAL(5, 2),
-    
-    -- Metadata
-    last_updated TIMESTAMP DEFAULT NOW(),
-    confidence_score DECIMAL(3, 2),             -- 0.0 to 1.0 data quality
-    source VARCHAR(50),                         -- 'billing_api', 'official_price_list', 'scraped', 'manual'
-    source_url TEXT,
-    notes TEXT,
-    
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_provider_prices_lookup ON provider_prices(provider, resource_type, cpu_cores, ram_gb);
-CREATE INDEX idx_provider_prices_region ON provider_prices(region, resource_type);
-CREATE INDEX idx_provider_prices_updated ON provider_prices(last_updated DESC);
-```
-
-**Price History Table:**
-```sql
-CREATE TABLE price_history (
-    id SERIAL PRIMARY KEY,
-    price_id INTEGER REFERENCES provider_prices(id),
-    old_monthly_cost DECIMAL(10, 2),
-    new_monthly_cost DECIMAL(10, 2),
-    change_percent DECIMAL(6, 2),
-    change_date TIMESTAMP DEFAULT NOW(),
-    change_reason VARCHAR(200),                 -- 'market_adjustment', 'promotion', 'hardware_upgrade'
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-**Optimization Recommendations Table:**
-```sql
-CREATE TABLE optimization_recommendations (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
-    current_resource_id INTEGER REFERENCES resources(id),
-    recommended_price_id INTEGER REFERENCES provider_prices(id),
-    
-    similarity_score DECIMAL(5, 2),             -- 0-100 match quality
-    monthly_savings DECIMAL(10, 2),
-    annual_savings DECIMAL(10, 2),
-    savings_percent DECIMAL(6, 2),
-    
-    migration_effort VARCHAR(20),               -- 'easy', 'medium', 'hard'
-    migration_notes TEXT,
-    
-    status VARCHAR(20) DEFAULT 'pending',       -- 'pending', 'accepted', 'rejected', 'completed'
-    user_feedback TEXT,
-    
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 17.4. Implementation Phases
-
-#### **Phase 1: Foundation (Weeks 1-2)**
-- ✅ **Database Models**: Create price storage tables and relationships
-- ✅ **Base Provider Extension**: Add `get_pricing_data()` method to provider base class
-- ✅ **Price Update Service**: Scheduler service for daily price updates
-- ✅ **Manual Trigger**: Admin interface to manually trigger price updates
-
-#### **Phase 2: Beget Price Collection (Weeks 3-4)**
-- ✅ **Beget Price Mapping**: Manually map all Beget products (VPS, hosting, VDS, storage)
-- ✅ **Initial Data Load**: Populate database with Beget pricing
-- ✅ **Beget Provider Extension**: Implement `get_pricing_data()` for Beget
-- ✅ **Validation**: Compare scraped prices against Beget website
-
-#### **Phase 3: Selectel Price Collection (Weeks 5-6)**
-- ✅ **Billing Data Extraction**: Extract pricing from existing Selectel billing data
-- ✅ **Official Price List**: Scrape Selectel pricing pages for unused resources
-- ✅ **Data Merging**: Combine billing data (high confidence) with official prices
-- ✅ **Selectel Provider Extension**: Implement `get_pricing_data()` for Selectel
-
-#### **Phase 4: Matching Engine (Weeks 7-8)**
-- ✅ **Similarity Algorithm**: Implement score-based matching logic
-- ✅ **Specification Normalization**: Normalize resource specs across providers
-- ✅ **Match Quality Filters**: Filter by minimum similarity score
-- ✅ **Testing**: Validate with real Beget vs Selectel comparisons
-
-#### **Phase 5: UI & User Experience (Weeks 9-10)**
-- ✅ **Cost Optimization Page**: New page showing all resources with recommendations
-- ✅ **Comparison View**: Side-by-side resource comparison interface
-- ✅ **Savings Summary**: Dashboard widget showing total potential savings
-- ✅ **Filters & Controls**: Filter by provider, resource type, savings threshold
-
-#### **Phase 6: Advanced Features (Weeks 11-12)**
-- ✅ **Migration Planning**: Generate migration plans with step-by-step guides
-- ✅ **Price Alerts**: Notify when prices change or better options become available
-- ✅ **Trend Analysis**: Show pricing trends over time
-- ✅ **Bulk Actions**: Accept/reject multiple recommendations
-
-### 17.5. User Experience Design
-
-#### **17.5.1. Cost Optimization Page**
-
-**Main Interface:**
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Cost Optimization Opportunities                                │
-│                                                                  │
-│  💰 Potential Monthly Savings: 15,240 ₽ (34%)                  │
-│  📊 67 Resources Analyzed  |  23 Opportunities Found            │
-│                                                                  │
-│  Filters: [All Providers ▼] [All Types ▼] [Min Savings: 10%]   │
-│  Show: [✓ Only Cheaper] [ ] All Similar [ ] Same Provider      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Resource: web-server-01 (Beget VPS-L)                         │
-│  Current: 2 CPU, 4GB RAM, 50GB SSD | Moscow | 350₽/mo         │
-│                                                                  │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ 💚 Best Match (Score: 95)                      -120₽ (34%)│ │
-│  │ Selectel Cloud VPS | 2 CPU, 4GB, 50GB SSD | MSK | 230₽/mo│ │
-│  │ Migration: Easy | Yearly Savings: 1,440₽                  │ │
-│  │ [View Details] [Create Migration Plan] [Dismiss]          │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │ ⚡ Alternative Option (Score: 85)             -80₽ (23%) │ │
-│  │ Selectel Cloud VPS | 2 CPU, 8GB, 100GB SSD | MSK | 270₽ │ │
-│  │ Migration: Medium | More resources for same price         │ │
-│  │ [View Details] [Create Migration Plan] [Dismiss]          │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Resource: database-prod-01 (Beget MySQL)                      │
-│  Current: 2 CPU, 8GB RAM, 100GB SSD | Moscow | 580₽/mo        │
-│  [Find Alternatives ▼]                                         │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### **17.5.2. Detailed Comparison View**
-
-**Side-by-Side Comparison:**
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Current Resource vs. Recommended Alternative                   │
-├──────────────────────────────┬──────────────────────────────────┤
-│  CURRENT: Beget VPS-L        │  RECOMMENDED: Selectel Cloud VPS │
-│  ✓ Active                    │  💰 34% Cheaper                  │
-├──────────────────────────────┼──────────────────────────────────┤
-│  Specifications              │  Specifications                  │
-│  • 2 CPU Cores               │  • 2 CPU Cores         [✓ Match]│
-│  • 4GB RAM                   │  • 4GB RAM             [✓ Match]│
-│  • 50GB SSD Storage          │  • 50GB SSD Storage    [✓ Match]│
-│  • Moscow Region             │  • Moscow Region       [✓ Match]│
-├──────────────────────────────┼──────────────────────────────────┤
-│  Pricing                     │  Pricing                         │
-│  • 350₽/month                │  • 230₽/month                    │
-│  • 4,200₽/year               │  • 2,760₽/year                   │
-│                              │  • Save 1,440₽/year              │
-├──────────────────────────────┼──────────────────────────────────┤
-│  Features                    │  Features                        │
-│  • 99.9% SLA                 │  • 99.95% SLA          [✓ Better]│
-│  • Daily backups             │  • Snapshot backups    [= Same]  │
-│  • 24/7 Support              │  • 24/7 Support        [= Same]  │
-├──────────────────────────────┴──────────────────────────────────┤
-│  Migration Effort: Easy                                         │
-│  • API-compatible (OpenStack)                                   │
-│  • Estimated downtime: <30 minutes                              │
-│  • Migration guide available                                    │
-│                                                                  │
-│  [✓ Accept Recommendation] [Create Migration Plan] [Dismiss]   │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### **17.5.3. Dashboard Integration**
-
-**Savings Widget:**
-```
-┌──────────────────────────────────────┐
-│  💰 Cost Optimization                │
-├──────────────────────────────────────┤
-│  Potential Monthly Savings           │
-│  15,240 ₽ (34%)                      │
-│                                       │
-│  Top Opportunities:                  │
-│  1. web-server-01    -120₽  [View]  │
-│  2. database-prod-01  -95₽  [View]  │
-│  3. storage-backup    -80₽  [View]  │
-│                                       │
-│  [View All Opportunities →]          │
-└──────────────────────────────────────┘
-```
-
-### 17.6. Technical Implementation Details
-
-#### **17.6.1. Provider Base Class Extension**
-
-```python
-class ProviderBase:
-    def get_pricing_data(self) -> List[PriceRecord]:
-        """
-        Fetch current pricing data from provider
-        Returns list of PriceRecord objects with:
-        - provider, resource_type, specs, pricing, metadata
-        
-        Implementation method varies by provider:
-        - API calls (if available)
-        - Web scraping (most Russian providers)
-        - Billing data extraction (Selectel, Beget)
-        - Manual data (fallback)
-        """
-        raise NotImplementedError
-```
-
-#### **17.6.2. Price Update Scheduler**
-
-```python
-class PriceUpdateService:
-    def daily_update(self):
-        """
-        Run daily at 2 AM to update all provider prices
-        1. Fetch new prices from each provider
-        2. Compare with existing prices
-        3. Log price changes to history
-        4. Update price records
-        5. Generate change notifications
-        """
-        pass
-    
-    def manual_update(self, provider: str = None):
-        """
-        Manually trigger price update
-        Optional provider filter for single-provider updates
-        """
-        pass
-```
-
-#### **17.6.3. Matching Engine**
-
-```python
-class ResourceMatcher:
-    def find_similar_resources(
-        self, 
-        source_resource: Resource,
-        min_score: float = 70.0,
-        max_results: int = 10
-    ) -> List[MatchResult]:
-        """
-        Find similar resources from other providers
-        Returns list of matches sorted by similarity score
-        Each match includes:
-        - target provider price record
-        - similarity score (0-100)
-        - savings amount and percentage
-        - migration effort estimate
-        """
-        pass
-    
-    def calculate_similarity(
-        self,
-        source: ResourceSpec,
-        target: ResourceSpec
-    ) -> float:
-        """
-        Calculate similarity score (0-100)
-        Based on CPU, RAM, storage, region matching
-        """
-        pass
-```
-
-### 17.7. Future Enhancements
-
-#### **17.7.1. Long-Term Commitment Pricing**
-- Track yearly and 3-year commitment discounts
-- Calculate ROI for commitment vs. on-demand
-- Alert when commitment makes financial sense
-
-#### **17.7.2. Multi-Currency Support**
-- Handle USD, EUR pricing for international providers
-- Real-time exchange rate updates
-- Normalize all comparisons to user's preferred currency
-
-#### **17.7.3. Advanced Matching**
-- ML-based similarity learning from user feedback
-- Performance benchmarking integration
-- Workload-aware recommendations (CPU-intensive vs. storage-heavy)
-
-#### **17.7.4. Provider Expansion**
-- AWS (pricing API + Russian region focus)
-- Azure (pricing API + Russian region focus)
-- Yandex Cloud (billing API + price list)
-- VK Cloud (web scraping)
-- Cloud.ru (web scraping)
-- International providers (as needed)
-
-### 17.8. Key Design Decisions & Rationale
-
-#### **Decision 1: Both SKU-Level and Spec-Based Storage**
-**Rationale:** SKU-level provides exact product mapping (useful for known migrations), while spec-based enables smart cross-provider matching. Both are needed for comprehensive comparison.
-
-#### **Decision 2: Similarity Score Over Exact Match**
-**Rationale:** Providers rarely offer identical specs. Similarity scoring provides flexibility while maintaining quality through configurable minimum score thresholds.
-
-#### **Decision 3: Price History Tracking**
-**Rationale:** Historical data enables trend analysis, forecasting, and competitive intelligence. Minimal storage overhead, high business value for FinOps.
-
-#### **Decision 4: Start with Core Specs, Extend Later**
-**Rationale:** CPU, RAM, Storage, Region provide 80% of matching accuracy. Extended specs (CPU type, network, etc.) can be added incrementally as needed without schema changes (JSONB field).
-
-#### **Decision 5: Daily Price Updates**
-**Rationale:** Cloud pricing changes infrequently (monthly/quarterly). Daily updates provide freshness without excessive API calls or scraping. Manual trigger available for urgent updates.
-
-#### **Decision 6: Hybrid Data Sources (Billing + Official + Scraped)**
-**Rationale:** Maximizes data quality and coverage. Billing data = 100% accurate for used resources. Official price lists = complete coverage. Web scraping = fallback when APIs unavailable.
-
-### 17.9. Success Metrics
-
-**Technical Metrics:**
-- Price data freshness: <24 hours for 95% of records
-- Match quality: Average similarity score >85 for accepted recommendations
-- Data coverage: 100% of user resources matched with alternatives
-
-**Business Metrics:**
-- Average savings identified: 25-35% per resource
-- Recommendation acceptance rate: >40%
-- Actual savings realized: >15% of total cloud spend
-- Time to first recommendation: <5 minutes after connection
-
-### 17.10. Implementation Status
-
-- 🎯 **Status**: Planned - Architecture and strategy defined
-- 📅 **Timeline**: 10-12 weeks from kickoff
-- 🚀 **Next Step**: Create database models and base provider extensions
-- ✅ **Prerequisites**: Existing provider architecture, resource tracking, billing data
-
----
-
-## 18. CSS Architecture & Styling Conventions ✅ IMPLEMENTED (Phases 1–3)
-
-### 18.1. Goals
+### 15.1. Goals
 - Isolation and predictability: avoid global bleed and regressions between pages
 - Composability: reusable components (buttons, cards, tables, modals, navigation, badges)
 - Page/layout scoping: local overrides without affecting other screens
 - Progressive migration: keep `legacy.css` while extracting components safely
 
-### 18.2. Directory Structure
+### 15.2. Directory Structure
 ```
 app/static/css/
   main.css                    # Entry point (imports below in strict order)
@@ -3616,7 +2879,7 @@ app/static/css/
   legacy.css                 # Legacy rules; gradually emptied
 ```
 
-### 18.3. Import Order (in `main.css`)
+### 15.3. Import Order (in `main.css`)
 1) Core (`variables`, `reset`, `utilities`)
 2) Components (buttons, forms, cards, tables, modals, navigation, badges)
 3) Layouts (admin, dashboard, connections)
@@ -3624,14 +2887,14 @@ app/static/css/
 5) Features (charts, drag-drop)
 6) Legacy (kept last to minimize influence; new code must not depend on it)
 
-### 18.4. Conventions
+### 15.4. Conventions
 - Use readable class names (e.g., `provider-header`, `provider-left`, `provider-right`, `provider-name`)
 - Scope component rules; avoid global bare selectors
 - Page tweaks live under a page root (e.g., `.resources-content`, `.admin-content`)
 - Prefer utilities from `utilities.css` for micro-spacing/align/text helpers
 - Avoid inline styles; add to the correct component/page file when feasible
 
-### 18.5. Provider Card Header – Final Spec (Resources page)
+### 15.5. Provider Card Header – Final Spec (Resources page)
 - Single-row header with three parts:
   - Left: `provider-icon` (logo)
   - Middle (grows): `provider-details-inline` → `provider-type` (UPPER), `provider-name`, `provider-sync`
@@ -3643,25 +2906,25 @@ app/static/css/
 - Visuals: cost in primary blue and semibold; metadata in secondary color
 - Behavior: entire header clickable to expand/collapse provider section
 
-### 18.6. Migration Plan
+### 15.6. Migration Plan
 - Phase 1: Core foundation (done)
 - Phase 2: Component extraction (done)
 - Phase 3: Buttons, badges, utilities (done)
 - Phase 4: Migrate remaining legacy rules and retire `legacy.css` (next)
 
-### 18.7. Guardrails
+### 15.7. Guardrails
 - No global overrides impacting unrelated pages
 - Stable component contracts; additive changes preferred
 - Import order and page scoping prevent regressions
 
 ---
 
-## 19. Referencing this Document
+## 16. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking, and the comprehensive multi-provider price comparison strategy for cost optimization.
 
-## 12. Demo Data & Seeding (October 2025)
+## 17. Demo Data & Seeding
 
-### 12.1 Demo company profile
+### 17.1 Demo company profile
 - **Spend target**: ≈ 5,000,000 ₽/year (≈ 416,667 ₽/month)
 - **Connections (4)**:
   - Selectel BU-A (prod)
@@ -3669,14 +2932,14 @@ Use this consolidated description as the canonical source while delivering Infra
   - Beget Prod
   - Beget Dev
 
-### 12.2 Seeded monthly costs by connection
+### 17.2 Seeded monthly costs by connection
 - Selectel BU-A: ≈ 166,600 ₽
 - Selectel BU-B: ≈ 104,300 ₽
 - Beget Prod: ≈ 104,250 ₽
 - Beget Dev: ≈ 41,850 ₽
 - Total: ≈ 417,000 ₽/mo
 
-### 12.3 Inventory examples
+### 17.3 Inventory examples
 - **Selectel BU-A**: `api-backend-prod-01`, `db-postgres-prod-01`, `postgres-data-volume`, `k8s-worker-01/02`, `k8s-master-01`, `lb-prod-01`, `s3-cdn-static`, `archive-cold-storage`, `snapshot-storage`, `analytics-etl-01`, `app-cache-redis`, `eip-01`.
 - **Selectel BU-B**: `web-frontend-01/02`, `db-mysql-staging`, `dev-k8s-node-01/02`, `s3-media-bucket`, `test-runner-01`, `ci-runner-spot`, `load-balancer-dev`, `vpn-gateway`, `pg-backup-volume`, `misc-egress-and-ips`.
 - **Beget Prod**: `vps-app-01/02`, `vps-db-01`, `vps-cache-01`, `vps-batch-01`, `vps-mq-01`, `obj-storage-prod`, `backup-service`, `lb-service`, `nat-firewall`, `extra-volumes`, `infrazen-demo.ru`.
@@ -3684,7 +2947,7 @@ Use this consolidated description as the canonical source while delivering Infra
 
 All resources are saved with monthly `effective_cost`. The seeder also sets `daily_cost` from `effective_cost` for UI KPIs.
 
-### 12.4 Recommendations (20) aligned with inventory
+### 17.4 Recommendations (20) aligned with inventory
 - Rightsizing CPU/RAM: `api-backend-prod-01`, `db-mysql-staging`, `vps-db-01`, `k8s-worker-01`.
 - Idle/unused: `ci-runner-spot` (shutdown), `pg-backup-volume` (unused volume), `dev-public-ip` (free IP).
 - Migrations: `k8s-worker-02` cheaper region, `web-frontend-01` cross‑provider, `db-postgres-prod-01` disk type, `s3-media-bucket` storage class, `archive-cold-storage` cold tier, `extra-volumes` merge.
@@ -3692,23 +2955,23 @@ All resources are saved with monthly `effective_cost`. The seeder also sets `dai
 
 Savings values are sized to be realistic relative to seeded costs.
 
-### 12.5 Snapshots and states
+### 17.5 Snapshots and states
 - A `SyncSnapshot` is created per connection with `total_monthly_cost`.
 - `ResourceState` rows are created for the latest snapshot of each connection so the Resources page (snapshot-driven) lists items.
 
-### 12.6 Demo login & reseed
+### 17.6 Demo login & reseed
 - Demo login (`/api/auth/google` with `demo=true`) authenticates as real DB user `demo@infrazen.com` and stores `db_id` in session.
 - Admin reseed endpoint `POST /api/admin/reseed-demo-user` wipes previous demo data and reseeds providers, resources, snapshots, states, and 20 recommendations.
 
-### 12.7 Seeder scripts
+### 17.7 Seeder scripts
 - `scripts/seed_demo_user.py` — main curated demo seed (4 connections, ~45 resources, snapshots, states, 20 recommendations).
 - `scripts/seed_recommendations.py` — auxiliary generator used during development.
 
 ---
 
-## 19. Production Infrastructure & Deployment Architecture ✅ IMPLEMENTED (October 2025)
+## 18. Production Infrastructure & Deployment Architecture ✅ IMPLEMENTED
 
-### 19.1. Infrastructure Overview
+### 18.1. Infrastructure Overview
 
 InfraZen operates on a modern production infrastructure with separate development and production environments, automated CI/CD, and professional database migration management.
 
@@ -3718,7 +2981,7 @@ InfraZen operates on a modern production infrastructure with separate developmen
 - **Database**: 100% MySQL-based architecture (SQLite fully deprecated)
 - **Migrations**: Alembic-based schema versioning and automated migration execution
 
-### 19.2. Production Server Configuration
+### 18.2. Production Server Configuration
 
 #### **Hosting Provider**
 - **Platform**: Beget (https://cp.beget.com/)
@@ -3738,7 +3001,7 @@ InfraZen operates on a modern production infrastructure with separate developmen
 - **Python**: 3.10+ with virtual environment
 - **Database**: MySQL 8.0+ (managed by Beget)
 
-### 19.3. Database Architecture
+### 18.3. Database Architecture
 
 #### **MySQL Configuration**
 
@@ -3765,7 +3028,7 @@ Connection: mysql+pymysql://infrazen_user:***@localhost:3306/infrazen_dev?charse
 - **Migrations**: Alembic-based version control
 - **Baseline**: Initial migration `1d8b3833a084` representing production-ready schema
 
-### 19.4. Deployment & CI/CD
+### 18.4. Deployment & CI/CD
 
 #### **Git-Based Workflow**
 - **Repository**: https://github.com/colaisr/infrazen.git
@@ -3803,7 +3066,7 @@ cd /opt/infrazen
 9. Failure: Show service logs and exit with error
 ```
 
-### 19.5. Alembic Migration System
+### 18.5. Alembic Migration System
 
 #### **Migration Architecture**
 
@@ -3865,7 +3128,7 @@ python3 -m alembic upgrade head
 python3 -m alembic downgrade -1
 ```
 
-### 19.6. Systemd Service Configuration
+### 18.6. Systemd Service Configuration
 
 **Service File:** `/etc/systemd/system/infrazen.service`
 
@@ -3927,7 +3190,7 @@ sudo systemctl status infrazen
 sudo journalctl -u infrazen -f
 ```
 
-### 19.7. Nginx Configuration
+### 18.7. Nginx Configuration
 
 **Configuration File:** `/etc/nginx/sites-available/infrazen`
 
@@ -3973,7 +3236,7 @@ server {
 - **SSL/TLS**: Automated certificate management via Certbot
 - **Header Forwarding**: Proper client IP and protocol headers
 
-### 19.8. Security & Access Control
+### 18.8. Security & Access Control
 
 #### **SSH Access**
 - **Key-Based Authentication**: ED25519 SSH keys (no password login)
@@ -3991,7 +3254,7 @@ server {
 - **Connection Encryption**: MySQL SSL/TLS support
 - **Charset**: UTF-8 (utf8mb4) for security and compatibility
 
-### 19.9. Monitoring & Health Checks
+### 18.9. Monitoring & Health Checks
 
 #### **Application Health**
 - **Endpoint**: `http://127.0.0.1:8000/` (internal)
@@ -4016,7 +3279,7 @@ sudo journalctl -u infrazen -n 80 --no-pager
 - **Gunicorn Error Log**: stderr (captured by journalctl)
 - **Log Level**: INFO (production), DEBUG (development)
 
-### 19.10. Performance Optimizations
+### 18.10. Performance Optimizations
 
 #### **Gunicorn Configuration**
 - **Workers**: 3 (CPU cores + 1 recommended)
@@ -4037,7 +3300,7 @@ sudo journalctl -u infrazen -n 80 --no-pager
 - **Billing API**: 90 seconds
 - **Pricing Updates**: 90 seconds
 
-### 19.11. Development vs Production Parity
+### 18.11. Development vs Production Parity
 
 #### **Environment Configuration**
 
@@ -4061,7 +3324,7 @@ sudo journalctl -u infrazen -n 80 --no-pager
 - ✅ Same provider plugins
 - ✅ Same demo user seeding logic
 
-### 19.12. Deployment Checklist
+### 18.12. Deployment Checklist
 
 #### **Initial Production Setup** (Completed)
 - ✅ Provision Beget VPS and managed MySQL database
@@ -4092,7 +3355,7 @@ sudo journalctl -u infrazen -n 80 --no-pager
 7. Verify health check passes
 8. Test critical user flows
 
-### 19.13. Disaster Recovery
+### 18.13. Disaster Recovery
 
 #### **Database Backup Strategy**
 ```bash
@@ -4139,7 +3402,7 @@ sudo systemctl restart infrazen
 curl http://localhost:8000/
 ```
 
-### 19.14. Known Production Issues & Solutions
+### 18.14. Known Production Issues & Solutions
 
 #### **Long-Running Operations**
 - **Issue**: Selectel sync and price catalog updates can take 60-90 seconds
@@ -4161,7 +3424,7 @@ curl http://localhost:8000/
 - **Solution**: `git update-index --skip-worktree config.env`
 - **Auto-Applied**: In deploy script
 
-### 19.15. Future Infrastructure Enhancements
+### 18.15. Future Infrastructure Enhancements
 
 #### **Planned Improvements**
 - **Docker Containerization**: Containerize application for easier deployment
@@ -4183,7 +3446,7 @@ curl http://localhost:8000/
 - **Response Time**: Maintain <500ms average response time
 - **Uptime**: Achieve 99.9% uptime SLA
 
-### 19.16. Implementation Status Summary
+### 18.16. Implementation Status Summary
 
 #### **✅ Completed (October 2025)**
 - Production VPS provisioned and configured
