@@ -66,6 +66,26 @@ def init_database():
             else:
                 print("ℹ️  Super admin user already exists")
             
+            # Optionally seed demo user
+            # Controlled by env var SEED_DEMO (default: 1) and only when DB is otherwise empty
+            should_seed_demo = os.getenv('SEED_DEMO', '1') == '1'
+            try:
+                current_user_count = db.session.query(User).count()
+            except Exception:
+                current_user_count = 0
+            if should_seed_demo and current_user_count <= 1:
+                print("\n🔄 Seeding demo user...")
+                try:
+                    # Import here to avoid circular dependencies
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
+                    from seed_demo_user import seed_demo_user
+                    seed_demo_user()
+                except Exception as demo_error:
+                    print(f"⚠️  Warning: Could not seed demo user: {demo_error}")
+                    print("   You can seed demo user later by running: python scripts/seed_demo_user.py")
+            else:
+                print("\nℹ️  Skipping demo seeding (SEED_DEMO disabled or users already present)")
+            
             # Show database statistics
             user_count = User.query.count()
             print(f"\n📊 Database Statistics:")

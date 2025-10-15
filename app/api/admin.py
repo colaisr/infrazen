@@ -811,3 +811,46 @@ def test_provider_credentials(provider_type):
             'success': False,
             'error': f'Failed to test credentials: {str(e)}'
         })
+
+@admin_bp.route('/reseed-demo-user', methods=['POST'])
+def reseed_demo_user():
+    """
+    Reseed demo user with fresh mock data
+    This endpoint deletes all demo user data and recreates it
+    Admin only
+    """
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        logger.info("Admin initiated demo user reseed")
+        
+        # Import the seeding function
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts'))
+        from seed_demo_user import seed_demo_user
+        
+        # Call the seeding function
+        demo_user = seed_demo_user()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Demo user successfully reseeded',
+            'demo_user': {
+                'id': demo_user.id,
+                'email': demo_user.email,
+                'providers': 2,
+                'resources': 7
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error reseeding demo user: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to reseed demo user: {str(e)}'
+        }), 500

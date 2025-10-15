@@ -14,6 +14,17 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
     
+    # MySQL-specific configuration
+    # Connection pool settings for MySQL
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+        'connect_args': {
+            'charset': 'utf8mb4'
+        } if 'mysql' in os.environ.get('DATABASE_URL', '') else {}
+    }
+    
     # Google OAuth configuration
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
     
@@ -30,13 +41,18 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///dev.db'
+    # Default to SQLite for local dev, but support MySQL via DATABASE_URL
+    # Example MySQL URL: mysql+pymysql://infrazen_user:password@localhost:3306/infrazen_dev?charset=utf8mb4
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///instance/dev.db'
     SQLALCHEMY_ECHO = True
 
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
+    # Production requires DATABASE_URL to be set
+    # Example Beget MySQL: mysql+pymysql://user:pass@mysql.beget.com:3306/infrazen_prod?charset=utf8mb4
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_ECHO = False
     
     # Security settings
     SESSION_COOKIE_SECURE = True

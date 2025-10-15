@@ -1,7 +1,7 @@
 """
 Recommendations API: list, detail, and actions
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from datetime import datetime
 from sqlalchemy import or_, and_, desc, asc
 
@@ -9,6 +9,7 @@ from app.core.database import db
 from app.core.models.recommendations import OptimizationRecommendation
 from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
+from app.core.models.user import User
 
 recommendations_bp = Blueprint('recommendations', __name__)
 
@@ -58,6 +59,23 @@ def _serialize(rec: OptimizationRecommendation):
 @recommendations_bp.route('/recommendations', methods=['GET'])
 def list_recommendations():
     query = OptimizationRecommendation.query
+
+    # Scope by current user (including demo session mapped to seeded demo user)
+    current_user_id = None
+    try:
+        user_data = session.get('user') or {}
+        if user_data.get('id') == 'demo-user-123':
+            demo_user = User.find_by_email('demo@infrazen.com')
+            if demo_user:
+                current_user_id = demo_user.id
+        else:
+            current_user_id = user_data.get('db_id')
+    except Exception:
+        current_user_id = None
+
+    if current_user_id:
+        query = query.join(CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id)
+        query = query.filter(CloudProvider.user_id == current_user_id)
 
     # Filters
     provider = request.args.get('provider')

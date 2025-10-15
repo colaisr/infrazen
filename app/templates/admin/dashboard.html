@@ -84,6 +84,20 @@
             </div>
         </div>
     </div>
+    
+    <div class="admin-actions">
+        <h2>System Actions</h2>
+        <div class="action-buttons">
+            <button class="btn btn-warning" onclick="reseedDemoUser()">
+                <i class="fa-solid fa-sync"></i>
+                Reseed Demo User
+            </button>
+        </div>
+        <p class="action-note">
+            <i class="fa-solid fa-info-circle"></i>
+            Reseeding the demo user will delete all existing demo data and create fresh mock providers, resources, and recommendations.
+        </p>
+    </div>
 </div>
 
 <script>
@@ -132,6 +146,40 @@ function loadAdminStats() {
         .catch(error => {
             console.error('Error loading resource stats:', error);
         });
+}
+
+function reseedDemoUser() {
+    if (!confirm('Are you sure you want to reseed the demo user? This will delete all existing demo data and create fresh mock data.')) {
+        return;
+    }
+    
+    const button = event.target.closest('button');
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reseeding...';
+    
+    fetch('/api/admin/reseed-demo-user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Demo user successfully reseeded!\n\nEmail: ' + data.demo_user.email + '\nProviders: ' + data.demo_user.providers + '\nResources: ' + data.demo_user.resources);
+            loadAdminStats(); // Reload stats
+        } else {
+            alert('❌ Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error reseeding demo user:', error);
+        alert('❌ Failed to reseed demo user. Check console for details.');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-sync"></i> Reseed Demo User';
+    });
 }
 </script>
 
@@ -248,9 +296,67 @@ function loadAdminStats() {
     font-size: 0.875rem;
 }
 
-    
+/* Admin Actions */
+.admin-actions {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-top: 2rem;
+}
+
+.admin-actions h2 {
+    margin: 0 0 1rem 0;
+    color: var(--text-primary);
+    font-size: 1.25rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.btn-warning {
+    background: var(--warning-orange);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s;
+}
+
+.btn-warning:hover {
+    background: #ea580c;
+}
+
+.btn-warning:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.action-note {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
     .overview-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
     }
 }
 </style>
