@@ -129,24 +129,10 @@ def connections():
             
             if last_snapshot:
                 # Use cost from sync snapshot if available (billing-first approach)
-                sync_config = {}
-                if last_snapshot.sync_config:
-                    try:
-                        sync_config = json.loads(last_snapshot.sync_config)
-                    except Exception:
-                        # Malformed JSON in sync_config should not break the page
-                        sync_config = {}
-                # Support both 'total_cost' (old) and 'total_daily_cost' (new Selectel format)
-                total_cost_from_sync = sync_config.get('total_daily_cost', sync_config.get('total_cost', 0))
-                
-                # Check if this is billing-first sync (has billing validation or sync_method)
-                billing_validation = sync_config.get('billing_validation', {})
-                is_billing_first = billing_validation.get('valid', False) or sync_config.get('sync_method') == 'billing_first'
-                
-                if is_billing_first and total_cost_from_sync > 0:
-                    # Use validated cost from billing-first sync
-                    total_daily_cost = total_cost_from_sync
-                    total_monthly_cost = total_cost_from_sync * 30
+                if last_snapshot.total_monthly_cost and last_snapshot.total_monthly_cost > 0:
+                    # Use validated cost from sync snapshot
+                    total_monthly_cost = last_snapshot.total_monthly_cost
+                    total_daily_cost = total_monthly_cost / 30  # Convert monthly to daily
                 else:
                     # Fallback to resource-based calculation for old syncs
                     provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
