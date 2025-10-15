@@ -3658,3 +3658,48 @@ app/static/css/
 
 ## 19. Referencing this Document
 Use this consolidated description as the canonical source while delivering InfraZen features, ensuring alignment with FinOps principles, brand identity, business goals, and technical architecture captured across all existing documentation and investor materials. This document reflects the current state of the solution including all recent developments in authentication system enhancements (October 2025: unified authentication, password management, settings interface, user profile navigation), Selectel integration enhancements, snapshot-based architecture, multi-cloud resource management, complete feature parity between Beget and Selectel providers with full FinOps capabilities, the enhanced unrecognized resource tracking system with smart resource type inference and complete history tracking, and the comprehensive multi-provider price comparison strategy for cost optimization.
+
+## 12. Demo Data & Seeding (October 2025)
+
+### 12.1 Demo company profile
+- **Spend target**: ≈ 5,000,000 ₽/year (≈ 416,667 ₽/month)
+- **Connections (4)**:
+  - Selectel BU-A (prod)
+  - Selectel BU-B (dev/stage)
+  - Beget Prod
+  - Beget Dev
+
+### 12.2 Seeded monthly costs by connection
+- Selectel BU-A: ≈ 166,600 ₽
+- Selectel BU-B: ≈ 104,300 ₽
+- Beget Prod: ≈ 104,250 ₽
+- Beget Dev: ≈ 41,850 ₽
+- Total: ≈ 417,000 ₽/mo
+
+### 12.3 Inventory examples
+- **Selectel BU-A**: `api-backend-prod-01`, `db-postgres-prod-01`, `postgres-data-volume`, `k8s-worker-01/02`, `k8s-master-01`, `lb-prod-01`, `s3-cdn-static`, `archive-cold-storage`, `snapshot-storage`, `analytics-etl-01`, `app-cache-redis`, `eip-01`.
+- **Selectel BU-B**: `web-frontend-01/02`, `db-mysql-staging`, `dev-k8s-node-01/02`, `s3-media-bucket`, `test-runner-01`, `ci-runner-spot`, `load-balancer-dev`, `vpn-gateway`, `pg-backup-volume`, `misc-egress-and-ips`.
+- **Beget Prod**: `vps-app-01/02`, `vps-db-01`, `vps-cache-01`, `vps-batch-01`, `vps-mq-01`, `obj-storage-prod`, `backup-service`, `lb-service`, `nat-firewall`, `extra-volumes`, `infrazen-demo.ru`.
+- **Beget Dev**: `dev-vps-01/02`, `dev-db-01`, `stage-web-01`, `s3-dev-bucket`, `ci-dev-runner`, `dev-public-ip`, `dev-logs-storage`.
+
+All resources are saved with monthly `effective_cost`. The seeder also sets `daily_cost` from `effective_cost` for UI KPIs.
+
+### 12.4 Recommendations (20) aligned with inventory
+- Rightsizing CPU/RAM: `api-backend-prod-01`, `db-mysql-staging`, `vps-db-01`, `k8s-worker-01`.
+- Idle/unused: `ci-runner-spot` (shutdown), `pg-backup-volume` (unused volume), `dev-public-ip` (free IP).
+- Migrations: `k8s-worker-02` cheaper region, `web-frontend-01` cross‑provider, `db-postgres-prod-01` disk type, `s3-media-bucket` storage class, `archive-cold-storage` cold tier, `extra-volumes` merge.
+- Hygiene/efficiency: `snapshot-storage` old snapshots; `dev-vps-01` night/weekend shutdown; commitment for `vps-app-01`; autoscaling for `web-frontend-02`.
+
+Savings values are sized to be realistic relative to seeded costs.
+
+### 12.5 Snapshots and states
+- A `SyncSnapshot` is created per connection with `total_monthly_cost`.
+- `ResourceState` rows are created for the latest snapshot of each connection so the Resources page (snapshot-driven) lists items.
+
+### 12.6 Demo login & reseed
+- Demo login (`/api/auth/google` with `demo=true`) authenticates as real DB user `demo@infrazen.com` and stores `db_id` in session.
+- Admin reseed endpoint `POST /api/admin/reseed-demo-user` wipes previous demo data and reseeds providers, resources, snapshots, states, and 20 recommendations.
+
+### 12.7 Seeder scripts
+- `scripts/seed_demo_user.py` — main curated demo seed (4 connections, ~45 resources, snapshots, states, 20 recommendations).
+- `scripts/seed_recommendations.py` — auxiliary generator used during development.
