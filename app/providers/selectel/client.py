@@ -140,7 +140,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=30)
+            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=90)
             
             if response.status_code == 201:
                 # Get the token from X-Subject-Token header
@@ -345,7 +345,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=30)
+            response = requests.post(auth_url, json=auth_data, headers=headers, timeout=90)
             
             if response.status_code == 201:
                 subject_token = response.headers.get('X-Subject-Token')
@@ -393,7 +393,7 @@ class SelectelClient:
             servers_url = f'{base_url}/compute/v2.1/servers/detail'
             
             logger.debug(f"Fetching servers from: {servers_url} (project: {project_id or 'default'})")
-            response = requests.get(servers_url, headers=headers, timeout=30)
+            response = requests.get(servers_url, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -415,7 +415,7 @@ class SelectelClient:
                 if flavor_id:
                     try:
                         flavor_url = f'{base_url}/compute/v2.1/flavors/{flavor_id}'
-                        flavor_response = requests.get(flavor_url, headers=headers, timeout=10)
+                        flavor_response = requests.get(flavor_url, headers=headers, timeout=90)
                         if flavor_response.status_code == 200:
                             flavor_data = flavor_response.json().get('flavor', {})
                             server['flavor'] = flavor_data
@@ -451,7 +451,7 @@ class SelectelClient:
             else:
                 volumes_url = f'{base_url}/volume/v3/volumes/detail'
             
-            response = requests.get(volumes_url, headers=headers, timeout=30)
+            response = requests.get(volumes_url, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -491,7 +491,7 @@ class SelectelClient:
             else:
                 shares_url = f'{base_url}/share/v2/shares/detail'
             
-            response = requests.get(shares_url, headers=headers, timeout=30)
+            response = requests.get(shares_url, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -519,7 +519,7 @@ class SelectelClient:
             headers['Openstack-Api-Version'] = 'network latest'
             networks_url = f'{self.openstack_base_url}/network/v2.0/networks'
             
-            response = requests.get(networks_url, headers=headers, timeout=30)
+            response = requests.get(networks_url, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -551,7 +551,7 @@ class SelectelClient:
             base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
             ports_url = f'{base_url}/network/v2.0/ports'
             
-            response = requests.get(ports_url, headers=headers, timeout=30)
+            response = requests.get(ports_url, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -607,7 +607,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.post(url, json=body, headers=headers, timeout=30)
+            response = requests.post(url, json=body, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -697,7 +697,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.post(url, json=body, headers=headers, timeout=30)
+            response = requests.post(url, json=body, headers=headers, timeout=90)
             response.raise_for_status()
             
             data = response.json()
@@ -775,7 +775,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.get(billing_url, params=params, headers=headers, timeout=30)
+            response = requests.get(billing_url, params=params, headers=headers, timeout=90)
             response.raise_for_status()
             data = response.json()
             
@@ -856,7 +856,7 @@ class SelectelClient:
                 'Accept': 'application/json'
             }
             
-            response = requests.get(billing_url, params=resource_params, headers=headers, timeout=30)
+            response = requests.get(billing_url, params=resource_params, headers=headers, timeout=90)
             response.raise_for_status()
             data = response.json()
             
@@ -1291,7 +1291,7 @@ class SelectelClient:
         """
         try:
             # Test with /accounts endpoint
-            response = self.session.get(f"{self.base_url}/accounts", timeout=30)
+            response = self.session.get(f"{self.base_url}/accounts", timeout=90)
             
             if response.status_code == 200:
                 account_data = response.json()
@@ -1337,7 +1337,7 @@ class SelectelClient:
             Dict containing account information
         """
         try:
-            response = self.session.get(f"{self.base_url}/accounts", timeout=30)
+            response = self.session.get(f"{self.base_url}/accounts", timeout=90)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -1351,7 +1351,7 @@ class SelectelClient:
             List of project dictionaries
         """
         try:
-            response = self.session.get(f"{self.base_url}/projects", timeout=30)
+            response = self.session.get(f"{self.base_url}/projects", timeout=90)
             response.raise_for_status()
             data = response.json()
             return data.get('projects', [])
@@ -1366,7 +1366,7 @@ class SelectelClient:
             List of user dictionaries
         """
         try:
-            response = self.session.get(f"{self.base_url}/users", timeout=30)
+            response = self.session.get(f"{self.base_url}/users", timeout=90)
             response.raise_for_status()
             data = response.json()
             return data.get('users', [])
@@ -1381,7 +1381,7 @@ class SelectelClient:
             List of role dictionaries
         """
         try:
-            response = self.session.get(f"{self.base_url}/roles", timeout=30)
+            response = self.session.get(f"{self.base_url}/roles", timeout=90)
             response.raise_for_status()
             data = response.json()
             return data.get('roles', [])
@@ -1403,7 +1403,7 @@ class SelectelClient:
             if project_id:
                 url += f"/{project_id}"
             
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=90)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -1425,7 +1425,7 @@ class SelectelClient:
             if project_id:
                 url += f"/{project_id}"
             
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(url, timeout=90)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -1450,7 +1450,7 @@ class SelectelClient:
             
             for endpoint in billing_endpoints:
                 try:
-                    response = self.session.get(endpoint, timeout=30)
+                    response = self.session.get(endpoint, timeout=90)
                     if response.status_code == 200:
                         return response.json()
                 except:
@@ -1479,7 +1479,7 @@ class SelectelClient:
             
             for endpoint in usage_endpoints:
                 try:
-                    response = self.session.get(endpoint, timeout=30)
+                    response = self.session.get(endpoint, timeout=90)
                     if response.status_code == 200:
                         return response.json()
                 except:
