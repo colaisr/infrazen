@@ -36,8 +36,13 @@ def list_users():
         per_page = request.args.get('per_page', 20, type=int)
         search = request.args.get('search', '')
         role_filter = request.args.get('role', '')
+        include_demo = request.args.get('include_demo', 'false').lower() == 'true'
         
         query = User.query
+        
+        # Exclude demo users by default
+        if not include_demo:
+            query = query.filter(User.role != 'demouser')
         
         # Apply search filter
         if search:
@@ -112,6 +117,10 @@ def update_user(user_id):
         if not user:
             return jsonify({'success': False, 'error': 'User not found'})
         
+        # Prevent modifying demo user role
+        if user.is_demo_user():
+            return jsonify({'success': False, 'error': 'Cannot modify demo user. Demo users are read-only.'})
+        
         data = request.get_json()
         
         # Update allowed fields
@@ -157,6 +166,10 @@ def delete_user(user_id):
         # Don't allow deleting super admins
         if user.is_super_admin():
             return jsonify({'success': False, 'error': 'Cannot delete super admin'})
+        
+        # Don't allow deleting demo users
+        if user.is_demo_user():
+            return jsonify({'success': False, 'error': 'Cannot delete demo user'})
         
         # Don't allow self-deletion
         current_user_id = session.get('user', {}).get('db_id')

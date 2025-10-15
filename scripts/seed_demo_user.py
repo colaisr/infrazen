@@ -79,14 +79,14 @@ def seed_demo_user():
         username='demo',
         first_name='Demo',
         last_name='User',
-        role='user',
+        role='demouser',
         is_active=True,
         is_verified=True,
         timezone='Europe/Moscow',
         currency='RUB',
         language='ru',
         created_by_admin=True,
-        admin_notes='Demo user for testing and demonstrations. Do not delete.'
+        admin_notes='Demo user for testing and demonstrations. Read-only access. Do not delete.'
     )
     
     # Set a password for demo user (same as username for simplicity)

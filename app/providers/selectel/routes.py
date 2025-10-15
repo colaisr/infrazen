@@ -60,6 +60,12 @@ def add_connection():
             flash('Authentication required', 'error')
             return redirect(url_for('main.connections'))
         
+        # Check if demo user (read-only)
+        user = session.get('user')
+        if user and user.get('role') == 'demouser':
+            flash('Demo users cannot modify data. This is a read-only demo account.', 'error')
+            return redirect(url_for('main.connections'))
+        
         user_id = session['user']['id']
         
         # Get form data
@@ -141,6 +147,12 @@ def sync_resources(provider_id):
         # Check if user is authenticated
         if 'user' not in session:
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
         
         user_id = session['user']['id']
         
@@ -235,6 +247,12 @@ def update_connection(provider_id):
         # Check if user is authenticated
         if 'user' not in session:
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
         
         user_id = session['user']['id']
         
@@ -331,6 +349,12 @@ def delete_connection(provider_id):
         # Check if user is authenticated
         if 'user' not in session:
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
+        
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
         
         user_id = session['user']['id']
         

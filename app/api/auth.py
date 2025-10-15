@@ -58,6 +58,29 @@ def validate_session(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def check_demo_user_write_access():
+    """
+    Check if current user is a demo user and block write operations
+    Returns error response if user is demo user, None otherwise
+    """
+    user = session.get('user')
+    
+    # If user exists in session but no role, try to fetch from database
+    if user and 'role' not in user and user.get('db_id'):
+        from app.core.models.user import User
+        db_user = User.find_by_id(user.get('db_id'))
+        if db_user:
+            # Update session with current role
+            session['user']['role'] = db_user.role
+            user = session.get('user')
+    
+    if user and user.get('role') == 'demouser':
+        return jsonify({
+            'success': False,
+            'error': 'Demo users cannot modify data. This is a read-only demo account.'
+        }), 403
+    return None
+
 @auth_bp.route('/login')
 def login():
     """Display login page"""

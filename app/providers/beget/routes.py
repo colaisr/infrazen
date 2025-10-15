@@ -21,6 +21,12 @@ def add_connection():
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
+        
         user_id = session['user']['id']
         
         # Get form data
@@ -108,6 +114,13 @@ def edit_connection(provider_id):
         if 'user' not in session:
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
+        # Check if demo user (read-only) for POST requests
+        if request.method == 'POST':
+            from app.api.auth import check_demo_user_write_access
+            demo_check = check_demo_user_write_access()
+            if demo_check:
+                return demo_check
+        
         user_id = session['user']['id']
         provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
         
@@ -174,6 +187,12 @@ def sync_connection(provider_id):
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
+        
         user_id = session['user']['id']
         provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
         
@@ -209,6 +228,12 @@ def delete_connection(provider_id):
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
+        
+        # Check if demo user (read-only)
+        from app.api.auth import check_demo_user_write_access
+        demo_check = check_demo_user_write_access()
+        if demo_check:
+            return demo_check
         
         user_id = session['user']['id']
         provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()

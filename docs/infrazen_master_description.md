@@ -206,6 +206,114 @@ The InfraZen platform implements a comprehensive user management system with Goo
 - **Error Handling**: Comprehensive error messages and validation
 - **Responsive Design**: Mobile-friendly interface with proper text truncation
 
+### 6.1.8. Demo User Role System ✅ COMPLETED
+
+#### **Purpose and Use Case**
+The `demouser` role provides a read-only demonstration account for showcasing the platform's capabilities without allowing any modifications to data. This is ideal for:
+- Product demonstrations and sales presentations
+- User onboarding and training
+- Testing UI/UX without risk of data changes
+- Public demo environments
+
+#### **Role Definition**
+- **Role Name**: `demouser` (added to valid roles: `user`, `admin`, `super_admin`, `demouser`)
+- **Access Level**: Read-only access to all platform features
+- **Exclusions**: Excluded from admin user lists and platform statistics by default
+
+#### **User Model Enhancements**
+New helper methods added to the User model:
+```python
+is_demo_user()              # Check if user has demouser role
+can_modify_data()           # Returns False for demo users
+is_excluded_from_stats()    # Mark demo users for exclusion from analytics
+is_excluded_from_admin_list() # Hide demo users from admin panels
+```
+
+#### **Backend Protection**
+All write operation endpoints protected with `check_demo_user_write_access()`:
+- **Provider Operations**: Add, edit, sync, delete cloud providers (Beget & Selectel)
+- **Recommendation Actions**: Update status, bulk actions, delete recommendations
+- Returns HTTP 403 with message: "Demo users cannot modify data. This is a read-only demo account."
+
+Protected endpoints:
+- `POST /beget/add`, `POST /beget/<id>/edit`, `POST /beget/<id>/sync`, `DELETE /beget/<id>/delete`
+- `POST /selectel/add`, `POST /selectel/<id>/update`, `POST /selectel/<id>/sync`, `DELETE /selectel/<id>/delete`
+- `POST /recommendations/<id>/action`, `POST /recommendations/bulk`, `DELETE /recommendations/<id>`
+
+#### **Frontend UI Restrictions**
+- **Connections Page**: 
+  - Hidden: "Add Provider", "Sync All", provider action buttons (Settings, Sync, Delete)
+  - Shown: "Demo Mode: Read Only" notice banner (yellow/amber styling)
+- **Recommendations Page**: 
+  - Hidden: Refresh, bulk action buttons, individual action buttons per recommendation
+  - Shown: View-only recommendation cards with full data
+- **JavaScript Detection**: `isDemoUser` flag available for dynamic UI control
+
+#### **Statistics and Analytics Exclusions**
+All data APIs exclude demo user data by default with `?include_demo=true` override:
+- `/api/admin/users` - Filters out demouser from listings
+- `/api/providers` - Excludes demo user providers from statistics
+- `/api/resources` - Excludes demo user resources from counts
+- Admin dashboard statistics automatically exclude demo user data
+
+#### **Demo User Configuration**
+Seeded via `scripts/seed_demo_user.py`:
+```python
+Email: demo@infrazen.com
+Username: demo
+Password: demo
+Role: demouser
+Status: Active, Verified
+Admin Notes: "Demo user for testing and demonstrations. Read-only access. Do not delete."
+```
+
+Demo data includes:
+- **4 Cloud Providers**: Beget Prod, Beget Dev, Selectel BU-A, Selectel BU-B
+- **~45 Resources**: Servers, storage, networking, databases across all providers
+- **20 Recommendations**: Cost optimization suggestions in Russian with realistic savings
+- **Total Monthly Cost**: ₽417,000 across all providers
+- **Full Sync History**: Snapshots and resource states for realistic demo experience
+
+#### **Admin Panel Protection**
+- **User Deletion**: Demo users cannot be deleted (similar to super admins)
+- **User Modification**: Demo users cannot be edited through admin interface
+- **User Listings**: Hidden by default from admin user management
+- **Reseed Capability**: Admin can reseed demo user data via dashboard button
+
+#### **Session Handling**
+- Demo user role properly set during login (both Google OAuth and password methods)
+- Session auto-updates role from database if missing (backward compatibility)
+- Role information included in session `to_dict()` output for easy frontend access
+
+#### **Security Considerations**
+- **No Privilege Escalation**: Demo users cannot be promoted to other roles via API
+- **Immutable Account**: Protected from deletion and modification
+- **Read-Only Enforcement**: All write operations blocked at API level
+- **Clear User Feedback**: Friendly error messages when actions are blocked
+
+#### **Implementation Files Modified**
+```
+app/core/models/user.py                   # Role validation and helper methods
+app/api/auth.py                           # Demo user write access check
+app/api/admin.py                          # Exclusion from admin lists
+app/api/providers.py                      # Statistics exclusion
+app/api/resources.py                      # Statistics exclusion
+app/api/recommendations.py                # Action blocking
+app/providers/beget/routes.py             # Write operation protection
+app/providers/selectel/routes.py          # Write operation protection
+app/templates/connections.html            # UI restrictions and notice
+app/templates/recommendations.html        # UI restrictions
+scripts/seed_demo_user.py                 # Role set to 'demouser'
+```
+
+#### **Benefits**
+✅ **Safe Demonstrations**: No risk of data corruption during demos  
+✅ **Consistent Experience**: Demo data remains pristine and realistic  
+✅ **Clean Analytics**: Real user metrics not polluted by demo activity  
+✅ **Easy Management**: Simple reseed process to refresh demo data  
+✅ **User-Friendly**: Clear visual indicators and helpful error messages  
+✅ **Flexible Override**: Admins can include demo data when needed with query parameters
+
 #### **Key Features**
 - **Automatic User Creation**: Seamless Google OAuth user onboarding
 - **Role Management**: Three-tier role system with permissions

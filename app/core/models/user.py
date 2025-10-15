@@ -10,6 +10,9 @@ class User(BaseModel):
     """User model for authentication with Google OAuth integration and roles"""
     __tablename__ = 'users'
     
+    # Valid user roles
+    VALID_ROLES = ['user', 'admin', 'super_admin', 'demouser']
+    
     # Basic user information
     username = db.Column(db.String(80), unique=True, nullable=True, index=True)  # Made nullable for Google OAuth users
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -27,7 +30,7 @@ class User(BaseModel):
     company = db.Column(db.String(100))
     
     # Role and permissions system
-    role = db.Column(db.String(20), default='user', nullable=False, index=True)  # user, admin, super_admin
+    role = db.Column(db.String(20), default='user', nullable=False, index=True)  # user, admin, super_admin, demouser
     permissions = db.Column(db.Text)  # JSON-encoded custom permissions
     
     # Account status
@@ -60,6 +63,8 @@ class User(BaseModel):
             'google_id': self.google_id,
             'google_picture': self.google_picture,
             'role': self.role,
+            'is_demo_user': self.is_demo_user(),
+            'can_modify_data': self.can_modify_data(),
             'is_active': self.is_active,
             'is_verified': self.is_verified,
             'last_login': self.last_login.isoformat() if self.last_login else None,
@@ -104,6 +109,22 @@ class User(BaseModel):
     def can_manage_users(self):
         """Check if user can manage other users"""
         return self.is_admin() and self.has_permission('manage_users')
+    
+    def is_demo_user(self):
+        """Check if user is a demo user (read-only)"""
+        return self.role == 'demouser'
+    
+    def can_modify_data(self):
+        """Check if user can modify data (create, update, delete resources/providers)"""
+        return not self.is_demo_user()
+    
+    def is_excluded_from_stats(self):
+        """Check if user should be excluded from statistics and analytics"""
+        return self.is_demo_user()
+    
+    def is_excluded_from_admin_list(self):
+        """Check if user should be excluded from admin user management lists"""
+        return self.is_demo_user()
     
     def set_password(self, password):
         """Set password for user"""

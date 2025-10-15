@@ -7,12 +7,37 @@
 
 {% block header_actions %}
     <div class="header-actions">
+        {% if user.role != 'demouser' %}
         <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
         <button class="btn btn-primary" onclick="showProviderModal()"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
+        {% else %}
+        <div class="demo-user-notice">
+            <i class="fa-solid fa-info-circle"></i>
+            <span>Демо-режим: только просмотр</span>
+        </div>
+        {% endif %}
     </div>
 {% endblock %}
 
 {% block content %}
+<style>
+.demo-user-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: 6px;
+    color: #92400E;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+.demo-user-notice i {
+    color: #F59E0B;
+}
+</style>
+
 <div class="connections-content">
     <div class="connections-summary">
         <div class="summary-header">
@@ -268,6 +293,7 @@
                 </div>
             </div>
 
+            {% if user.role != 'demouser' %}
             <div class="card-actions">
                 <button class="action-btn secondary" title="Настройки" onclick="editConnection('{{ provider.id }}')">
                     <i class="fa-solid fa-gear"></i>
@@ -281,9 +307,11 @@
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
+            {% endif %}
         </article>
         {% endfor %}
 
+        {% if user.role != 'demouser' %}
         <article class="connection-card add-card" id="add-provider-card">
             <div class="add-card-content">
                 <div class="add-icon">
@@ -297,6 +325,7 @@
                 </button>
             </div>
         </article>
+        {% endif %}
     </div>
 
     {% else %}
