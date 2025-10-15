@@ -70,7 +70,7 @@ class SelectelPricingClient:
                 "User-Agent": "InfraZenPricing/1.0",
             },
             params={"currency": "rub"},
-            timeout=30,
+            timeout=90,
         )
         response.raise_for_status()
         data = response.json()
@@ -119,7 +119,7 @@ class SelectelGridPricingClient:
                 "User-Agent": "InfraZenPricing/1.0",
             },
             params={"currency": "rub"},
-            timeout=30,
+            timeout=90,
         )
         response.raise_for_status()
         prices = response.json().get("prices", [])
