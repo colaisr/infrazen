@@ -18,6 +18,30 @@ from app.core.models.provider_catalog import ProviderCatalog
 
 main_bp = Blueprint('main', __name__)
 
+def ensure_demo_session():
+    """If the session represents the demo user, ensure it matches the DB user record.
+    This avoids mismatches where a placeholder ID breaks filtering by user_id.
+    """
+    try:
+        user = session.get('user') or {}
+        email = user.get('email')
+        if email == 'demo@infrazen.com':
+            # Load actual demo user from DB
+            demo_user = User.query.filter_by(email='demo@infrazen.com').order_by(User.created_at.desc()).first()
+            if demo_user:
+                session['user'] = {
+                    'id': str(demo_user.id),
+                    'db_id': demo_user.id,
+                    'email': demo_user.email,
+                    'name': f"{demo_user.first_name} {demo_user.last_name}".strip() or 'Demo User',
+                    'picture': demo_user.google_picture or '',
+                    'role': demo_user.role,
+                    'is_admin': False,
+                }
+    except Exception:
+        # Do not break page rendering if something goes wrong
+        pass
+
 def require_auth():
     """Check if user is authenticated and session is valid"""
     user_data = session.get('user')
@@ -67,6 +91,9 @@ def dashboard():
         }
 
     user = session['user']
+    # Normalize demo session to actual DB user if demo email is used
+    ensure_demo_session()
+    user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
     
     if is_demo_user:
@@ -89,11 +116,13 @@ def connections():
     """Cloud connections page"""
     if 'user' not in session:
         session['user'] = {
-            'id': '106509284268867883869',
+            'id': 'demo-user-123',
             'email': 'demo@infrazen.com',
             'name': 'Demo User',
             'picture': ''
         }
+    # Normalize demo session to actual DB user if demo email is used
+    ensure_demo_session()
     
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
@@ -190,11 +219,13 @@ def resources():
     """Resources overview page"""
     if 'user' not in session:
         session['user'] = {
-            'id': '106509284268867883869',  # Use the actual user ID from the database
-            'email': 'real@infrazen.com',
-            'name': 'Real User',
+            'id': 'demo-user-123',
+            'email': 'demo@infrazen.com',
+            'name': 'Demo User',
             'picture': ''
         }
+    # Normalize demo session to actual DB user if demo email is used
+    ensure_demo_session()
     
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
@@ -279,6 +310,8 @@ def recommendations():
     if auth_check:
         return auth_check
     
+    # Normalize demo session to actual DB user if demo email is used
+    ensure_demo_session()
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
 
