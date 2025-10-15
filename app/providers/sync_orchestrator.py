@@ -483,7 +483,7 @@ class SyncOrchestrator:
     def _create_or_update_resource_from_plugin(self, resource_data: Dict, sync_snapshot: SyncSnapshot,
                                              provider: CloudProvider) -> Optional[Resource]:
         """
-        Create or update a resource from plugin data
+        Create a fresh resource from plugin data (always creates new, never updates)
 
         Args:
             resource_data: Resource data from plugin
@@ -507,71 +507,37 @@ class SyncOrchestrator:
             provider_config = resource_data.get('provider_config', resource_data)
             tags = resource_data.get('tags', {})
 
-            # Find existing resource
-            existing_resource = Resource.query.filter_by(
+            # Always create new resource (fresh snapshot approach)
+            # No checking for existing resources - each sync creates completely fresh data
+            resource = Resource(
                 provider_id=provider.id,
                 resource_id=resource_id,
-                resource_type=resource_type
-            ).first()
+                resource_name=resource_name,
+                resource_type=resource_type,
+                service_name=service_name,
+                region=region,
+                status=status,
+                effective_cost=effective_cost,
+                currency=currency,
+                billing_period=billing_period,
+                provider_config=json.dumps(provider_config),
+                last_sync=datetime.now(),
+                is_active=True
+            )
 
-            if existing_resource:
-                # Update existing resource
-                existing_resource.resource_name = resource_name
-                existing_resource.service_name = service_name
-                existing_resource.region = region
-                existing_resource.status = status
-                existing_resource.effective_cost = effective_cost
-                existing_resource.currency = currency
-                existing_resource.billing_period = billing_period
-                existing_resource.provider_config = json.dumps(provider_config)
-                existing_resource.last_sync = datetime.now()
-                existing_resource.is_active = True
+            db.session.add(resource)
+            db.session.flush()  # Get the resource ID
 
-                # Set daily cost baseline for FinOps analysis
-                existing_resource.set_daily_cost_baseline(
-                    original_cost=effective_cost,
-                    period=billing_period,
-                    frequency='recurring'
-                )
+            # Set daily cost baseline for FinOps analysis
+            resource.set_daily_cost_baseline(
+                original_cost=effective_cost,
+                period=billing_period,
+                frequency='recurring'
+            )
 
-                # Update tags
-                existing_resource.clear_tags()
-                for key, value in tags.items():
-                    existing_resource.add_tag(key, str(value))
-
-                resource = existing_resource
-
-            else:
-                # Create new resource
-                resource = Resource(
-                    provider_id=provider.id,
-                    resource_id=resource_id,
-                    resource_name=resource_name,
-                    resource_type=resource_type,
-                    service_name=service_name,
-                    region=region,
-                    status=status,
-                    effective_cost=effective_cost,
-                    currency=currency,
-                    billing_period=billing_period,
-                    provider_config=json.dumps(provider_config),
-                    last_sync=datetime.now(),
-                    is_active=True
-                )
-
-                db.session.add(resource)
-                db.session.flush()  # Get the resource ID
-
-                # Set daily cost baseline for FinOps analysis
-                resource.set_daily_cost_baseline(
-                    original_cost=effective_cost,
-                    period=billing_period,
-                    frequency='recurring'
-                )
-
-                # Add tags after resource is flushed (has ID)
-                for key, value in tags.items():
-                    resource.add_tag(key, str(value))
+            # Add tags after resource is flushed (has ID)
+            for key, value in tags.items():
+                resource.add_tag(key, str(value))
 
             # Create resource state for tracking changes
             from app.core.models.sync import ResourceState
@@ -581,7 +547,7 @@ class SyncOrchestrator:
                 provider_resource_id=resource_id,
                 resource_type=resource_type,
                 resource_name=resource_name,
-                state_action='created' if not existing_resource else 'updated',
+                state_action='created',  # Always 'created' for fresh snapshots
                 service_name=service_name,
                 region=region,
                 status=status,
