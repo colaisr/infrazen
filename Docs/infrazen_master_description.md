@@ -3703,3 +3703,512 @@ Savings values are sized to be realistic relative to seeded costs.
 ### 12.7 Seeder scripts
 - `scripts/seed_demo_user.py` — main curated demo seed (4 connections, ~45 resources, snapshots, states, 20 recommendations).
 - `scripts/seed_recommendations.py` — auxiliary generator used during development.
+
+---
+
+## 19. Production Infrastructure & Deployment Architecture ✅ IMPLEMENTED (October 2025)
+
+### 19.1. Infrastructure Overview
+
+InfraZen operates on a modern production infrastructure with separate development and production environments, automated CI/CD, and professional database migration management.
+
+#### **Environment Architecture**
+- **Local Development**: MySQL database on localhost with full feature parity to production
+- **Production**: Beget VPS with managed MySQL, Nginx reverse proxy, and systemd service management
+- **Database**: 100% MySQL-based architecture (SQLite fully deprecated)
+- **Migrations**: Alembic-based schema versioning and automated migration execution
+
+### 19.2. Production Server Configuration
+
+#### **Hosting Provider**
+- **Platform**: Beget (https://cp.beget.com/)
+- **VPS Server**: `217.26.28.90` (xbokgqumbu)
+- **Domain**: https://infrazen.ru
+- **SSL/TLS**: Automated HTTPS with Let's Encrypt via Certbot
+- **Server Location**: Moscow, Russia
+- **Timezone**: Europe/Moscow (UTC+3)
+
+#### **Server Stack**
+- **OS**: Ubuntu/Debian Linux
+- **Web Server**: Nginx (reverse proxy + static file serving)
+- **Application Server**: Gunicorn with 3 workers
+  - Worker timeout: 120 seconds (for long-running sync operations)
+  - Graceful reload support for zero-downtime deployments
+- **Process Manager**: systemd
+- **Python**: 3.10+ with virtual environment
+- **Database**: MySQL 8.0+ (managed by Beget)
+
+### 19.3. Database Architecture
+
+#### **MySQL Configuration**
+
+**Production Database:**
+```
+Host: jufiedeycadeth.beget.app:3306
+Database: infrazen_prod
+User: infrazen_prod
+Connection: mysql+pymysql://infrazen_prod:***@jufiedeycadeth.beget.app:3306/infrazen_prod?charset=utf8mb4
+```
+
+**Development Database:**
+```
+Host: localhost:3306
+Database: infrazen_dev
+User: infrazen_user
+Connection: mysql+pymysql://infrazen_user:***@localhost:3306/infrazen_dev?charset=utf8mb4
+```
+
+#### **Database Features**
+- **Connection Pooling**: 10-connection pool with 5-second timeout
+- **Charset**: UTF-8 (utf8mb4) for full Unicode support
+- **Engine Options**: Optimized for MySQL InnoDB
+- **Migrations**: Alembic-based version control
+- **Baseline**: Initial migration `1d8b3833a084` representing production-ready schema
+
+### 19.4. Deployment & CI/CD
+
+#### **Git-Based Workflow**
+- **Repository**: https://github.com/colaisr/infrazen.git
+- **Branch**: `master` (production branch)
+- **Strategy**: Git pull → dependency update → migrations → graceful reload
+
+#### **Deploy Script** (`/opt/infrazen/deploy`)
+
+**Features:**
+- ✅ Pulls latest code from Git (master branch)
+- ✅ Preserves server-specific configuration (`config.env`)
+- ✅ Installs/updates Python dependencies via pip
+- ✅ Runs Alembic migrations (`alembic upgrade head`)
+- ✅ Gracefully reloads Gunicorn service (zero-downtime)
+- ✅ Health check validation (20 retries, 0.5s interval)
+- ✅ Automatic rollback logging if health check fails
+
+**Usage:**
+```bash
+# On production server
+cd /opt/infrazen
+./deploy
+```
+
+**Deployment Flow:**
+```
+1. Git fetch & pull (preserves config.env via skip-worktree)
+2. Activate virtual environment
+3. pip install -r requirements.txt
+4. Load environment variables from config.env
+5. Run: python3 -m alembic upgrade head
+6. systemctl reload-or-restart infrazen.service
+7. HTTP health check on localhost:8000
+8. Success: Display deployed commit hash
+9. Failure: Show service logs and exit with error
+```
+
+### 19.5. Alembic Migration System
+
+#### **Migration Architecture**
+
+**Directory Structure:**
+```
+migrations/
+├── README.md              # Migration workflow documentation
+├── env.py                 # Alembic environment configuration
+├── script.py.mako         # Migration template
+└── versions/
+    └── 1d8b3833a084_initial_baseline_migration.py
+```
+
+**Configuration:**
+- **Auto-detection**: Alembic reads Flask models and auto-generates migrations
+- **Environment Integration**: Uses `DATABASE_URL` from config.env
+- **Flask Context**: Runs within Flask app context for model access
+- **Baseline**: Empty baseline migration representing current production schema
+
+#### **Migration Workflow**
+
+**Creating Migrations:**
+```bash
+# Local development - create migration after model changes
+python scripts/create_migration.py "Add new table"
+
+# Review generated migration
+cat migrations/versions/<revision>_*.py
+
+# Test locally
+DATABASE_URL=mysql+pymysql://... python3 -m alembic upgrade head
+
+# Commit and push
+git add migrations/ && git commit -m "Add migration: description"
+git push origin master
+```
+
+**Production Deployment:**
+```bash
+# Automatic via deploy script
+./deploy
+
+# Or manual
+python3 -m alembic upgrade head
+```
+
+**Migration Commands:**
+```bash
+# Check current version
+python3 -m alembic current
+
+# Show migration history
+python3 -m alembic history
+
+# Upgrade to latest
+python3 -m alembic upgrade head
+
+# Downgrade one step
+python3 -m alembic downgrade -1
+```
+
+### 19.6. Systemd Service Configuration
+
+**Service File:** `/etc/systemd/system/infrazen.service`
+
+```ini
+[Unit]
+Description=InfraZen FinOps Platform
+After=network.target
+
+[Service]
+Type=notify
+User=infrazen
+Group=www-data
+WorkingDirectory=/opt/infrazen
+EnvironmentFile=/opt/infrazen/config.env
+
+ExecStart=/opt/infrazen/venv/bin/gunicorn "app:create_app()" \
+    --bind 127.0.0.1:8000 \
+    --workers 3 \
+    --access-logfile - \
+    --error-logfile - \
+    --timeout 120
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=QUIT
+TimeoutStopSec=30
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Key Features:**
+- **Zero-Downtime Reloads**: `systemctl reload infrazen` sends HUP signal for graceful worker restart
+- **Graceful Shutdown**: QUIT signal allows workers to finish current requests
+- **Auto-Restart**: Restarts on failure with 5-second delay
+- **Environment Loading**: Reads `DATABASE_URL` and other secrets from config.env
+- **Extended Timeout**: 120-second worker timeout for long-running API calls (Selectel sync, price updates)
+
+**Service Management:**
+```bash
+# Start service
+sudo systemctl start infrazen
+
+# Stop service
+sudo systemctl stop infrazen
+
+# Reload (zero-downtime)
+sudo systemctl reload infrazen
+
+# Restart
+sudo systemctl restart infrazen
+
+# Check status
+sudo systemctl status infrazen
+
+# View logs
+sudo journalctl -u infrazen -f
+```
+
+### 19.7. Nginx Configuration
+
+**Configuration File:** `/etc/nginx/sites-available/infrazen`
+
+```nginx
+server {
+    server_name infrazen.ru www.infrazen.ru;
+
+    # Static files
+    location /static/ {
+        alias /opt/infrazen/app/static/;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Application proxy
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/infrazen.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/infrazen.ru/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    server_name infrazen.ru www.infrazen.ru;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+**Key Features:**
+- **HTTPS Redirect**: All HTTP traffic redirected to HTTPS
+- **Static File Serving**: Nginx serves static assets directly (30-day cache)
+- **Reverse Proxy**: Dynamic requests proxied to Gunicorn on port 8000
+- **SSL/TLS**: Automated certificate management via Certbot
+- **Header Forwarding**: Proper client IP and protocol headers
+
+### 19.8. Security & Access Control
+
+#### **SSH Access**
+- **Key-Based Authentication**: ED25519 SSH keys (no password login)
+- **Key Location**: `.ssh/infrazen_beget` (local), `~/.ssh/authorized_keys` (server)
+- **Server User**: `root` (production) / `infrazen` (service)
+
+#### **Environment Variables**
+- **Storage**: `/opt/infrazen/config.env` (git-ignored, skip-worktree)
+- **Secrets**: `SECRET_KEY`, `DATABASE_URL`, `GOOGLE_CLIENT_ID`
+- **Git Protection**: `git update-index --skip-worktree config.env`
+
+#### **Database Access**
+- **Production**: IP allowlisting required (VPS IP: `217.26.28.90`)
+- **Credentials**: Managed via Beget control panel
+- **Connection Encryption**: MySQL SSL/TLS support
+- **Charset**: UTF-8 (utf8mb4) for security and compatibility
+
+### 19.9. Monitoring & Health Checks
+
+#### **Application Health**
+- **Endpoint**: `http://127.0.0.1:8000/` (internal)
+- **Deploy Validation**: 20 retries with 0.5s interval
+- **Expected Response**: HTTP 200 status code
+- **Failure Action**: Display service logs and exit
+
+#### **Service Logs**
+```bash
+# Real-time logs
+sudo journalctl -u infrazen -f
+
+# Last 100 lines
+sudo journalctl -u infrazen -n 100
+
+# Logs from deploy script
+sudo journalctl -u infrazen -n 80 --no-pager
+```
+
+#### **Application Logs**
+- **Gunicorn Access Log**: stdout (captured by journalctl)
+- **Gunicorn Error Log**: stderr (captured by journalctl)
+- **Log Level**: INFO (production), DEBUG (development)
+
+### 19.10. Performance Optimizations
+
+#### **Gunicorn Configuration**
+- **Workers**: 3 (CPU cores + 1 recommended)
+- **Worker Class**: sync (default)
+- **Timeout**: 120 seconds (handles long API calls)
+- **Graceful Timeout**: 30 seconds
+- **Keep-Alive**: 2 seconds
+
+#### **Database Optimizations**
+- **Connection Pooling**: 10-connection pool
+- **Pool Recycle**: 3600 seconds (1 hour)
+- **Pool Timeout**: 5 seconds
+- **Charset**: utf8mb4 (full Unicode support)
+
+#### **Selectel API Timeouts**
+- **Authentication**: 90 seconds
+- **Resource Fetching**: 90 seconds
+- **Billing API**: 90 seconds
+- **Pricing Updates**: 90 seconds
+
+### 19.11. Development vs Production Parity
+
+#### **Environment Configuration**
+
+| Aspect | Development | Production |
+|--------|-------------|------------|
+| **Database** | Local MySQL | Beget Managed MySQL |
+| **Server** | Flask dev server | Gunicorn + Nginx |
+| **Domain** | localhost:5001 | infrazen.ru (HTTPS) |
+| **Debug Mode** | Enabled | Disabled |
+| **Log Level** | DEBUG | INFO |
+| **SQL Echo** | Enabled | Disabled |
+| **Migrations** | Manual (via script) | Automatic (via deploy) |
+| **OAuth** | Google test client | Google production client |
+| **Timezone** | Local | Europe/Moscow |
+
+#### **Shared Features**
+- ✅ Same MySQL database schema
+- ✅ Same Alembic migrations
+- ✅ Same Python dependencies
+- ✅ Same Flask app factory
+- ✅ Same provider plugins
+- ✅ Same demo user seeding logic
+
+### 19.12. Deployment Checklist
+
+#### **Initial Production Setup** (Completed)
+- ✅ Provision Beget VPS and managed MySQL database
+- ✅ Configure DNS records (A records for infrazen.ru, www.infrazen.ru)
+- ✅ Generate and configure SSH keys for server access
+- ✅ Clone repository to `/opt/infrazen`
+- ✅ Create Python virtual environment
+- ✅ Install dependencies from requirements.txt
+- ✅ Create and configure `config.env` with production secrets
+- ✅ Set up Gunicorn systemd service
+- ✅ Configure Nginx reverse proxy
+- ✅ Obtain SSL certificate via Certbot
+- ✅ Run Alembic baseline migration (`alembic stamp head`)
+- ✅ Import initial data to production database
+- ✅ Enable and start infrazen.service
+- ✅ Configure git skip-worktree for config.env
+- ✅ Test deploy script end-to-end
+- ✅ Set server timezone to Europe/Moscow
+- ✅ Verify Google OAuth production credentials
+
+#### **Regular Deployment** (Current Workflow)
+1. Make changes locally
+2. Test in development environment
+3. Create Alembic migration if schema changed
+4. Commit and push to GitHub
+5. SSH to production server
+6. Run `./deploy` script
+7. Verify health check passes
+8. Test critical user flows
+
+### 19.13. Disaster Recovery
+
+#### **Database Backup Strategy**
+```bash
+# Local backup before major changes
+mysqldump -u infrazen_user -p infrazen_dev > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Production backup (via SSH)
+ssh root@217.26.28.90 'mysqldump -h jufiedeycadeth.beget.app -u infrazen_prod -p infrazen_prod' > prod_backup_$(date +%Y%m%d_%H%M%S).sql
+```
+
+#### **Restore Process**
+```bash
+# Local restore
+mysql -u infrazen_user -p infrazen_dev < backup_file.sql
+
+# Production restore
+mysql -h jufiedeycadeth.beget.app -u infrazen_prod -p infrazen_prod < backup_file.sql
+```
+
+#### **Rollback Procedure**
+```bash
+# If deployment fails
+# 1. SSH to server
+ssh root@217.26.28.90
+
+# 2. Check service status
+sudo systemctl status infrazen
+
+# 3. View recent logs
+sudo journalctl -u infrazen -n 100
+
+# 4. Rollback to previous commit
+cd /opt/infrazen
+git log --oneline -5  # find previous commit hash
+git checkout <previous-commit-hash>
+
+# 5. Rollback migrations if needed
+python3 -m alembic downgrade -1
+
+# 6. Restart service
+sudo systemctl restart infrazen
+
+# 7. Verify health
+curl http://localhost:8000/
+```
+
+### 19.14. Known Production Issues & Solutions
+
+#### **Long-Running Operations**
+- **Issue**: Selectel sync and price catalog updates can take 60-90 seconds
+- **Solution**: Increased Gunicorn worker timeout to 120 seconds
+- **Config**: `--timeout 120` in systemd ExecStart
+
+#### **Database Connection Timeouts**
+- **Issue**: MySQL connection timeouts during heavy load
+- **Solution**: Connection pooling with 10 connections, 5-second timeout
+- **Config**: `SQLALCHEMY_ENGINE_OPTIONS` in app/config.py
+
+#### **Zero-Downtime Deployments**
+- **Issue**: Service restart causes brief downtime
+- **Solution**: Graceful reload with HUP signal
+- **Command**: `systemctl reload infrazen` instead of restart
+
+#### **Config Preservation**
+- **Issue**: Git pull overwrites config.env
+- **Solution**: `git update-index --skip-worktree config.env`
+- **Auto-Applied**: In deploy script
+
+### 19.15. Future Infrastructure Enhancements
+
+#### **Planned Improvements**
+- **Docker Containerization**: Containerize application for easier deployment
+- **Database Replication**: Set up MySQL read replicas for scaling
+- **Caching Layer**: Add Redis for session storage and API caching
+- **CDN Integration**: Use CDN for static asset delivery
+- **Monitoring**: Integrate Prometheus + Grafana for metrics
+- **Log Aggregation**: Centralized logging with ELK stack
+- **Load Balancing**: Multiple Gunicorn instances behind load balancer
+- **Automated Backups**: Scheduled database backups to S3-compatible storage
+- **Blue-Green Deployment**: Zero-downtime deployments with traffic switching
+- **Staging Environment**: Separate staging server for pre-production testing
+
+#### **Scalability Targets**
+- **Users**: Support 100+ concurrent users
+- **Providers**: Handle 1000+ cloud provider connections
+- **Resources**: Track 50,000+ cloud resources
+- **API Calls**: Process 10,000+ API requests per day
+- **Response Time**: Maintain <500ms average response time
+- **Uptime**: Achieve 99.9% uptime SLA
+
+### 19.16. Implementation Status Summary
+
+#### **✅ Completed (October 2025)**
+- Production VPS provisioned and configured
+- MySQL migration completed (SQLite fully deprecated)
+- Alembic migration system implemented and tested
+- Git-based deployment workflow established
+- Automated deploy script with health checks
+- Zero-downtime reload capability
+- HTTPS with automated certificate renewal
+- Nginx reverse proxy and static file serving
+- Systemd service management
+- Demo user properly implemented and seeded
+- Development/production environment parity
+- Production database synchronized with development
+- Server timezone set to Europe/Moscow
+- Extended timeouts for long-running operations
+- Fresh snapshot sync logic implemented
+
+#### **📊 Current Metrics**
+- **Database**: 100% MySQL (SQLite removed)
+- **Deployment Time**: ~10 seconds (git pull to health check)
+- **Zero-Downtime**: ✅ Graceful reload support
+- **Migration System**: ✅ Alembic baseline established
+- **Uptime**: ✅ Production service running stable
+- **Security**: ✅ HTTPS, SSH keys, environment secrets
+- **Monitoring**: ✅ systemd logs + journalctl
+
+---
