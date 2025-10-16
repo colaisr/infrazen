@@ -518,13 +518,21 @@ def get_real_user_overview(user_id):
             # Count active resources for this provider
             active_resources += Resource.query.filter_by(provider_id=provider.id, status='active').count()
     
-    # Calculate potential savings from recommendations
+    # Calculate potential savings from optimization recommendations
+    from app.core.models.recommendations import OptimizationRecommendation
+    provider_ids = [p.id for p in providers]
+    
+    # Get all pending recommendations for user's providers
+    recommendations = OptimizationRecommendation.query.filter(
+        OptimizationRecommendation.provider_id.in_(provider_ids),
+        OptimizationRecommendation.status == 'pending'
+    ).all()
+    
     potential_savings_rub = 0
-    for provider in providers:
-        if provider.provider_metadata:
-            metadata = json.loads(provider.provider_metadata)
-            for rec in metadata.get('recommendations', []):
-                potential_savings_rub += rec.get('savings_rub', 0)
+    for rec in recommendations:
+        # Use estimated_monthly_savings if available, otherwise potential_savings
+        savings = rec.estimated_monthly_savings or rec.potential_savings or 0
+        potential_savings_rub += savings
     
     # Mock trend data for now
     from datetime import timedelta
@@ -553,10 +561,16 @@ def get_real_user_overview(user_id):
             'last_sync': provider.last_sync.strftime('%d.%m.%Y %H:%M') if provider.last_sync else 'Никогда'
         })
     
+    # Calculate savings percentage
+    savings_percentage = 0
+    if total_expenses_rub > 0:
+        savings_percentage = round((potential_savings_rub / total_expenses_rub) * 100, 1)
+    
     return {
         'kpis': {
             'total_expenses_rub': total_expenses_rub,
             'potential_savings_rub': potential_savings_rub,
+            'savings_percentage': savings_percentage,
             'active_resources': active_resources,
             'connected_providers': total_connections
         },
