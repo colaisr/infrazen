@@ -24,15 +24,24 @@
             <div class="kpi-card-header">
                 <div>
                     <span class="kpi-label">Общие расходы</span>
-                    <div class="kpi-value">{{ overview.kpis.total_expenses_rub | default(0) }} ₽</div>
+                    {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
+                        <div class="kpi-value">{{ "%.0f"|format(last_complete_sync.total_monthly_cost or 0) }} ₽</div>
+                    {% else %}
+                        <div class="kpi-value">{{ overview.kpis.total_expenses_rub | default(0) }} ₽</div>
+                    {% endif %}
                 </div>
                 <div class="kpi-icon icon-expense"><i class="fa-solid fa-ruble-sign"></i></div>
             </div>
             <div class="kpi-footer">
-                {% if is_demo_user %}
-                <div class="kpi-trend trend-down"><i class="fa-solid fa-arrow-down"></i> -12.5% за месяц</div>
+                {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
+                    <div class="kpi-trend trend-neutral">
+                        <i class="fa-solid fa-calendar"></i> 
+                        {{ "%.0f"|format((last_complete_sync.total_monthly_cost or 0) * 12) }} ₽/год
+                    </div>
+                {% elif is_demo_user %}
+                    <div class="kpi-trend trend-down"><i class="fa-solid fa-arrow-down"></i> -12.5% за месяц</div>
                 {% else %}
-                <div class="kpi-trend trend-neutral"><i class="fa-solid fa-minus"></i> 0% за месяц</div>
+                    <div class="kpi-trend trend-neutral"><i class="fa-solid fa-minus"></i> 0% за месяц</div>
                 {% endif %}
                 <span class="kpi-subtext kpi-subtext-muted">Рублей</span>
             </div>

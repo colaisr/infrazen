@@ -89,6 +89,11 @@ def dashboard():
     
     # Get expense dynamics data for the "Динамика расходов" card
     expense_dynamics = get_expense_dynamics_data(user.get('id', 'demo-user-123'))
+    
+    # Get last complete sync data for dashboard display
+    from app.core.models.complete_sync import CompleteSync
+    user_id_int = int(float(user['id']))
+    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
 
     return render_template(
         'dashboard.html',
@@ -96,6 +101,7 @@ def dashboard():
         active_page='dashboard',
         overview=overview,
         expense_dynamics=expense_dynamics,
+        last_complete_sync=last_complete_sync,
         is_demo_user=is_demo_user
     )
 
@@ -489,21 +495,36 @@ def get_real_user_overview(user_id):
     total_connections = len(providers)
     active_connections = len([p for p in providers if p.is_active])
     
-    total_expenses_rub = 0
-    potential_savings_rub = 0
-    active_resources = 0
+    # Get last complete sync data for accurate cost information
+    from app.core.models.complete_sync import CompleteSync
+    user_id_int = int(float(user_id))
+    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
     
+    # Use complete sync data if available, otherwise fall back to provider metadata
+    if last_complete_sync and last_complete_sync.sync_status == 'success':
+        total_expenses_rub = last_complete_sync.total_monthly_cost or 0
+        active_resources = last_complete_sync.total_resources_found or 0
+    else:
+        # Fallback to provider metadata calculation
+        total_expenses_rub = 0
+        active_resources = 0
+        
+        for provider in providers:
+            # Assuming provider_metadata contains billing_info and recommendations
+            if provider.provider_metadata:
+                metadata = json.loads(provider.provider_metadata)
+                total_expenses_rub += metadata.get('total_monthly_cost', 0)
+            
+            # Count active resources for this provider
+            active_resources += Resource.query.filter_by(provider_id=provider.id, status='active').count()
+    
+    # Calculate potential savings from recommendations
+    potential_savings_rub = 0
     for provider in providers:
-        # Assuming provider_metadata contains billing_info and recommendations
         if provider.provider_metadata:
             metadata = json.loads(provider.provider_metadata)
-            total_expenses_rub += metadata.get('total_monthly_cost', 0)
-            # Sum potential savings from recommendations
             for rec in metadata.get('recommendations', []):
                 potential_savings_rub += rec.get('savings_rub', 0)
-        
-        # Count active resources for this provider
-        active_resources += Resource.query.filter_by(provider_id=provider.id, status='active').count()
     
     # Mock trend data for now
     from datetime import timedelta
