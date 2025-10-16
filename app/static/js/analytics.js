@@ -11,10 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Initialize charts with real data
-        console.log('🚀 Starting chart initialization...');
         loadMainSpendingChart();
         loadServiceAnalysisChart();
-        console.log('📊 Loading provider breakdown chart...');
         loadProviderBreakdownChart();
         
         // Wait a bit more for provider charts to be rendered
@@ -282,39 +280,25 @@ function initializeServiceAnalysisChartLegacy() {
 
 // Provider Breakdown Chart (Pie Chart)
 function initializeProviderBreakdownChart(chartData) {
-    console.log('🎯 initializeProviderBreakdownChart called with data:', chartData);
-    
     // Find the provider breakdown chart container by ID
     const ctx = document.getElementById('providerBreakdownChart');
     if (!ctx) {
-        console.error('❌ Provider breakdown chart canvas not found');
         return;
     }
-    console.log('✅ Found canvas element:', ctx);
     
     // Get the parent container to restore canvas if needed
     const container = ctx.parentElement;
     if (!container) {
-        console.error('❌ Provider breakdown chart container not found');
         return;
     }
-    console.log('✅ Found container element:', container);
     
     // Check if chartData is valid
     if (!chartData || !chartData.labels || !chartData.datasets) {
-        console.error('❌ Invalid chart data:', chartData);
         container.innerHTML = '<div class="analytics-chart-error">Нет данных для отображения</div>';
         return;
     }
     
-    console.log('📊 Chart data validation passed:', {
-        labels: chartData.labels,
-        datasets: chartData.datasets,
-        dataLength: chartData.datasets[0]?.data?.length
-    });
-    
     try {
-        console.log('🎨 Creating Chart.js doughnut chart...');
         const chart = new Chart(ctx, {
             type: 'doughnut',
             data: chartData,
@@ -345,9 +329,7 @@ function initializeProviderBreakdownChart(chartData) {
                 }
             }
         });
-        console.log('✅ Chart created successfully:', chart);
     } catch (error) {
-        console.error('❌ Error creating chart:', error);
         container.innerHTML = '<div class="analytics-chart-error">Ошибка создания графика</div>';
     }
 }
@@ -513,45 +495,34 @@ function loadServiceAnalysisChart() {
 
 // Load Provider Breakdown Chart with Real Data
 function loadProviderBreakdownChart() {
-    console.log('🔍 loadProviderBreakdownChart called');
     const ctx = document.getElementById('providerBreakdownChart');
     if (!ctx) {
-        console.error('❌ Provider breakdown chart canvas not found');
         return;
     }
-    console.log('✅ Found provider breakdown chart canvas:', ctx);
     
     // Show loading state
     const container = ctx.parentElement;
     if (container) {
-        console.log('📊 Setting loading state...');
         container.innerHTML = '<div class="analytics-chart-loading"><i class="fa-solid fa-spinner"></i> Загрузка данных...</div>';
     }
     
-    console.log('🌐 Fetching data from /api/analytics/provider-breakdown...');
     // Fetch real data from API
     fetch('/api/analytics/provider-breakdown')
         .then(response => {
-            console.log('📡 API response received:', response.status, response.statusText);
             return response.json();
         })
         .then(data => {
-            console.log('📊 Provider breakdown data received:', data);
             if (data.success) {
-                console.log('✅ Data is successful, initializing chart...');
                 // Restore canvas before initializing chart
                 if (container) {
                     container.innerHTML = '<canvas id="providerBreakdownChart" width="400" height="300"></canvas>';
-                    console.log('🔄 Canvas restored');
                 }
                 initializeProviderBreakdownChart(data.data);
             } else {
-                console.error('❌ Data fetch failed:', data.error);
                 showChartError(container, 'Ошибка загрузки данных: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('❌ Error loading provider breakdown:', error);
             showChartError(container, 'Ошибка загрузки данных');
         });
 }
