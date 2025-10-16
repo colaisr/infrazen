@@ -512,7 +512,7 @@ function loadExpenseDynamicsData(days) {
     }
     
     const ctx = document.getElementById('expenseDynamicsChart');
-    if (ctx) {
+    if (ctx && ctx.parentElement) {
         ctx.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 200px;"><i class="fa-solid fa-spinner fa-spin"></i> Загрузка данных...</div>';
     }
     
@@ -522,8 +522,10 @@ function loadExpenseDynamicsData(days) {
         .then(data => {
             if (data.success) {
                 // Restore canvas
-                const container = document.querySelector('#expenseDynamicsChart').parentElement;
-                container.innerHTML = '<canvas id="expenseDynamicsChart" width="400" height="200"></canvas>';
+                const container = document.querySelector('.chart-container');
+                if (container) {
+                    container.innerHTML = '<canvas id="expenseDynamicsChart" width="400" height="200"></canvas>';
+                }
                 
                 // Create new chart with fetched data
                 const newCtx = document.getElementById('expenseDynamicsChart');
