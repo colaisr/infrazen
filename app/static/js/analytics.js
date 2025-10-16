@@ -281,16 +281,17 @@ function initializeServiceAnalysisChartLegacy() {
 // Provider Breakdown Chart (Pie Chart)
 function initializeProviderBreakdownChart(chartData) {
     
-    // Find the provider breakdown chart container
-    const providerChartContainer = document.querySelector('.analytics-secondary-grid .analytics-chart-container:last-child .analytics-chart-content');
-    if (!providerChartContainer) {
+    // Find the provider breakdown chart container by ID
+    const ctx = document.getElementById('providerBreakdownChart');
+    if (!ctx) {
+        console.error('Provider breakdown chart canvas not found');
         return;
     }
     
-    // Restore canvas
-    providerChartContainer.innerHTML = '<canvas id="providerBreakdownChart" width="400" height="300"></canvas>';
-    const ctx = document.getElementById('providerBreakdownChart');
-    if (!ctx) {
+    // Get the parent container to restore canvas if needed
+    const container = ctx.parentElement;
+    if (!container) {
+        console.error('Provider breakdown chart container not found');
         return;
     }
     
@@ -488,24 +489,34 @@ function loadServiceAnalysisChart() {
 // Load Provider Breakdown Chart with Real Data
 function loadProviderBreakdownChart() {
     const ctx = document.getElementById('providerBreakdownChart');
-    if (!ctx) return;
+    if (!ctx) {
+        console.error('Provider breakdown chart canvas not found');
+        return;
+    }
     
     // Show loading state
-    ctx.parentElement.innerHTML = '<div class="analytics-chart-loading"><i class="fa-solid fa-spinner"></i> Загрузка данных...</div>';
+    const container = ctx.parentElement;
+    if (container) {
+        container.innerHTML = '<div class="analytics-chart-loading"><i class="fa-solid fa-spinner"></i> Загрузка данных...</div>';
+    }
     
     // Fetch real data from API
     fetch('/api/analytics/provider-breakdown')
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Restore canvas before initializing chart
+                if (container) {
+                    container.innerHTML = '<canvas id="providerBreakdownChart" width="400" height="300"></canvas>';
+                }
                 initializeProviderBreakdownChart(data.data);
             } else {
-                showChartError(ctx, 'Ошибка загрузки данных: ' + data.error);
+                showChartError(container, 'Ошибка загрузки данных: ' + data.error);
             }
         })
         .catch(error => {
             console.error('Error loading provider breakdown:', error);
-            showChartError(ctx, 'Ошибка загрузки данных');
+            showChartError(container, 'Ошибка загрузки данных');
         });
 }
 
