@@ -627,11 +627,14 @@ def get_expense_dynamics_data(user_id):
         .order_by(CompleteSync.sync_completed_at.desc()).first()
     
     # Get implemented recommendations savings
-    implemented_savings = OptimizationRecommendation.query.filter_by(
-        user_id=user_id_int, 
-        status='implemented'
-    ).with_entities(
+    # Join through CloudProvider to get recommendations for this user
+    implemented_savings = db.session.query(
         db.func.sum(OptimizationRecommendation.estimated_monthly_savings)
+    ).join(
+        CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id
+    ).filter(
+        CloudProvider.user_id == user_id_int,
+        OptimizationRecommendation.status == 'implemented'
     ).scalar() or 0
     
     # Get trend data for the last 30 days
