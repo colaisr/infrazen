@@ -15,6 +15,7 @@ from .logs import ResourceLog, ResourceComponent
 from .costs import CostAllocation, CostTrend
 from .recommendations import OptimizationRecommendation
 from .sync import SyncSnapshot, ResourceState
+from .complete_sync import CompleteSync, ProviderSyncReference
 from .unrecognized_resource import UnrecognizedResource
 from .provider_catalog import ProviderCatalog
 from .pricing import ProviderPrice, PriceHistory, PriceComparisonRecommendation
@@ -36,6 +37,8 @@ __all__ = [
     'OptimizationRecommendation',
     'SyncSnapshot',
     'ResourceState',
+    'CompleteSync',
+    'ProviderSyncReference',
     'UnrecognizedResource',
     'ProviderCatalog',
     'ProviderPrice',

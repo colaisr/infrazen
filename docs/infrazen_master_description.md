@@ -457,18 +457,26 @@ User "cola" (user_id: 4)
 
 **Sync Architecture:**
 - **Snapshot-Based**: Each sync creates immutable resource state snapshot
-- **Parallel Processing**: Multi-provider sync with configurable concurrency
+- **Two-Level Sync System**: Individual provider syncs + Complete sync orchestration
 - **Error Handling**: Robust error recovery with partial success tracking
 - **Change Detection**: Resource state comparison across sync cycles
 - **Audit Trail**: Complete historical record of all sync operations
 
-**Sync Flow:**
-1. **Provider Discovery**: Load all active user providers
-2. **Parallel Execution**: Concurrent sync across providers
+**Individual Provider Sync Flow:**
+1. **Provider Discovery**: Load specific provider configuration
+2. **Plugin Execution**: Provider-specific sync via plugin system
 3. **Resource Processing**: Normalize and store resource data
 4. **Cost Calculation**: Apply FinOps cost baseline
 5. **State Tracking**: Record changes and create audit trail
-6. **Notification**: Update UI with sync results
+6. **Snapshot Creation**: Create immutable resource state snapshot
+
+**Complete Sync Flow (NEW):**
+1. **Provider Discovery**: Load all providers enabled for auto-sync
+2. **Sequential Execution**: Sync providers one after another
+3. **Cost Aggregation**: Sum costs from all successful provider syncs
+4. **Unified Snapshot**: Create complete sync record with aggregated data
+5. **Provider References**: Link to individual provider snapshots
+6. **Dashboard Integration**: Update main spending view with complete sync data
 
 ### 6.2.7. Scalability & Performance Features
 
@@ -503,20 +511,23 @@ User "cola" (user_id: 4)
 **Completed Components:**
 - ✅ **Plugin System**: Full plugin architecture with discovery
 - ✅ **Sync Orchestrator**: Unified sync coordination
+- ✅ **Complete Sync System**: NEW - Two-level sync with cost aggregation
 - ✅ **Resource Registry**: Dynamic mapping system
 - ✅ **Cost Tracking**: FinOps cost baseline implementation
 - ✅ **Database Schema**: Optimized relationships and indexes
-- ✅ **Web Interface**: Complete UI integration
+- ✅ **Web Interface**: Complete UI integration with complete sync
 - ✅ **Error Handling**: Robust error recovery and logging
 - ✅ **Testing**: Comprehensive test coverage and validation
 
 **Validated Scenarios:**
 - ✅ Multi-provider sync (Beget + Selectel)
+- ✅ Complete sync orchestration with cost aggregation
 - ✅ Resource lifecycle management
 - ✅ Cost data accuracy (RUB currency, monthly/daily conversion)
 - ✅ Change detection and historical tracking
 - ✅ User isolation and security
 - ✅ Performance under load (14 snapshots processed successfully)
+- ✅ Complete sync UI integration and statistics alignment
 
 **Production Readiness:**
 - **Scalability**: Supports unlimited users and providers
@@ -533,18 +544,70 @@ The InfraZen platform implements a comprehensive multi-cloud synchronization sys
 ### 6.3.2. Core Sync Components
 
 #### **Sync Models & Database Schema**
-- **`SyncSnapshot`**: Tracks metadata for each sync operation including timing, status, resource counts, and cost totals
+- **`SyncSnapshot`**: Tracks metadata for each individual provider sync operation including timing, status, resource counts, and cost totals
 - **`ResourceState`**: Records the state of individual resources during each sync, enabling change detection and historical tracking
 - **`Resource`**: Universal resource registry storing normalized data from all cloud providers
 - **`CloudProvider`**: Provider connection management with credential storage and sync status tracking
+- **`CompleteSync`**: NEW - Tracks aggregated sync operations across all providers with total costs and resource counts
+- **`ProviderSyncReference`**: NEW - Links CompleteSync records to individual provider SyncSnapshot records
 
 #### **Sync Service Architecture**
-- **`SyncService`**: Core orchestration service that manages the entire sync process
+- **`SyncService`**: Core orchestration service that manages individual provider sync processes
+- **`CompleteSyncService`**: NEW - Orchestrates complete sync operations across all auto-sync enabled providers
 - **Provider Clients**: Specialized API clients for each cloud provider (Beget, Yandex.Cloud, Selectel, AWS, Azure, GCP)
 - **Change Detection**: Automated comparison between current and previous resource states
 - **State Management**: Tracks resource lifecycle (created, updated, deleted, unchanged)
+- **Cost Aggregation**: NEW - Sums costs from all providers in complete sync operations
 
-### 6.3.3. Billing-First Sync Process Flow
+### 6.3.3. Complete Sync Implementation ✅ NEW FEATURE
+
+#### **Complete Sync Architecture**
+The platform now supports **two-level synchronization**:
+1. **Individual Provider Sync**: Traditional per-provider sync with independent snapshots
+2. **Complete Sync**: NEW - Orchestrated sync across all auto-sync enabled providers with aggregated results
+
+#### **Complete Sync Features**
+- **Auto-Sync Filtering**: Only syncs providers with `auto_sync=True` flag
+- **Sequential Execution**: Syncs providers one after another to avoid API rate limits
+- **Cost Aggregation**: Sums daily/monthly costs from all successful provider syncs
+- **Resource Counting**: Tracks total resources found across all providers
+- **Provider Breakdown**: Stores cost and resource counts per provider
+- **Success Tracking**: Records successful vs failed provider syncs
+- **Reference Linking**: Links to individual provider SyncSnapshot records
+
+#### **Complete Sync Data Model**
+```python
+CompleteSync:
+- user_id: User who initiated the sync
+- sync_type: 'manual' or 'scheduled'
+- sync_status: 'running', 'success', 'error'
+- total_providers_synced: Number of providers included
+- successful_providers: Number of successful syncs
+- failed_providers: Number of failed syncs
+- total_resources_found: Total resources across all providers
+- total_daily_cost: Aggregated daily cost
+- total_monthly_cost: Aggregated monthly cost
+- cost_by_provider: JSON breakdown by provider
+- resources_by_provider: JSON resource counts by provider
+
+ProviderSyncReference:
+- complete_sync_id: Link to CompleteSync record
+- provider_id: Link to CloudProvider
+- sync_snapshot_id: Link to individual SyncSnapshot
+- sync_order: Order of execution
+- sync_status: Success/failure status
+- resources_synced: Resources found for this provider
+- provider_cost: Cost for this provider
+```
+
+#### **UI Integration**
+- **"Обновить все" Button**: Triggers complete sync from connections page
+- **Aggregated Statistics**: Shows total resources and costs from complete sync
+- **Individual Provider Views**: Still shows data from individual provider snapshots
+- **Dashboard Integration**: Main spending view uses complete sync data
+- **Analytics Foundation**: Complete sync data enables user spending trends over time
+
+### 6.3.4. Billing-First Sync Process Flow
 
 #### **Universal Billing-First Sync Algorithm**
 The platform implements a revolutionary **billing-first synchronization approach** that prioritizes cost visibility and FinOps principles. This method ensures all resources with actual costs are captured, including zombie resources (deleted but still billed) and orphan volumes.

@@ -37,28 +37,33 @@
     {% if resources_by_provider %}
     <div class="resources-summary">
         <div class="summary-stats">
-            {% set all_resources = [] %}
-            {% for provider_resources in resources_by_provider.values() %}
-                {% for resource in provider_resources %}
-                    {% set _ = all_resources.append(resource) %}
+            {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
+                <!-- Use complete sync data -->
+                <div class="stat-item">
+                    <span class="stat-label">Всего ресурсов</span>
+                    <span class="stat-value">{{ last_complete_sync.total_resources_found or 0 }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Общая стоимость</span>
+                    <span class="stat-value">{{ (last_complete_sync.total_daily_cost or 0)|round(2) }} ₽/день</span>
+                </div>
+            {% else %}
+                <!-- Fallback to individual resource data -->
+                {% set all_resources = [] %}
+                {% for provider_resources in resources_by_provider.values() %}
+                    {% for resource in provider_resources %}
+                        {% set _ = all_resources.append(resource) %}
+                    {% endfor %}
                 {% endfor %}
-            {% endfor %}
-            <div class="stat-item">
-                <span class="stat-label">Всего ресурсов</span>
-                <span class="stat-value">{{ all_resources|length }}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Активных</span>
-                <span class="stat-value">{{ all_resources|selectattr('status', 'equalto', 'RUNNING')|list|length + all_resources|selectattr('status', 'equalto', 'ACTIVE')|list|length + all_resources|selectattr('status', 'equalto', 'IN_USE')|list|length }}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Остановленных</span>
-                <span class="stat-value">{{ all_resources|selectattr('status', 'equalto', 'STOPPED')|list|length }}</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Общая стоимость</span>
-                <span class="stat-value">{{ all_resources|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
-            </div>
+                <div class="stat-item">
+                    <span class="stat-label">Всего ресурсов</span>
+                    <span class="stat-value">{{ all_resources|length }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Общая стоимость</span>
+                    <span class="stat-value">{{ all_resources|sum(attribute='daily_cost')|round(2) }} ₽/день</span>
+                </div>
+            {% endif %}
         </div>
     </div>
 

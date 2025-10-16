@@ -152,6 +152,7 @@ def connections():
                 'connection_name': provider.connection_name,
                 'status': 'connected' if provider.is_active else 'disconnected',
                 'last_sync': provider.last_sync,
+                'auto_sync': provider.auto_sync,  # Add auto_sync field for template
                 'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
                 'provider_metadata': provider.provider_metadata,  # Add this line
                 'total_daily_cost': round(total_daily_cost, 2),
@@ -168,6 +169,10 @@ def connections():
     # Get enabled providers from catalog for "Available Providers" section
     enabled_providers = ProviderCatalog.query.filter_by(is_enabled=True).all()
     
+    # Get last complete sync data for accurate statistics
+    from app.core.models.complete_sync import CompleteSync
+    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    
     return render_template('connections.html', 
                         user=user,
                         active_page='connections',
@@ -175,6 +180,7 @@ def connections():
                         page_subtitle='Управление подключениями к облачным провайдерам',
                         providers=providers,
                         enabled_providers=enabled_providers,
+                        last_complete_sync=last_complete_sync,
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/resources')
@@ -228,6 +234,11 @@ def resources():
             snapshot_metadata = {}
             resources_by_provider = {}
     
+    # Get last complete sync data for accurate statistics
+    from app.core.models.complete_sync import CompleteSync
+    user_id_int = int(float(user['id']))
+    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    
     return render_template('resources.html', 
                         user=user,
                         active_page='resources',
@@ -237,6 +248,7 @@ def resources():
                         providers=providers,
                         resources_by_provider=resources_by_provider,
                         snapshot_metadata=snapshot_metadata,
+                        last_complete_sync=last_complete_sync,
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/analytics')
@@ -439,7 +451,7 @@ def get_real_user_resources(user_id):
         ).order_by(SyncSnapshot.created_at.desc()).first()
         
         if latest_snapshot:
-            # Get resources from the latest snapshot
+            # Get resources from the latest snapshot (correct architecture)
             resource_states = ResourceState.query.filter_by(
                 sync_snapshot_id=latest_snapshot.id
             ).all()

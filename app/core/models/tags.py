@@ -10,7 +10,7 @@ class ResourceTag(BaseModel):
     
     resource_id = db.Column(db.Integer, db.ForeignKey('resources.id'), nullable=False, index=True)
     tag_key = db.Column(db.String(100), nullable=False, index=True)
-    tag_value = db.Column(db.String(255), nullable=False)
+    tag_value = db.Column(db.Text, nullable=False)
     
     # Constraints
     __table_args__ = (

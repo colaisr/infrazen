@@ -464,6 +464,7 @@ class SyncOrchestrator:
         try:
             processed_count = 0
 
+            processed_resources = []
             for resource_data in plugin_resources:
                 try:
                     # Create or update resource in database
@@ -472,10 +473,51 @@ class SyncOrchestrator:
                     )
                     if resource:
                         processed_count += 1
+                        processed_resources.append((resource, resource_data))
+                        self.logger.info(f"Successfully processed resource: {resource_data.get('resource_name', 'unknown')}")
+                    else:
+                        self.logger.warning(f"Resource processing returned None for: {resource_data.get('resource_name', 'unknown')}")
 
                 except Exception as e:
                     self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}")
                     continue
+            
+            # Create ResourceState records and finish resource processing
+            from app.core.models.sync import ResourceState
+            with db.session.no_autoflush:
+                for resource, resource_data in processed_resources:
+                    try:
+                        # Create ResourceState record
+                        resource_state = ResourceState(
+                            sync_snapshot_id=sync_snapshot.id,
+                            resource_id=resource.id,
+                            provider_resource_id=resource_data['resource_id'],
+                            resource_type=resource_data['resource_type'],
+                            resource_name=resource_data['resource_name'],
+                            state_action='created' if resource_data.get('is_new', False) else 'updated',
+                            service_name=resource_data.get('service_name', resource_data['resource_type'].title()),
+                            region=resource_data.get('region', 'unknown'),
+                            status=resource_data.get('status', 'unknown'),
+                            effective_cost=resource_data.get('effective_cost', 0.0)
+                        )
+                        db.session.add(resource_state)
+                        
+                        # Finish resource processing (set daily cost baseline and add tags)
+                        resource.set_daily_cost_baseline(
+                            original_cost=resource_data.get('effective_cost', 0.0),
+                            period=resource_data.get('billing_period', 'monthly'),
+                            frequency='recurring'
+                        )
+                        
+                        # Add tags
+                        tags = resource_data.get('tags', {})
+                        for key, value in tags.items():
+                            resource.add_tag(key, str(value))
+                        
+                        self.logger.info(f"Successfully created ResourceState for {resource_data.get('resource_name', 'unknown')}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to create ResourceState for {resource_data.get('resource_name', 'unknown')}: {e}")
+                        continue
 
             self.logger.info(f"Processed {processed_count} resources for provider {provider.id}")
             return processed_count
@@ -502,6 +544,8 @@ class SyncOrchestrator:
             resource_id = resource_data['resource_id']
             resource_name = resource_data['resource_name']
             resource_type = resource_data['resource_type']
+            
+            self.logger.info(f"Processing resource: {resource_name} ({resource_type}) - ID: {resource_id}")
             service_name = resource_data.get('service_name', resource_type.title())
             region = resource_data.get('region', 'unknown')
             status = resource_data.get('status', 'unknown')
@@ -511,56 +555,54 @@ class SyncOrchestrator:
             provider_config = resource_data.get('provider_config', resource_data)
             tags = resource_data.get('tags', {})
 
-            # Always create new resource (fresh snapshot approach)
-            # No checking for existing resources - each sync creates completely fresh data
-            resource = Resource(
+            # Get or create the base Resource record (for reference)
+            existing_resource = Resource.query.filter_by(
                 provider_id=provider.id,
-                resource_id=resource_id,
-                resource_name=resource_name,
-                resource_type=resource_type,
-                service_name=service_name,
-                region=region,
-                status=status,
-                effective_cost=effective_cost,
-                currency=currency,
-                billing_period=billing_period,
-                provider_config=json.dumps(provider_config),
-                last_sync=datetime.now(),
-                is_active=True
-            )
-
-            db.session.add(resource)
+                resource_id=resource_id
+            ).first()
+            
+            if existing_resource:
+                # Update the base resource record with latest info
+                resource = existing_resource
+                resource.resource_name = resource_name
+                resource.resource_type = resource_type
+                resource.service_name = service_name
+                resource.region = region
+                resource.status = status
+                resource.effective_cost = effective_cost
+                resource.currency = currency
+                resource.billing_period = billing_period
+                resource.provider_config = json.dumps(provider_config)
+                resource.last_sync = datetime.now()
+                resource.is_active = True
+            else:
+                # Create new base resource record
+                resource = Resource(
+                    provider_id=provider.id,
+                    resource_id=resource_id,
+                    resource_name=resource_name,
+                    resource_type=resource_type,
+                    service_name=service_name,
+                    region=region,
+                    status=status,
+                    effective_cost=effective_cost,
+                    currency=currency,
+                    billing_period=billing_period,
+                    provider_config=json.dumps(provider_config),
+                    last_sync=datetime.now(),
+                    is_active=True
+                )
+                db.session.add(resource)
+            
             db.session.flush()  # Get the resource ID
-
-            # Set daily cost baseline for FinOps analysis
-            resource.set_daily_cost_baseline(
-                original_cost=effective_cost,
-                period=billing_period,
-                frequency='recurring'
-            )
-
-            # Add tags after resource is flushed (has ID)
-            for key, value in tags.items():
-                resource.add_tag(key, str(value))
-
-            # Create resource state for tracking changes
-            from app.core.models.sync import ResourceState
-            resource_state = ResourceState(
-                sync_snapshot_id=sync_snapshot.id,
-                resource_id=resource.id,
-                provider_resource_id=resource_id,
-                resource_type=resource_type,
-                resource_name=resource_name,
-                state_action='created',  # Always 'created' for fresh snapshots
-                service_name=service_name,
-                region=region,
-                status=status,
-                effective_cost=effective_cost
-            )
-
-            db.session.add(resource_state)
-            db.session.commit()
-
+            
+            # Store resource data for later processing to avoid autoflush conflicts
+            resource_data['processed_resource'] = resource
+            resource_data['tags'] = tags
+            resource_data['effective_cost'] = effective_cost
+            resource_data['billing_period'] = billing_period
+            
+            self.logger.info(f"Successfully processed resource: {resource_name}")
             return resource
 
         except Exception as e:

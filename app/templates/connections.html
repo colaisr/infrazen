@@ -8,7 +8,7 @@
 {% block header_actions %}
     <div class="header-actions">
         {% if user.role != 'demouser' %}
-        <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
+        <button class="btn btn-secondary" onclick="startCompleteSync()" id="complete-sync-btn"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
         <button class="btn btn-primary" onclick="showProviderModal()"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
         {% else %}
         <div class="demo-user-notice">
@@ -57,7 +57,7 @@
                     <i class="fa-solid fa-check-circle"></i>
                 </div>
                 <div class="stat-content">
-                    <span class="stat-value">{{ providers|selectattr('status', 'equalto', 'connected')|list|length }}</span>
+                    <span class="stat-value">{{ providers|selectattr('auto_sync', 'equalto', True)|list|length }}</span>
                     <span class="stat-label">Активных</span>
                 </div>
             </div>
@@ -66,7 +66,13 @@
                     <i class="fa-solid fa-sync"></i>
                 </div>
                 <div class="stat-content">
-                    <span class="stat-value">{{ providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list|length }}</span>
+                    <span class="stat-value">
+                        {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
+                            {{ last_complete_sync.successful_providers or 0 }}
+                        {% else %}
+                            {{ providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list|length }}
+                        {% endif %}
+                    </span>
                     <span class="stat-label">Синхронизировано</span>
                 </div>
             </div>
@@ -76,12 +82,16 @@
                 </div>
                 <div class="stat-content">
                     <span class="stat-value">
-                        {% set synced_providers = providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list %}
-                        {% if synced_providers|length > 0 %}
-                            {% set latest_sync = synced_providers|first %}
-                            {{ latest_sync.last_sync.strftime('%H:%M') }}
+                        {% if last_complete_sync and last_complete_sync.sync_completed_at %}
+                            {{ last_complete_sync.sync_completed_at.strftime('%d.%m %H:%M') }}
                         {% else %}
-                            Никогда
+                            {% set synced_providers = providers|selectattr('last_sync', 'defined')|selectattr('last_sync', 'ne', None)|list %}
+                            {% if synced_providers|length > 0 %}
+                                {% set latest_sync = synced_providers|first %}
+                                {{ latest_sync.last_sync.strftime('%d.%m %H:%M') }}
+                            {% else %}
+                                Никогда
+                            {% endif %}
                         {% endif %}
                     </span>
                     <span class="stat-label">Последняя синхронизация</span>
@@ -2416,6 +2426,61 @@ function syncConnection(connectionId, providerType) {
     .catch(error => {
         showFlashMessage('❌ Ошибка синхронизации', 'error');
         console.error('Sync error:', error);
+    })
+    .finally(() => {
+        // Restore button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+    });
+}
+
+function startCompleteSync() {
+    const button = document.getElementById('complete-sync-btn');
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Синхронизация всех...</span>';
+    button.disabled = true;
+    
+    // Make complete sync request
+    fetch('/api/complete-sync', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            sync_type: 'manual'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Show success message with aggregated results
+            let message = `✅ Полная синхронизация завершена!<br>`;
+            message += `📊 Провайдеров: ${data.total_providers_synced}<br>`;
+            message += `💰 Общая стоимость: ${data.total_daily_cost.toFixed(2)} ₽/день<br>`;
+            message += `📦 Ресурсов: ${data.total_resources_found}`;
+            
+            if (data.cost_by_provider && Object.keys(data.cost_by_provider).length > 0) {
+                message += `<br><br>📈 По провайдерам:<br>`;
+                for (const [provider, cost] of Object.entries(data.cost_by_provider)) {
+                    message += `• ${provider}: ${cost.toFixed(2)} ₽/день<br>`;
+                }
+            }
+            
+            showFlashMessage(message, 'success');
+            
+            // Reload page to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        } else {
+            showFlashMessage('❌ Ошибка полной синхронизации: ' + (data.error || data.message), 'error');
+        }
+    })
+    .catch(error => {
+        showFlashMessage('❌ Ошибка полной синхронизации', 'error');
+        console.error('Complete sync error:', error);
     })
     .finally(() => {
         // Restore button state

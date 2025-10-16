@@ -38,6 +38,7 @@ def create_app(config_name=None):
     from app.api.providers import providers_bp
     from app.api.resources import resources_bp
     from app.api import recommendations_bp
+    from app.api.complete_sync import complete_sync_bp
     from app.providers.beget.routes import beget_bp
     from app.providers.selectel.routes import selectel_bp
     
@@ -46,6 +47,7 @@ def create_app(config_name=None):
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(providers_bp, url_prefix='/api/providers')
     app.register_blueprint(resources_bp, url_prefix='/api/resources')
+    app.register_blueprint(complete_sync_bp)
     app.register_blueprint(beget_bp, url_prefix='/api/providers/beget')
     app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     app.register_blueprint(recommendations_bp, url_prefix='/api')
