@@ -848,7 +848,7 @@ def reseed_demo_user():
         from seed_demo_user import seed_demo_user
         
         # Call the seeding function
-        demo_user = seed_demo_user()
+        demo_user, providers_dict = seed_demo_user()
 
         # Compute fresh counts for response
         provider_count = CloudProvider.query.filter_by(user_id=demo_user.id).count()
