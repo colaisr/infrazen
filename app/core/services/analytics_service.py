@@ -148,7 +148,14 @@ class AnalyticsService:
         latest_sync = CompleteSync.query.filter_by(user_id=self.user_id)\
             .order_by(desc(CompleteSync.sync_completed_at)).first()
         
+        print(f"🔍 DEBUG: User ID: {self.user_id}")
+        print(f"🔍 DEBUG: Latest sync found: {latest_sync is not None}")
+        if latest_sync:
+            print(f"🔍 DEBUG: Cost by provider: {latest_sync.cost_by_provider}")
+            print(f"🔍 DEBUG: Cost by provider type: {type(latest_sync.cost_by_provider)}")
+        
         if not latest_sync or not latest_sync.cost_by_provider:
+            print("❌ DEBUG: No latest sync or no cost_by_provider data")
             return {'providers': [], 'total_cost': 0}
         
         try:
