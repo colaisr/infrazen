@@ -140,7 +140,11 @@ function cardTemplate(rec){
   const id = rec.id;
   
   // Conditionally show action buttons for non-demo users
-  const actionButtons = isDemoUser ? '' : `
+  const actionButtons = isDemoUser ? `
+    <div class="rec-actions" style="visibility: hidden;">
+      <!-- Hidden actions for demo users to maintain layout -->
+    </div>
+  ` : `
     <div class="rec-actions">
       <input type="checkbox" class="rowCheck" />
       <button class="btn-icon act" data-act="seen" title="Отметить просмотренной">👁</button>
