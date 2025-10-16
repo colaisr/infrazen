@@ -6,6 +6,46 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/features/analytics-charts.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/analytics-cards.css') }}">
+<style>
+/* Force light theme for analytics page - override any dark mode */
+.analytics-page {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.analytics-page * {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* Override any inherited dark theme styles */
+body {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+/* Ensure all cards and containers are light */
+.analytics-kpi-card,
+.analytics-chart-container,
+.analytics-provider-chart {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    border-color: #e5e7eb !important;
+}
+
+/* Force light theme for all text elements */
+.analytics-title,
+.analytics-kpi-value,
+.analytics-chart-title {
+    color: #1f2937 !important;
+}
+
+.analytics-subtitle,
+.analytics-kpi-subtitle,
+.analytics-chart-subtitle {
+    color: #6b7280 !important;
+}
+</style>
 {% endblock %}
 
 {% block content %}

@@ -1,9 +1,42 @@
 /* Analytics Page Specific Styles - Scoped to avoid conflicts */
+/* Force light theme regardless of system preferences */
 
 .analytics-page {
     padding: 1.5rem;
     max-width: 1400px;
     margin: 0 auto;
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+/* Override any dark theme styles */
+.analytics-page * {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* Force light theme for all analytics elements */
+.analytics-page,
+.analytics-page .analytics-header,
+.analytics-page .analytics-kpi-card,
+.analytics-page .analytics-chart-container,
+.analytics-page .analytics-provider-chart {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    border-color: #e5e7eb !important;
+}
+
+/* Ensure text remains dark */
+.analytics-page .analytics-title,
+.analytics-page .analytics-kpi-value,
+.analytics-page .analytics-chart-title {
+    color: #1f2937 !important;
+}
+
+.analytics-page .analytics-subtitle,
+.analytics-page .analytics-kpi-subtitle,
+.analytics-page .analytics-chart-subtitle {
+    color: #6b7280 !important;
 }
 
 /* Page Header */
