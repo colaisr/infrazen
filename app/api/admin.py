@@ -830,8 +830,8 @@ def test_provider_credentials(provider_type):
 @admin_bp.route('/reseed-demo-user', methods=['POST'])
 def reseed_demo_user():
     """
-    Reseed demo user with fresh mock data
-    This endpoint deletes all demo user data and recreates it
+    Reseed demo user with fresh mock data including 3-month historical data
+    This endpoint deletes all demo user data and recreates it with comprehensive history
     Admin only
     """
     admin_check = require_admin()
@@ -839,16 +839,19 @@ def reseed_demo_user():
         return admin_check
     
     try:
-        logger.info("Admin initiated demo user reseed")
+        logger.info("Admin initiated demo user reseed with historical data")
         
-        # Import the seeding function
+        # Import the seeding functions
         import sys
         import os
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts'))
-        from seed_demo_user import seed_demo_user
+        from seed_demo_user import seed_demo_user, seed_historical_complete_syncs
         
-        # Call the seeding function
+        # Call the comprehensive seeding function (base data + historical data)
         demo_user, providers_dict = seed_demo_user()
+        
+        # Generate 90 days of historical complete sync data
+        seed_historical_complete_syncs(demo_user, providers_dict)
 
         # Compute fresh counts for response
         provider_count = CloudProvider.query.filter_by(user_id=demo_user.id).count()
@@ -858,14 +861,19 @@ def reseed_demo_user():
             .count()
         )
         
+        # Get complete sync count
+        from app.core.models.complete_sync import CompleteSync
+        complete_sync_count = CompleteSync.query.filter_by(user_id=demo_user.id).count()
+        
         return jsonify({
             'success': True,
-            'message': 'Demo user successfully reseeded',
+            'message': 'Demo user successfully reseeded with 3-month historical data',
             'demo_user': {
                 'id': demo_user.id,
                 'email': demo_user.email,
                 'providers': provider_count,
-                'resources': resource_count
+                'resources': resource_count,
+                'complete_syncs': complete_sync_count
             }
         })
         
