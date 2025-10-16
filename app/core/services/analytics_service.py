@@ -155,15 +155,16 @@ class AnalyticsService:
             import json
             cost_by_provider = json.loads(latest_sync.cost_by_provider) if isinstance(latest_sync.cost_by_provider, str) else latest_sync.cost_by_provider
             
-            # Get provider names - handle string keys
-            provider_ids = list(cost_by_provider.keys())
+            # Get provider names - handle string keys by converting to int
+            provider_ids = [int(pid) for pid in cost_by_provider.keys()]
             providers = CloudProvider.query.filter(CloudProvider.id.in_(provider_ids)).all()
             provider_names = {p.id: p.connection_name for p in providers}
             
             total_cost = sum(cost_by_provider.values())
             
             provider_data = []
-            for provider_id, cost in cost_by_provider.items():
+            for provider_id_str, cost in cost_by_provider.items():
+                provider_id = int(provider_id_str)
                 provider_data.append({
                     'id': provider_id,
                     'name': provider_names.get(provider_id, f'Provider {provider_id}'),
