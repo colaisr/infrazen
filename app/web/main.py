@@ -647,7 +647,7 @@ def get_expense_dynamics_data(user_id):
     for sync in trend_syncs:
         trend_data.append({
             'date': sync.sync_completed_at.strftime('%Y-%m-%d'),
-            'cost': sync.total_daily_cost
+            'cost': sync.total_monthly_cost  # Use monthly costs for consistency
         })
     
     return {
