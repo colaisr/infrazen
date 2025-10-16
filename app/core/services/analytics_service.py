@@ -162,19 +162,25 @@ class AnalyticsService:
             import json
             cost_by_provider = json.loads(latest_sync.cost_by_provider) if isinstance(latest_sync.cost_by_provider, str) else latest_sync.cost_by_provider
             
-            # Get provider names - handle string keys by converting to int
-            provider_ids = [int(pid) for pid in cost_by_provider.keys()]
-            providers = CloudProvider.query.filter(CloudProvider.id.in_(provider_ids)).all()
-            provider_names = {p.id: p.connection_name for p in providers}
+            print(f"🔍 DEBUG: Cost by provider keys: {list(cost_by_provider.keys())}")
+            print(f"🔍 DEBUG: Cost by provider values: {list(cost_by_provider.values())}")
+            
+            # The cost_by_provider uses provider names as keys, not IDs
+            # We need to find providers by connection_name
+            provider_names = list(cost_by_provider.keys())
+            providers = CloudProvider.query.filter(CloudProvider.connection_name.in_(provider_names)).all()
+            provider_name_to_id = {p.connection_name: p.id for p in providers}
+            
+            print(f"🔍 DEBUG: Found providers: {[(p.connection_name, p.id) for p in providers]}")
             
             total_cost = sum(cost_by_provider.values())
             
             provider_data = []
-            for provider_id_str, cost in cost_by_provider.items():
-                provider_id = int(provider_id_str)
+            for provider_name, cost in cost_by_provider.items():
+                provider_id = provider_name_to_id.get(provider_name)
                 provider_data.append({
                     'id': provider_id,
-                    'name': provider_names.get(provider_id, f'Provider {provider_id}'),
+                    'name': provider_name,
                     'cost': float(cost),
                     'percentage': (cost / total_cost * 100) if total_cost > 0 else 0
                 })
