@@ -1,0 +1,349 @@
+/* Analytics Page Specific Styles - Scoped to avoid conflicts */
+
+.analytics-page {
+    padding: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Page Header */
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.analytics-title-section {
+    flex: 1;
+}
+
+.analytics-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.analytics-subtitle {
+    font-size: 1rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.analytics-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.analytics-export-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: #1e40af;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.analytics-export-btn:hover {
+    background: #1d4ed8;
+}
+
+/* Executive Summary - KPI Cards */
+.analytics-summary {
+    margin-bottom: 2rem;
+}
+
+.analytics-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.analytics-kpi-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+    transition: box-shadow 0.2s;
+}
+
+.analytics-kpi-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-kpi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.analytics-kpi-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0;
+}
+
+.analytics-kpi-trend {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.analytics-trend-up {
+    color: #059669;
+    background: #d1fae5;
+}
+
+.analytics-trend-down {
+    color: #dc2626;
+    background: #fee2e2;
+}
+
+.analytics-trend-stable {
+    color: #6b7280;
+    background: #f3f4f6;
+}
+
+.analytics-kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+}
+
+.analytics-kpi-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+/* Main Chart Section */
+.analytics-main-chart-section {
+    margin-bottom: 2rem;
+}
+
+.analytics-main-chart {
+    grid-column: 1 / -1;
+}
+
+/* Secondary Analysis */
+.analytics-secondary-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.analytics-secondary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.analytics-full-width {
+    grid-column: 1 / -1;
+}
+
+/* Individual Provider Charts Grid */
+.analytics-provider-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.analytics-provider-chart {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.analytics-provider-chart .analytics-chart-content {
+    height: 300px;
+}
+
+/* Chart Containers */
+.analytics-chart-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+}
+
+.analytics-chart-header {
+    margin-bottom: 1.5rem;
+}
+
+.analytics-chart-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.5rem 0;
+}
+
+.analytics-chart-subtitle {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.analytics-chart-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.analytics-provider-toggles {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.analytics-toggle-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    background: white;
+    color: #6b7280;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.analytics-toggle-btn:hover {
+    border-color: #1e40af;
+    color: #1e40af;
+}
+
+.analytics-toggle-btn.active {
+    background: #1e40af;
+    color: white;
+    border-color: #1e40af;
+}
+
+.analytics-time-range {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.analytics-time-selector,
+.analytics-provider-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: white;
+    color: #374151;
+}
+
+.analytics-chart-content {
+    position: relative;
+    height: 400px;
+}
+
+.analytics-chart-content canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Recommendations Section */
+.analytics-recommendations-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+}
+
+.analytics-summary-item {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.analytics-recommendations-content {
+    min-height: 200px;
+}
+
+.analytics-recommendations-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    text-align: center;
+}
+
+.analytics-empty-icon {
+    font-size: 3rem;
+    color: #d1d5db;
+    margin-bottom: 1rem;
+}
+
+.analytics-empty-text {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+}
+
+.analytics-empty-subtext {
+    font-size: 0.875rem;
+    color: #9ca3af;
+    margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .analytics-page {
+        padding: 1rem;
+    }
+    
+    .analytics-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .analytics-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .analytics-secondary-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .analytics-provider-charts-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .analytics-chart-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .analytics-provider-toggles {
+        justify-content: center;
+    }
+    
+    .analytics-recommendations-summary {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}

@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика расходов - InfraZen{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/features/analytics-charts.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/analytics-cards.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="analytics-page">
+    <!-- Page Header -->
+    <div class="analytics-header">
+        <div class="analytics-title-section">
+            <h1 class="analytics-title">Аналитика расходов</h1>
+            <p class="analytics-subtitle">Детальная аналитика расходов и использования облачных ресурсов</p>
+        </div>
+        <div class="analytics-actions">
+            <button class="btn btn-primary analytics-export-btn">
+                <i class="fa-solid fa-download"></i>
+                Экспорт отчета
+            </button>
+        </div>
+    </div>
+
+    <!-- Executive Summary - 4 KPI Cards -->
+    <div class="analytics-summary">
+        <div class="analytics-kpi-grid">
+            <div class="analytics-kpi-card">
+                <div class="analytics-kpi-header">
+                    <h3 class="analytics-kpi-title">Общие расходы</h3>
+                    <div class="analytics-kpi-trend analytics-trend-up">
+                        <i class="fa-solid fa-arrow-up"></i>
+                        <span>+5.2%</span>
+                    </div>
+                </div>
+                <div class="analytics-kpi-value">
+                    {% if latest_complete_sync %}
+                        {{ "%.2f"|format(latest_complete_sync.total_daily_cost) }} ₽/день
+                    {% else %}
+                        0.00 ₽/день
+                    {% endif %}
+                </div>
+                <div class="analytics-kpi-subtitle">
+                    {% if latest_complete_sync %}
+                        {{ "%.2f"|format(latest_complete_sync.total_monthly_cost) }} ₽/месяц
+                    {% else %}
+                        0.00 ₽/месяц
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="analytics-kpi-card">
+                <div class="analytics-kpi-header">
+                    <h3 class="analytics-kpi-title">Активные ресурсы</h3>
+                    <div class="analytics-kpi-trend analytics-trend-stable">
+                        <i class="fa-solid fa-minus"></i>
+                        <span>0%</span>
+                    </div>
+                </div>
+                <div class="analytics-kpi-value">{{ active_resources_count }}</div>
+                <div class="analytics-kpi-subtitle">ресурсов</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+                <div class="analytics-kpi-header">
+                    <h3 class="analytics-kpi-title">Провайдеры</h3>
+                    <div class="analytics-kpi-trend analytics-trend-up">
+                        <i class="fa-solid fa-arrow-up"></i>
+                        <span>100%</span>
+                    </div>
+                </div>
+                <div class="analytics-kpi-value">
+                    {% if latest_complete_sync %}
+                        {{ latest_complete_sync.successful_providers }}/{{ latest_complete_sync.total_providers_synced }}
+                    {% else %}
+                        0/0
+                    {% endif %}
+                </div>
+                <div class="analytics-kpi-subtitle">синхронизировано</div>
+            </div>
+
+            <div class="analytics-kpi-card">
+                <div class="analytics-kpi-header">
+                    <h3 class="analytics-kpi-title">Экономия</h3>
+                    <div class="analytics-kpi-trend analytics-trend-up">
+                        <i class="fa-solid fa-arrow-up"></i>
+                        <span>+0₽</span>
+                    </div>
+                </div>
+                <div class="analytics-kpi-value">
+                    {% set total_savings = implemented_recommendations|sum(attribute='estimated_monthly_savings') %}
+                    {{ "%.2f"|format(total_savings) }} ₽/месяц
+                </div>
+                <div class="analytics-kpi-subtitle">от рекомендаций</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Spending Analysis Chart (Full Width) -->
+    <div class="analytics-main-chart-section">
+        <div class="analytics-chart-container analytics-main-chart">
+            <div class="analytics-chart-header">
+                <h2 class="analytics-chart-title">📈 Тренды расходов по полной синхронизации</h2>
+                <div class="analytics-chart-controls">
+                    <div class="analytics-time-range">
+                        <select class="analytics-time-selector">
+                            <option value="7">7 дней</option>
+                            <option value="30" selected>30 дней</option>
+                            <option value="90">90 дней</option>
+                            <option value="custom">Настройка</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="analytics-chart-content">
+                <canvas id="mainSpendingChart" width="800" height="400"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secondary Analysis (2-Column Grid) -->
+    <div class="analytics-secondary-section">
+        <!-- Service Analysis & Provider Breakdown (2-Column) -->
+        <div class="analytics-secondary-grid">
+            <div class="analytics-chart-container">
+                <div class="analytics-chart-header">
+                    <h3 class="analytics-chart-title">Анализ сервисов</h3>
+                    <p class="analytics-chart-subtitle">Текущий снимок</p>
+                </div>
+                <div class="analytics-chart-content">
+                    <canvas id="serviceAnalysisChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+
+            <div class="analytics-chart-container">
+                <div class="analytics-chart-header">
+                    <h3 class="analytics-chart-title">Разбивка по провайдерам</h3>
+                    <p class="analytics-chart-subtitle">Текущий снимок</p>
+                </div>
+                <div class="analytics-chart-content">
+                    <canvas id="providerBreakdownChart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Individual Provider Spending Charts (2-Column Grid) -->
+        <div class="analytics-provider-charts-grid">
+            {% for provider in providers %}
+            <div class="analytics-chart-container analytics-provider-chart">
+                <div class="analytics-chart-header">
+                    <h3 class="analytics-chart-title">📈 {{ provider.connection_name }}</h3>
+                    <div class="analytics-chart-controls">
+                        <div class="analytics-time-range">
+                            <select class="analytics-time-selector" data-provider="{{ provider.id }}">
+                                <option value="7">7 дней</option>
+                                <option value="30" selected>30 дней</option>
+                                <option value="90">90 дней</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-chart-content">
+                    <canvas id="providerTrendChart{{ provider.id }}" width="400" height="300"></canvas>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Implemented Recommendations (Full Width) -->
+        <div class="analytics-chart-container analytics-full-width">
+            <div class="analytics-chart-header">
+                <h3 class="analytics-chart-title">Внедренные рекомендации</h3>
+                <div class="analytics-recommendations-summary">
+                    <span class="analytics-summary-item">Всего внедрено: <strong>{{ implemented_recommendations|length }}</strong> рекомендаций</span>
+                    <span class="analytics-summary-item">Общая экономия: <strong>{{ "%.2f"|format(implemented_recommendations|sum(attribute='estimated_monthly_savings')) }} ₽/месяц</strong></span>
+                </div>
+            </div>
+            <div class="analytics-recommendations-content">
+                {% if implemented_recommendations %}
+                    <div class="analytics-recommendations-list">
+                        {% for rec in implemented_recommendations %}
+                        <div class="analytics-recommendations-item">
+                            <div class="analytics-recommendation-info">
+                                <h4 class="analytics-recommendation-title">{{ rec.title }}</h4>
+                                <p class="analytics-recommendation-description">{{ rec.description }}</p>
+                                <span class="analytics-recommendation-date">
+                                    Внедрено: {{ rec.applied_at.strftime('%d.%m.%Y %H:%M') if rec.applied_at else 'Неизвестно' }}
+                                </span>
+                            </div>
+                            <div class="analytics-recommendation-savings">
+                                <i class="fa-solid fa-ruble-sign"></i>
+                                {{ "%.2f"|format(rec.estimated_monthly_savings) }} ₽/месяц
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="analytics-recommendations-empty">
+                        <i class="fa-solid fa-lightbulb analytics-empty-icon"></i>
+                        <p class="analytics-empty-text">Пока нет внедренных рекомендаций</p>
+                        <p class="analytics-empty-subtext">Внедрите рекомендации для оптимизации расходов</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+{% endblock %}

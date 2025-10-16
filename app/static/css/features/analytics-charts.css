@@ -1,0 +1,130 @@
+/* Analytics Chart Components - Chart.js specific styles */
+
+/* Chart Container Styles */
+.analytics-chart-container canvas {
+    border-radius: 8px;
+}
+
+/* Chart Loading States */
+.analytics-chart-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #6b7280;
+}
+
+.analytics-chart-loading i {
+    margin-right: 0.5rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Chart Error States */
+.analytics-chart-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #dc2626;
+    text-align: center;
+}
+
+.analytics-chart-error i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+/* Chart Legend Customization */
+.analytics-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.analytics-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.analytics-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+/* Chart Tooltip Customization */
+.analytics-chart-tooltip {
+    background: rgba(0, 0, 0, 0.8) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    color: white !important;
+    font-size: 0.875rem !important;
+    padding: 0.75rem 1rem !important;
+}
+
+/* Chart Animation Classes */
+.analytics-chart-fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Chart Responsive Adjustments */
+@media (max-width: 768px) {
+    .analytics-chart-content {
+        height: 300px;
+    }
+    
+    .analytics-chart-legend {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
+/* Chart Color Schemes */
+.analytics-chart-primary {
+    --chart-primary: #1e40af;
+    --chart-secondary: #3b82f6;
+    --chart-success: #10b981;
+    --chart-warning: #f59e0b;
+    --chart-danger: #ef4444;
+    --chart-info: #06b6d4;
+}
+
+.analytics-chart-primary .chartjs-render-monitor {
+    filter: none;
+}
+
+/* Chart Grid Lines */
+.analytics-chart-grid {
+    border-color: #e5e7eb !important;
+    border-width: 1px !important;
+}
+
+/* Chart Axis Labels */
+.analytics-chart-axis {
+    color: #6b7280 !important;
+    font-size: 0.75rem !important;
+}
+
+/* Chart Data Point Hover Effects */
+.analytics-chart-point:hover {
+    cursor: pointer;
+    transform: scale(1.1);
+    transition: transform 0.2s;
+}

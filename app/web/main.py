@@ -259,22 +259,36 @@ def analytics():
         return auth_check
     
     user = session['user']
-    is_demo_user = user.get('id') == 'demo-user-123'
+    user_id = int(float(user['id']))
     
-    if is_demo_user:
-        # Demo user: show mock data
-        overview = get_overview()
+    # Get latest complete sync data for analytics
+    from app.core.models.complete_sync import CompleteSync
+    from app.core.models.resource import Resource
+    from app.core.models.recommendations import OptimizationRecommendation
+    from app.core.models.provider import CloudProvider
+    
+    # Get latest complete sync
+    latest_complete_sync = CompleteSync.query.filter_by(user_id=user_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    
+    # Get implemented recommendations
+    implemented_recommendations = OptimizationRecommendation.query.filter_by(status='implemented').all()
+    
+    # Get active resources count from latest complete sync
+    if latest_complete_sync:
+        active_resources_count = latest_complete_sync.total_resources_found
     else:
-        # Real user: show real database data
-        overview = get_real_user_overview(user['id'])
+        active_resources_count = 0
     
-    return render_template('page.html', 
+    # Get user's providers for individual charts
+    providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True).all()
+    
+    return render_template('analytics.html', 
                         user=user,
                         active_page='analytics',
-                        page_title='Аналитика',
-                        page_subtitle='Детальная аналитика расходов и использования',
-                        overview=overview,
-                        is_demo_user=is_demo_user)
+                        latest_complete_sync=latest_complete_sync,
+                        implemented_recommendations=implemented_recommendations,
+                        active_resources_count=active_resources_count,
+                        providers=providers)
 
 @main_bp.route('/recommendations')
 def recommendations():
