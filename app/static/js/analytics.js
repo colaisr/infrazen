@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Load Main Spending Chart with Real Data
-function loadMainSpendingChart() {
+function loadMainSpendingChart(days = 30) {
     const ctx = document.getElementById('mainSpendingChart');
     if (!ctx) {
         return;
@@ -38,7 +38,7 @@ function loadMainSpendingChart() {
     ctx.parentElement.innerHTML = '<div class="analytics-chart-loading"><i class="fa-solid fa-spinner"></i> Загрузка данных...</div>';
     
     // Fetch real data from API
-    fetch('/api/analytics/main-trends?days=30')
+    fetch(`/api/analytics/main-trends?days=${days}`)
         .then(response => {
             return response.json();
         })
@@ -391,34 +391,54 @@ function initializeProviderTrendChart() {
 
 // Provider Toggle Controls
 function initializeProviderToggles() {
-    const toggleButtons = document.querySelectorAll('.analytics-toggle-btn');
-    
-    toggleButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // Remove active class from all buttons
-            toggleButtons.forEach(btn => btn.classList.remove('active'));
-            // Add active class to clicked button
-            this.classList.add('active');
-            
-            // Get provider filter
-            const provider = this.dataset.provider;
-            
-            // TODO: Update main chart data based on provider selection
-            updateMainChartData(provider);
-        });
-    });
+    // Provider toggle buttons removed from main chart
+    // Main chart now shows only aggregated spending from complete syncs
 }
 
 // Time Range Selectors
 function initializeTimeRangeSelectors() {
-    const timeSelectors = document.querySelectorAll('.analytics-time-selector');
+    // Main chart time range selector
+    const mainTimeSelector = document.querySelector('.analytics-main-chart-section .analytics-time-selector');
+    if (mainTimeSelector) {
+        mainTimeSelector.addEventListener('change', function() {
+            const days = parseInt(this.value);
+            if (days && days !== 'custom') {
+                loadMainSpendingChart(days);
+            }
+        });
+    }
     
-    timeSelectors.forEach(selector => {
+    // Individual provider chart time range selectors
+    const providerTimeSelectors = document.querySelectorAll('.analytics-provider-chart .analytics-time-selector');
+    providerTimeSelectors.forEach(selector => {
         selector.addEventListener('change', function() {
-            const days = this.value;
+            const days = parseInt(this.value);
+            const providerId = this.dataset.provider;
             
-            // TODO: Update chart data based on time range
-            updateChartTimeRange(days);
+            if (days && providerId && days !== 'custom') {
+                // Reload specific provider chart with new time range
+                const canvas = document.getElementById(`providerTrendChart${providerId}`);
+                if (canvas) {
+                    const container = canvas.parentElement;
+                    if (container) {
+                        container.innerHTML = '<div class="analytics-chart-loading"><i class="fa-solid fa-spinner"></i> Загрузка данных...</div>';
+                        
+                        fetch(`/api/analytics/provider-trends/${providerId}?days=${days}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    initializeIndividualProviderChart(container, data.data, providerId);
+                                } else {
+                                    showChartError(container, 'Ошибка загрузки данных');
+                                }
+                            })
+                            .catch(error => {
+                                console.error(`Error reloading provider ${providerId} chart:`, error);
+                                showChartError(container, 'Ошибка загрузки данных');
+                            });
+                    }
+                }
+            }
         });
     });
 }
@@ -435,15 +455,6 @@ function initializeExportButton() {
     }
 }
 
-// Update main chart data (placeholder)
-function updateMainChartData(provider) {
-    // TODO: Implement chart data update
-}
-
-// Update chart time range (placeholder)
-function updateChartTimeRange(days) {
-    // TODO: Implement time range update
-}
 
 // Load Service Analysis Chart with Real Data
 function loadServiceAnalysisChart() {
