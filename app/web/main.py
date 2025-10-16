@@ -75,12 +75,16 @@ def dashboard():
     else:
         # Real user: show real database data
         overview = get_real_user_overview(user['id'])
+    
+    # Get expense dynamics data for the "Динамика расходов" card
+    expense_dynamics = get_expense_dynamics_data(user.get('id', 'demo-user-123'))
 
     return render_template(
         'dashboard.html',
         user=user,
         active_page='dashboard',
         overview=overview,
+        expense_dynamics=expense_dynamics,
         is_demo_user=is_demo_user
     )
 
@@ -571,3 +575,81 @@ def get_latest_snapshot_metadata(user_id):
                     metadata[provider.id] = {}
     
     return metadata
+
+def get_expense_dynamics_data(user_id):
+    """Get expense dynamics data for the dashboard card"""
+    from app.core.models.complete_sync import CompleteSync
+    from app.core.models.recommendations import OptimizationRecommendation
+    from datetime import datetime, timedelta
+    
+    # Handle demo user
+    if user_id == 'demo-user-123':
+        # For demo user, get the actual demo user ID from database
+        demo_user = User.query.filter_by(email='demo@infrazen.com').first()
+        if demo_user:
+            user_id = demo_user.id
+        else:
+            # Fallback to mock data
+            return {
+                'last_month_cost': 0,
+                'current_month_cost': 0,
+                'savings': 0,
+                'trend_data': []
+            }
+    
+    try:
+        user_id_int = int(float(user_id))
+    except (ValueError, TypeError):
+        return {
+            'last_month_cost': 0,
+            'current_month_cost': 0,
+            'savings': 0,
+            'trend_data': []
+        }
+    
+    # Get latest complete sync for current month
+    now = datetime.now()
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    latest_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
+        .filter(CompleteSync.sync_completed_at >= current_month_start)\
+        .order_by(CompleteSync.sync_completed_at.desc()).first()
+    
+    # Get last sync from previous month
+    if current_month_start.month == 1:
+        last_month_start = current_month_start.replace(year=current_month_start.year - 1, month=12)
+    else:
+        last_month_start = current_month_start.replace(month=current_month_start.month - 1)
+    
+    last_month_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
+        .filter(CompleteSync.sync_completed_at >= last_month_start)\
+        .filter(CompleteSync.sync_completed_at < current_month_start)\
+        .order_by(CompleteSync.sync_completed_at.desc()).first()
+    
+    # Get implemented recommendations savings
+    implemented_savings = OptimizationRecommendation.query.filter_by(
+        user_id=user_id_int, 
+        status='implemented'
+    ).with_entities(
+        db.func.sum(OptimizationRecommendation.estimated_monthly_savings)
+    ).scalar() or 0
+    
+    # Get trend data for the last 30 days
+    thirty_days_ago = now - timedelta(days=30)
+    trend_syncs = CompleteSync.query.filter_by(user_id=user_id_int)\
+        .filter(CompleteSync.sync_completed_at >= thirty_days_ago)\
+        .order_by(CompleteSync.sync_completed_at.asc()).all()
+    
+    trend_data = []
+    for sync in trend_syncs:
+        trend_data.append({
+            'date': sync.sync_completed_at.strftime('%Y-%m-%d'),
+            'cost': sync.total_daily_cost
+        })
+    
+    return {
+        'last_month_cost': last_month_sync.total_daily_cost * 30 if last_month_sync else 0,
+        'current_month_cost': latest_sync.total_daily_cost * 30 if latest_sync else 0,
+        'savings': implemented_savings,
+        'trend_data': trend_data
+    }

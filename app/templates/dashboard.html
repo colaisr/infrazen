@@ -146,28 +146,26 @@
                     <p class="section-meta">Анализ затрат за выбранный период</p>
                 </div>
                 <div class="filter-controls">
-                    <button class="filter-pill active">30д</button>
-                    <button class="filter-pill">90д</button>
-                    <button class="filter-pill">1г</button>
+                    <button class="filter-pill active" data-days="30">30д</button>
+                    <button class="filter-pill" data-days="90">90д</button>
+                    <button class="filter-pill" data-days="365">1г</button>
                 </div>
             </div>
-            <div class="chart-placeholder">
-                <i class="fa-solid fa-chart-line"></i>
-                <p>График динамики расходов</p>
-                <span>Интерактивный график с данными по периоду</span>
+            <div class="chart-container">
+                <canvas id="expenseDynamicsChart" width="400" height="200"></canvas>
             </div>
             <div class="summary-metrics">
                 <div>
-                    <div class="summary-label">Прошлый месяц</div>
-                    <div class="summary-value">₽{{ overview.trend[0].amount_rub if overview.trend else 0 }}</div>
+                    <div class="summary-label">ПРОШЛЫЙ МЕСЯЦ</div>
+                    <div class="summary-value">₽{{ "%.0f"|format(expense_dynamics.last_month_cost) }}</div>
                 </div>
                 <div>
-                    <div class="summary-label">Текущий месяц</div>
-                    <div class="summary-value text-success">₽{{ overview.trend[-1].amount_rub if overview.trend else 0 }}</div>
+                    <div class="summary-label">ТЕКУЩИЙ МЕСЯЦ</div>
+                    <div class="summary-value text-success">₽{{ "%.0f"|format(expense_dynamics.current_month_cost) }}</div>
                 </div>
                 <div>
-                    <div class="summary-label">Экономия</div>
-                    <div class="summary-value text-primary-blue">₽{{ overview.kpis.potential_savings_rub | default(0) }}</div>
+                    <div class="summary-label">ЭКОНОМИЯ</div>
+                    <div class="summary-value text-primary-blue">₽{{ "%.0f"|format(expense_dynamics.savings) }}</div>
                 </div>
             </div>
         </article>
@@ -424,9 +422,143 @@
     background: #4CAF50;
     color: white;
 }
+
+/* Chart container styling */
+.chart-container {
+    height: 200px;
+    margin: 1rem 0;
+    position: relative;
+}
+
+.chart-container canvas {
+    max-height: 200px;
+}
 </style>
 
 <script>
+// Expense Dynamics Chart
+let expenseChart = null;
+
+function initExpenseDynamicsChart() {
+    const ctx = document.getElementById('expenseDynamicsChart');
+    if (!ctx) return;
+    
+    // Get trend data from server
+    const trendData = {{ expense_dynamics.trend_data | tojson }};
+    
+    const labels = trendData.map(item => item.date);
+    const costs = trendData.map(item => item.cost);
+    
+    expenseChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Дневные расходы (₽)',
+                data: costs,
+                borderColor: '#1e40af',
+                backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '₽' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Time range filter functionality
+function initTimeRangeFilters() {
+    const filterButtons = document.querySelectorAll('.filter-controls .filter-pill');
+    
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove active class from all buttons
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            this.classList.add('active');
+            
+            // Get the selected days
+            const days = parseInt(this.dataset.days);
+            
+            // Reload chart with new time range
+            loadExpenseDynamicsData(days);
+        });
+    });
+}
+
+function loadExpenseDynamicsData(days) {
+    // Show loading state
+    if (expenseChart) {
+        expenseChart.destroy();
+    }
+    
+    const ctx = document.getElementById('expenseDynamicsChart');
+    if (ctx) {
+        ctx.parentElement.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 200px;"><i class="fa-solid fa-spinner fa-spin"></i> Загрузка данных...</div>';
+    }
+    
+    // Fetch new data based on time range
+    fetch(`/api/analytics/main-trends?days=${days}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Restore canvas
+                const container = document.querySelector('#expenseDynamicsChart').parentElement;
+                container.innerHTML = '<canvas id="expenseDynamicsChart" width="400" height="200"></canvas>';
+                
+                // Create new chart with fetched data
+                const newCtx = document.getElementById('expenseDynamicsChart');
+                expenseChart = new Chart(newCtx, {
+                    type: 'line',
+                    data: data.data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '₽' + value.toLocaleString();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.error('Failed to load expense dynamics data:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading expense dynamics data:', error);
+        });
+}
+
 function syncProvider(providerId) {
     const button = event.target.closest('.sync-btn');
     const originalText = button.innerHTML;
@@ -486,5 +618,22 @@ function syncProvider(providerId) {
         }, 3000);
     });
 }
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Load Chart.js if not already loaded
+    if (typeof Chart === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = function() {
+            initExpenseDynamicsChart();
+            initTimeRangeFilters();
+        };
+        document.head.appendChild(script);
+    } else {
+        initExpenseDynamicsChart();
+        initTimeRangeFilters();
+    }
+});
 </script>
 {% endblock %}
