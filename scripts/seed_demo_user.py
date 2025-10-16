@@ -341,61 +341,112 @@ def seed_demo_user():
         return Resource.query.filter_by(provider_id=p.id, resource_name=name).first()
 
     recs = [
-        # 1 Resize CPU down
+        # 1 Major rightsizing - High-value CPU optimization
         {
-            'p': selectel_bu_a, 'name': 'api-backend-prod-01', 'type': 'rightsizing', 'sev': 'high',
-            'title': 'Снизить vCPU для api-backend-prod-01',
-            'desc': 'Средняя загрузка CPU 8% за 30 дней. Рекомендуется уменьшить конфигурацию с 8 до 4 vCPU.',
-            'save': 1800.0, 'metrics': {'cpu_avg': 0.08}
+            'p': selectel_bu_a, 'name': 'api-backend-prod-01', 'type': 'rightsizing', 'sev': 'critical',
+            'title': 'Критическое снижение vCPU для api-backend-prod-01',
+            'desc': 'Средняя загрузка CPU 6% за 30 дней. Рекомендуется уменьшить конфигурацию с 16 до 4 vCPU.',
+            'save': 10500.0, 'metrics': {'cpu_avg': 0.06, 'current_vcpu': 16, 'recommended_vcpu': 4}
         },
-        # 2 Stop idle VM
+        # 2 Stop idle production VM
         {
             'p': selectel_bu_b, 'name': 'ci-runner-spot', 'type': 'shutdown', 'sev': 'critical',
-            'title': 'Остановить неиспользуемую VM ci-runner-spot',
-            'desc': 'Нет входящего трафика и загрузки CPU за 30 дней.',
-            'save': 3200.0, 'metrics': {'cpu_avg': 0.0, 'net_in': 0}
+            'title': 'Остановить неиспользуемую production VM ci-runner-spot',
+            'desc': 'Нет входящего трафика и загрузки CPU за 45 дней. Критическая экономия.',
+            'save': 7200.0, 'metrics': {'cpu_avg': 0.0, 'net_in': 0, 'idle_days': 45}
         },
-        # 3 Delete unused volume
+        # 3 Major storage cleanup
         {
-            'p': selectel_bu_b, 'name': 'pg-backup-volume', 'type': 'cleanup', 'sev': 'medium',
-            'title': 'Удалить неиспользуемый том pg-backup-volume',
-            'desc': 'Том не подключён ни к одному инстансу более 45 дней.',
-            'save': 450.0, 'metrics': {'attachments': 0, 'last_used_days': 45}
+            'p': selectel_bu_b, 'name': 'pg-backup-volume', 'type': 'cleanup', 'sev': 'high',
+            'title': 'Удалить неиспользуемые backup тома (2TB)',
+            'desc': 'Томы не подключены более 60 дней. Общий объем 2TB неиспользуемого хранилища.',
+            'save': 4800.0, 'metrics': {'attachments': 0, 'last_used_days': 60, 'size_tb': 2}
         },
-        # 4 Cheaper region
-        {'p': selectel_bu_a, 'name': 'k8s-worker-02', 'type': 'migrate', 'sev': 'low', 'title': 'Перенести k8s-worker-02 в более дешёвый регион', 'desc': 'Стоимость в целевом регионе на ~25% ниже при сопоставимых параметрах.', 'save': 700.0, 'metrics': {'current_region': 'ru-1', 'target_region': 'ru-2'}},
-        # 5 Resize RAM down
-        {'p': selectel_bu_b, 'name': 'db-mysql-staging', 'type': 'rightsizing', 'sev': 'medium', 'title': 'Снизить RAM для db-mysql-staging', 'desc': 'Пиковое использование памяти за 14 дней 38%.', 'save': 900.0, 'metrics': {'mem_avg_gb': 3.1, 'mem_p95_gb': 6.2}},
-        # 6 Storage class switch
-        {'p': selectel_bu_b, 'name': 's3-media-bucket', 'type': 'migrate', 'sev': 'low', 'title': 'Перевести s3-media-bucket в класс хранения «нечастый доступ»', 'desc': 'Доступ реже 1 раза за 30 дней.', 'save': 350.0, 'metrics': {'access_per_30d': 0}},
-        # 7 Old snapshots
-        {'p': selectel_bu_a, 'name': 'snapshot-storage', 'type': 'cleanup', 'sev': 'medium', 'title': 'Удалить устаревшие снапшоты', 'desc': '5 снапшотов старше 60 дней.', 'save': 520.0, 'metrics': {'snapshots': 5, 'oldest_days': 120}},
-        # 8 Shrink volume
-        {'p': selectel_bu_a, 'name': 'postgres-data-volume', 'type': 'rightsizing', 'sev': 'high', 'title': 'Уменьшить том postgres-data-volume', 'desc': 'Использование диска 48% стабильно.', 'save': 600.0, 'metrics': {'disk_used_gb': 240, 'disk_size_gb': 500}},
-        # 9 Commitment
-        {'p': beget_prod, 'name': 'vps-app-01', 'type': 'commitment', 'sev': 'info', 'title': 'Перейти на подписку с коммитом для vps-app-01', 'desc': 'Стабильное использование за 90 дней, коммит даст скидку.', 'save': 800.0, 'metrics': {'lookback_days': 90}},
-        # 10 Cross-provider migrate
-        {'p': selectel_bu_b, 'name': 'web-frontend-01', 'type': 'migrate', 'sev': 'high', 'title': 'Мигрировать web-frontend-01 к более дешёвому провайдеру', 'desc': 'Найдены эквивалентные характеристики с экономией ~22%.', 'save': 2100.0, 'metrics': {'match_score': 0.86}},
-        # 11 Night/weekend shutdown
-        {'p': beget_dev, 'name': 'dev-vps-01', 'type': 'shutdown', 'sev': 'medium', 'title': 'Останавливать dev-vps-01 на ночь и выходные', 'desc': 'Рабочие часы 08:00–20:00 Пн-Пт, вне окна простаивает.', 'save': 1100.0, 'metrics': {'work_hours': '8-20', 'days': 'Mon-Fri'}},
-        # 12 Release unused IP
-        {'p': beget_dev, 'name': 'dev-public-ip', 'type': 'cleanup', 'sev': 'low', 'title': 'Освободить неиспользуемый публичный IP', 'desc': 'IP не привязан к ресурсам, тарифицируется отдельно.', 'save': 150.0, 'metrics': {'attached': False}},
-        # 13 Downsize LB
-        {'p': selectel_bu_a, 'name': 'lb-prod-01', 'type': 'rightsizing', 'sev': 'medium', 'title': 'Понизить тариф балансировщика lb-prod-01', 'desc': 'Средний трафик <10% лимита текущего плана.', 'save': 400.0, 'metrics': {'avg_rps': 12, 'plan_rps_cap': 200}},
-        # 14 Merge small volumes
-        {'p': beget_prod, 'name': 'extra-volumes', 'type': 'migrate', 'sev': 'low', 'title': 'Объединить малые тома для снижения накладных расходов', 'desc': 'Несколько томов <20 ГБ могут быть объединены.', 'save': 260.0, 'metrics': {'volumes': 3, 'avg_size_gb': 12}},
-        # 15 Switch disk type
-        {'p': selectel_bu_a, 'name': 'db-postgres-prod-01', 'type': 'migrate', 'sev': 'medium', 'title': 'Сменить тип диска на стандартный для db-postgres-prod-01', 'desc': 'IOPS/latency низкие — премиум-диск избыточен.', 'save': 980.0, 'metrics': {'iops_avg': 150, 'disk_type': 'premium'}},
-        # 16 Remove old images (use BU-A as placeholder store)
-        {'p': selectel_bu_a, 'name': 's3-cdn-static', 'type': 'cleanup', 'sev': 'low', 'title': 'Удалить неиспользуемые образы (>90 дней)', 'desc': 'Образы не запускались в течение 3 месяцев.', 'save': 320.0, 'metrics': {'images': 4, 'oldest_days': 120}},
-        # 17 Downsize DB
-        {'p': beget_prod, 'name': 'vps-db-01', 'type': 'rightsizing', 'sev': 'high', 'title': 'Уменьшить конфигурацию БД (vps-db-01)', 'desc': 'Нагрузка БД стабильно низкая, буферный кеш не заполняется.', 'save': 2400.0, 'metrics': {'cpu_avg': 0.09, 'mem_avg': 0.28}},
-        # 18 Enable autoscaling
-        {'p': selectel_bu_b, 'name': 'web-frontend-02', 'type': 'commitment', 'sev': 'medium', 'title': 'Включить авто-масштабирование вместо фиксированных VM', 'desc': 'Нагрузка по часам меняется, выгоднее авто-скейлинг.', 'save': 1300.0, 'metrics': {'variance': 0.4}},
-        # 19 Rightsize K8s nodes
-        {'p': selectel_bu_a, 'name': 'k8s-worker-01', 'type': 'rightsizing', 'sev': 'high', 'title': 'Правильный размер узлов Kubernetes', 'desc': 'Requests/limits значительно превышают фактическое потребление.', 'save': 1750.0, 'metrics': {'requests_cpu': 16, 'used_cpu': 6}},
-        # 20 Move cold objects
-        {'p': selectel_bu_a, 'name': 'archive-cold-storage', 'type': 'migrate', 'sev': 'low', 'title': 'Перевести нечасто используемые объекты в холодное хранилище', 'desc': 'Чтение реже 1 раза в 60 дней — cold-tier выгоднее.', 'save': 540.0, 'metrics': {'access_per_60d': 0}},
+        # 4 Major region migration
+        {'p': selectel_bu_a, 'name': 'k8s-worker-02', 'type': 'migrate', 'sev': 'high', 
+         'title': 'Перенести k8s-worker-02 в более дешёвый регион', 
+         'desc': 'Стоимость в целевом регионе на ~40% ниже при сопоставимых параметрах. Крупная экономия.', 
+         'save': 6800.0, 'metrics': {'current_region': 'ru-1', 'target_region': 'ru-2', 'savings_percent': 40}},
+        # 5 Major RAM rightsizing
+        {'p': selectel_bu_b, 'name': 'db-mysql-staging', 'type': 'rightsizing', 'sev': 'high', 
+         'title': 'Критическое снижение RAM для db-mysql-staging', 
+         'desc': 'Пиковое использование памяти за 30 дней 25%. Можно снизить с 32GB до 16GB.', 
+         'save': 8500.0, 'metrics': {'mem_avg_gb': 8.2, 'mem_p95_gb': 12.5, 'current_gb': 32, 'recommended_gb': 16}},
+        # 6 Major storage class optimization
+        {'p': selectel_bu_b, 'name': 's3-media-bucket', 'type': 'migrate', 'sev': 'high', 
+         'title': 'Перевести s3-media-bucket в архивное хранилище', 
+         'desc': 'Доступ реже 1 раза за 90 дней. Архивное хранилище в 5 раз дешевле.', 
+         'save': 3800.0, 'metrics': {'access_per_90d': 0, 'size_tb': 1.2, 'savings_percent': 80}},
+        # 7 Major snapshot cleanup
+        {'p': selectel_bu_a, 'name': 'snapshot-storage', 'type': 'cleanup', 'sev': 'high', 
+         'title': 'Удалить устаревшие снапшоты (15TB)', 
+         'desc': '25 снапшотов старше 90 дней. Общий объем 15TB неиспользуемого хранилища.', 
+         'save': 5400.0, 'metrics': {'snapshots': 25, 'oldest_days': 120, 'size_tb': 15}},
+        # 8 Major volume rightsizing
+        {'p': selectel_bu_a, 'name': 'postgres-data-volume', 'type': 'rightsizing', 'sev': 'critical', 
+         'title': 'Критическое уменьшение тома postgres-data-volume', 
+         'desc': 'Использование диска 35% стабильно. Можно уменьшить с 2TB до 1TB.', 
+         'save': 6800.0, 'metrics': {'disk_used_gb': 700, 'disk_size_gb': 2000, 'recommended_gb': 1000}},
+        # 9 Major commitment discount
+        {'p': beget_prod, 'name': 'vps-app-01', 'type': 'commitment', 'sev': 'high', 
+         'title': 'Перейти на 3-летний коммит для vps-app-01', 
+         'desc': 'Стабильное использование за 180 дней. 3-летний коммит даст скидку 35%.', 
+         'save': 4800.0, 'metrics': {'lookback_days': 180, 'commitment_years': 3, 'discount_percent': 35}},
+        # 10 Major cross-provider migration
+        {'p': selectel_bu_b, 'name': 'web-frontend-01', 'type': 'migrate', 'sev': 'critical', 
+         'title': 'Мигрировать web-frontend-01 к более дешёвому провайдеру', 
+         'desc': 'Найдены эквивалентные характеристики с экономией ~45%. Крупная миграция.', 
+         'save': 10500.0, 'metrics': {'match_score': 0.92, 'savings_percent': 45}},
+        # 11 Major dev environment optimization
+        {'p': beget_dev, 'name': 'dev-vps-01', 'type': 'shutdown', 'sev': 'high', 
+         'title': 'Останавливать dev-vps-01 на ночь и выходные (крупная экономия)', 
+         'desc': 'Рабочие часы 09:00–18:00 Пн-Пт. Остановка на 75% времени.', 
+         'save': 6800.0, 'metrics': {'work_hours': '9-18', 'days': 'Mon-Fri', 'uptime_percent': 25}},
+        # 12 Major IP cleanup
+        {'p': beget_dev, 'name': 'dev-public-ip', 'type': 'cleanup', 'sev': 'medium', 
+         'title': 'Освободить неиспользуемые публичные IP (5 адресов)', 
+         'desc': '5 IP не привязаны к ресурсам, тарифицируются отдельно.', 
+         'save': 1400.0, 'metrics': {'attached': False, 'count': 5}},
+        # 13 Major load balancer optimization
+        {'p': selectel_bu_a, 'name': 'lb-prod-01', 'type': 'rightsizing', 'sev': 'high', 
+         'title': 'Критическое понижение тарифа балансировщика lb-prod-01', 
+         'desc': 'Средний трафик <5% лимита текущего плана. Можно снизить в 3 раза.', 
+         'save': 4800.0, 'metrics': {'avg_rps': 8, 'plan_rps_cap': 500, 'reduction_factor': 3}},
+        # 14 Major volume consolidation
+        {'p': beget_prod, 'name': 'extra-volumes', 'type': 'migrate', 'sev': 'high', 
+         'title': 'Объединить малые тома для снижения накладных расходов', 
+         'desc': '12 томов <50 ГБ могут быть объединены в 3 больших тома.', 
+         'save': 3800.0, 'metrics': {'volumes': 12, 'avg_size_gb': 35, 'consolidated': 3}},
+        # 15 Major disk type optimization
+        {'p': selectel_bu_a, 'name': 'db-postgres-prod-01', 'type': 'migrate', 'sev': 'high', 
+         'title': 'Сменить тип диска на стандартный для db-postgres-prod-01', 
+         'desc': 'IOPS/latency низкие — премиум-диск избыточен. Экономия 60%.', 
+         'save': 8500.0, 'metrics': {'iops_avg': 120, 'disk_type': 'premium', 'savings_percent': 60}},
+        # 16 Major image cleanup
+        {'p': selectel_bu_a, 'name': 's3-cdn-static', 'type': 'cleanup', 'sev': 'high', 
+         'title': 'Удалить неиспользуемые образы (>180 дней)', 
+         'desc': 'Образы не запускались в течение 6 месяцев. 2TB неиспользуемых образов.', 
+         'save': 4800.0, 'metrics': {'images': 15, 'oldest_days': 200, 'size_tb': 2}},
+        # 17 Major database rightsizing
+        {'p': beget_prod, 'name': 'vps-db-01', 'type': 'rightsizing', 'sev': 'critical', 
+         'title': 'Критическое уменьшение конфигурации БД (vps-db-01)', 
+         'desc': 'Нагрузка БД стабильно низкая, буферный кеш не заполняется. Можно снизить в 2 раза.', 
+         'save': 12500.0, 'metrics': {'cpu_avg': 0.12, 'mem_avg': 0.35, 'reduction_factor': 2}},
+        # 18 Major autoscaling implementation
+        {'p': selectel_bu_b, 'name': 'web-frontend-02', 'type': 'commitment', 'sev': 'high', 
+         'title': 'Включить авто-масштабирование вместо фиксированных VM', 
+         'desc': 'Нагрузка по часам меняется значительно, авто-скейлинг сэкономит 50%.', 
+         'save': 8500.0, 'metrics': {'variance': 0.7, 'savings_percent': 50}},
+        # 19 Major K8s optimization
+        {'p': selectel_bu_a, 'name': 'k8s-worker-01', 'type': 'rightsizing', 'sev': 'critical', 
+         'title': 'Критическая оптимизация узлов Kubernetes', 
+         'desc': 'Requests/limits значительно превышают фактическое потребление. Можно снизить в 3 раза.', 
+         'save': 14000.0, 'metrics': {'requests_cpu': 32, 'used_cpu': 8, 'reduction_factor': 3}},
+        # 20 Major cold storage migration
+        {'p': selectel_bu_a, 'name': 'archive-cold-storage', 'type': 'migrate', 'sev': 'high', 
+         'title': 'Перевести архивные объекты в холодное хранилище', 
+         'desc': 'Чтение реже 1 раза в 180 дней — cold-tier в 10 раз дешевле.', 
+         'save': 6800.0, 'metrics': {'access_per_180d': 0, 'size_tb': 5, 'savings_percent': 90}},
     ]
 
     created = 0
