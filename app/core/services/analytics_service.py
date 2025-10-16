@@ -67,7 +67,7 @@ class AnalyticsService:
         for sync in syncs:
             trend_data = {
                 'date': sync.sync_completed_at.strftime('%Y-%m-%d'),
-                'total_cost': float(sync.total_daily_cost or 0),
+                'total_cost': float(sync.total_monthly_cost or 0),  # Show monthly costs for consistency
                 'total_resources': sync.total_resources_found or 0,
                 'successful_providers': sync.successful_providers or 0
             }
