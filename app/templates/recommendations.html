@@ -173,11 +173,43 @@ function cardTemplate(rec){
 }
 
 async function load(){
-  const res = await fetch('/api/recommendations?'+buildQuery());
-  const data = await res.json();
-  const list = qs('#recsList');
-  list.innerHTML = (data.items||[]).map(cardTemplate).join('');
-  enableBulkButtons();
+  try {
+    console.log('Fetching recommendations from API...');
+    const queryString = buildQuery();
+    console.log('Query string:', queryString);
+    const res = await fetch('/api/recommendations?'+queryString);
+    console.log('API response status:', res.status);
+    
+    if (!res.ok) {
+      throw new Error(`API request failed with status ${res.status}`);
+    }
+    
+    const data = await res.json();
+    console.log('API response data:', data);
+    
+    const list = qs('#recsList');
+    if (!list) {
+      console.error('Recommendations list container not found');
+      return;
+    }
+    
+    const items = data.items || [];
+    console.log(`Found ${items.length} recommendations`);
+    
+    if (items.length === 0) {
+      list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
+    } else {
+      list.innerHTML = items.map(cardTemplate).join('');
+    }
+    
+    enableBulkButtons();
+  } catch (error) {
+    console.error('Error in load function:', error);
+    const list = qs('#recsList');
+    if (list) {
+      list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #d32f2f;">Ошибка загрузки рекомендаций: ' + error.message + '</div>';
+    }
+  }
 }
 
 async function actOne(id, action, extra={}){
@@ -240,10 +272,21 @@ async function toggleDetails(id){
 }
 // Init
 (async function(){
-  await fetchProviders();
-  const urlp = new URLSearchParams(location.search);
-  ['q','provider','status','severity','type','resource_type'].forEach(k=>{ if(urlp.get(k)) qs('#'+k).value = urlp.get(k);});
-  await load();
+  try {
+    console.log('Loading recommendations page...');
+    await fetchProviders();
+    const urlp = new URLSearchParams(location.search);
+    ['q','provider','status','severity','type','resource_type'].forEach(k=>{ if(urlp.get(k)) qs('#'+k).value = urlp.get(k);});
+    console.log('Loading recommendations data...');
+    await load();
+    console.log('Recommendations loaded successfully');
+  } catch (error) {
+    console.error('Error loading recommendations:', error);
+    const list = qs('#recsList');
+    if (list) {
+      list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Ошибка загрузки рекомендаций. Попробуйте обновить страницу.</div>';
+    }
+  }
 })();
 </script>
 {% endblock %}
