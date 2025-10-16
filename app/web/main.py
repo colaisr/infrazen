@@ -59,19 +59,30 @@ def dashboard():
     """Main dashboard page"""
     # Allow demo session fallback without forcing login
     if 'user' not in session:
-        session['user'] = {
-            'id': 'demo-user-123',
-            'email': 'demo@infrazen.com',
-            'name': 'Demo User',
-            'picture': ''
-        }
+        # Check if demo user exists in database and use that instead of mock data
+        demo_user = User.query.filter_by(email='demo@infrazen.com').first()
+        if demo_user:
+            session['user'] = {
+                'id': str(demo_user.id),
+                'email': demo_user.email,
+                'name': f"{demo_user.first_name} {demo_user.last_name}",
+                'picture': '',
+                'db_id': demo_user.id
+            }
+        else:
+            session['user'] = {
+                'id': 'demo-user-123',
+                'email': 'demo@infrazen.com',
+                'name': 'Demo User',
+                'picture': ''
+            }
 
     user = session['user']
-    is_demo_user = user.get('id') == 'demo-user-123'
+    is_demo_user = user.get('email') == 'demo@infrazen.com'
     
     if is_demo_user:
-        # Demo user: show mock data
-        overview = get_overview()
+        # Demo user: show real database data (seeded data)
+        overview = get_real_user_overview(user['id'])
     else:
         # Real user: show real database data
         overview = get_real_user_overview(user['id'])
@@ -92,20 +103,82 @@ def dashboard():
 def connections():
     """Cloud connections page"""
     if 'user' not in session:
-        session['user'] = {
-            'id': '106509284268867883869',
-            'email': 'demo@infrazen.com',
-            'name': 'Demo User',
-            'picture': ''
-        }
+        # Check if demo user exists in database and use that instead of mock data
+        demo_user = User.query.filter_by(email='demo@infrazen.com').first()
+        if demo_user:
+            session['user'] = {
+                'id': str(demo_user.id),
+                'email': demo_user.email,
+                'name': f"{demo_user.first_name} {demo_user.last_name}",
+                'picture': '',
+                'db_id': demo_user.id
+            }
+        else:
+            session['user'] = {
+                'id': '106509284268867883869',
+                'email': 'demo@infrazen.com',
+                'name': 'Demo User',
+                'picture': ''
+            }
     
     user = session['user']
-    is_demo_user = user.get('id') == 'demo-user-123'
+    is_demo_user = user.get('email') == 'demo@infrazen.com'
     
     if is_demo_user:
-        # Demo user: show mock data (Yandex Cloud + Selectel + mock Beget)
-        overview = get_overview()
-        providers = overview['providers']
+        # Demo user: show real database data (seeded data)
+        # Get real providers from database
+        all_providers = CloudProvider.query.all()
+        user_id_int = int(float(user['id']))
+        cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
+        
+        # Convert to provider format
+        providers = []
+        for provider in cloud_providers:
+            # Get resource counts for this provider
+            resource_count = Resource.query.filter_by(provider_id=provider.id).count()
+            
+            # Get resource count from last successful sync snapshot
+            last_snapshot = SyncSnapshot.query.filter_by(
+                provider_id=provider.id, 
+                sync_status='success'
+            ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+            last_snapshot_resources = last_snapshot.total_resources_found if last_snapshot else 0
+            
+            # Calculate provider costs from latest sync snapshot (billing-first approach)
+            total_daily_cost = 0.0
+            total_monthly_cost = 0.0
+            
+            if last_snapshot:
+                # Use cost from sync snapshot if available (billing-first approach)
+                if last_snapshot.total_monthly_cost and last_snapshot.total_monthly_cost > 0:
+                    # Use validated cost from sync snapshot (stored as daily cost)
+                    total_daily_cost = last_snapshot.total_monthly_cost
+                    total_monthly_cost = total_daily_cost * 30  # Convert daily to monthly
+                else:
+                    # Fallback to resource-based calculation for old syncs
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                    total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
+                    total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
+            else:
+                # No sync snapshot - use resource table
+                provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                total_daily_cost = sum(resource.daily_cost or 0 for resource in provider_resources)
+                total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
+            
+            providers.append({
+                'id': provider.id,
+                'name': provider.connection_name,
+                'type': provider.provider_type,
+                'status': 'connected' if provider.is_active else 'disconnected',
+                'last_sync': provider.last_sync,
+                'sync_status': provider.sync_status,
+                'resource_count': resource_count,
+                'last_snapshot_resources': last_snapshot_resources,
+                'total_daily_cost': total_daily_cost,
+                'total_monthly_cost': total_monthly_cost,
+                'auto_sync': provider.auto_sync,
+                'sync_interval': provider.sync_interval
+            })
     else:
         # Real user: show only real database connections using unified models
         
@@ -191,28 +264,51 @@ def connections():
 def resources():
     """Resources overview page"""
     if 'user' not in session:
-        session['user'] = {
-            'id': '106509284268867883869',  # Use the actual user ID from the database
-            'email': 'real@infrazen.com',
-            'name': 'Real User',
-            'picture': ''
-        }
+        # Check if demo user exists in database and use that instead of mock data
+        demo_user = User.query.filter_by(email='demo@infrazen.com').first()
+        if demo_user:
+            session['user'] = {
+                'id': str(demo_user.id),
+                'email': demo_user.email,
+                'name': f"{demo_user.first_name} {demo_user.last_name}",
+                'picture': '',
+                'db_id': demo_user.id
+            }
+        else:
+            session['user'] = {
+                'id': '106509284268867883869',  # Use the actual user ID from the database
+                'email': 'real@infrazen.com',
+                'name': 'Real User',
+                'picture': ''
+            }
     
     user = session['user']
-    is_demo_user = user.get('id') == 'demo-user-123'
+    is_demo_user = user.get('email') == 'demo@infrazen.com'
     
     if is_demo_user:
-        # Demo user: show mock data
-        overview = get_overview()
-        resources = overview['resources']
-        providers = overview['providers']
-        # Group resources by provider for demo
-        resources_by_provider = {}
-        for resource in resources:
-            provider_id = resource.get('provider_id', 'demo-provider')
-            if provider_id not in resources_by_provider:
-                resources_by_provider[provider_id] = []
-            resources_by_provider[provider_id].append(resource)
+        # Demo user: show real database data (seeded data)
+        try:
+            # Use the string user_id directly
+            user_id_str = user['id']
+            resources = get_real_user_resources(user_id_str)
+            providers = get_real_user_providers(user_id_str)
+            # Get latest snapshot metadata for performance data
+            snapshot_metadata = get_latest_snapshot_metadata(user_id_str)
+            # Group resources by provider
+            resources_by_provider = {}
+            for resource in resources:
+                provider_id = resource.provider.id
+                if provider_id not in resources_by_provider:
+                    resources_by_provider[provider_id] = []
+                resources_by_provider[provider_id].append(resource)
+            
+        except Exception as e:
+            print(f"Error loading demo user resources: {e}")
+            # Fallback to empty data
+            resources = []
+            providers = []
+            snapshot_metadata = {}
+            resources_by_provider = {}
     else:
         # Real user: show real database data
         try:
@@ -478,6 +574,26 @@ def get_real_user_resources(user_id):
             resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id]
             if resource_ids:
                 provider_resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
+                
+                # Separate resources with and without performance data
+                resources_with_performance = []
+                resources_without_performance = []
+                
+                for resource in provider_resources:
+                    tags = resource.get_all_tags()
+                    has_performance = 'cpu_avg_usage' in tags or 'memory_avg_usage_mb' in tags
+                    
+                    if has_performance:
+                        resources_with_performance.append(resource)
+                    else:
+                        resources_without_performance.append(resource)
+                
+                # Add performance resources first, then others
+                all_resources.extend(resources_with_performance)
+                all_resources.extend(resources_without_performance)
+            else:
+                # Snapshot exists but has no resource states - fall back to direct resources
+                provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
                 
                 # Separate resources with and without performance data
                 resources_with_performance = []
