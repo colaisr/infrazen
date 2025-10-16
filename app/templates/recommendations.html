@@ -174,19 +174,14 @@ function cardTemplate(rec){
 
 async function load(){
   try {
-    console.log('Fetching recommendations from API...');
     const queryString = buildQuery();
-    console.log('Query string:', queryString);
     const res = await fetch('/api/recommendations?'+queryString);
-    console.log('API response status:', res.status);
     
     if (!res.ok) {
       throw new Error(`API request failed with status ${res.status}`);
     }
     
     const data = await res.json();
-    console.log('API response data:', data);
-    
     const list = qs('#recsList');
     if (!list) {
       console.error('Recommendations list container not found');
@@ -194,7 +189,6 @@ async function load(){
     }
     
     const items = data.items || [];
-    console.log(`Found ${items.length} recommendations`);
     
     if (items.length === 0) {
       list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
@@ -229,20 +223,54 @@ async function actBulk(action){
 
 function enableBulkButtons(){
   const has = selectedIds().length>0;
-  qs('#bulkImplement').disabled = !has;
-  qs('#bulkDismiss').disabled = !has;
+  const bulkImplement = qs('#bulkImplement');
+  const bulkDismiss = qs('#bulkDismiss');
+  
+  if (bulkImplement) {
+    bulkImplement.disabled = !has;
+  }
+  if (bulkDismiss) {
+    bulkDismiss.disabled = !has;
+  }
 }
 
 // Events
 ['#search','#provider','#status','#severity','#type','#resource_type'].forEach(sel=>{
-  qs(sel).addEventListener('change', ()=>{state.page=1; load();});
+  const element = qs(sel);
+  if (element) {
+    element.addEventListener('change', ()=>{state.page=1; load();});
+  }
 });
-qs('#refreshBtn').addEventListener('click', ()=>load());
-qs('#selectAll').addEventListener('change', (e)=>{ qsa('.rowCheck').forEach(cb=>cb.checked=e.target.checked); enableBulkButtons(); });
-document.addEventListener('change', (e)=>{ if(e.target.classList.contains('rowCheck')) enableBulkButtons(); });
+
+// Add event listeners only if elements exist
+const refreshBtn = qs('#refreshBtn');
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', ()=>load());
+}
+
+const selectAll = qs('#selectAll');
+if (selectAll) {
+  selectAll.addEventListener('change', (e)=>{ 
+    qsa('.rowCheck').forEach(cb=>cb.checked=e.target.checked); 
+    enableBulkButtons(); 
+  });
+}
+
+document.addEventListener('change', (e)=>{ 
+  if(e.target.classList.contains('rowCheck')) enableBulkButtons(); 
+});
+
 document.addEventListener('click', (e)=>{
-  if(e.target.classList.contains('act')){ e.preventDefault(); const id = e.target.closest('.rec-card').dataset.id; actOne(id, e.target.dataset.act); }
-  if(e.target.classList.contains('more')){ e.preventDefault(); const id = e.target.dataset.id; toggleDetails(id); }
+  if(e.target.classList.contains('act')){ 
+    e.preventDefault(); 
+    const id = e.target.closest('.rec-card').dataset.id; 
+    actOne(id, e.target.dataset.act); 
+  }
+  if(e.target.classList.contains('more')){ 
+    e.preventDefault(); 
+    const id = e.target.dataset.id; 
+    toggleDetails(id); 
+  }
 });
 
 async function toggleDetails(id){
@@ -273,13 +301,10 @@ async function toggleDetails(id){
 // Init
 (async function(){
   try {
-    console.log('Loading recommendations page...');
     await fetchProviders();
     const urlp = new URLSearchParams(location.search);
     ['q','provider','status','severity','type','resource_type'].forEach(k=>{ if(urlp.get(k)) qs('#'+k).value = urlp.get(k);});
-    console.log('Loading recommendations data...');
     await load();
-    console.log('Recommendations loaded successfully');
   } catch (error) {
     console.error('Error loading recommendations:', error);
     const list = qs('#recsList');
