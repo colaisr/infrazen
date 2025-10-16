@@ -268,11 +268,14 @@ Admin Notes: "Demo user for testing and demonstrations. Read-only access. Do not
 ```
 
 Demo data includes:
-- **4 Cloud Providers**: Beget Prod, Beget Dev, Selectel BU-A, Selectel BU-B
+- **4 Cloud Providers**: Beget Prod, Beget Dev, Selectel BU-A, Selectel BU-B (all with `auto_sync=True`)
 - **~45 Resources**: Servers, storage, networking, databases across all providers
 - **20 Recommendations**: Cost optimization suggestions in Russian with realistic savings
-- **Total Monthly Cost**: ₽417,000 across all providers
-- **Full Sync History**: Snapshots and resource states for realistic demo experience
+- **Total Monthly Cost**: ₽417,000 across all providers (~₽5M annually)
+- **3-Month Sync History**: 91 complete syncs with 364 provider snapshots (dynamic dates, always current)
+- **Historical Cost Trends**: Realistic daily variance (±7%) with gradual 2% growth over 90 days
+- **Complete Analytics Data**: Full timeline for spending trends, service analysis, and provider breakdowns
+- **Resource States**: Latest snapshot includes full resource state tracking for all 45 resources
 
 #### **Admin Panel Protection**
 - **User Deletion**: Demo users cannot be deleted (similar to super admins)

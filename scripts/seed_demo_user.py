@@ -15,11 +15,13 @@ from app.core.models.user import User
 from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot, ResourceState
+from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
 from app.core.models.recommendations import OptimizationRecommendation
 from app.core.models.tags import ResourceTag
 from app.core.models.metrics import ResourceMetric, ResourceUsageSummary
 from app.core.models.logs import ResourceLog, ResourceComponent
 from app.core.models.costs import CostAllocation, CostTrend
+import random
 
 def seed_demo_user():
     """
@@ -37,6 +39,15 @@ def seed_demo_user():
         providers = CloudProvider.query.filter_by(user_id=demo_user.id).all()
         provider_ids = [p.id for p in providers]
         if provider_ids:
+            # Delete complete syncs and their references first
+            complete_sync_ids = [cs.id for cs in CompleteSync.query.filter_by(user_id=demo_user.id).all()]
+            if complete_sync_ids:
+                ProviderSyncReference.query.filter(ProviderSyncReference.complete_sync_id.in_(complete_sync_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                CompleteSync.query.filter(CompleteSync.id.in_(complete_sync_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                print("  ✓ Deleted complete syncs and references")
+            
             # Delete dependent snapshots and states
             snapshot_ids = [s.id for s in SyncSnapshot.query.filter(SyncSnapshot.provider_id.in_(provider_ids)).all()]
             if snapshot_ids:
@@ -44,6 +55,7 @@ def seed_demo_user():
                 db.session.commit()
                 SyncSnapshot.query.filter(SyncSnapshot.id.in_(snapshot_ids)).delete(synchronize_session=False)
                 db.session.commit()
+                print("  ✓ Deleted sync snapshots and resource states")
             # Delete recommendations for these providers/resources
             res_ids = [rid for (rid,) in db.session.query(Resource.id).filter(Resource.provider_id.in_(provider_ids)).all()]
             if res_ids:
@@ -169,43 +181,8 @@ def seed_demo_user():
     
     print(f"✅ Providers created (IDs: BegetProd={beget_prod.id}, BegetDev={beget_dev.id}, SelA={selectel_bu_a.id}, SelB={selectel_bu_b.id})")
     
-    # Create sync snapshots for Beget
-    print("🔄 Creating sync snapshots...")
-    snapshots = [
-        SyncSnapshot(
-            provider_id=selectel_bu_a.id,
-            sync_type='full', sync_status='success',
-            sync_started_at=datetime.now() - timedelta(hours=1, minutes=5),
-            sync_completed_at=datetime.now() - timedelta(hours=1),
-            total_resources_found=13, resources_created=13, total_monthly_cost=166600.0
-        ),
-        SyncSnapshot(
-            provider_id=selectel_bu_b.id,
-            sync_type='full', sync_status='success',
-            sync_started_at=datetime.now() - timedelta(minutes=50),
-            sync_completed_at=datetime.now() - timedelta(minutes=45),
-            total_resources_found=12, resources_created=12, total_monthly_cost=104300.0
-        ),
-        SyncSnapshot(
-            provider_id=beget_prod.id,
-            sync_type='full', sync_status='success',
-        sync_started_at=datetime.now() - timedelta(hours=2, minutes=5),
-        sync_completed_at=datetime.now() - timedelta(hours=2),
-            total_resources_found=12, resources_created=12, total_monthly_cost=104250.0
-        ),
-        SyncSnapshot(
-            provider_id=beget_dev.id,
-            sync_type='full', sync_status='success',
-            sync_started_at=datetime.now() - timedelta(hours=1, minutes=20),
-            sync_completed_at=datetime.now() - timedelta(hours=1, minutes=15),
-            total_resources_found=8, resources_created=8, total_monthly_cost=41850.0
-        ),
-    ]
-    for s in snapshots:
-        db.session.add(s)
-    db.session.commit()
-    
-    print("✅ Sync snapshots created")
+    # Note: Sync snapshots will be created by seed_historical_complete_syncs()
+    # to generate 90 days of historical data with realistic variations
     
     # Helper to add resources
     def add_resources(resource_defs):
@@ -355,50 +332,8 @@ def seed_demo_user():
         db.session.rollback()
     print("✅ Resources and tags created")
     
-    # Create ResourceState rows for snapshots so Resources page can resolve items from snapshots
-    print("🔄 Creating resource states for latest snapshots...")
-    def create_states_for_provider(provider, snapshot):
-        resources = Resource.query.filter_by(provider_id=provider.id).all()
-        for r in resources:
-            state = ResourceState(
-                sync_snapshot_id=snapshot.id,
-                resource_id=r.id,
-                provider_resource_id=r.resource_id,
-                resource_type=r.resource_type,
-                resource_name=r.resource_name,
-                state_action='created',
-                previous_state=None,
-                current_state=json.dumps({
-                    'resource_name': r.resource_name,
-                    'status': r.status,
-                    'effective_cost': r.effective_cost,
-                    'region': r.region,
-                    'service_name': r.service_name,
-                    'provider_config': r.get_provider_config(),
-                }),
-                changes_detected=json.dumps({}),
-                service_name=r.service_name,
-                region=r.region,
-                status=r.status,
-                effective_cost=r.effective_cost,
-                has_cost_change=False,
-                has_status_change=False,
-                has_config_change=False,
-            )
-            db.session.add(state)
-        db.session.commit()
-
-    # Fetch snapshots freshly to ensure IDs
-    sel_a_snap = SyncSnapshot.query.filter_by(provider_id=selectel_bu_a.id).order_by(SyncSnapshot.created_at.desc()).first()
-    sel_b_snap = SyncSnapshot.query.filter_by(provider_id=selectel_bu_b.id).order_by(SyncSnapshot.created_at.desc()).first()
-    beget_prod_snap = SyncSnapshot.query.filter_by(provider_id=beget_prod.id).order_by(SyncSnapshot.created_at.desc()).first()
-    beget_dev_snap = SyncSnapshot.query.filter_by(provider_id=beget_dev.id).order_by(SyncSnapshot.created_at.desc()).first()
-
-    create_states_for_provider(selectel_bu_a, sel_a_snap)
-    create_states_for_provider(selectel_bu_b, sel_b_snap)
-    create_states_for_provider(beget_prod, beget_prod_snap)
-    create_states_for_provider(beget_dev, beget_dev_snap)
-    print("✅ Resource states created")
+    # Note: ResourceStates will be created by seed_historical_complete_syncs()
+    # for the latest (day 0) snapshot only
 
     # Create recommendations (20, RU)
     print("🔄 Creating cost optimization recommendations (20)...")
@@ -490,7 +425,7 @@ def seed_demo_user():
     
     # Summary
     print("\n" + "="*60)
-    print("✅ Demo user seeding completed successfully!")
+    print("✅ Demo user base seeding completed successfully!")
     print("="*60)
     print(f"Demo User ID: {demo_user.id}")
     print(f"Email: {demo_user.email}")
@@ -504,7 +439,215 @@ def seed_demo_user():
     print(f"Total Monthly Cost: ₽{total_monthly:,}")
     print("="*60)
     
-    return demo_user
+    # Return demo user and providers for historical sync generation
+    providers_dict = {
+        'selectel_bu_a': selectel_bu_a,
+        'selectel_bu_b': selectel_bu_b,
+        'beget_prod': beget_prod,
+        'beget_dev': beget_dev
+    }
+    
+    return demo_user, providers_dict
+
+def seed_historical_complete_syncs(demo_user, providers):
+    """
+    Generate 90 days of historical complete sync data with realistic cost variations
+    This creates a complete timeline for analytics page trending
+    
+    Args:
+        demo_user: The demo user object
+        providers: Dict with keys 'beget_prod', 'beget_dev', 'selectel_bu_a', 'selectel_bu_b'
+    """
+    print("\n" + "="*60)
+    print("🔄 Generating 3-month historical sync data...")
+    print("="*60)
+    
+    # Base costs per provider (daily)
+    BASE_COSTS = {
+        'selectel_bu_a': 166600.0 / 30.0,  # ~5,553 ₽/day
+        'selectel_bu_b': 104300.0 / 30.0,  # ~3,477 ₽/day
+        'beget_prod': 104250.0 / 30.0,      # ~3,475 ₽/day
+        'beget_dev': 41850.0 / 30.0,        # ~1,395 ₽/day
+    }
+    
+    # Resource counts per provider (for latest snapshot)
+    RESOURCE_COUNTS = {
+        'selectel_bu_a': 13,
+        'selectel_bu_b': 12,
+        'beget_prod': 12,
+        'beget_dev': 8
+    }
+    
+    # Calculate total base daily cost
+    total_base_daily = sum(BASE_COSTS.values())  # ~13,900 ₽/day
+    
+    print(f"Base daily cost: ₽{total_base_daily:,.2f}")
+    print(f"Target annual spend: ₽{total_base_daily * 365:,.2f}")
+    
+    # Generate 90 days of syncs (from 90 days ago to today)
+    today = datetime.now()
+    
+    complete_syncs_created = 0
+    provider_snapshots_created = 0
+    
+    for days_ago in range(90, -1, -1):  # 90, 89, 88, ... 1, 0
+        sync_date = today - timedelta(days=days_ago)
+        
+        # Calculate growth factor (2% total growth over 90 days)
+        growth_factor = 1.0 + (0.02 * (90 - days_ago) / 90)
+        
+        # Add daily variance (±7%)
+        daily_variance = random.uniform(0.93, 1.07)
+        
+        # Calculate costs for each provider
+        provider_costs = {}
+        provider_resources = {}
+        provider_snapshot_ids = {}
+        
+        total_daily_cost = 0.0
+        total_resources = 0
+        
+        # Create individual provider snapshots first
+        for provider_key, provider in providers.items():
+            base_cost = BASE_COSTS[provider_key]
+            
+            # Apply growth and variance
+            daily_cost = base_cost * growth_factor * daily_variance
+            monthly_cost = daily_cost * 30.0
+            
+            # Resource count (with slight variation for realism, but exact on day 0)
+            if days_ago == 0:
+                resource_count = RESOURCE_COUNTS[provider_key]
+            else:
+                resource_count = max(1, int(RESOURCE_COUNTS[provider_key] * random.uniform(0.95, 1.00)))
+            
+            # Create provider snapshot
+            snapshot = SyncSnapshot(
+                provider_id=provider.id,
+                sync_type='scheduled',
+                sync_status='success',
+                sync_started_at=sync_date - timedelta(minutes=random.randint(5, 15)),
+                sync_completed_at=sync_date,
+                sync_duration_seconds=random.randint(30, 180),
+                total_resources_found=resource_count,
+                resources_created=resource_count if days_ago == 90 else 0,
+                resources_updated=0 if days_ago == 90 else resource_count,
+                resources_deleted=0,
+                resources_unchanged=0,
+                total_monthly_cost=monthly_cost,
+                total_resources_by_type=json.dumps({'server': resource_count // 2, 'storage': resource_count // 3, 'other': resource_count // 6}),
+                total_resources_by_status=json.dumps({'active': resource_count, 'stopped': 0})
+            )
+            
+            db.session.add(snapshot)
+            db.session.flush()  # Get the snapshot ID
+            
+            provider_costs[str(provider.id)] = daily_cost
+            provider_resources[str(provider.id)] = resource_count
+            provider_snapshot_ids[provider_key] = snapshot.id
+            
+            total_daily_cost += daily_cost
+            total_resources += resource_count
+            provider_snapshots_created += 1
+        
+        # Create complete sync record
+        complete_sync = CompleteSync(
+            user_id=demo_user.id,
+            sync_type='scheduled',
+            sync_status='success',
+            sync_started_at=sync_date - timedelta(minutes=random.randint(15, 30)),
+            sync_completed_at=sync_date,
+            sync_duration_seconds=random.randint(120, 600),
+            total_providers_synced=4,
+            successful_providers=4,
+            failed_providers=0,
+            total_resources_found=total_resources,
+            total_daily_cost=total_daily_cost,
+            total_monthly_cost=total_daily_cost * 30.0,
+            cost_by_provider=json.dumps(provider_costs),
+            resources_by_provider=json.dumps(provider_resources),
+            sync_config=json.dumps({'auto_sync': True, 'include_inactive': False})
+        )
+        
+        db.session.add(complete_sync)
+        db.session.flush()  # Get the complete_sync ID
+        
+        # Create provider sync references
+        for provider_key, snapshot_id in provider_snapshot_ids.items():
+            provider = providers[provider_key]
+            ref = ProviderSyncReference(
+                complete_sync_id=complete_sync.id,
+                provider_id=provider.id,
+                sync_snapshot_id=snapshot_id,
+                sync_order=list(provider_snapshot_ids.keys()).index(provider_key) + 1,
+                sync_status='success',
+                sync_duration_seconds=random.randint(30, 180),
+                provider_cost=provider_costs[str(provider.id)],
+                resources_synced=provider_resources[str(provider.id)]
+            )
+            db.session.add(ref)
+        
+        complete_syncs_created += 1
+        
+        # For the latest snapshot (day 0), create ResourceState records
+        if days_ago == 0:
+            print("\n🔄 Creating resource states for latest snapshots...")
+            for provider_key, snapshot_id in provider_snapshot_ids.items():
+                provider = providers[provider_key]
+                resources = Resource.query.filter_by(provider_id=provider.id).all()
+                
+                for r in resources:
+                    state = ResourceState(
+                        sync_snapshot_id=snapshot_id,
+                        resource_id=r.id,
+                        provider_resource_id=r.resource_id,
+                        resource_type=r.resource_type,
+                        resource_name=r.resource_name,
+                        state_action='created',
+                        previous_state=None,
+                        current_state=json.dumps({
+                            'resource_name': r.resource_name,
+                            'status': r.status,
+                            'effective_cost': r.effective_cost,
+                            'region': r.region,
+                            'service_name': r.service_name,
+                            'provider_config': r.get_provider_config(),
+                        }),
+                        changes_detected=json.dumps({}),
+                        service_name=r.service_name,
+                        region=r.region,
+                        status=r.status,
+                        effective_cost=r.effective_cost,
+                        has_cost_change=False,
+                        has_status_change=False,
+                        has_config_change=False,
+                    )
+                    db.session.add(state)
+                
+                print(f"  ✓ Created {len(resources)} resource states for {provider.connection_name}")
+            
+            db.session.commit()
+            print("✅ Resource states for latest snapshot created")
+        
+        # Commit every 10 syncs to avoid memory issues
+        if complete_syncs_created % 10 == 0:
+            db.session.commit()
+            print(f"  ✓ Generated {complete_syncs_created}/91 complete syncs (Day -{days_ago})")
+    
+    # Final commit
+    db.session.commit()
+    
+    print("\n" + "="*60)
+    print("✅ Historical sync data generation completed!")
+    print("="*60)
+    print(f"Complete Syncs Created: {complete_syncs_created}")
+    print(f"Provider Snapshots Created: {provider_snapshots_created}")
+    print(f"Total Records: {complete_syncs_created + provider_snapshots_created + (complete_syncs_created * 4)}")
+    print(f"Date Range: {(today - timedelta(days=90)).strftime('%Y-%m-%d')} to {today.strftime('%Y-%m-%d')}")
+    print(f"Final Daily Cost: ₽{total_daily_cost:,.2f}")
+    print(f"Final Monthly Projection: ₽{total_daily_cost * 30.0:,.2f}")
+    print(f"Final Annual Projection: ₽{total_daily_cost * 365.0:,.2f}")
+    print("="*60 + "\n")
 
 def main():
     """Main seeding function"""
@@ -519,7 +662,16 @@ def main():
         print()
         
         try:
-            seed_demo_user()
+            # Seed base demo user data
+            demo_user, providers = seed_demo_user()
+            
+            # Generate 90 days of historical complete sync data
+            seed_historical_complete_syncs(demo_user, providers)
+            
+            print("\n" + "="*60)
+            print("🎉 COMPLETE! Demo user fully seeded with 3-month history!")
+            print("="*60)
+            
         except Exception as e:
             print(f"\n❌ Error seeding demo user: {e}")
             import traceback
