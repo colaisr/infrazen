@@ -7,7 +7,6 @@
 
 {% block header_actions %}
 <div style="display: flex; gap: 1rem; align-items: center;">
-    <button id="refreshBtn" class="btn btn-secondary" style="padding: 0.5rem 1rem;">🔄 Обновить</button>
     <div style="display:flex; gap:0.5rem;">
         <button id="bulkImplement" class="btn btn-primary" disabled>Отметить внедрёнными</button>
         <button id="bulkDismiss" class="btn btn-secondary" disabled>Скрыть</button>
@@ -302,11 +301,7 @@ function filterRecommendations() {
   enableBulkButtons();
 }
 
-// Add event listeners only if elements exist
-const refreshBtn = qs('#refreshBtn');
-if (refreshBtn) {
-  refreshBtn.addEventListener('click', ()=>load());
-}
+// Refresh button removed - no longer needed
 
 const selectAll = qs('#selectAll');
 if (selectAll) {
