@@ -1413,6 +1413,10 @@ function exportResourcesToCSV() {
     csvContent.push(`ИТОГО,,,,"Всего ресурсов",${totalResources},,`);
     csvContent.push(''); // Empty line separator
     
+    // Get all provider content elements directly
+    const allProviderContents = document.querySelectorAll('[id^="provider-content-"]');
+    console.log('Found provider content elements:', allProviderContents.length);
+    
     // Process each provider section
     providerSections.forEach((providerSection, index) => {
         console.log(`Processing provider section ${index + 1}`);
@@ -1423,13 +1427,27 @@ function exportResourcesToCSV() {
                            'Неизвестный провайдер';
         console.log('Provider name:', providerName);
         
-        // Get provider ID from the section
-        const providerId = providerSection.id || providerSection.querySelector('[id^="provider-content-"]')?.id?.replace('provider-content-', '');
-        console.log('Provider ID:', providerId);
+        // Find the corresponding provider content by looking for the one that contains resources for this provider
+        let providerContent = null;
+        let originalDisplay = 'none';
         
-        // Find provider content by ID
-        const providerContent = providerId ? document.getElementById(`provider-content-${providerId}`) : null;
-        const originalDisplay = providerContent ? providerContent.style.display : 'none';
+        // Try to find provider content by looking for the one that's a sibling or child of this provider section
+        const possibleContent = providerSection.querySelector('.provider-content');
+        if (possibleContent) {
+            providerContent = possibleContent;
+            originalDisplay = providerContent.style.display;
+        } else {
+            // Fallback: look for any provider content that might belong to this provider
+            for (let content of allProviderContents) {
+                // Check if this content is related to the current provider section
+                if (providerSection.contains(content) || content.closest('.provider-section') === providerSection) {
+                    providerContent = content;
+                    originalDisplay = providerContent.style.display;
+                    break;
+                }
+            }
+        }
+        
         console.log('Provider content found:', !!providerContent, 'Original display:', originalDisplay);
         
         // Temporarily show the content to access resource cards
