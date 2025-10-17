@@ -7,13 +7,11 @@
 
 {% block header_actions %}
 <div style="display: flex; gap: 1rem; align-items: center;">
-    {% if user.role != 'demouser' %}
     <button id="refreshBtn" class="btn btn-secondary" style="padding: 0.5rem 1rem;">🔄 Обновить</button>
     <div style="display:flex; gap:0.5rem;">
         <button id="bulkImplement" class="btn btn-primary" disabled>Отметить внедрёнными</button>
         <button id="bulkDismiss" class="btn btn-secondary" disabled>Скрыть</button>
     </div>
-    {% endif %}
     <button id="exportCsv" class="btn btn-secondary">Экспорт CSV</button>
     <a href="/connections" class="btn btn-link">К подключениями</a>
     </div>
@@ -139,12 +137,8 @@ function cardTemplate(rec){
   const chips = ctx.map(x=>`<span class="chip">${x}</span>`).join('');
   const id = rec.id;
   
-  // Conditionally show action buttons for non-demo users
-  const actionButtons = isDemoUser ? `
-    <div class="rec-actions" style="visibility: hidden;">
-      <!-- Hidden actions for demo users to maintain layout -->
-    </div>
-  ` : `
+  // Action buttons for all users (including demo users)
+  const actionButtons = `
     <div class="rec-actions">
       <input type="checkbox" class="rowCheck" />
       <button class="btn-icon act" data-act="seen" title="Отметить просмотренной">👁</button>
