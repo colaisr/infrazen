@@ -1090,6 +1090,19 @@ function toggleProviderSection(providerId) {
     }
 }
 
+function toggleProviderSection(providerId) {
+    const content = document.getElementById(`provider-content-${providerId}`);
+    const chevron = document.getElementById(`provider-chevron-${providerId}`);
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        chevron.classList.add('rotated');
+    } else {
+        content.style.display = 'none';
+        chevron.classList.remove('rotated');
+    }
+}
+
 function toggleUsageSection(resourceId) {
     const content = document.getElementById(`usage-info-${resourceId}`);
     const chevron = document.getElementById(`usage-chevron-${resourceId}`);
