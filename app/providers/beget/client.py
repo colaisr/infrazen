@@ -1127,10 +1127,10 @@ class BegetAPIClient:
                 
                 # Collect CPU and memory statistics for all VPS servers
                 logger.info("Collecting CPU statistics for VPS servers...")
-                cpu_statistics = self.get_all_vps_cpu_statistics(vps_servers, period='HOUR')
+                cpu_statistics = self.get_all_vps_cpu_statistics(vps_servers, period='DAY')
                 
                 logger.info("Collecting memory statistics for VPS servers...")
-                memory_statistics = self.get_all_vps_memory_statistics(vps_servers, period='HOUR')
+                memory_statistics = self.get_all_vps_memory_statistics(vps_servers, period='DAY')
                 
                 sync_result['vps_sync'] = {
                     'status': 'success',

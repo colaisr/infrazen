@@ -524,10 +524,10 @@ class BegetProviderPlugin(ProviderPlugin):
         if vps_servers_for_stats:
             try:
                 self.logger.info("Collecting CPU statistics for VPS servers...")
-                cpu_statistics = self.client.get_all_vps_cpu_statistics(vps_servers_for_stats, period='HOUR')
+                cpu_statistics = self.client.get_all_vps_cpu_statistics(vps_servers_for_stats, period='DAY')
                 
                 self.logger.info("Collecting memory statistics for VPS servers...")
-                memory_statistics = self.client.get_all_vps_memory_statistics(vps_servers_for_stats, period='HOUR')
+                memory_statistics = self.client.get_all_vps_memory_statistics(vps_servers_for_stats, period='DAY')
                 
                 self.logger.info(f"CPU statistics collected for {cpu_statistics.get('vps_with_cpu_data', 0)} VPS servers")
                 self.logger.info(f"Memory statistics collected for {memory_statistics.get('vps_with_memory_data', 0)} VPS servers")
