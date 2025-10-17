@@ -1399,10 +1399,6 @@ function exportResourcesToCSV() {
     const totalCost = document.querySelectorAll('.stat-value')[1]?.textContent || '0 ₽/день';
     console.log('Total resources:', totalResources, 'Total cost:', totalCost);
     
-    // Get provider data from the page structure
-    const providerSections = document.querySelectorAll('.provider-section');
-    console.log('Found provider sections:', providerSections.length);
-    
     let csvContent = [];
     
     // Add header
@@ -1413,59 +1409,52 @@ function exportResourcesToCSV() {
     csvContent.push(`ИТОГО,,,,"Всего ресурсов",${totalResources},,`);
     csvContent.push(''); // Empty line separator
     
-    // Get all provider content elements directly
+    // Get all provider content elements and temporarily show them
     const allProviderContents = document.querySelectorAll('[id^="provider-content-"]');
     console.log('Found provider content elements:', allProviderContents.length);
     
-    // Process each provider section
-    providerSections.forEach((providerSection, index) => {
-        console.log(`Processing provider section ${index + 1}`);
-        
-        // Get provider name from the provider header
-        const providerName = providerSection.querySelector('.provider-name')?.textContent || 
-                           providerSection.querySelector('.provider-left .provider-name')?.textContent || 
-                           'Неизвестный провайдер';
-        console.log('Provider name:', providerName);
-        
-        // Find the corresponding provider content by looking for the one that contains resources for this provider
-        let providerContent = null;
-        let originalDisplay = 'none';
-        
-        // Try to find provider content by looking for the one that's a sibling or child of this provider section
-        const possibleContent = providerSection.querySelector('.provider-content');
-        if (possibleContent) {
-            providerContent = possibleContent;
-            originalDisplay = providerContent.style.display;
-        } else {
-            // Fallback: look for any provider content that might belong to this provider
-            for (let content of allProviderContents) {
-                // Check if this content is related to the current provider section
-                if (providerSection.contains(content) || content.closest('.provider-section') === providerSection) {
-                    providerContent = content;
-                    originalDisplay = providerContent.style.display;
-                    break;
-                }
+    // Store original display states
+    const originalStates = [];
+    allProviderContents.forEach((content, index) => {
+        originalStates[index] = content.style.display;
+        content.style.display = 'block';
+        console.log(`Expanded provider content ${index + 1}`);
+    });
+    
+    // Get all resource cards from all providers
+    const allResourceCards = document.querySelectorAll('.resource-card');
+    console.log('Total resource cards found:', allResourceCards.length);
+    
+    // Group resources by provider
+    const resourcesByProvider = {};
+    
+    allResourceCards.forEach(card => {
+        // Find which provider this card belongs to
+        const providerSection = card.closest('.provider-section');
+        if (providerSection) {
+            const providerName = providerSection.querySelector('.provider-name')?.textContent || 
+                               providerSection.querySelector('.provider-left .provider-name')?.textContent || 
+                               'Неизвестный провайдер';
+            
+            if (!resourcesByProvider[providerName]) {
+                resourcesByProvider[providerName] = [];
             }
+            resourcesByProvider[providerName].push(card);
         }
-        
-        console.log('Provider content found:', !!providerContent, 'Original display:', originalDisplay);
-        
-        // Temporarily show the content to access resource cards
-        if (providerContent) {
-            providerContent.style.display = 'block';
-        }
-        
-        // Get resource cards from the now-visible provider content
-        const resourceCards = providerContent ? providerContent.querySelectorAll('.resource-card') : [];
-        console.log('Resource cards found:', resourceCards.length);
+    });
+    
+    console.log('Resources grouped by provider:', Object.keys(resourcesByProvider));
+    
+    // Process each provider
+    Object.keys(resourcesByProvider).forEach(providerName => {
+        const resourceCards = resourcesByProvider[providerName];
+        console.log(`Processing provider: ${providerName} with ${resourceCards.length} resources`);
         
         if (resourceCards.length === 0) {
-            console.log('No resources found for provider:', providerName);
             csvContent.push(`${providerName},Нет ресурсов,,,,,,`);
         } else {
-            console.log('Processing', resourceCards.length, 'resource cards');
             resourceCards.forEach((card, cardIndex) => {
-                console.log(`Processing resource card ${cardIndex + 1}`);
+                console.log(`Processing resource card ${cardIndex + 1} for ${providerName}`);
                 
                 // Extract resource information using correct selectors
                 const resourceName = card.querySelector('.resource-name')?.textContent || '';
@@ -1508,12 +1497,12 @@ function exportResourcesToCSV() {
             });
         }
         
-        // Restore original display state
-        if (providerContent) {
-            providerContent.style.display = originalDisplay;
-        }
-        
         csvContent.push(''); // Empty line between providers
+    });
+    
+    // Restore original display states
+    allProviderContents.forEach((content, index) => {
+        content.style.display = originalStates[index];
     });
     
     console.log('Final CSV content:', csvContent);
