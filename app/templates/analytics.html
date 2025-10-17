@@ -28,6 +28,25 @@
     color: inherit !important;
 }
 
+/* Fix KPI card values to prevent line breaks */
+.analytics-kpi-value {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+}
+
+.analytics-kpi-subtitle {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 0.875rem !important;
+    color: #6b7280 !important;
+    margin-top: 0.5rem !important;
+}
+
 /* Override any inherited dark theme styles */
 body {
     background-color: #ffffff !important;
