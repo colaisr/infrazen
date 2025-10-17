@@ -180,40 +180,43 @@
                             {% if resource.provider_config is mapping %}
                                 {% set config = resource.provider_config %}
                                 {% set mysql_config = config.get('mysql_config', {}) %}
+                            {% elif resource.provider_config is string %}
+                                {% set config = resource.provider_config | from_json %}
+                                {% set mysql_config = config.get('mysql_config', {}) %}
                             {% else %}
                                 {% set config = {} %}
                                 {% set mysql_config = {} %}
                             {% endif %}
                             <div class="resource-specs">
-                                {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') %}
+                                {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') %}
                                 <div class="spec-item">
                                     <div class="spec-icon">
                                         <i class="fa-solid fa-microchip"></i>
                                     </div>
                                     <div class="spec-content">
-                                        <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') }}</span>
+                                        <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') }}</span>
                                         <span class="spec-label">vCPU</span>
                                     </div>
                                 </div>
                                 {% endif %}
-                                {% if config.get('ram_mb') or mysql_config.get('memory_mb') %}
+                                {% if config.get('ram_mb') or mysql_config.get('memory_mb') or config.get('memory') %}
                                 <div class="spec-item">
                                     <div class="spec-icon">
                                         <i class="fa-solid fa-memory"></i>
                                     </div>
                                     <div class="spec-content">
-                                        <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) }} GB</span>
+                                        <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) if config.get('ram_mb') or mysql_config.get('memory_mb') else config.get('memory') }} {{ 'GB' if config.get('ram_mb') or mysql_config.get('memory_mb') else '' }}</span>
                                         <span class="spec-label">RAM</span>
                                     </div>
                                 </div>
                                 {% endif %}
-                                {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') %}
+                                {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') or config.get('storage') %}
                                 <div class="spec-item">
                                     <div class="spec-icon">
                                         <i class="fa-solid fa-hdd"></i>
                                     </div>
                                     <div class="spec-content">
-                                        <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) }} GB</span>
+                                        <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else config.get('storage') }} {{ 'GB' if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else '' }}</span>
                                         <span class="spec-label">HD</span>
                                     </div>
                                 </div>
@@ -223,6 +226,11 @@
                             <!-- Usage Data Section -->
                             {% if resource.tags is mapping %}
                                 {% set tags = resource.tags %}
+                            {% elif resource.tags is iterable %}
+                                {% set tags = {} %}
+                                {% for tag in resource.tags %}
+                                    {% set _ = tags.update({tag.tag_key: tag.tag_value}) %}
+                                {% endfor %}
                             {% else %}
                                 {% set tags = {} %}
                             {% endif %}
