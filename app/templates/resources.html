@@ -6,7 +6,7 @@
 {% block page_subtitle %}{% endblock %}
 
 {% block header_actions %}
-    <button class="btn btn-primary"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
+    <button class="btn btn-primary" onclick="exportResourcesToCSV()"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
 {% endblock %}
 
 {% block content %}
@@ -75,12 +75,10 @@
     </div>
 
     <!-- Provider Sections -->
-    <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
     <div class="content-body">
     {% for provider in providers %}
-    <!-- DEBUG: Processing provider {{ provider.id }}: {{ provider.connection_name or provider.provider_type }} -->
     <div class="provider-section">
-        <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
+            <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
                 <div class="provider-left">
                     <div class="provider-icon">
                         {% if provider.provider_type == 'beget' %}
@@ -111,13 +109,12 @@
                     <i class="fa-solid fa-chevron-down provider-chevron" id="provider-chevron-{{ provider.id }}"></i>
                 </div>
             </div>
-        </div>
+            
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
             <div class="resources-grid">
                 {% for resource in resources_by_provider.get(provider.id, []) %}
                 <div class="resource-card">
-                    <!-- Resource Header -->
-                    <div class="resource-header">
+            <div class="resource-header">
                 <div class="resource-icon">
                     {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
                         <i class="fa-solid fa-server"></i>
@@ -140,19 +137,11 @@
                 <div class="resource-status">
                     {% if resource.status == 'RUNNING' %}
                         <span class="status-badge status-running">
-                            <i class="fa-solid fa-circle"></i> Запущен
+                                        <i class="fa-solid fa-circle"></i> {{ resource.status }}
                         </span>
                     {% elif resource.status == 'STOPPED' %}
                         <span class="status-badge status-stopped">
-                            <i class="fa-solid fa-circle"></i> Остановлен
-                        </span>
-                    {% elif resource.status == 'IN_USE' %}
-                        <span class="status-badge status-active">
-                            <i class="fa-solid fa-circle"></i> Используется
-                        </span>
-                    {% elif resource.status == 'ACTIVE' %}
-                        <span class="status-badge status-active">
-                            <i class="fa-solid fa-circle"></i> Активен
+                                        <i class="fa-solid fa-circle"></i> {{ resource.status }}
                         </span>
                     {% else %}
                         <span class="status-badge status-unknown">
@@ -162,7 +151,6 @@
                 </div>
             </div>
 
-            <!-- Resource Details -->
             <div class="resource-details">
                 <div class="detail-row">
                     <span class="detail-label">Провайдер</span>
@@ -178,196 +166,11 @@
                     <span class="detail-value">{{ resource.region }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Сервис</span>
-                    <span class="detail-value">{{ resource.service_name }}</span>
-                </div>
-                {% if resource.provider_config %}
-                    {% set config = resource.get_provider_config() %}
-                    {% if config.get('project_name') %}
-                    <div class="detail-row">
-                        <span class="detail-label">Проект</span>
-                        <span class="detail-value">{{ config.project_name }}</span>
-                    </div>
-                    {% endif %}
-                    {% if config.get('created_at') %}
-                    <div class="detail-row">
-                        <span class="detail-label">Создан</span>
-                        <span class="detail-value">{{ config.created_at[:10] if config.created_at|length > 10 else config.created_at }}</span>
-                    </div>
-                    {% endif %}
-                {% endif %}
-                {% if resource.provider_config %}
-                    {% set config = resource.get_provider_config() %}
-                    {% if config.get('size_gb') %}
-                    <div class="detail-row">
-                        <span class="detail-label">Размер</span>
-                        <span class="detail-value">{{ config.size_gb }} ГБ</span>
-                    </div>
-                    {% endif %}
-                    {% if config.get('ip_address') %}
-                    <div class="detail-row">
-                        <span class="detail-label">IP адрес</span>
-                        <span class="detail-value">{{ config.ip_address }}</span>
-                    </div>
-                    {% endif %}
-                    {% if config.get('hostname') %}
-                    <div class="detail-row">
-                        <span class="detail-label">Хост</span>
-                        <span class="detail-value">{{ config.hostname }}</span>
-                    </div>
-                    {% endif %}
-                    {% if config.get('os') %}
-                    <div class="detail-row">
-                        <span class="detail-label">ОС</span>
-                        <span class="detail-value">{{ config.os }}</span>
-                    </div>
-                    {% endif %}
-                    {% if config.get('software') %}
-                    <div class="detail-row">
-                        <span class="detail-label">ПО</span>
-                        <span class="detail-value">{{ config.software }}</span>
-                    </div>
-                    {% endif %}
-                {% endif %}
-            </div>
-
-            <!-- Resource Specifications -->
-            {% if resource.provider_config %}
-                {% set config = resource.get_provider_config() %}
-                {% set mysql_config = config.get('mysql_config', {}) %}
-                {% if config.get('cpu_cores') or config.get('vcpus') or config.get('ram_mb') or config.get('disk_gb') or config.get('total_storage_gb') or mysql_config.get('cpu_count') or mysql_config.get('memory_mb') or mysql_config.get('disk_size_mb') %}
-                <div class="resource-specs">
-                    <div class="specs-header">
-                        <span class="specs-title">Характеристики</span>
-                    </div>
-                    <div class="specs-grid">
-                        {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') %}
-                        <div class="spec-item">
-                            <div class="spec-icon">
-                                <i class="fa-solid fa-microchip"></i>
-                            </div>
-                            <div class="spec-content">
-                                <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') }}</span>
-                                <span class="spec-label">vCPU</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if config.get('ram_mb') or mysql_config.get('memory_mb') %}
-                        <div class="spec-item">
-                            <div class="spec-icon">
-                                <i class="fa-solid fa-memory"></i>
-                            </div>
-                            <div class="spec-content">
-                                <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) }} GB</span>
-                                <span class="spec-label">RAM</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') %}
-                        <div class="spec-item">
-                            <div class="spec-icon">
-                                <i class="fa-solid fa-hdd"></i>
-                            </div>
-                            <div class="spec-content">
-                                {% set disk_size = config.get('total_storage_gb') or config.get('disk_gb') or config.get('billing', {}).get('total_storage_gb', 0) or (mysql_config.get('disk_size_mb', 0) / 1024) %}
-                                <span class="spec-value">{{ disk_size|round(1) }} GB</span>
-                                <span class="spec-label">Диск</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% if config.get('bandwidth_gb') %}
-                        <div class="spec-item">
-                            <div class="spec-icon">
-                                <i class="fa-solid fa-network-wired"></i>
-                            </div>
-                            <div class="spec-content">
-                                <span class="spec-value">{{ config.bandwidth_gb }} GB</span>
-                                <span class="spec-label">Трафик</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            {% endif %}
-
-            <!-- Resource Usage (if available) -->
-            {% if resource.provider_config %}
-                {% set config = resource.get_provider_config() %}
-                {% set mysql_config = config.get('mysql_config', {}) %}
-                {% set tags = resource.get_all_tags() %}
-                {% if config.get('disk_used_gb') or config.get('disk_left_gb') or tags.get('cpu_avg_usage') or tags.get('memory_avg_usage_mb') or mysql_config.get('disk_used_bytes') or mysql_config.get('disk_left_bytes') %}
-                <div class="resource-usage-collapsible">
-                    <div class="usage-header" onclick="toggleUsageInfo('{{ resource.id }}')">
-                        <i class="fa-solid fa-chart-line"></i>
-                        <span>Использование</span>
-                        <i class="fa-solid fa-chevron-down usage-chevron" id="usage-chevron-{{ resource.id }}"></i>
-                    </div>
-            <div class="usage-content" id="usage-info-{{ resource.id }}" style="display: none;">
-                <!-- CPU Usage Graph -->
-                        {% if tags.get('cpu_avg_usage') %}
-                        <div class="usage-graph">
-                            <div class="usage-graph-header">
-                                <span class="usage-graph-title">CPU:</span>
-                            </div>
-                            <div class="usage-graph-container">
-                                <canvas id="cpu-chart-{{ resource.id }}" class="usage-chart" width="300" height="120"></canvas>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Memory Usage Graph -->
-                        {% if tags.get('memory_avg_usage_mb') %}
-                        <div class="usage-graph">
-                            <div class="usage-graph-header">
-                                <span class="usage-graph-title">Memory consumption:</span>
-                            </div>
-                            <div class="usage-graph-container">
-                                <canvas id="memory-chart-{{ resource.id }}" class="usage-chart" width="300" height="120"></canvas>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <!-- HD Usage (moved from original usage section) -->
-                        {% if config.get('disk_used_gb') and config.get('disk_left_gb') %}
-                        <div class="usage-item">
-                            <div class="usage-label">HD</div>
-                            <div class="usage-bar">
-                                <div class="usage-fill" style="width: {{ ((config.disk_used_gb / (config.disk_used_gb + config.disk_left_gb)) * 100)|round(1) }}%"></div>
-                            </div>
-                            <div class="usage-text">{{ config.disk_used_gb|round(1) }} GB / {{ (config.disk_used_gb + config.disk_left_gb)|round(1) }} GB</div>
-                        </div>
-                        {% elif mysql_config.get('disk_used_bytes') and mysql_config.get('disk_left_bytes') %}
-                        <div class="usage-item">
-                            <div class="usage-label">HD</div>
-                            <div class="usage-bar">
-                                {% set disk_used_gb = (mysql_config.get('disk_used_bytes', 0)|int) / (1024**3) %}
-                                {% set disk_left_gb = (mysql_config.get('disk_left_bytes', 0)|int) / (1024**3) %}
-                                {% set disk_total_gb = disk_used_gb + disk_left_gb %}
-                                {% set usage_percent = (disk_used_gb / disk_total_gb * 100) if disk_total_gb > 0 else 0 %}
-                                <div class="usage-fill" style="width: {{ usage_percent|round(1) }}%"></div>
-                            </div>
-                            <div class="usage-text">{{ disk_used_gb|round(2) }} GB / {{ disk_total_gb|round(1) }} GB</div>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-            {% endif %}
-
-            <!-- Resource Cost -->
-            <div class="resource-cost">
-                <div class="cost-primary">
-                    <div class="cost-amount">{{ resource.daily_cost|round(2) }} ₽</div>
-                    <div class="cost-period">в день</div>
-                </div>
-                <div class="cost-secondary">
-                    <div class="cost-amount-secondary">{{ (resource.daily_cost * 30)|round(2) }} ₽</div>
-                    <div class="cost-period-secondary">в месяц</div>
+                                <span class="detail-label">Стоимость</span>
+                                <span class="detail-value">{{ resource.daily_cost|round(2) }} ₽/день</span>
                 </div>
             </div>
 
-            <!-- Resource Actions -->
             <div class="resource-actions">
                 <button class="action-button action-primary" title="Подробнее">
                     <i class="fa-solid fa-info"></i>
@@ -385,11 +188,14 @@
                 </button>
                 {% endif %}
             </div>
+                </div>
                 {% endfor %}
             </div>
         </div>
+    </div>
     {% endfor %}
     </div>
+
     {% else %}
     <div class="empty-state">
         <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
@@ -404,6 +210,30 @@
     padding: 0;
 }
 
+/* Filters */
+.filters {
+    background: var(--background-white);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.filters .input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    background: var(--background-white);
+}
+
+.filters .input:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Summary */
 .resources-summary {
     background: var(--background-white);
     border: 1px solid var(--border-light);
@@ -413,9 +243,8 @@
 }
 
 .summary-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    display: flex;
+    gap: 2rem;
 }
 
 .stat-item {
@@ -427,11 +256,12 @@
 .stat-label {
     font-size: 0.875rem;
     color: var(--text-secondary);
+    font-weight: 500;
 }
 
 .stat-value {
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
@@ -464,141 +294,75 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    flex: 1;
-    min-width: 0;
 }
 
 .provider-icon {
-    width: 64px;
-    height: 64px;
-    background: #f5f5f4;
-    border-radius: 14px;
+    width: 3rem;
+    height: 3rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #a16207;
-    font-size: 2.5rem !important;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(161, 98, 7, 0.2);
-}
-
-.provider-icon i,
-.provider-icon .fas,
-.provider-icon .fa-server {
-    font-size: 2.5rem !important;
-    line-height: 1 !important;
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-    display: inline-block !important;
-    transform: scale(1.5) !important;
+    border-radius: 8px;
+    background: var(--background-light);
 }
 
 .provider-details-inline {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-    min-width: 0;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.provider-right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
+.provider-type {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.provider-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .provider-sync {
     font-size: 0.75rem;
     color: var(--text-secondary);
-    font-weight: 400;
-    flex-shrink: 0;
+}
+
+.provider-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .provider-daily-cost {
-    font-size: 0.875rem;
-    color: var(--primary-blue);
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.provider-resource-count {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 400;
-    flex-shrink: 0;
-}
-
-.provider-name {
     font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1.3;
-    flex: 1;
-    min-width: 0;
-}
-
-.provider-type {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 500;
-    flex-shrink: 0;
-}
-
-.provider-last-sync {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 400;
-    margin-left: 0.5rem;
-}
-
-.provider-stats {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.75rem;
+    font-weight: 700;
+    color: var(--primary-blue);
 }
 
 .provider-resource-count {
     font-size: 0.875rem;
     color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.provider-daily-cost {
-    font-size: 0.875rem;
-    color: var(--primary-blue);
-    font-weight: 600;
-}
-
-.provider-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .provider-chevron {
-    transition: transform 0.2s ease;
-    color: var(--text-secondary);
     font-size: 1rem;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
 }
 
 .provider-chevron.rotated {
     transform: rotate(180deg);
 }
 
-.provider-content {
-    padding: 1.5rem;
-    background: var(--background-white);
-}
-
-/* Resource Cards Grid */
+/* Resources Grid */
 .resources-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 1.5rem;
+    padding: 1.5rem;
 }
 
 .resource-card {
@@ -617,25 +381,23 @@
     transform: translateY(-2px);
 }
 
-/* Resource Header */
 .resource-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 1rem;
     margin-bottom: 1rem;
 }
 
 .resource-icon {
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, var(--primary-blue), var(--primary-blue-dark));
-    border-radius: 10px;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    background: var(--background-light);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-size: 1.25rem;
-    flex-shrink: 0;
+    font-size: 1.125rem;
+    color: var(--primary-blue);
 }
 
 .resource-info {
@@ -644,19 +406,18 @@
 }
 
 .resource-name {
-    font-size: 1.125rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 0.25rem;
-    line-height: 1.3;
-    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .resource-type {
     font-size: 0.75rem;
     color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     font-weight: 500;
 }
 
@@ -668,7 +429,7 @@
     display: flex;
     align-items: center;
     gap: 0.375rem;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 500;
     padding: 0.375rem 0.75rem;
     border-radius: 6px;
@@ -681,21 +442,15 @@
 }
 
 .status-stopped {
-    background: rgba(245, 158, 11, 0.1);
-    color: var(--warning-orange);
-}
-
-.status-active {
-    background: rgba(59, 130, 246, 0.1);
-    color: var(--primary-blue);
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error-red);
 }
 
 .status-unknown {
-    background: rgba(107, 114, 128, 0.1);
+    background: rgba(156, 163, 175, 0.1);
     color: var(--text-secondary);
 }
 
-/* Resource Details */
 .resource-details {
     margin-bottom: 1rem;
 }
@@ -706,6 +461,7 @@
     align-items: center;
     padding: 0.5rem 0;
     border-bottom: 1px solid var(--border-light);
+    font-size: 0.875rem;
 }
 
 .detail-row:last-child {
@@ -713,29 +469,33 @@
 }
 
 .detail-label {
-    font-size: 0.875rem;
     color: var(--text-secondary);
     font-weight: 500;
 }
 
 .detail-value {
-    font-size: 0.875rem;
     color: var(--text-primary);
     font-weight: 500;
+    font-family: monospace;
+    font-size: 0.75rem;
 }
 
 .provider-badge {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .provider-beget {
+    background: rgba(139, 69, 19, 0.1);
+    color: #8b4513;
+}
+
+.provider-selectel {
     background: rgba(59, 130, 246, 0.1);
-    color: var(--primary-blue);
+    color: #1e40af;
 }
 
 .provider-yandex {
@@ -743,65 +503,6 @@
     color: #b45309;
 }
 
-.provider-selectel {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--success-green);
-}
-
-/* Resource Cost */
-.resource-cost {
-    background: var(--background-light);
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-    margin-bottom: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.cost-primary {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.cost-amount {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary-blue);
-    line-height: 1;
-}
-
-.cost-period {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    margin-top: 0.25rem;
-    font-weight: 500;
-}
-
-.cost-secondary {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border-light);
-}
-
-.cost-amount-secondary {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    line-height: 1;
-}
-
-.cost-period-secondary {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: 0.125rem;
-}
-
-/* Resource Actions */
 .resource-actions {
     display: flex;
     gap: 0.5rem;
@@ -809,18 +510,18 @@
 }
 
 .action-button {
-    width: 36px;
-    height: 36px;
-    border: 1px solid var(--border-light);
-    background: var(--background-white);
-    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: all 0.2s ease;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--border-light);
+    background: var(--background-white);
+    border-radius: 8px;
     font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
 }
 
 .action-button:hover {
@@ -833,8 +534,8 @@
 }
 
 .action-primary:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: var(--primary-blue);
+    background: var(--primary-blue);
+    color: white;
 }
 
 .action-secondary {
@@ -851,8 +552,8 @@
 }
 
 .action-warning:hover {
-    background: rgba(245, 158, 11, 0.1);
-    border-color: var(--warning-orange);
+    background: var(--warning-orange);
+    color: white;
 }
 
 .action-success {
@@ -860,240 +561,8 @@
 }
 
 .action-success:hover {
-    background: rgba(16, 185, 129, 0.1);
-    border-color: var(--success-green);
-}
-
-/* Resource Specifications */
-.resource-specs {
-    margin: 1rem 0;
-    padding: 1rem;
-    background: var(--background-light);
-    border-radius: 8px;
-    border: 1px solid var(--border-light);
-}
-
-.specs-header {
-    margin-bottom: 0.75rem;
-}
-
-.specs-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.specs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 0.75rem;
-}
-
-.spec-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: var(--background-white);
-    border-radius: 6px;
-    border: 1px solid var(--border-light);
-}
-
-.spec-icon {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--primary-blue);
+    background: var(--success-green);
     color: white;
-    border-radius: 4px;
-    font-size: 0.75rem;
-}
-
-.spec-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-}
-
-.spec-value {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1;
-}
-
-.spec-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-/* Resource Usage */
-.resource-usage {
-    margin: 1rem 0;
-    padding: 1rem;
-    background: var(--background-light);
-    border-radius: 8px;
-    border: 1px solid var(--border-light);
-}
-
-.usage-header {
-    margin-bottom: 0.75rem;
-}
-
-.usage-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-/* Collapsible Usage Section */
-.resource-usage-collapsible {
-    margin: 1rem 0;
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
-    background: var(--background-light);
-    overflow: hidden;
-}
-
-.resource-usage-collapsible .usage-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1rem;
-    background: var(--background-light);
-    border-bottom: 1px solid var(--border-light);
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    user-select: none;
-    margin-bottom: 0;
-}
-
-.resource-usage-collapsible .usage-header:hover {
-    background: var(--background-gray);
-}
-
-.resource-usage-collapsible .usage-header i:first-child {
-    margin-right: 0.5rem;
-    color: var(--primary-blue);
-}
-
-.usage-chevron {
-    transition: transform 0.2s ease;
-    color: var(--text-secondary);
-}
-
-.usage-chevron.rotated {
-    transform: rotate(180deg);
-}
-
-.usage-content {
-    padding: 1rem;
-    background: white;
-    border-top: 1px solid var(--border-light);
-}
-
-/* Usage Summary */
-.usage-summary {
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    background: var(--background-white);
-    border-radius: 6px;
-    border: 1px solid var(--border-light);
-}
-
-.usage-summary-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 0.5rem;
-}
-
-.usage-summary-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.25rem 0;
-}
-
-.usage-summary-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-.usage-summary-value {
-    font-size: 0.875rem;
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-/* Usage Graphs */
-.usage-graph {
-    margin-bottom: 1rem;
-    padding: 0.75rem;
-    background: var(--background-white);
-    border-radius: 6px;
-    border: 1px solid var(--border-light);
-}
-
-.usage-graph-header {
-    margin-bottom: 0.5rem;
-}
-
-.usage-graph-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.usage-graph-container {
-    position: relative;
-    width: 100%;
-    height: 120px;
-    background: var(--background-white);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.usage-chart {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.usage-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.usage-label {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-}
-
-.usage-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--border-light);
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.usage-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--primary-blue), #1e40af);
-    border-radius: 4px;
-    transition: width 0.3s ease;
-}
-
-.usage-text {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-align: right;
 }
 
 /* Empty State */
@@ -1120,7 +589,7 @@
 
 .empty-state-text {
     color: var(--text-secondary);
-    font-size: 0.875rem;
+    margin-bottom: 2rem;
 }
 
 /* Responsive Design */
@@ -1140,21 +609,14 @@
         gap: 0.75rem;
     }
     
-    .resource-status {
-        align-self: flex-start;
-    }
-    
-    .resource-actions {
-        justify-content: flex-start;
+    .summary-stats {
+        flex-direction: column;
+        gap: 1rem;
     }
 }
 </style>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-// Toggle provider section collapsible
 function toggleProviderSection(providerId) {
     const content = document.getElementById(`provider-content-${providerId}`);
     const chevron = document.getElementById(`provider-chevron-${providerId}`);
@@ -1168,381 +630,40 @@ function toggleProviderSection(providerId) {
     }
 }
 
-// Toggle usage info collapsible section
-function toggleUsageInfo(resourceId) {
-    const content = document.getElementById(`usage-info-${resourceId}`);
-    const chevron = document.getElementById(`usage-chevron-${resourceId}`);
-    
-    if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        chevron.classList.add('rotated');
-        
-        // Initialize charts when section is expanded
-        initializeCharts(resourceId);
-    } else {
-        content.style.display = 'none';
-        chevron.classList.remove('rotated');
-    }
-}
-
-// Initialize charts for a specific resource
-function initializeCharts(resourceId) {
-    // Get real data from snapshot metadata
-    const snapshotMetadata = {{ snapshot_metadata | tojson }};
-    let cpuData = [];
-    let memoryData = [];
-    let labels = [];
-    
-    // Find the resource's provider and get its metadata
-    let resourceMetadata = null;
-    for (const [providerId, metadata] of Object.entries(snapshotMetadata)) {
-        if (metadata.vps_cpu_statistics && metadata.vps_cpu_statistics[resourceId]) {
-            resourceMetadata = metadata;
-            break;
-        }
-    }
-    
-    if (resourceMetadata && resourceMetadata.vps_cpu_statistics && resourceMetadata.vps_cpu_statistics[resourceId]) {
-        const cpuStats = resourceMetadata.vps_cpu_statistics[resourceId];
-        const memoryStats = resourceMetadata.vps_memory_statistics && resourceMetadata.vps_memory_statistics[resourceId];
-        
-        // Use real CPU data if available
-        if (cpuStats.cpu_statistics && cpuStats.cpu_statistics.raw_data) {
-            const rawData = cpuStats.cpu_statistics.raw_data;
-            labels = rawData.dates.map(date => {
-                const d = new Date(date);
-                return d.toLocaleTimeString('en-GB', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: false 
-                });
-            });
-            cpuData = rawData.values;
-        }
-        
-        // Use real memory data if available
-        if (memoryStats && memoryStats.memory_statistics && memoryStats.memory_statistics.raw_data) {
-            const rawData = memoryStats.memory_statistics.raw_data;
-            memoryData = rawData.values;
-        }
-    }
-    
-    // Fallback to sample data if no real data available
-    if (cpuData.length === 0) {
-        const now = new Date();
-        // Generate 6 data points for the last hour (10-minute intervals)
-        for (let i = 5; i >= 0; i--) {
-            const time = new Date(now.getTime() - (i * 10 * 60 * 1000));
-            const timeStr = time.toLocaleTimeString('en-GB', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: false 
-            });
-            labels.push(timeStr);
-            
-            // Generate realistic CPU data (5-10% range with small fluctuations)
-            const baseCpu = 7.5;
-            const variation = (Math.random() - 0.5) * 3;
-            cpuData.push(Math.max(0, Math.min(100, baseCpu + variation)));
-            
-            // Generate realistic memory data (0.9-1.0 GB range)
-            const baseMemory = 0.95;
-            const memVariation = (Math.random() - 0.5) * 0.1;
-            memoryData.push(Math.max(0.8, Math.min(1.2, baseMemory + memVariation)));
-        }
-    }
-    
-    // CPU Chart
-    const cpuCanvas = document.getElementById(`cpu-chart-${resourceId}`);
-    if (cpuCanvas && !cpuCanvas.chart) {
-        const cpuCtx = cpuCanvas.getContext('2d');
-        cpuCanvas.chart = new Chart(cpuCtx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'CPU Usage',
-                    data: cpuData,
-                    borderColor: '#1E40AF',
-                    backgroundColor: 'rgba(30, 64, 175, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#1E40AF',
-                    pointBorderColor: '#1E40AF'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    }
-                },
-                elements: {
-                    point: {
-                        radius: 3
-                    }
-                }
-            }
-        });
-    }
-    
-    // Memory Chart
-    const memoryCanvas = document.getElementById(`memory-chart-${resourceId}`);
-    if (memoryCanvas && !memoryCanvas.chart) {
-        const memoryCtx = memoryCanvas.getContext('2d');
-        
-        // Calculate max value for memory chart (use actual data or default to 2.0)
-        const maxMemory = memoryData.length > 0 ? Math.max(...memoryData) * 1.2 : 2.0;
-        
-        memoryCanvas.chart = new Chart(memoryCtx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Memory Usage',
-                    data: memoryData,
-                    borderColor: '#1E40AF',
-                    backgroundColor: 'rgba(30, 64, 175, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#1E40AF',
-                    pointBorderColor: '#1E40AF'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: maxMemory,
-                        ticks: {
-                            callback: function(value) {
-                                return value.toFixed(1) + ' GB';
-                            }
-                        },
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            color: '#E5E7EB'
-                        }
-                    }
-                },
-                elements: {
-                    point: {
-                        radius: 3
-                    }
-                }
-            }
-        });
-    }
-}
-
-// Initialize charts for all resources when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    // Find all resource cards and initialize their charts if usage sections are expanded
-    const resourceCards = document.querySelectorAll('.resource-card');
-    resourceCards.forEach(card => {
-        const resourceId = card.querySelector('[id^="usage-info-"]')?.id?.replace('usage-info-', '');
-        if (resourceId) {
-            const usageContent = document.getElementById(`usage-info-${resourceId}`);
-            if (usageContent && usageContent.style.display !== 'none') {
-                initializeCharts(resourceId);
-            }
-        }
-    });
-    
-    // Add export functionality
-    const exportBtn = document.querySelector('.btn-primary');
-    if (exportBtn && exportBtn.textContent.includes('Экспорт')) {
-        exportBtn.addEventListener('click', exportResourcesToCSV);
-    }
-});
-
 function exportResourcesToCSV() {
-    console.log('Starting CSV export...');
-    
-    // Get overall stats from the page
-    const totalResources = document.querySelector('.stat-value')?.textContent || '0';
-    const totalCost = document.querySelectorAll('.stat-value')[1]?.textContent || '0 ₽/день';
-    console.log('Total resources:', totalResources, 'Total cost:', totalCost);
-    
-    let csvContent = [];
+    // Get all provider sections
+    const providerSections = document.querySelectorAll('.provider-section');
+    let csvContent = '\uFEFF'; // UTF-8 BOM for proper encoding
     
     // Add header
-    csvContent.push('Провайдер,Ресурс,Тип,Статус,Регион,Стоимость/день,Стоимость/месяц,Теги');
+    csvContent += 'Провайдер,Ресурс,Тип,Статус,Регион,Стоимость (₽/день)\n';
     
-    // Add overall summary
-    csvContent.push(`ИТОГО,,,,"Общая стоимость",${totalCost},,`);
-    csvContent.push(`ИТОГО,,,,"Всего ресурсов",${totalResources},,`);
-    csvContent.push(''); // Empty line separator
-    
-    // Get all provider content elements and temporarily show them
-    const allProviderContents = document.querySelectorAll('[id^="provider-content-"]');
-    console.log('Found provider content elements:', allProviderContents.length);
-    
-    // Store original display states
-    const originalStates = [];
-    allProviderContents.forEach((content, index) => {
-        originalStates[index] = content.style.display;
-        content.style.display = 'block';
-        console.log(`Expanded provider content ${index + 1}`);
-    });
-    
-    // Get all resource cards from all providers
-    const allResourceCards = document.querySelectorAll('.resource-card');
-    console.log('Total resource cards found:', allResourceCards.length);
-    
-    // Group resources by provider
-    const resourcesByProvider = {};
-    
-    allResourceCards.forEach((card, index) => {
-        console.log(`Processing resource card ${index + 1}`);
-        
-        // Find which provider this card belongs to by looking for the nearest provider content
-        let providerName = 'Неизвестный провайдер';
-        
-        // Method 1: Look for provider content that contains this card
-        for (let content of allProviderContents) {
-            if (content.contains(card)) {
-                // Find the provider section that contains this content
-                const providerSection = content.closest('.provider-section');
-                if (providerSection) {
-                    providerName = providerSection.querySelector('.provider-name')?.textContent || 
-                                 providerSection.querySelector('.provider-left .provider-name')?.textContent || 
-                                 'Неизвестный провайдер';
-                    console.log(`Found provider for card ${index + 1}: ${providerName}`);
-                    break;
-                }
-            }
-        }
-        
-        // Method 2: If not found, try to find by looking at the card's parent hierarchy
-        if (providerName === 'Неизвестный провайдер') {
-            let parent = card.parentElement;
-            while (parent && parent !== document.body) {
-                if (parent.classList.contains('provider-section')) {
-                    providerName = parent.querySelector('.provider-name')?.textContent || 
-                                 parent.querySelector('.provider-left .provider-name')?.textContent || 
-                                 'Неизвестный провайдер';
-                    console.log(`Found provider via parent hierarchy for card ${index + 1}: ${providerName}`);
-                    break;
-                }
-                parent = parent.parentElement;
-            }
-        }
-        
-        if (!resourcesByProvider[providerName]) {
-            resourcesByProvider[providerName] = [];
-        }
-        resourcesByProvider[providerName].push(card);
-        console.log(`Added card ${index + 1} to provider: ${providerName}`);
-    });
-    
-    console.log('Resources grouped by provider:', Object.keys(resourcesByProvider));
-    
-    // Process each provider
-    Object.keys(resourcesByProvider).forEach(providerName => {
-        const resourceCards = resourcesByProvider[providerName];
-        console.log(`Processing provider: ${providerName} with ${resourceCards.length} resources`);
+    // Process each provider section
+    providerSections.forEach(section => {
+        const providerName = section.querySelector('.provider-name').textContent;
+        const resourceCards = section.querySelectorAll('.resource-card');
         
         if (resourceCards.length === 0) {
-            csvContent.push(`${providerName},Нет ресурсов,,,,,,`);
-        } else {
-            resourceCards.forEach((card, cardIndex) => {
-                console.log(`Processing resource card ${cardIndex + 1} for ${providerName}`);
+            csvContent += `"${providerName}","Нет ресурсов","","","",""\n`;
+    } else {
+            resourceCards.forEach(card => {
+                const resourceName = card.querySelector('.resource-name').textContent;
+                const resourceType = card.querySelector('.resource-type').textContent;
+                const status = card.querySelector('.status-badge').textContent.trim();
+                const region = card.querySelector('.detail-row:nth-child(2) .detail-value').textContent;
+                const cost = card.querySelector('.detail-row:nth-child(3) .detail-value').textContent;
                 
-                // Extract resource information using correct selectors
-                const resourceName = card.querySelector('.resource-name')?.textContent || '';
-                const resourceType = card.querySelector('.resource-type')?.textContent || '';
-                console.log('Resource name:', resourceName, 'Type:', resourceType);
-                
-                // Get status from status badge
-                const statusBadge = card.querySelector('.status-badge');
-                const resourceStatus = statusBadge ? statusBadge.textContent.trim() : '';
-                
-                // Get region from detail rows
-                const detailRows = card.querySelectorAll('.detail-row');
-                let resourceRegion = '';
-                detailRows.forEach(row => {
-                    const label = row.querySelector('.detail-label')?.textContent;
-                    if (label === 'Регион') {
-                        resourceRegion = row.querySelector('.detail-value')?.textContent || '';
-                    }
-                });
-                
-                // Get costs from resource-cost section
-                const costPrimary = card.querySelector('.cost-amount')?.textContent || '0 ₽';
-                const costSecondary = card.querySelector('.cost-amount-secondary')?.textContent || '0 ₽';
-                
-                // Get tags (if any exist in the template)
-                const tagElements = card.querySelectorAll('.resource-tag, .tag');
-                const tags = Array.from(tagElements).map(tag => tag.textContent).join('; ');
-                
-                console.log('Final resource data:', {
-                    name: resourceName,
-                    type: resourceType,
-                    status: resourceStatus,
-                    region: resourceRegion,
-                    dailyCost: costPrimary,
-                    monthlyCost: costSecondary,
-                    tags: tags
-                });
-                
-                csvContent.push(`"${providerName}","${resourceName}","${resourceType}","${resourceStatus}","${resourceRegion}","${costPrimary}","${costSecondary}","${tags}"`);
+                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${region}","${cost}"\n`;
             });
         }
-        
-        csvContent.push(''); // Empty line between providers
     });
     
-    // Restore original display states
-    allProviderContents.forEach((content, index) => {
-        content.style.display = originalStates[index];
-    });
-    
-    console.log('Final CSV content:', csvContent);
-    
-    // Create and download CSV
-    const csvText = csvContent.join('\n');
-    const blob = new Blob(['\ufeff' + csvText], { type: 'text/csv;charset=utf-8;' });
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `resources_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `resources_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1550,4 +671,3 @@ function exportResourcesToCSV() {
 }
     </script>
 {% endblock %}
-
