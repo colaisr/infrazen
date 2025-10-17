@@ -195,11 +195,7 @@ def _apply_action(rec: OptimizationRecommendation, action: str, payload: dict):
 
 @recommendations_bp.route('/recommendations/<int:rec_id>/action', methods=['POST'])
 def recommendation_action(rec_id: int):
-    # Check if demo user (read-only)
-    from app.api.auth import check_demo_user_write_access
-    demo_check = check_demo_user_write_access()
-    if demo_check:
-        return demo_check
+    # Allow demo users to interact with recommendations
     
     rec = OptimizationRecommendation.find_by_id(rec_id)
     if not rec:
@@ -214,11 +210,7 @@ def recommendation_action(rec_id: int):
 
 @recommendations_bp.route('/recommendations/bulk', methods=['POST'])
 def bulk_action():
-    # Check if demo user (read-only)
-    from app.api.auth import check_demo_user_write_access
-    demo_check = check_demo_user_write_access()
-    if demo_check:
-        return demo_check
+    # Allow demo users to interact with recommendations
     
     payload = request.get_json(force=True) or {}
     ids = payload.get('ids') or []
