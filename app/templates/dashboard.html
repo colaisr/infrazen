@@ -237,7 +237,15 @@
             {% for p in overview.providers %}
             <article class="provider-card">
                 <header class="provider-header">
-                    <span class="provider-badge {{ p.code | lower }}">{{ p.code | upper }}</span>
+                    <div class="provider-logo">
+                        {% if p.code | lower == 'selectel' %}
+                            <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 2rem; height: 2rem; object-fit: contain;">
+                        {% elif p.code | lower == 'beget' %}
+                            <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
+                        {% else %}
+                            <span class="provider-badge {{ p.code | lower }}">{{ p.code | upper }}</span>
+                        {% endif %}
+                    </div>
                     <span class="provider-name">{{ p.name }}</span>
                 </header>
                 <div class="provider-connection {% if p.status == 'connected' %}status-connected{% else %}status-disconnected{% endif %}">
@@ -465,6 +473,24 @@
 </div>
 
 <style>
+/* Provider Logo Layout */
+.provider-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.provider-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
 /* Provider Info Layout */
 .provider-info {
     display: flex;
