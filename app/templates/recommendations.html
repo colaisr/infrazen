@@ -7,10 +7,7 @@
 
 {% block header_actions %}
 <div style="display: flex; gap: 1rem; align-items: center;">
-    <div style="display:flex; gap:0.5rem;">
-        <button id="bulkSeen" class="btn btn-primary" disabled>Отметить просмотренными</button>
-        <button id="bulkDismiss" class="btn btn-secondary" disabled>Скрыть</button>
-    </div>
+    <button id="bulkSeen" class="btn btn-primary" disabled>Отметить просмотренными</button>
     <button id="exportCsv" class="btn btn-secondary">Экспорт CSV</button>
     <a href="/connections" class="btn btn-link">К подключениями</a>
     </div>
@@ -235,13 +232,9 @@ async function actBulk(action){
 function enableBulkButtons(){
   const has = selectedIds().length>0;
   const bulkSeen = qs('#bulkSeen');
-  const bulkDismiss = qs('#bulkDismiss');
   
   if (bulkSeen) {
     bulkSeen.disabled = !has;
-  }
-  if (bulkDismiss) {
-    bulkDismiss.disabled = !has;
   }
 }
 
@@ -314,11 +307,6 @@ if (selectAll) {
 const bulkSeen = qs('#bulkSeen');
 if (bulkSeen) {
   bulkSeen.addEventListener('click', ()=>actBulk('seen'));
-}
-
-const bulkDismiss = qs('#bulkDismiss');
-if (bulkDismiss) {
-  bulkDismiss.addEventListener('click', ()=>actBulk('dismissed'));
 }
 
 document.addEventListener('change', (e)=>{ 
