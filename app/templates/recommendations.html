@@ -187,7 +187,20 @@ async function load(){
       return;
     }
     
-    const items = data.items || [];
+    // Store all recommendations for client-side filtering
+    state.allRecommendations = data.items || [];
+    
+    // Apply client-side search filter if search term exists
+    let items = data.items || [];
+    const searchTerm = qs('#search')?.value?.trim();
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      items = items.filter(rec => 
+        (rec.title || '').toLowerCase().includes(searchLower) ||
+        (rec.description || '').toLowerCase().includes(searchLower) ||
+        (rec.resource_name || '').toLowerCase().includes(searchLower)
+      );
+    }
     
     if (items.length === 0) {
       list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
@@ -241,18 +254,45 @@ function enableBulkButtons(){
   }
 });
 
-// Special handling for search input - use both input and change events
+// Special handling for search input - use client-side filtering
 const searchInput = qs('#search');
 if (searchInput) {
   let searchTimeout;
   searchInput.addEventListener('input', ()=>{
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(()=>{
-      state.page=1; 
-      load();
+      // Apply client-side filtering without making new API call
+      filterRecommendations();
     }, 300); // Debounce search by 300ms
   });
-  searchInput.addEventListener('change', ()=>{state.page=1; load();});
+  searchInput.addEventListener('change', ()=>{
+    filterRecommendations();
+  });
+}
+
+function filterRecommendations() {
+  const list = qs('#recsList');
+  if (!list || !state.allRecommendations) return;
+  
+  const searchTerm = qs('#search')?.value?.trim();
+  let items = state.allRecommendations;
+  
+  if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase();
+    items = items.filter(rec => 
+      (rec.title || '').toLowerCase().includes(searchLower) ||
+      (rec.description || '').toLowerCase().includes(searchLower) ||
+      (rec.resource_name || '').toLowerCase().includes(searchLower)
+    );
+  }
+  
+  if (items.length === 0) {
+    list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
+  } else {
+    list.innerHTML = items.map(cardTemplate).join('');
+  }
+  
+  enableBulkButtons();
 }
 
 // Add event listeners only if elements exist
