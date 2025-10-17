@@ -1423,8 +1423,12 @@ function exportResourcesToCSV() {
                            'Неизвестный провайдер';
         console.log('Provider name:', providerName);
         
-        // Temporarily expand the provider section to access resource cards
-        const providerContent = providerSection.querySelector('.provider-content');
+        // Get provider ID from the section
+        const providerId = providerSection.id || providerSection.querySelector('[id^="provider-content-"]')?.id?.replace('provider-content-', '');
+        console.log('Provider ID:', providerId);
+        
+        // Find provider content by ID
+        const providerContent = providerId ? document.getElementById(`provider-content-${providerId}`) : null;
         const originalDisplay = providerContent ? providerContent.style.display : 'none';
         console.log('Provider content found:', !!providerContent, 'Original display:', originalDisplay);
         
