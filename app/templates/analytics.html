@@ -2,6 +2,9 @@
 
 {% block title %}Аналитика расходов - InfraZen{% endblock %}
 
+{% block page_title %}Аналитика расходов{% endblock %}
+{% block page_subtitle %}Детальная аналитика расходов и использования облачных ресурсов{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/features/analytics-charts.css') }}">
@@ -50,18 +53,12 @@ body {
 
 {% block content %}
 <div class="analytics-page">
-    <!-- Page Header -->
-    <div class="analytics-header">
-        <div class="analytics-title-section">
-            <h1 class="analytics-title">Аналитика расходов</h1>
-            <p class="analytics-subtitle">Детальная аналитика расходов и использования облачных ресурсов</p>
-        </div>
-        <div class="analytics-actions">
-            <button class="btn btn-primary analytics-export-btn">
-                <i class="fa-solid fa-download"></i>
-                Экспорт отчета
-            </button>
-        </div>
+    <!-- Export Button -->
+    <div class="analytics-actions" style="margin-bottom: 2rem;">
+        <button class="btn btn-primary analytics-export-btn">
+            <i class="fa-solid fa-download"></i>
+            Экспорт отчета
+        </button>
     </div>
 
     <!-- Executive Summary - 4 KPI Cards -->
