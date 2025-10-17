@@ -338,51 +338,6 @@
         {% endif %}
     </div>
 
-    {% if enabled_providers %}
-    <div class="available-providers">
-        <h3>Доступные провайдеры</h3>
-        <div class="providers-list">
-            {% for provider in enabled_providers %}
-            <div class="provider-option">
-                <div class="provider-logo">
-                    {% if provider.logo_url %}
-                        <img src="{{ provider.logo_url }}" alt="{{ provider.display_name }}" style="width: 2rem; height: 2rem; object-fit: contain;">
-                    {% else %}
-                        <div class="provider-icon {{ provider.provider_type }}">
-                            {% if provider.provider_type == 'aws' %}
-                                <i class="fa-brands fa-aws"></i>
-                            {% elif provider.provider_type == 'azure' %}
-                                <i class="fa-brands fa-microsoft"></i>
-                            {% elif provider.provider_type == 'gcp' %}
-                                <i class="fa-brands fa-google"></i>
-                            {% elif provider.provider_type == 'beget' %}
-                                <i class="fa-solid fa-server"></i>
-                            {% elif provider.provider_type == 'selectel' %}
-                                <i class="fa-solid fa-cloud"></i>
-                            {% elif provider.provider_type == 'yandex' %}
-                                <i class="fa-solid fa-cloud"></i>
-                            {% elif provider.provider_type == 'vk-cloud' %}
-                                <i class="fa-solid fa-cloud"></i>
-                            {% else %}
-                                <i class="fa-solid fa-cloud"></i>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="provider-info">
-                    <span class="provider-name">{{ provider.display_name }}</span>
-                    <span class="provider-description">{{ provider.description or 'Облачный провайдер' }}</span>
-                </div>
-                {% if not is_demo_user %}
-                <button class="btn btn-outline btn-sm" onclick="showProviderModal('{{ provider.provider_type }}')">Добавить</button>
-                {% else %}
-                <button class="btn btn-outline btn-sm" disabled title="Войдите в систему для создания подключений">Добавить</button>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
 
     {% else %}
     <div class="empty-state">
