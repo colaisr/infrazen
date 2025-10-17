@@ -1237,7 +1237,7 @@ function createMemoryChart(canvas, resourceId) {
         memoryData.push(Math.max(0.8, Math.min(1.2, baseMemory + memVariation)));
     }
     
-    const maxMemory = Math.max(...memoryData) * 1.2;
+    const maxMemory = Math.max.apply(null, memoryData) * 1.2;
     
     canvas.chart = new Chart(ctx, {
         type: 'line',
