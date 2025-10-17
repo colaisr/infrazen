@@ -1428,19 +1428,47 @@ function exportResourcesToCSV() {
     // Group resources by provider
     const resourcesByProvider = {};
     
-    allResourceCards.forEach(card => {
-        // Find which provider this card belongs to
-        const providerSection = card.closest('.provider-section');
-        if (providerSection) {
-            const providerName = providerSection.querySelector('.provider-name')?.textContent || 
-                               providerSection.querySelector('.provider-left .provider-name')?.textContent || 
-                               'Неизвестный провайдер';
-            
-            if (!resourcesByProvider[providerName]) {
-                resourcesByProvider[providerName] = [];
+    allResourceCards.forEach((card, index) => {
+        console.log(`Processing resource card ${index + 1}`);
+        
+        // Find which provider this card belongs to by looking for the nearest provider content
+        let providerName = 'Неизвестный провайдер';
+        
+        // Method 1: Look for provider content that contains this card
+        for (let content of allProviderContents) {
+            if (content.contains(card)) {
+                // Find the provider section that contains this content
+                const providerSection = content.closest('.provider-section');
+                if (providerSection) {
+                    providerName = providerSection.querySelector('.provider-name')?.textContent || 
+                                 providerSection.querySelector('.provider-left .provider-name')?.textContent || 
+                                 'Неизвестный провайдер';
+                    console.log(`Found provider for card ${index + 1}: ${providerName}`);
+                    break;
+                }
             }
-            resourcesByProvider[providerName].push(card);
         }
+        
+        // Method 2: If not found, try to find by looking at the card's parent hierarchy
+        if (providerName === 'Неизвестный провайдер') {
+            let parent = card.parentElement;
+            while (parent && parent !== document.body) {
+                if (parent.classList.contains('provider-section')) {
+                    providerName = parent.querySelector('.provider-name')?.textContent || 
+                                 parent.querySelector('.provider-left .provider-name')?.textContent || 
+                                 'Неизвестный провайдер';
+                    console.log(`Found provider via parent hierarchy for card ${index + 1}: ${providerName}`);
+                    break;
+                }
+                parent = parent.parentElement;
+            }
+        }
+        
+        if (!resourcesByProvider[providerName]) {
+            resourcesByProvider[providerName] = [];
+        }
+        resourcesByProvider[providerName].push(card);
+        console.log(`Added card ${index + 1} to provider: ${providerName}`);
     });
     
     console.log('Resources grouped by provider:', Object.keys(resourcesByProvider));
