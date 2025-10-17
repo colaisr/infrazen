@@ -109,8 +109,25 @@ def list_recommendations():
         query = query.filter((OptimizationRecommendation.estimated_monthly_savings <= max_savings) | (OptimizationRecommendation.potential_savings <= max_savings))
     # confidence filter removed
     if q:
-        like = f"%{q}%"
-        query = query.filter(or_(OptimizationRecommendation.title.ilike(like), OptimizationRecommendation.description.ilike(like), OptimizationRecommendation.resource_name.ilike(like)))
+        # Use Python-level filtering for Unicode/Cyrillic character support
+        # Database LIKE queries don't handle Cyrillic properly, so we filter in Python
+        all_recommendations = query.all()
+        filtered_recommendations = []
+        search_lower = q.lower()
+        
+        for rec in all_recommendations:
+            if (search_lower in (rec.title or "").lower() or 
+                search_lower in (rec.description or "").lower() or 
+                search_lower in (rec.resource_name or "").lower()):
+                filtered_recommendations.append(rec)
+        
+        # Create a new query with the filtered IDs
+        if filtered_recommendations:
+            rec_ids = [rec.id for rec in filtered_recommendations]
+            query = query.filter(OptimizationRecommendation.id.in_(rec_ids))
+        else:
+            # Return empty result if no matches
+            query = query.filter(OptimizationRecommendation.id == -1)
     if date_from:
         try:
             df = datetime.fromisoformat(date_from)
