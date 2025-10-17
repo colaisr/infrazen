@@ -78,8 +78,9 @@
     <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
     <div class="content-body">
     {% for provider in providers %}
+    <!-- DEBUG: Processing provider {{ provider.id }}: {{ provider.connection_name or provider.provider_type }} -->
     <div class="provider-section">
-            <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
+        <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
                 <div class="provider-left">
                     <div class="provider-icon">
                         {% if provider.provider_type == 'beget' %}
@@ -115,8 +116,8 @@
             <div class="resources-grid">
                 {% for resource in resources_by_provider.get(provider.id, []) %}
                 <div class="resource-card">
-            <!-- Resource Header -->
-            <div class="resource-header">
+                    <!-- Resource Header -->
+                    <div class="resource-header">
                 <div class="resource-icon">
                     {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
                         <i class="fa-solid fa-server"></i>
