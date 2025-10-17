@@ -177,8 +177,13 @@
 
                         <!-- Server Specifications -->
                         {% if resource.resource_type in ['vps', 'vm', 'server'] and resource.provider_config %}
-                            {% set config = resource.provider_config %}
-                            {% set mysql_config = config.get('mysql_config', {}) %}
+                            {% if resource.provider_config is mapping %}
+                                {% set config = resource.provider_config %}
+                                {% set mysql_config = config.get('mysql_config', {}) %}
+                            {% else %}
+                                {% set config = {} %}
+                                {% set mysql_config = {} %}
+                            {% endif %}
                             <div class="resource-specs">
                                 {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') %}
                                 <div class="spec-item">
@@ -216,7 +221,11 @@
                             </div>
 
                             <!-- Usage Data Section -->
-                            {% set tags = resource.tags or {} %}
+                            {% if resource.tags is mapping %}
+                                {% set tags = resource.tags %}
+                            {% else %}
+                                {% set tags = {} %}
+                            {% endif %}
                             {% if tags.get('cpu_avg_usage') or tags.get('memory_avg_usage_mb') or config.get('disk_used_gb') or mysql_config.get('disk_used_bytes') %}
                             <div class="usage-section">
                                 <div class="usage-header" onclick="toggleUsageSection('{{ resource.id }}')">
