@@ -338,15 +338,6 @@
         {% endif %}
     </div>
 
-    {% else %}
-    <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-cloud"></i></div>
-        <div class="empty-state-title">Нет подключений</div>
-        <div class="empty-state-text">Добавьте облачных провайдеров для начала работы</div>
-        <button class="btn btn-primary" onclick="showProviderModal()">Добавить первого провайдера</button>
-    </div>
-    {% endif %}
-
     {% if enabled_providers %}
     <div class="available-providers">
         <h3>Доступные провайдеры</h3>
@@ -390,6 +381,15 @@
             </div>
             {% endfor %}
         </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-cloud"></i></div>
+        <div class="empty-state-title">Нет подключений</div>
+        <div class="empty-state-text">Добавьте облачных провайдеров для начала работы</div>
+        <button class="btn btn-primary" onclick="showProviderModal()">Добавить первого провайдера</button>
     </div>
     {% endif %}
 </div>
