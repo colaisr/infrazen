@@ -5,6 +5,13 @@
 {% block page_title %}Аналитика расходов{% endblock %}
 {% block page_subtitle %}Детальная аналитика расходов и использования облачных ресурсов{% endblock %}
 
+{% block header_actions %}
+<button class="btn btn-primary analytics-export-btn">
+    <i class="fa-solid fa-download"></i>
+    Экспорт отчета
+</button>
+{% endblock %}
+
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/features/analytics-charts.css') }}">
@@ -53,13 +60,6 @@ body {
 
 {% block content %}
 <div class="analytics-page">
-    <!-- Export Button -->
-    <div class="analytics-actions" style="margin-bottom: 2rem;">
-        <button class="btn btn-primary analytics-export-btn">
-            <i class="fa-solid fa-download"></i>
-            Экспорт отчета
-        </button>
-    </div>
 
     <!-- Executive Summary - 4 KPI Cards -->
     <div class="analytics-summary">
