@@ -560,7 +560,7 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack ports from {region or 'default region'}: {str(e)}")
     
-    def get_server_cpu_statistics(self, server_id: str, hours: int = 1, region: str = None) -> Dict[str, Any]:
+    def get_server_cpu_statistics(self, server_id: str, hours: int = 24 * 30, region: str = None) -> Dict[str, Any]:
         """
         Get CPU usage statistics for a server
         
@@ -589,11 +589,10 @@ class SelectelClient:
             start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
-            # Request CPU metrics with 5-minute granularity (300 seconds)
-            # Note: Selectel only supports 300-second granularity
+            # Request CPU metrics with daily granularity (86400 seconds = 24 hours)
             # Use the correct region for metrics API
             base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
-            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=86400&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(max (metric cpu_util mean) (/ (clip_min (rateofchangesec (metric cpu_average mean)) 0) 10000000)))",
@@ -638,7 +637,7 @@ class SelectelClient:
                         'trend': round(trend, 2),
                         'performance_tier': performance_tier,
                         'data_points': len(cpu_values),
-                        'period': 'HOUR',
+                        'period': 'DAY',
                         'collection_timestamp': datetime.utcnow().isoformat(),
                         'raw_data': data_points
                     }
@@ -648,7 +647,7 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get CPU statistics for server {server_id}: {str(e)}")
     
-    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 1, region: str = None) -> Dict[str, Any]:
+    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 24 * 30, region: str = None) -> Dict[str, Any]:
         """
         Get memory usage statistics for a server
         
@@ -679,11 +678,10 @@ class SelectelClient:
             start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
-            # Request memory metrics with 5-minute granularity (300 seconds)
-            # Note: Selectel only supports 300-second granularity
+            # Request memory metrics with daily granularity (86400 seconds = 24 hours)
             # Use the correct region for metrics API
             base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
-            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=86400&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(metric memory.usage mean)",
@@ -733,7 +731,7 @@ class SelectelClient:
                             'trend': round(trend, 2),
                             'memory_tier': memory_tier,
                             'data_points': len(mem_values),
-                            'period': 'HOUR',
+                            'period': 'DAY',
                             'collection_timestamp': datetime.utcnow().isoformat(),
                             'raw_data': data_points
                         }
@@ -1082,10 +1080,10 @@ class SelectelClient:
                 server_region = 'ru-7'
                 
                 # Get CPU statistics
-                cpu_stats = self.get_server_cpu_statistics(server_id, hours=1, region=server_region)
+                cpu_stats = self.get_server_cpu_statistics(server_id, hours=24*30, region=server_region)
                 
                 # Get memory statistics
-                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=1, region=server_region)
+                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=24*30, region=server_region)
                 
                 all_statistics[server_id] = {
                     'server_name': server_name,
