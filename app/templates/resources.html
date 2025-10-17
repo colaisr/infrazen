@@ -1415,8 +1415,16 @@ function exportResourcesToCSV() {
                            providerSection.querySelector('.provider-left .provider-name')?.textContent || 
                            'Неизвестный провайдер';
         
-        // Get resource cards from the provider content (which might be hidden)
+        // Temporarily expand the provider section to access resource cards
         const providerContent = providerSection.querySelector('.provider-content');
+        const originalDisplay = providerContent ? providerContent.style.display : 'none';
+        
+        // Temporarily show the content to access resource cards
+        if (providerContent) {
+            providerContent.style.display = 'block';
+        }
+        
+        // Get resource cards from the now-visible provider content
         const resourceCards = providerContent ? providerContent.querySelectorAll('.resource-card') : [];
         
         if (resourceCards.length === 0) {
@@ -1452,6 +1460,12 @@ function exportResourcesToCSV() {
                 csvContent.push(`"${providerName}","${resourceName}","${resourceType}","${resourceStatus}","${resourceRegion}","${costPrimary}","${costSecondary}","${tags}"`);
             });
         }
+        
+        // Restore original display state
+        if (providerContent) {
+            providerContent.style.display = originalDisplay;
+        }
+        
         csvContent.push(''); // Empty line between providers
     });
     
