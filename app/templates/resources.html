@@ -1410,25 +1410,46 @@ function exportResourcesToCSV() {
     
     // Process each provider section
     providerSections.forEach(providerSection => {
-        const providerName = providerSection.querySelector('.provider-name')?.textContent || 'Неизвестный провайдер';
-        const resourceCards = providerSection.querySelectorAll('.resource-card');
+        // Get provider name from the provider header
+        const providerName = providerSection.querySelector('.provider-name')?.textContent || 
+                           providerSection.querySelector('.provider-left .provider-name')?.textContent || 
+                           'Неизвестный провайдер';
+        
+        // Get resource cards from the provider content (which might be hidden)
+        const providerContent = providerSection.querySelector('.provider-content');
+        const resourceCards = providerContent ? providerContent.querySelectorAll('.resource-card') : [];
         
         if (resourceCards.length === 0) {
             csvContent.push(`${providerName},Нет ресурсов,,,,,,`);
         } else {
             resourceCards.forEach(card => {
+                // Extract resource information using correct selectors
                 const resourceName = card.querySelector('.resource-name')?.textContent || '';
                 const resourceType = card.querySelector('.resource-type')?.textContent || '';
-                const resourceStatus = card.querySelector('.resource-status')?.textContent || '';
-                const resourceRegion = card.querySelector('.resource-region')?.textContent || '';
-                const dailyCost = card.querySelector('.resource-cost-daily')?.textContent || '0 ₽';
-                const monthlyCost = card.querySelector('.resource-cost-monthly')?.textContent || '0 ₽';
                 
-                // Get tags
-                const tagElements = card.querySelectorAll('.resource-tag');
+                // Get status from status badge
+                const statusBadge = card.querySelector('.status-badge');
+                const resourceStatus = statusBadge ? statusBadge.textContent.trim() : '';
+                
+                // Get region from detail rows
+                const detailRows = card.querySelectorAll('.detail-row');
+                let resourceRegion = '';
+                detailRows.forEach(row => {
+                    const label = row.querySelector('.detail-label')?.textContent;
+                    if (label === 'Регион') {
+                        resourceRegion = row.querySelector('.detail-value')?.textContent || '';
+                    }
+                });
+                
+                // Get costs from resource-cost section
+                const costPrimary = card.querySelector('.cost-amount')?.textContent || '0 ₽';
+                const costSecondary = card.querySelector('.cost-amount-secondary')?.textContent || '0 ₽';
+                
+                // Get tags (if any exist in the template)
+                const tagElements = card.querySelectorAll('.resource-tag, .tag');
                 const tags = Array.from(tagElements).map(tag => tag.textContent).join('; ');
                 
-                csvContent.push(`"${providerName}","${resourceName}","${resourceType}","${resourceStatus}","${resourceRegion}","${dailyCost}","${monthlyCost}","${tags}"`);
+                csvContent.push(`"${providerName}","${resourceName}","${resourceType}","${resourceStatus}","${resourceRegion}","${costPrimary}","${costSecondary}","${tags}"`);
             });
         }
         csvContent.push(''); // Empty line between providers
