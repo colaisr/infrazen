@@ -113,9 +113,7 @@
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
             <div class="resources-grid">
                 {% for resource in resources_by_provider.get(provider.id, []) %}
-                <div class="resource-card" data-resource-id="{{ resource.id }}"
-                     {% if tags.get('cpu_raw_data') %}data-cpu-raw-data="{{ tags.get('cpu_raw_data') }}"{% endif %}
-                     {% if tags.get('memory_raw_data') %}data-memory-raw-data="{{ tags.get('memory_raw_data') }}"{% endif %}>
+                <div class="resource-card" data-resource-id="{{ resource.id }}">
             <div class="resource-header">
                 <div class="resource-icon">
                     {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
@@ -370,7 +368,7 @@
 
                             <!-- Status Information from Tags -->
                             {% if resource.tags is mapping %}
-                                {% set tags = resource.tags %}
+{% set tags = resource.tags %}
                             {% elif resource.tags is iterable %}
                                 {% set tags = {} %}
                                 {% for tag in resource.tags %}
@@ -378,6 +376,14 @@
                                 {% endfor %}
                             {% else %}
                                 {% set tags = {} %}
+                            {% endif %}
+                            
+                            <!-- Hidden data for JavaScript charts -->
+                            {% if tags.get('cpu_raw_data') %}
+                            <input type="hidden" id="cpu-raw-data-{{ resource.id }}" value="{{ tags.get('cpu_raw_data') }}">
+                            {% endif %}
+                            {% if tags.get('memory_raw_data') %}
+                            <input type="hidden" id="memory-raw-data-{{ resource.id }}" value="{{ tags.get('memory_raw_data') }}">
                             {% endif %}
                             
                             {% if tags.get('note') or tags.get('status') or tags.get('attachment_status') %}
@@ -1149,28 +1155,24 @@ function createCpuChart(canvas, resourceId) {
     let labels = [];
     let cpuData = [];
     
-    // Try to get real data from the page (if available)
-    const resourceCard = document.querySelector(`[data-resource-id="${resourceId}"]`);
-    if (resourceCard) {
-        // Look for CPU raw data in the page
-        const cpuRawDataElement = resourceCard.querySelector('[data-cpu-raw-data]');
-        if (cpuRawDataElement) {
-            try {
-                const rawData = JSON.parse(cpuRawDataElement.dataset.cpuRawData);
-                if (rawData.dates && rawData.values) {
-                    // Use real data
-                    labels = rawData.dates.map(date => {
-                        const d = new Date(date);
-                        return d.toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: '2-digit' 
-                        });
+    // Try to get real data from hidden inputs
+    const cpuRawDataInput = document.getElementById(`cpu-raw-data-${resourceId}`);
+    if (cpuRawDataInput) {
+        try {
+            const rawData = JSON.parse(cpuRawDataInput.value);
+            if (rawData.dates && rawData.values) {
+                // Use real data
+                labels = rawData.dates.map(date => {
+                    const d = new Date(date);
+                    return d.toLocaleDateString('en-GB', { 
+                        day: '2-digit', 
+                        month: '2-digit' 
                     });
-                    cpuData = rawData.values;
-                }
-            } catch (e) {
-                console.log('Could not parse CPU raw data:', e);
+                });
+                cpuData = rawData.values;
             }
+        } catch (e) {
+            console.log('Could not parse CPU raw data:', e);
         }
     }
     
@@ -1251,28 +1253,24 @@ function createMemoryChart(canvas, resourceId) {
     let labels = [];
     let memoryData = [];
     
-    // Try to get real data from the page (if available)
-    const resourceCard = document.querySelector(`[data-resource-id="${resourceId}"]`);
-    if (resourceCard) {
-        // Look for memory raw data in the page
-        const memoryRawDataElement = resourceCard.querySelector('[data-memory-raw-data]');
-        if (memoryRawDataElement) {
-            try {
-                const rawData = JSON.parse(memoryRawDataElement.dataset.memoryRawData);
-                if (rawData.dates && rawData.values) {
-                    // Use real data
-                    labels = rawData.dates.map(date => {
-                        const d = new Date(date);
-                        return d.toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: '2-digit' 
-                        });
+    // Try to get real data from hidden inputs
+    const memoryRawDataInput = document.getElementById(`memory-raw-data-${resourceId}`);
+    if (memoryRawDataInput) {
+        try {
+            const rawData = JSON.parse(memoryRawDataInput.value);
+            if (rawData.dates && rawData.values) {
+                // Use real data
+                labels = rawData.dates.map(date => {
+                    const d = new Date(date);
+                    return d.toLocaleDateString('en-GB', { 
+                        day: '2-digit', 
+                        month: '2-digit' 
                     });
-                    memoryData = rawData.values;
-                }
-            } catch (e) {
-                console.log('Could not parse memory raw data:', e);
+                });
+                memoryData = rawData.values;
             }
+        } catch (e) {
+            console.log('Could not parse memory raw data:', e);
         }
     }
     
