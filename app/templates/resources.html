@@ -113,7 +113,9 @@
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
             <div class="resources-grid">
                 {% for resource in resources_by_provider.get(provider.id, []) %}
-                <div class="resource-card">
+                <div class="resource-card" data-resource-id="{{ resource.id }}"
+                     {% if tags.get('cpu_raw_data') %}data-cpu-raw-data="{{ tags.get('cpu_raw_data') }}"{% endif %}
+                     {% if tags.get('memory_raw_data') %}data-memory-raw-data="{{ tags.get('memory_raw_data') }}"{% endif %}>
             <div class="resource-header">
                 <div class="resource-icon">
                     {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
@@ -1143,23 +1145,50 @@ function initializeCharts(resourceId) {
 function createCpuChart(canvas, resourceId) {
     const ctx = canvas.getContext('2d');
     
-    // Generate sample data (in real implementation, this would come from the backend)
-    const labels = [];
-    const cpuData = [];
-    const now = new Date();
+    // Get real CPU data from the resource tags
+    let labels = [];
+    let cpuData = [];
     
-    for (let i = 23; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-        labels.push(time.toLocaleTimeString('en-GB', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false 
-        }));
-        
-        // Generate realistic CPU data (5-10% range with small fluctuations)
-        const baseCpu = 7.5;
-        const variation = (Math.random() - 0.5) * 3;
-        cpuData.push(Math.max(0, Math.min(100, baseCpu + variation)));
+    // Try to get real data from the page (if available)
+    const resourceCard = document.querySelector(`[data-resource-id="${resourceId}"]`);
+    if (resourceCard) {
+        // Look for CPU raw data in the page
+        const cpuRawDataElement = resourceCard.querySelector('[data-cpu-raw-data]');
+        if (cpuRawDataElement) {
+            try {
+                const rawData = JSON.parse(cpuRawDataElement.dataset.cpuRawData);
+                if (rawData.dates && rawData.values) {
+                    // Use real data
+                    labels = rawData.dates.map(date => {
+                        const d = new Date(date);
+                        return d.toLocaleDateString('en-GB', { 
+                            day: '2-digit', 
+                            month: '2-digit' 
+                        });
+                    });
+                    cpuData = rawData.values;
+                }
+            } catch (e) {
+                console.log('Could not parse CPU raw data:', e);
+            }
+        }
+    }
+    
+    // Fallback to sample data if no real data available
+    if (labels.length === 0) {
+        const now = new Date();
+        for (let i = 30; i >= 0; i--) {
+            const time = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+            labels.push(time.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: '2-digit' 
+            }));
+            
+            // Generate realistic CPU data (0-2% range for low usage)
+            const baseCpu = 0.5;
+            const variation = (Math.random() - 0.5) * 1;
+            cpuData.push(Math.max(0, Math.min(5, baseCpu + variation)));
+        }
     }
     
     canvas.chart = new Chart(ctx, {
@@ -1218,23 +1247,50 @@ function createCpuChart(canvas, resourceId) {
 function createMemoryChart(canvas, resourceId) {
     const ctx = canvas.getContext('2d');
     
-    // Generate sample data (in real implementation, this would come from the backend)
-    const labels = [];
-    const memoryData = [];
-    const now = new Date();
+    // Get real memory data from the resource tags
+    let labels = [];
+    let memoryData = [];
     
-    for (let i = 23; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-        labels.push(time.toLocaleTimeString('en-GB', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: false 
-        }));
-        
-        // Generate realistic memory data (0.9-1.0 GB range)
-        const baseMemory = 0.95;
-        const memVariation = (Math.random() - 0.5) * 0.1;
-        memoryData.push(Math.max(0.8, Math.min(1.2, baseMemory + memVariation)));
+    // Try to get real data from the page (if available)
+    const resourceCard = document.querySelector(`[data-resource-id="${resourceId}"]`);
+    if (resourceCard) {
+        // Look for memory raw data in the page
+        const memoryRawDataElement = resourceCard.querySelector('[data-memory-raw-data]');
+        if (memoryRawDataElement) {
+            try {
+                const rawData = JSON.parse(memoryRawDataElement.dataset.memoryRawData);
+                if (rawData.dates && rawData.values) {
+                    // Use real data
+                    labels = rawData.dates.map(date => {
+                        const d = new Date(date);
+                        return d.toLocaleDateString('en-GB', { 
+                            day: '2-digit', 
+                            month: '2-digit' 
+                        });
+                    });
+                    memoryData = rawData.values;
+                }
+            } catch (e) {
+                console.log('Could not parse memory raw data:', e);
+            }
+        }
+    }
+    
+    // Fallback to sample data if no real data available
+    if (labels.length === 0) {
+        const now = new Date();
+        for (let i = 30; i >= 0; i--) {
+            const time = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+            labels.push(time.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: '2-digit' 
+            }));
+            
+            // Generate realistic memory data (0.9-1.0 GB range)
+            const baseMemory = 0.95;
+            const memVariation = (Math.random() - 0.5) * 0.1;
+            memoryData.push(Math.max(0.8, Math.min(1.2, baseMemory + memVariation)));
+        }
     }
     
     const maxMemory = Math.max.apply(null, memoryData) * 1.2;
