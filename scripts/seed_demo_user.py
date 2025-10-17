@@ -700,6 +700,104 @@ def seed_historical_complete_syncs(demo_user, providers):
     print(f"Final Annual Projection: ₽{total_daily_cost * 365.0:,.2f}")
     print("="*60 + "\n")
 
+def seed_usage_data_tags(demo_user, providers):
+    """
+    Generate usage data tags (CPU/memory statistics) for demo user resources
+    This creates realistic daily usage data for the last 30 days
+    """
+    print("\n" + "="*60)
+    print("🔄 Generating usage data tags for demo resources...")
+    print("="*60)
+    
+    # Get all server resources for the demo user
+    server_resources = []
+    for provider in providers.values():
+        resources = Resource.query.filter_by(provider_id=provider.id, resource_type='server').all()
+        server_resources.extend(resources)
+    
+    print(f"Found {len(server_resources)} server resources to add usage data")
+    
+    tags_created = 0
+    
+    for resource in server_resources:
+        # Generate realistic CPU usage data (daily for 30 days)
+        cpu_data = generate_daily_usage_data('cpu', resource.resource_name)
+        memory_data = generate_daily_usage_data('memory', resource.resource_name)
+        
+        # Add CPU usage tags
+        resource.add_tag('cpu_avg_usage', f"{cpu_data['avg_usage']:.1f}")
+        resource.add_tag('cpu_max_usage', f"{cpu_data['max_usage']:.1f}")
+        resource.add_tag('cpu_min_usage', f"{cpu_data['min_usage']:.1f}")
+        resource.add_tag('cpu_raw_data', json.dumps(cpu_data['raw_data']))
+        
+        # Add memory usage tags
+        resource.add_tag('memory_avg_usage_mb', f"{memory_data['avg_usage']:.1f}")
+        resource.add_tag('memory_max_usage_mb', f"{memory_data['max_usage']:.1f}")
+        resource.add_tag('memory_min_usage_mb', f"{memory_data['min_usage']:.1f}")
+        resource.add_tag('memory_raw_data', json.dumps(memory_data['raw_data']))
+        
+        tags_created += 8
+        print(f"  ✓ Added usage data for {resource.resource_name}")
+    
+    db.session.commit()
+    print(f"\n✅ Created {tags_created} usage data tags for {len(server_resources)} resources")
+
+def generate_daily_usage_data(metric_type, resource_name):
+    """
+    Generate realistic daily usage data for the last 30 days
+    """
+    from datetime import datetime, timedelta
+    import random
+    
+    # Base usage patterns based on resource name
+    if 'prod' in resource_name.lower():
+        base_usage = 45.0  # Production resources have higher usage
+        variance = 0.3
+    elif 'dev' in resource_name.lower() or 'test' in resource_name.lower():
+        base_usage = 15.0  # Dev/test resources have lower usage
+        variance = 0.5
+    elif 'db' in resource_name.lower():
+        base_usage = 35.0  # Database resources have moderate usage
+        variance = 0.4
+    else:
+        base_usage = 25.0  # Default moderate usage
+        variance = 0.4
+    
+    # Generate 30 days of data
+    raw_data = []
+    values = []
+    
+    for days_ago in range(29, -1, -1):  # 29, 28, ..., 1, 0
+        date = datetime.now() - timedelta(days=days_ago)
+        
+        # Add weekend effect (lower usage on weekends)
+        weekend_factor = 0.7 if date.weekday() >= 5 else 1.0
+        
+        # Add daily variance
+        daily_variance = random.uniform(1 - variance, 1 + variance)
+        
+        # Calculate usage for this day
+        if metric_type == 'cpu':
+            usage = base_usage * weekend_factor * daily_variance
+        else:  # memory
+            usage = base_usage * weekend_factor * daily_variance * 1024  # Convert to MB
+        
+        # Ensure usage is within reasonable bounds
+        if metric_type == 'cpu':
+            usage = max(5.0, min(95.0, usage))
+        else:  # memory
+            usage = max(512.0, min(8192.0, usage))
+        
+        raw_data.append([date.strftime('%Y-%m-%d'), usage])
+        values.append(usage)
+    
+    return {
+        'avg_usage': sum(values) / len(values),
+        'max_usage': max(values),
+        'min_usage': min(values),
+        'raw_data': raw_data
+    }
+
 def main():
     """Main seeding function"""
     from app import create_app
@@ -719,8 +817,11 @@ def main():
             # Generate 90 days of historical complete sync data
             seed_historical_complete_syncs(demo_user, providers)
             
+            # Generate usage data tags for resources
+            seed_usage_data_tags(demo_user, providers)
+            
             print("\n" + "="*60)
-            print("🎉 COMPLETE! Demo user fully seeded with 3-month history!")
+            print("🎉 COMPLETE! Demo user fully seeded with 3-month history and usage data!")
             print("="*60)
             
         except Exception as e:
