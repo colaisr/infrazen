@@ -64,7 +64,7 @@ def list_recommendations():
     current_user_id = None
     try:
         user_data = session.get('user') or {}
-        if user_data.get('id') == 'demo-user-123':
+        if user_data.get('email') == 'demo@infrazen.com':
             demo_user = User.find_by_email('demo@infrazen.com')
             if demo_user:
                 current_user_id = demo_user.id

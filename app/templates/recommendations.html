@@ -96,11 +96,17 @@ const isDemoUser = {{ 'true' if user.role == 'demouser' else 'false' }};
 function buildQuery(){
   const params = new URLSearchParams();
   ['q','provider','status','severity','type','resource_type'].forEach(k=>{
-    const v = qs('#'+k)?.value?.trim(); if(v) params.set(k, v);
+    const v = qs('#'+k)?.value?.trim(); 
+    if(v) {
+      console.log(`DEBUG: Setting ${k} = "${v}"`);
+      params.set(k, v);
+    }
   });
   params.set('page', state.page); params.set('page_size', state.page_size); params.set('order_by', state.order_by);
-  history.replaceState(null, '', '?'+params.toString());
-  return params.toString();
+  const queryString = params.toString();
+  console.log('DEBUG: Final query string:', queryString);
+  history.replaceState(null, '', '?'+queryString);
+  return queryString;
 }
 
 async function fetchProviders(){
