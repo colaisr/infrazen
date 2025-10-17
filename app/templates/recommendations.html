@@ -224,7 +224,7 @@ async function actOne(id, action, extra={}){
 }
 
 function selectedIds(){
-  return qsa('.rowCheck:checked').map(cb=>cb.closest('tr').dataset.id);
+  return qsa('.rowCheck:checked').map(cb=>cb.closest('.rec-card').dataset.id);
 }
 
 async function actBulk(action){
@@ -251,6 +251,13 @@ function enableBulkButtons(){
   const element = qs(sel);
   if (element) {
     element.addEventListener('change', ()=>{state.page=1; load();});
+  }
+});
+
+// Add event listener for checkboxes to enable/disable bulk buttons
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('rowCheck')) {
+    enableBulkButtons();
   }
 });
 
