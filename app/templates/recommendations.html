@@ -296,6 +296,98 @@ function filterRecommendations() {
 
 // Refresh button removed - no longer needed
 
+function exportToCSV() {
+  if (!state.allRecommendations || state.allRecommendations.length === 0) {
+    alert('Нет данных для экспорта');
+    return;
+  }
+  
+  // Apply current filters to get the filtered data
+  let items = state.allRecommendations;
+  const searchTerm = qs('#search')?.value?.trim();
+  if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase();
+    items = items.filter(rec => 
+      (rec.title || '').toLowerCase().includes(searchLower) ||
+      (rec.description || '').toLowerCase().includes(searchLower) ||
+      (rec.resource_name || '').toLowerCase().includes(searchLower)
+    );
+  }
+  
+  // Apply other filters
+  const provider = qs('#provider')?.value;
+  const status = qs('#status')?.value;
+  const severity = qs('#severity')?.value;
+  const type = qs('#type')?.value;
+  const resourceType = qs('#resource_type')?.value;
+  
+  if (provider) {
+    items = items.filter(rec => rec.provider_id == provider);
+  }
+  if (status) {
+    items = items.filter(rec => rec.status === status);
+  }
+  if (severity) {
+    items = items.filter(rec => rec.severity === severity);
+  }
+  if (type) {
+    items = items.filter(rec => rec.recommendation_type === type);
+  }
+  if (resourceType) {
+    items = items.filter(rec => rec.resource_type === resourceType);
+  }
+  
+  if (items.length === 0) {
+    alert('Нет данных для экспорта после применения фильтров');
+    return;
+  }
+  
+  // Create CSV content
+  const headers = [
+    'ID',
+    'Название',
+    'Описание', 
+    'Провайдер',
+    'Ресурс',
+    'Тип ресурса',
+    'Тип рекомендации',
+    'Важность',
+    'Статус',
+    'Экономия/мес (₽)',
+    'Потенциальная экономия (₽)',
+    'Дата создания'
+  ];
+  
+  const csvContent = [
+    headers.join(','),
+    ...items.map(rec => [
+      rec.id || '',
+      `"${(rec.title || '').replace(/"/g, '""')}"`,
+      `"${(rec.description || '').replace(/"/g, '""')}"`,
+      rec.provider_code || '',
+      rec.resource_name || '',
+      rec.resource_type || '',
+      rec.recommendation_type || '',
+      rec.severity || '',
+      rec.status || '',
+      rec.estimated_monthly_savings || 0,
+      rec.potential_savings || 0,
+      rec.created_at ? new Date(rec.created_at).toLocaleDateString('ru-RU') : ''
+    ].join(','))
+  ].join('\n');
+  
+  // Create and download file
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `recommendations_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 const selectAll = qs('#selectAll');
 if (selectAll) {
   selectAll.addEventListener('change', (e)=>{ 
@@ -307,6 +399,11 @@ if (selectAll) {
 const bulkSeen = qs('#bulkSeen');
 if (bulkSeen) {
   bulkSeen.addEventListener('click', ()=>actBulk('seen'));
+}
+
+const exportCsv = qs('#exportCsv');
+if (exportCsv) {
+  exportCsv.addEventListener('click', exportToCSV);
 }
 
 document.addEventListener('change', (e)=>{ 
