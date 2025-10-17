@@ -6,34 +6,42 @@
 {% block page_subtitle %}{% endblock %}
 
 {% block header_actions %}
-    <div class="header-actions">
-        <input class="form-control" type="text" placeholder="Поиск ресурсов..." style="width: 200px;">
-        <select class="form-control" style="width: 150px;">
-            <option>Все провайдеры</option>
-            {% for provider in providers %}
-            <option>{{ provider.name }}</option>
-            {% endfor %}
-        </select>
-        <select class="form-control" style="width: 120px;">
-            <option>Все типы</option>
-            <option>VM</option>
-            <option>Диск</option>
-            <option>Хранилище</option>
-        </select>
-        <select class="form-control" style="width: 120px;">
-            <option>Все статусы</option>
-            <option>RUNNING</option>
-            <option>STOPPED</option>
-            <option>IN_USE</option>
-            <option>ACTIVE</option>
-        </select>
-        <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить</span></button>
-        <button class="btn btn-primary"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
-    </div>
+    <button class="btn btn-secondary"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить</span></button>
+    <button class="btn btn-primary"><i class="fa-solid fa-download"></i><span>Экспорт</span></button>
 {% endblock %}
 
 {% block content %}
 <div class="resources-content">
+    <!-- Filters Section -->
+    <div class="filters" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); gap: 0.75rem;">
+        <input id="search" class="input" placeholder="Поиск ресурсов..." />
+        <select id="provider" class="input">
+            <option value="">Все провайдеры</option>
+            {% for provider in providers %}
+            <option value="{{ provider.id }}">{{ provider.name }}</option>
+            {% endfor %}
+        </select>
+        <select id="resource_type" class="input">
+            <option value="">Все типы</option>
+            <option value="VM">VM</option>
+            <option value="Диск">Диск</option>
+            <option value="Хранилище">Хранилище</option>
+        </select>
+        <select id="status" class="input">
+            <option value="">Все статусы</option>
+            <option value="RUNNING">RUNNING</option>
+            <option value="STOPPED">STOPPED</option>
+            <option value="IN_USE">IN_USE</option>
+            <option value="ACTIVE">ACTIVE</option>
+        </select>
+        <select id="region" class="input">
+            <option value="">Все регионы</option>
+            <option value="ru-1">ru-1</option>
+            <option value="ru-2">ru-2</option>
+            <option value="eu-1">eu-1</option>
+        </select>
+    </div>
+
     {% if resources_by_provider %}
     <div class="resources-summary">
         <div class="summary-stats">
