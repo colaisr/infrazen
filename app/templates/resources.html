@@ -635,7 +635,24 @@ function exportResourcesToCSV() {
     const providerSections = document.querySelectorAll('.provider-section');
     let csvContent = '\uFEFF'; // UTF-8 BOM for proper encoding
     
-    // Add header
+    // Add title and summary from main sync
+    csvContent += 'ЭКСПОРТ РЕСУРСОВ - InfraZen FinOps Platform\n';
+    csvContent += 'Дата экспорта: ' + new Date().toLocaleDateString('ru-RU') + '\n';
+    csvContent += '\n';
+    
+    // Add summary statistics
+    const summaryStats = document.querySelector('.summary-stats');
+    if (summaryStats) {
+        const totalResources = summaryStats.querySelector('.stat-value')?.textContent || '0';
+        const totalCost = summaryStats.querySelectorAll('.stat-value')[1]?.textContent || '0 ₽/день';
+        csvContent += 'ОБЩАЯ СТАТИСТИКА:\n';
+        csvContent += 'Всего ресурсов: ' + totalResources + '\n';
+        csvContent += 'Общая стоимость: ' + totalCost + '\n';
+        csvContent += '\n';
+    }
+    
+    // Add data header
+    csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
     csvContent += 'Провайдер,Ресурс,Тип,Статус,Регион,Стоимость (₽/день)\n';
     
     // Process each provider section
