@@ -76,6 +76,7 @@
 
     <!-- Provider Sections -->
     <!-- DEBUG: providers={{ providers|length }}, resources_by_provider={{ resources_by_provider.keys()|list }} -->
+    <div class="content-body">
     {% for provider in providers %}
     <div class="provider-section">
             <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
@@ -389,6 +390,7 @@
         </div>
     </div>
     {% endfor %}
+    </div>
     {% else %}
     <div class="empty-state">
         <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
