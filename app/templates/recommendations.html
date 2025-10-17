@@ -233,12 +233,26 @@ function enableBulkButtons(){
 }
 
 // Events
-['#search','#provider','#status','#severity','#type','#resource_type'].forEach(sel=>{
+['#provider','#status','#severity','#type','#resource_type'].forEach(sel=>{
   const element = qs(sel);
   if (element) {
     element.addEventListener('change', ()=>{state.page=1; load();});
   }
 });
+
+// Special handling for search input - use both input and change events
+const searchInput = qs('#search');
+if (searchInput) {
+  let searchTimeout;
+  searchInput.addEventListener('input', ()=>{
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(()=>{
+      state.page=1; 
+      load();
+    }, 300); // Debounce search by 300ms
+  });
+  searchInput.addEventListener('change', ()=>{state.page=1; load();});
+}
 
 // Add event listeners only if elements exist
 const refreshBtn = qs('#refreshBtn');
