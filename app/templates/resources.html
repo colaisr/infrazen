@@ -1383,7 +1383,69 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // Add export functionality
+    const exportBtn = document.querySelector('.btn-primary');
+    if (exportBtn && exportBtn.textContent.includes('Экспорт')) {
+        exportBtn.addEventListener('click', exportResourcesToCSV);
+    }
 });
+
+function exportResourcesToCSV() {
+    // Get overall stats from the page
+    const totalResources = document.querySelector('.stat-value')?.textContent || '0';
+    const totalCost = document.querySelectorAll('.stat-value')[1]?.textContent || '0 ₽/день';
+    
+    // Get provider data from the page structure
+    const providerSections = document.querySelectorAll('.provider-section');
+    let csvContent = [];
+    
+    // Add header
+    csvContent.push('Провайдер,Ресурс,Тип,Статус,Регион,Стоимость/день,Стоимость/месяц,Теги');
+    
+    // Add overall summary
+    csvContent.push(`ИТОГО,,,,"Общая стоимость",${totalCost},,`);
+    csvContent.push(`ИТОГО,,,,"Всего ресурсов",${totalResources},,`);
+    csvContent.push(''); // Empty line separator
+    
+    // Process each provider section
+    providerSections.forEach(providerSection => {
+        const providerName = providerSection.querySelector('.provider-name')?.textContent || 'Неизвестный провайдер';
+        const resourceCards = providerSection.querySelectorAll('.resource-card');
+        
+        if (resourceCards.length === 0) {
+            csvContent.push(`${providerName},Нет ресурсов,,,,,,`);
+        } else {
+            resourceCards.forEach(card => {
+                const resourceName = card.querySelector('.resource-name')?.textContent || '';
+                const resourceType = card.querySelector('.resource-type')?.textContent || '';
+                const resourceStatus = card.querySelector('.resource-status')?.textContent || '';
+                const resourceRegion = card.querySelector('.resource-region')?.textContent || '';
+                const dailyCost = card.querySelector('.resource-cost-daily')?.textContent || '0 ₽';
+                const monthlyCost = card.querySelector('.resource-cost-monthly')?.textContent || '0 ₽';
+                
+                // Get tags
+                const tagElements = card.querySelectorAll('.resource-tag');
+                const tags = Array.from(tagElements).map(tag => tag.textContent).join('; ');
+                
+                csvContent.push(`"${providerName}","${resourceName}","${resourceType}","${resourceStatus}","${resourceRegion}","${dailyCost}","${monthlyCost}","${tags}"`);
+            });
+        }
+        csvContent.push(''); // Empty line between providers
+    });
+    
+    // Create and download CSV
+    const csvText = csvContent.join('\n');
+    const blob = new Blob(['\ufeff' + csvText], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `resources_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
     </script>
 {% endblock %}
 
