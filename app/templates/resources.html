@@ -171,8 +171,8 @@
                             </div>
                         </div>
 
-                        <!-- Server Specifications -->
-                        {% if resource.resource_type in ['vps', 'vm', 'server'] and resource.provider_config %}
+                        <!-- Resource Specifications -->
+                        {% if resource.provider_config %}
                             {% if resource.provider_config is mapping %}
                                 {% set config = resource.provider_config %}
                                 {% set mysql_config = config.get('mysql_config', {}) %}
@@ -184,40 +184,222 @@
                                 {% set mysql_config = {} %}
                             {% endif %}
                             <div class="resource-specs">
-                                {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') %}
-                                <div class="spec-item">
-                                    <div class="spec-icon">
-                                        <i class="fa-solid fa-microchip"></i>
+                                <!-- Server/VPS Specifications -->
+                                {% if resource.resource_type in ['vps', 'vm', 'server'] %}
+                                    {% if config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-microchip"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') }}</span>
+                                            <span class="spec-label">vCPU</span>
+                                        </div>
                                     </div>
-                                    <div class="spec-content">
-                                        <span class="spec-value">{{ config.get('cpu_cores') or config.get('vcpus') or mysql_config.get('cpu_count') or config.get('cpu') }}</span>
-                                        <span class="spec-label">vCPU</span>
+                                    {% endif %}
+                                    {% if config.get('ram_mb') or mysql_config.get('memory_mb') or config.get('memory') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-memory"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) if config.get('ram_mb') or mysql_config.get('memory_mb') else config.get('memory') }} {{ 'GB' if config.get('ram_mb') or mysql_config.get('memory_mb') else '' }}</span>
+                                            <span class="spec-label">RAM</span>
+                                        </div>
                                     </div>
+                                    {% endif %}
+                                    {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') or config.get('storage') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-hdd"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else config.get('storage') }} {{ 'GB' if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else '' }}</span>
+                                            <span class="spec-label">HD</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- Volume Specifications -->
+                                {% elif resource.resource_type == 'volume' %}
+                                    {% if config.get('size_gb') or config.get('disk_size') or config.get('storage_gb') or config.get('volume_size') or config.get('capacity') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-hdd"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('size_gb') or config.get('disk_size') or config.get('storage_gb') or config.get('volume_size') or config.get('capacity') }} GB</span>
+                                            <span class="spec-label">Size</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('project_name') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-folder"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('project_name') }}</span>
+                                            <span class="spec-label">Project</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('created_at') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-calendar"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('created_at')[:10] }}</span>
+                                            <span class="spec-label">Created</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- Database Specifications -->
+                                {% elif resource.resource_type == 'database' %}
+                                    {% if config.get('engine') or config.get('db_engine') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-database"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('engine') or config.get('db_engine') }}</span>
+                                            <span class="spec-label">Engine</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('version') or config.get('db_version') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-tag"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('version') or config.get('db_version') }}</span>
+                                            <span class="spec-label">Version</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('size_gb') or config.get('storage_gb') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-hdd"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('size_gb') or config.get('storage_gb') }} GB</span>
+                                            <span class="spec-label">Storage</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- Domain Specifications -->
+                                {% elif resource.resource_type == 'domain' %}
+                                    {% if config.get('status') or config.get('domain_status') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-globe"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('status') or config.get('domain_status') }}</span>
+                                            <span class="spec-label">Status</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('expires_at') or config.get('expiry_date') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-calendar"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ (config.get('expires_at') or config.get('expiry_date'))[:10] }}</span>
+                                            <span class="spec-label">Expires</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('registrar') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-building"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('registrar') }}</span>
+                                            <span class="spec-label">Registrar</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- Load Balancer Specifications -->
+                                {% elif resource.resource_type == 'load_balancer' %}
+                                    {% if config.get('scheme') or config.get('type') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-balance-scale"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('scheme') or config.get('type') }}</span>
+                                            <span class="spec-label">Type</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('listeners') or config.get('port_count') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-plug"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('listeners') or config.get('port_count') }}</span>
+                                            <span class="spec-label">Listeners</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('targets') or config.get('target_count') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-bullseye"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('targets') or config.get('target_count') }}</span>
+                                            <span class="spec-label">Targets</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+
+                            <!-- Status Information from Tags -->
+                            {% if resource.tags is mapping %}
+                                {% set tags = resource.tags %}
+                            {% elif resource.tags is iterable %}
+                                {% set tags = {} %}
+                                {% for tag in resource.tags %}
+                                    {% set _ = tags.update({tag.tag_key: tag.tag_value}) %}
+                                {% endfor %}
+                            {% else %}
+                                {% set tags = {} %}
+                            {% endif %}
+                            
+                            {% if tags.get('note') or tags.get('status') or tags.get('attachment_status') %}
+                            <div class="resource-status">
+                                {% if tags.get('note') %}
+                                <div class="status-item">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    <span>{{ tags.get('note') }}</span>
                                 </div>
                                 {% endif %}
-                                {% if config.get('ram_mb') or mysql_config.get('memory_mb') or config.get('memory') %}
-                                <div class="spec-item">
-                                    <div class="spec-icon">
-                                        <i class="fa-solid fa-memory"></i>
-                                    </div>
-                                    <div class="spec-content">
-                                        <span class="spec-value">{{ ((config.get('ram_mb') or mysql_config.get('memory_mb', 0)) / 1024)|round(1) if config.get('ram_mb') or mysql_config.get('memory_mb') else config.get('memory') }} {{ 'GB' if config.get('ram_mb') or mysql_config.get('memory_mb') else '' }}</span>
-                                        <span class="spec-label">RAM</span>
-                                    </div>
+                                {% if tags.get('status') %}
+                                <div class="status-item">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <span>{{ tags.get('status') }}</span>
                                 </div>
                                 {% endif %}
-                                {% if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') or config.get('storage') %}
-                                <div class="spec-item">
-                                    <div class="spec-icon">
-                                        <i class="fa-solid fa-hdd"></i>
-                                    </div>
-                                    <div class="spec-content">
-                                        <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else config.get('storage') }} {{ 'GB' if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else '' }}</span>
-                                        <span class="spec-label">HD</span>
-                                    </div>
+                                {% if tags.get('attachment_status') %}
+                                <div class="status-item">
+                                    <i class="fa-solid fa-link"></i>
+                                    <span>{{ tags.get('attachment_status') }}</span>
                                 </div>
                                 {% endif %}
                             </div>
+                            {% endif %}
 
                             <!-- Usage Data Section -->
                             {% if resource.tags is mapping %}
@@ -1152,6 +1334,34 @@ function exportResourcesToCSV() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+}
+
+/* Resource Status Information Styles */
+.resource-status {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: var(--background-light);
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.status-item:last-child {
+    margin-bottom: 0;
+}
+
+.status-item i {
+    color: var(--primary-color);
+    width: 14px;
+    text-align: center;
 }
 </script>
 
