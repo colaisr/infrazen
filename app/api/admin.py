@@ -845,13 +845,16 @@ def reseed_demo_user():
         import sys
         import os
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts'))
-        from seed_demo_user import seed_demo_user, seed_historical_complete_syncs
+        from seed_demo_user import seed_demo_user, seed_historical_complete_syncs, seed_usage_data_tags
         
         # Call the comprehensive seeding function (base data + historical data)
         demo_user, providers_dict = seed_demo_user()
         
         # Generate 90 days of historical complete sync data
         seed_historical_complete_syncs(demo_user, providers_dict)
+        
+        # Generate usage data tags for all server resources
+        seed_usage_data_tags(demo_user, providers_dict)
 
         # Compute fresh counts for response
         provider_count = CloudProvider.query.filter_by(user_id=demo_user.id).count()
@@ -867,7 +870,7 @@ def reseed_demo_user():
         
         return jsonify({
             'success': True,
-            'message': 'Demo user successfully reseeded with 3-month historical data',
+            'message': 'Demo user successfully reseeded with 3-month historical data and usage analytics',
             'demo_user': {
                 'id': demo_user.id,
                 'email': demo_user.email,
