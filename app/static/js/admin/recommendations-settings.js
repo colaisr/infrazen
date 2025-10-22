@@ -107,8 +107,9 @@ function renderResource(rows) {
     return `
       <div class="reco-acc">
         <button class="reco-acc-header" aria-controls="${providerId}" aria-expanded="true" onclick="toggleAcc('${providerId}', this)">
-          <span class="reco-acc-caret">▸</span> Провайдер: ${pTitle}
-          <button class="reco-info-btn" title="Типы ресурсов" onclick="event.stopPropagation(); showProviderTypes('${p}')">ℹ️</button>
+          <span class="reco-acc-caret">▸</span>
+          <span class="reco-provider-title">Провайдер: ${pTitle}</span>
+          <span class="reco-info-btn" title="Типы ресурсов" role="button" tabindex="0" onclick="event.stopPropagation(); showProviderTypes('${p}')">ℹ️</span>
         </button>
         <div id="${providerId}" class="reco-acc-panel">
           ${inner}

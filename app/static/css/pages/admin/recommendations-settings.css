@@ -56,6 +56,9 @@ input:checked + .slider:before { transform: translateX(22px); }
 .reco-acc-header.small { font-weight: 600; font-size: 0.95rem; }
 .reco-acc-caret { transition: transform 0.2s; display: inline-block; }
 .reco-acc-header[aria-expanded="true"] .reco-acc-caret { transform: rotate(90deg); }
+.reco-provider-title { flex: 1 1 auto; }
+.reco-info-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--background-white); border: 1px solid var(--border-light); color: var(--text-secondary); font-size: 0.8rem; }
+.reco-info-btn:hover { color: var(--primary-blue); border-color: var(--primary-blue); }
 .reco-acc-panel { display: block; }
 .reco-acc-panel.collapsed { display: none; }
 
