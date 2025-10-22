@@ -1,2 +1,14 @@
 /* Admin Layout Styles */
-/* TODO: Extract admin-specific layout styles from legacy.css */
+
+/* Keep admin top tabs single-line and consistent height */
+.admin-nav-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+}
+
+.admin-nav-tab {
+    white-space: nowrap; /* prevent wrapping like "System Status" -> two lines */
+    line-height: 1;      /* tighter baseline so height is driven by padding */
+    padding: 0.875rem 1.25rem; /* align thickness across pages */
+}

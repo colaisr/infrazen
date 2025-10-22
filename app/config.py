@@ -38,6 +38,19 @@ class Config:
     # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
+    # Recommendations feature flags
+    RECOMMENDATIONS_ENABLED = os.environ.get('RECOMMENDATIONS_ENABLED', 'true').lower() == 'true'
+    # Deprecated: debug cards removed; use logs instead
+    RECOMMENDATIONS_DEBUG_MODE = False
+    # Price check thresholds (defaults disabled)
+    PRICE_CHECK_MIN_SAVINGS_RUB = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_RUB', '0'))
+    PRICE_CHECK_MIN_SAVINGS_PERCENT = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_PERCENT', '0'))
+
+    # Recommendation rules feature flags (disable by rule id, comma-separated)
+    # Example: RECOMMENDATION_RULES_DISABLED="cost.price_check.cross_provider,cost.rightsize.cpu_underuse"
+    _DISABLED_RAW = os.environ.get('RECOMMENDATION_RULES_DISABLED', '')
+    RECOMMENDATION_RULES_DISABLED = set([s.strip() for s in _DISABLED_RAW.split(',') if s.strip()])
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

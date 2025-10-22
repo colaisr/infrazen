@@ -2,7 +2,7 @@
 Recommendations API: list, detail, and actions
 """
 from flask import Blueprint, request, jsonify, session
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import or_, and_, desc, asc
 
 from app.core.database import db
@@ -10,6 +10,7 @@ from app.core.models.recommendations import OptimizationRecommendation
 from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
 from app.core.models.user import User
+from app.core.models.complete_sync import CompleteSync
 
 recommendations_bp = Blueprint('recommendations', __name__)
 
@@ -183,9 +184,13 @@ def _apply_action(rec: OptimizationRecommendation, action: str, payload: dict):
         rec.status = 'snoozed'
         until = payload.get('until')
         try:
-            rec.snoozed_until = datetime.fromisoformat(until) if until else None
+            if until:
+                rec.snoozed_until = datetime.fromisoformat(until)
+            else:
+                # Default snooze period: 1 month
+                rec.snoozed_until = datetime.utcnow() + timedelta(days=30)
         except Exception:
-            rec.snoozed_until = None
+            rec.snoozed_until = datetime.utcnow() + timedelta(days=30)
     else:
         return False
     return True
@@ -236,5 +241,38 @@ def delete_recommendation(rec_id: int):
     db.session.delete(rec)
     db.session.commit()
     return jsonify({'status': 'deleted'})
+
+
+@recommendations_bp.route('/recommendations/summary', methods=['GET'])
+def recommendations_summary():
+    """Return recommendations summary for the most recent successful/partial complete sync of current user."""
+    # Resolve current user
+    current_user_id = None
+    try:
+        user_data = session.get('user') or {}
+        if user_data.get('email') == 'demo@infrazen.com':
+            demo_user = User.find_by_email('demo@infrazen.com')
+            if demo_user:
+                current_user_id = demo_user.id
+        else:
+            current_user_id = user_data.get('db_id')
+    except Exception:
+        current_user_id = None
+
+    if not current_user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # Find last sync
+    cs = CompleteSync.query.filter_by(user_id=current_user_id).order_by(CompleteSync.sync_started_at.desc()).first()
+    if not cs:
+        return jsonify({'error': 'No syncs found'}), 404
+
+    cfg = cs.get_sync_config() or {}
+    summary = cfg.get('recommendations_summary') or {}
+    return jsonify({
+        'complete_sync_id': cs.id,
+        'sync_status': cs.sync_status,
+        'recommendations_summary': summary,
+    })
 
 

@@ -1,14 +1,14 @@
-{% extends "base.html" %}
+{% extends "admin/_layout.html" %}
 
-{% block title %}Провайдеры - InfraZen FinOps Platform{% endblock %}
+{% block admin_title_tag %}Провайдеры - InfraZen FinOps Platform{% endblock %}
 
-{% block page_title %}{% endblock %}
-{% block page_subtitle %}{% endblock %}
+{% block admin_title %}Providers{% endblock %}
+{% block admin_subtitle %}Manage price catalogs and sync status{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="admin-content">
     <!-- Compact Filters (follow master guidelines, mirror Unrecognized Resources) -->
-    <div class="compact-filters">
+    <div class="compact-filters" style="margin-top: 0;">
         <div class="filters-container">
             <div class="filter-group">
                 <input type="text" class="filter-input" id="provider-search" placeholder="Поиск провайдеров..." onkeyup="applyProviderFilters()" />

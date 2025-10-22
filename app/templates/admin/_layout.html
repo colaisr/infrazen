@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{# Bridge blocks: child admin pages define admin_* blocks; this layout maps them to base blocks #}
+
+{% block title %}{% block admin_title_tag %}Admin - InfraZen{% endblock %}{% endblock %}
+
+{% block page_title %}{% block admin_title %}Admin{% endblock %}{% endblock %}
+
+{% block page_subtitle %}{% block admin_subtitle %}{% endblock %}{% endblock %}
+
+{% block header_actions %}{% block admin_header_actions %}{% endblock %}{% endblock %}
+
+{% block extra_css %}{% block admin_extra_css %}{% endblock %}{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+    {% block admin_content %}{% endblock %}
+    {% block admin_modals %}{% endblock %}
+    {% block admin_inline_scripts %}{% endblock %}
+    {% block admin_inline_styles %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}{% block admin_extra_js %}{% endblock %}{% endblock %}
+
+

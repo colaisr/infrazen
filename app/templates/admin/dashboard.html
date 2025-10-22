@@ -1,17 +1,12 @@
-{% extends "base.html" %}
+{% extends "admin/_layout.html" %}
 
-{% block title %}Admin Dashboard - InfraZen{% endblock %}
+{% block admin_title_tag %}Admin Dashboard - InfraZen{% endblock %}
 
-{% block page_title %}{% endblock %}
-{% block page_subtitle %}{% endblock %}
+{% block admin_title %}Admin Dashboard{% endblock %}
+{% block admin_subtitle %}System administration and management{% endblock %}
 
-{% block content %}
-<div class="page-header">
-    <div class="page-title">
-        <h1>Admin Dashboard</h1>
-        <p>System administration and management</p>
-    </div>
-</div>
+{% block admin_content %}
+{# Removed duplicate in-body page header; title/subtitle now come from layout header #}
 
 <div class="admin-content">
     <div class="admin-stats-grid">

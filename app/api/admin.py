@@ -11,7 +11,10 @@ from app.core.models.resource import Resource
 from app.core.models.unrecognized_resource import UnrecognizedResource
 from app.core.models.provider_catalog import ProviderCatalog
 from app.core.models.provider_admin_credentials import ProviderAdminCredentials
+from app.core.models.recommendation_settings import RecommendationRuleSetting
 from app.api.auth import validate_session
+from app.providers.resource_registry import resource_registry
+from app.core.models.provider_resource_type import ProviderResourceType
 
 logger = logging.getLogger(__name__)
 
@@ -393,6 +396,19 @@ def list_unrecognized_resources():
             'error': f'Failed to fetch unrecognized resources: {str(e)}'
         })
 
+@admin_bp.route('/unrecognized-resources/<int:resource_id>', methods=['GET'])
+def get_unrecognized_resource(resource_id: int):
+    """Return a single unrecognized resource including billing_data (admin only)."""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    try:
+        item = UnrecognizedResource.query.get_or_404(resource_id)
+        data = item.to_dict()
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/unrecognized-resources/<int:resource_id>', methods=['DELETE'])
 def delete_unrecognized_resource(resource_id):
     """Delete an unrecognized resource (admin only)"""
@@ -451,6 +467,64 @@ def resolve_unrecognized_resource(resource_id):
             'error': f'Failed to resolve unrecognized resource: {str(e)}'
         })
 
+@admin_bp.route('/unrecognized-resources/<int:resource_id>/promote', methods=['POST'])
+def promote_unrecognized_resource(resource_id: int):
+    """Promote an unrecognized resource to known provider type inventory.
+
+    Body: { unified_type: 'managed_db', display_name?, icon?, raw_alias? }
+    """
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    try:
+        data = request.get_json(force=True) or {}
+        unified_type = (data.get('unified_type') or '').strip()
+        if not unified_type:
+            return jsonify({'success': False, 'error': 'unified_type is required'}), 400
+
+        item = UnrecognizedResource.query.get_or_404(resource_id)
+        provider = CloudProvider.query.get(item.provider_id)
+        if not provider:
+            return jsonify({'success': False, 'error': 'Provider not found'}), 404
+
+        # Upsert provider resource type
+        prt = ProviderResourceType.query.filter_by(provider_type=provider.provider_type, unified_type=unified_type).first()
+        if prt is None:
+            prt = ProviderResourceType(
+                provider_type=provider.provider_type,
+                unified_type=unified_type,
+                display_name=data.get('display_name'),
+                icon=data.get('icon'),
+                enabled=True,
+                raw_aliases=None
+            )
+            db.session.add(prt)
+        # Merge observed raw type into alias list automatically (ignore client alias input)
+        import json
+        aliases = []
+        if prt.raw_aliases:
+            try:
+                aliases = json.loads(prt.raw_aliases)
+            except Exception:
+                aliases = []
+        observed_alias = (item.resource_type or '').strip()
+        if observed_alias and observed_alias not in aliases:
+            aliases.append(observed_alias)
+        if aliases:
+            prt.raw_aliases = json.dumps(aliases, ensure_ascii=False)
+
+        # Mark unrecognized as resolved with note
+        item.is_resolved = True
+        item.resolved_at = datetime.utcnow()
+        item.resolved_by = session.get('user', {}).get('id')
+        item.resolution_notes = (item.resolution_notes or '') + f"\nPromoted as {unified_type}"
+
+        db.session.commit()
+        return jsonify({'success': True, 'provider_type': provider.provider_type, 'unified_type': unified_type, 'alias_added': observed_alias})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @admin_bp.route('/unrecognized-resources-page')
 def unrecognized_resources_page():
     """Unrecognized resources management page"""
@@ -461,6 +535,207 @@ def unrecognized_resources_page():
     # Get current user from session
     user = session.get('user', {})
     return render_template('admin/unrecognized_resources.html', user=user)
+
+# Recommendations Settings (blank scaffold)
+@admin_bp.route('/recommendations-settings-page')
+def recommendations_settings_page():
+    """Recommendations settings page (admin only)."""
+    admin_check = require_admin()
+    if admin_check:
+        return redirect(url_for('main.dashboard'))
+    user = session.get('user', {})
+    # Build bootstrap payload to avoid empty page if fetch fails
+    rules_payload = _build_reco_rules_payload()
+    return render_template('admin/recommendations_settings.html', user=user, rules_bootstrap=rules_payload)
+
+def _build_reco_rules_payload():
+    try:
+        from app.core.recommendations.registry import RuleRegistry
+        reg = RuleRegistry(); reg.discover()
+        global_rules = [r for r in reg.global_rules() if not getattr(r, 'id', '').startswith('debug.')]
+        resource_rules = [r for r in reg.resource_rules() if not getattr(r, 'id', '').startswith('debug.')]
+        settings_index = {}
+        try:
+            settings = RecommendationRuleSetting.query.all()
+            for s in settings:
+                settings_index[(s.rule_id, s.scope, s.provider_type or '', s.resource_type or '')] = s
+        except Exception:
+            # Table may not exist yet; treat as all enabled by default
+            settings_index = {}
+
+        def rule_dict(rule, scope, provider_type=None, resource_type=None):
+            rid = getattr(rule, 'id') if isinstance(getattr(rule, 'id', None), str) else rule.id
+            key = (rid, scope, provider_type or '', resource_type or '')
+            s = settings_index.get(key)
+            return {
+                'rule_id': rid,
+                'name': getattr(rule, 'name', rid),
+                'scope': scope,
+                'provider_type': provider_type,
+                'resource_type': resource_type,
+                'enabled': True if s is None else bool(s.enabled),
+                'description': getattr(rule, 'description', None) or (s.description if s else None),
+            }
+
+        global_payload = [rule_dict(r, 'global') for r in global_rules]
+        resource_payload = []
+        # Expand resource rules by enabled providers and known provider types (registry/DB)
+        enabled_providers = ProviderCatalog.query.filter_by(is_enabled=True).all()
+        enabled_types = [p.provider_type for p in enabled_providers]
+        # Known types from provider_resource_types
+        known_map = {}
+        rows = ProviderResourceType.query.filter(ProviderResourceType.enabled == True).all()
+        for row in rows:
+            known_map.setdefault(row.provider_type, set()).add(row.unified_type)
+
+        for r in resource_rules:
+            rule_rtypes = list(getattr(r, 'resource_types', []) or [])
+            declared_providers = list(getattr(r, 'providers', None) or [])
+            provider_list = declared_providers or enabled_types
+            for p in provider_list:
+                allowed_types = list(known_map.get(p, set()))
+                rtypes = [rt for rt in rule_rtypes if (not allowed_types or rt in allowed_types)]
+                for rt in rtypes:
+                    resource_payload.append(rule_dict(r, 'resource', provider_type=p, resource_type=rt))
+        return {'success': True, 'global': global_payload, 'resource': resource_payload}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+@admin_bp.route('/recommendations/rules', methods=['GET'])
+def list_recommendation_rules():
+    """List rule settings grouped for admin UI.
+
+    Returns discovered rules and current enablement from DB. Missing rows are implied enabled=True by default.
+    """
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    try:
+        payload = _build_reco_rules_payload()
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# CRUD for Provider Resource Types
+@admin_bp.route('/provider-types/<string:provider_type>/resource-types', methods=['GET'])
+def list_provider_resource_types(provider_type: str):
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    rows = ProviderResourceType.query.filter_by(provider_type=provider_type).order_by(ProviderResourceType.unified_type.asc()).all()
+    return jsonify({'success': True, 'items': [r.to_dict() for r in rows]})
+
+@admin_bp.route('/provider-types/<string:provider_type>/resource-types', methods=['POST'])
+def create_provider_resource_type(provider_type: str):
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    data = request.get_json(force=True) or {}
+    item = ProviderResourceType(
+        provider_type=provider_type,
+        unified_type=(data.get('unified_type') or '').strip(),
+        display_name=data.get('display_name'),
+        icon=data.get('icon'),
+        enabled=bool(data.get('enabled', True)),
+        raw_aliases=data.get('raw_aliases')
+    )
+    db.session.add(item); db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+@admin_bp.route('/provider-types/resource-types/<int:item_id>', methods=['PUT'])
+def update_provider_resource_type(item_id: int):
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    data = request.get_json(force=True) or {}
+    item = ProviderResourceType.query.get_or_404(item_id)
+    for f in ['unified_type','display_name','icon','raw_aliases']:
+        if f in data:
+            setattr(item, f, data[f])
+    if 'enabled' in data:
+        item.enabled = bool(data['enabled'])
+    db.session.commit()
+    return jsonify({'success': True, 'item': item.to_dict()})
+
+@admin_bp.route('/provider-types/resource-types/<int:item_id>', methods=['DELETE'])
+def delete_provider_resource_type(item_id: int):
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    item = ProviderResourceType.query.get_or_404(item_id)
+    db.session.delete(item); db.session.commit()
+    return jsonify({'success': True})
+
+@admin_bp.route('/recommendations/rules', methods=['POST'])
+def upsert_recommendation_rule():
+    """Create/update a rule setting (enable/disable, description)."""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    try:
+        data = request.get_json(force=True) or {}
+        rule_id = (data.get('rule_id') or '').strip()
+        scope = (data.get('scope') or '').strip()
+        provider_type = (data.get('provider_type') or None)
+        resource_type = (data.get('resource_type') or None)
+        enabled = bool(data.get('enabled', True))
+        description = data.get('description')
+
+        if not rule_id or scope not in ('global', 'resource'):
+            return jsonify({'success': False, 'error': 'rule_id and scope are required'}), 400
+
+        existing = RecommendationRuleSetting.query.filter_by(
+            rule_id=rule_id, scope=scope, provider_type=provider_type, resource_type=resource_type
+        ).first()
+        if existing is None:
+            existing = RecommendationRuleSetting(
+                rule_id=rule_id, scope=scope, provider_type=provider_type, resource_type=resource_type
+            )
+            db.session.add(existing)
+        existing.enabled = enabled
+        if description is not None:
+            existing.description = description
+        db.session.commit()
+        return jsonify({'success': True, 'setting': existing.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/recommendations/providers/<string:provider_type>/resource-types', methods=['GET'])
+def provider_resource_types(provider_type: str):
+    """Return known (configured) and observed resource types for a provider.
+
+    - known: from resource registry mappings (unified types)
+    - observed: from current inventory (resources table) with counts
+    """
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    try:
+        # Known from curated DB inventory (provider_resource_types)
+        rows = (
+            ProviderResourceType.query
+            .filter_by(provider_type=provider_type)
+            .filter(ProviderResourceType.enabled == True)
+            .order_by(ProviderResourceType.unified_type.asc())
+            .all()
+        )
+        known = [r.unified_type for r in rows]
+
+        # Observed from inventory
+        rows = (
+            db.session.query(Resource.resource_type, db.func.count(Resource.id))
+            .join(CloudProvider, Resource.provider_id == CloudProvider.id)
+            .filter(CloudProvider.provider_type == provider_type)
+            .group_by(Resource.resource_type)
+            .all()
+        )
+        observed = { rtype: int(count) for (rtype, count) in rows }
+
+        effective = sorted(set(known) | set(observed.keys()))
+        return jsonify({ 'success': True, 'provider': provider_type, 'known': known, 'observed': observed, 'effective': effective })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # Provider Catalog Management
 

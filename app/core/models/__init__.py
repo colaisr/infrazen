@@ -14,12 +14,14 @@ from .tags import ResourceTag
 from .logs import ResourceLog, ResourceComponent
 from .costs import CostAllocation, CostTrend
 from .recommendations import OptimizationRecommendation
+from .recommendation_settings import RecommendationRuleSetting
 from .sync import SyncSnapshot, ResourceState
 from .complete_sync import CompleteSync, ProviderSyncReference
 from .unrecognized_resource import UnrecognizedResource
 from .provider_catalog import ProviderCatalog
 from .pricing import ProviderPrice, PriceHistory, PriceComparisonRecommendation
 from .provider_admin_credentials import ProviderAdminCredentials
+from .provider_resource_type import ProviderResourceType
 
 __all__ = [
     'db',
@@ -35,6 +37,7 @@ __all__ = [
     'CostAllocation',
     'CostTrend',
     'OptimizationRecommendation',
+    'RecommendationRuleSetting',
     'SyncSnapshot',
     'ResourceState',
     'CompleteSync',
@@ -45,4 +48,5 @@ __all__ = [
     'PriceHistory',
     'PriceComparisonRecommendation',
     'ProviderAdminCredentials'
+    , 'ProviderResourceType'
 ]

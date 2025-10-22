@@ -5,6 +5,8 @@ Flask Application Factory
 import os
 import json
 from flask import Flask
+import logging
+from logging.handlers import RotatingFileHandler
 from flask_migrate import Migrate
 from app.core.database import db
 
@@ -55,5 +57,38 @@ def create_app(config_name=None):
     app.register_blueprint(recommendations_bp, url_prefix='/api')
     
     # All routes are now in the new structure
+
+    # -------------------------
+    # Development file logging
+    # -------------------------
+    try:
+        log_level_name = app.config.get('LOG_LEVEL', 'INFO')
+        log_level = getattr(logging, str(log_level_name).upper(), logging.INFO)
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+        app.logger.setLevel(log_level)
+
+        # Write to server.log in project root with rotation
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        log_path = os.path.join(project_root, 'server.log')
+
+        # Avoid duplicate handlers on reload
+        has_file = False
+        for h in root_logger.handlers:
+            try:
+                if isinstance(h, RotatingFileHandler) and getattr(h, 'baseFilename', None) == log_path:
+                    has_file = True
+                    break
+            except Exception:
+                continue
+        if not has_file:
+            fh = RotatingFileHandler(log_path, maxBytes=5 * 1024 * 1024, backupCount=2, encoding='utf-8')
+            fh.setLevel(log_level)
+            fmt = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+            fh.setFormatter(fmt)
+            root_logger.addHandler(fh)
+    except Exception:
+        # Logging setup failures should not break the app
+        pass
     
     return app

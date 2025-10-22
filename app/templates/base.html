@@ -170,9 +170,9 @@
                         <i class="fa-solid fa-question-circle"></i>
                         Unrecognized Resources
                     </a>
-                    <a href="#" class="admin-nav-tab {% if request.endpoint == 'admin.system_preferences' %}active{% endif %}">
-                        <i class="fa-solid fa-cog"></i>
-                        System Preferences
+                    <a href="{{ url_for('admin.recommendations_settings_page') }}" class="admin-nav-tab {% if request.endpoint == 'admin.recommendations_settings_page' %}active{% endif %}">
+                        <i class="fa-solid fa-lightbulb"></i>
+                        Recommendations Settings
                     </a>
                 </div>
             </div>

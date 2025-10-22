@@ -95,6 +95,9 @@
                         {% endif %}
                     </span>
                     <span class="stat-label">Последняя синхронизация</span>
+                    {% if last_complete_sync %}
+                    <a href="#" class="stat-link" onclick="showRecoSummary(); return false;" title="Показать сводку рекомендаций">Сводка рекомендаций</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -486,6 +489,17 @@
     color: var(--text-secondary);
     font-weight: 500;
 }
+
+.stat-link {
+    display: inline-block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--primary-blue);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.stat-link:hover { color: #1e40af; }
 
 /* Connection Cards Grid */
 .providers-grid {
@@ -1934,6 +1948,22 @@
     </div>
 </div>
 
+<!-- Recommendations Summary Modal -->
+<div id="recoSummaryModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
+                <i class="fa-solid fa-lightbulb" style="color: #1E40AF; margin-right: 0.5rem;"></i>
+                Сводка рекомендаций
+            </h3>
+            <button class="modal-close" onclick="closeRecoSummary()">&times;</button>
+        </div>
+        <div class="modal-body" id="recoSummaryBody">
+            <div style="color: var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> Загрузка сводки...</div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Provider configurations
 const providers = {
@@ -2405,6 +2435,62 @@ window.onclick = function(event) {
     if (event.target === modal) {
         closeProviderModal();
     }
+    const recoModal = document.getElementById('recoSummaryModal');
+    if (recoModal && event.target === recoModal) {
+        closeRecoSummary();
+    }
+}
+// Recommendations summary modal
+function showRecoSummary() {
+    const modal = document.getElementById('recoSummaryModal');
+    const body = document.getElementById('recoSummaryBody');
+    modal.style.display = 'block';
+    body.innerHTML = '<div><i class="fa-solid fa-spinner fa-spin"></i> Загрузка сводки...</div>';
+    fetch('/api/recommendations/summary')
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                body.innerHTML = `<div style=\"color: var(--error-red);\">Ошибка: ${data.error}</div>`;
+                return;
+            }
+            const s = data.recommendations_summary || {};
+            const timings = s.rule_timings || {};
+            const rows = [
+                ['Ресурсов обработано', s.resources_processed],
+                ['Правил (ресурсных) выполнено', s.resource_rules_run],
+                ['Правил (глобальных) выполнено', s.global_rules_run],
+                ['Создано рекомендаций', s.recommendations_created],
+                ['Обновлено рекомендаций', s.recommendations_updated],
+                ['Подавлено (отклонены)', s.suppressed_dismissed],
+                ['Подавлено (внедрены)', s.suppressed_implemented],
+                ['Подавлено (отложены)', s.suppressed_snoozed],
+                ['Пропущено (правило отключено)', s.skipped_rules_disabled],
+            ];
+            let html = '';
+            html += '<div class="provider-info-card">';
+            html += `<div class=\"detail-item\"><span class=\"detail-label\">Статус синхронизации:</span><span class=\"detail-value\">${data.sync_status || '—'}</span></div>`;
+            rows.forEach(([label, value]) => {
+                html += `<div class=\"detail-item\"><span class=\"detail-label\">${label}:</span><span class=\"detail-value\">${(value ?? 0)}</span></div>`;
+            });
+            html += '</div>';
+            if (Object.keys(timings).length > 0) {
+                html += '<div class="provider-info-card"><h4>Время выполнения правил (сек)</h4>';
+                for (const [k, v] of Object.entries(timings)) {
+                    const sec = (typeof v === 'number') ? v : parseFloat(v) || 0;
+                    html += `<div class=\"detail-item\"><span class=\"detail-label\">${k}</span><span class=\"detail-value\">${sec.toFixed(3)}</span></div>`;
+                }
+                html += '</div>';
+            }
+            body.innerHTML = html;
+        })
+        .catch(err => {
+            console.error('summary error', err);
+            body.innerHTML = '<div style=\"color: var(--error-red);\">Ошибка загрузки сводки</div>';
+        });
+}
+
+function closeRecoSummary() {
+    document.getElementById('recoSummaryModal').style.display = 'none';
 }
 
 // Connection management functions

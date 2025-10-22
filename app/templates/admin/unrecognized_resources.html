@@ -1,14 +1,14 @@
-{% extends "base.html" %}
+{% extends "admin/_layout.html" %}
 
-{% block title %}Unrecognized Resources - Admin Dashboard{% endblock %}
+{% block admin_title_tag %}Unrecognized Resources - Admin Dashboard{% endblock %}
 
-{% block page_title %}{% endblock %}
-{% block page_subtitle %}{% endblock %}
+{% block admin_title %}Unrecognized Resources{% endblock %}
+{% block admin_subtitle %}Investigate and resolve unknown billing items{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="admin-content">
     <!-- Compact Filters -->
-    <div class="compact-filters">
+    <div class="compact-filters" style="margin-top: 0;">
         <div class="filters-container">
             <div class="filter-group">
                 <input type="text" class="filter-input" id="search" placeholder="Search resources..." />
@@ -239,12 +239,15 @@ function displayUnrecognizedResources(resources) {
             </td>
             <td class="col-actions">
                 <div class="action-buttons">
-                    <button class="action-btn view-btn" onclick="viewBillingData(${resource.id}, \`${escapeHtml(resource.billing_data)}\`)" title="View billing data">
+                    <button class="action-btn view-btn" onclick="viewBillingData(${resource.id})" title="View billing data">
                         <i class="fas fa-eye"></i>
                     </button>
                     ${!resource.is_resolved ? `
                         <button class="action-btn resolve-btn" onclick="openResolveModal(${resource.id})" title="Mark as resolved">
                             <i class="fas fa-check"></i>
+                        </button>
+                        <button class="action-btn" onclick="promoteToKnown(${resource.id}, '${resource.provider ? resource.provider.provider_type : ''}', '${resource.resource_type || ''}')" title="Promote to known type">
+                            <i class="fas fa-arrow-up"></i>
                         </button>
                     ` : ''}
                     <button class="action-btn delete-btn" onclick="deleteResource(${resource.id})" title="Delete resource">
@@ -302,7 +305,7 @@ function updatePagination(pagination) {
 function openResolveModal(resourceId) {
     currentResourceId = resourceId;
     document.getElementById('resolution-notes').value = '';
-    $('#resolveModal').modal('show');
+    showModal('resolveModal');
 }
 
 function resolveResource() {
@@ -322,7 +325,7 @@ function resolveResource() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            $('#resolveModal').modal('hide');
+            hideModal('resolveModal');
             loadUnrecognizedResources(currentPage);
             showSuccess(data.message);
         } else {
@@ -356,10 +359,44 @@ function deleteResource(resourceId) {
     });
 }
 
-function viewBillingData(resourceId, billingData) {
-    document.getElementById('billing-data-content').textContent = billingData;
-    $('#billingDataModal').modal('show');
+function viewBillingData(resourceId) {
+    // Fetch on demand to avoid inline JSON parsing issues
+    fetch(`/api/admin/unrecognized-resources/${resourceId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Failed to load');
+            let raw = data.data && data.data.billing_data ? data.data.billing_data : '';
+            // Pretty-print if JSON
+            try {
+                const parsed = JSON.parse(raw);
+                raw = JSON.stringify(parsed, null, 2);
+            } catch (e) { /* leave as-is if not valid JSON */ }
+            document.getElementById('billing-data-content').textContent = raw;
+            showModal('billingDataModal');
+        })
+        .catch(err => alert('Ошибка загрузки: ' + err.message));
 }
+
+// Minimal modal helpers (fallback if jQuery/Bootstrap JS is not present)
+function showModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.$ && typeof window.$(el).modal === 'function') { window.$(el).modal('show'); return; }
+    el.style.display = 'block';
+}
+function hideModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.$ && typeof window.$(el).modal === 'function') { window.$(el).modal('hide'); return; }
+    el.style.display = 'none';
+}
+document.addEventListener('click', function(e){
+    const target = e.target;
+    if (target && target.getAttribute && target.getAttribute('data-dismiss') === 'modal') {
+        const modal = target.closest('.modal');
+        if (modal && modal.id) hideModal(modal.id);
+    }
+});
 
 function clearFilters() {
     document.getElementById('search').value = '';
@@ -367,6 +404,20 @@ function clearFilters() {
     document.getElementById('resource-type-filter').value = '';
     document.getElementById('resolved-filter').value = '';
     loadUnrecognizedResources(1);
+}
+
+function promoteToKnown(id, providerType, rawType) {
+    const unified = prompt(`Укажите унифицированный тип для ${providerType} (например: server, domain, DB):`, rawType || 'server');
+    if (!unified) return;
+    fetch(`/api/admin/unrecognized-resources/${id}/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unified_type: unified })
+    }).then(r => r.json()).then(data => {
+        if (!data.success) throw new Error(data.error || 'Failed');
+        alert(`Добавлено в известные типы: ${data.provider_type} → ${data.unified_type}\nАлиас добавлен автоматически: ${data.alias_added || rawType || ''}`);
+        loadUnrecognizedResources(currentPage);
+    }).catch(err => alert('Ошибка: ' + err.message));
 }
 
 function showError(message) {

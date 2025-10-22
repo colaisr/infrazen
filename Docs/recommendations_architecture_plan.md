@@ -139,7 +139,7 @@ Exit criteria:
 - Rule versioning and A/B evaluation.
 - Expand SKU normalization to a richer library: families, burstable/base CPU, storage IOPS, network caps.
 
-## Timeline & Milestones
+## Timeline & Milestones (updated)
 - Week 1:
   - Scaffold orchestrator, registry, contexts, persistence; post-sync trigger; debug rules.
   - Exit: end-to-end debug recommendations visible via API.
@@ -148,7 +148,8 @@ Exit criteria:
   - Exit: downsizing recs appear with savings; normalization unit tests passing.
 - Week 3:
   - Global price check rule using normalizer; dedup/lifecycle; observability and flags.
-  - Exit: cross-provider comparison recs generated; metrics/logs in place.
+  - Admin UI: recommendations settings (global/per-resource), enable/disable scoped by provider/resource type; provider inventory of known resource types; Unrecognized Resources promote flow.
+  - Exit: cross-provider comparison recs generated; metrics/logs in place; admin controls available.
 
 
 ## Test Plan

@@ -1,14 +1,14 @@
-{% extends "base.html" %}
+{% extends "admin/_layout.html" %}
 
-{% block title %}User Management - InfraZen{% endblock %}
+{% block admin_title_tag %}User Management - InfraZen{% endblock %}
 
-{% block page_title %}{% endblock %}
-{% block page_subtitle %}{% endblock %}
+{% block admin_title %}Users{% endblock %}
+{% block admin_subtitle %}Manage platform users and roles{% endblock %}
 
-{% block content %}
+{% block admin_content %}
 <div class="admin-content">
     <!-- Page Actions -->
-    <div class="page-actions" style="margin-bottom: 1.5rem;">
+    <div class="page-actions" style="margin-bottom: 1rem;">
         <button onclick="createUser()" class="btn btn-primary">
             <i class="fa-solid fa-plus"></i>
             Add User

@@ -540,6 +540,60 @@ class SyncOrchestrator:
             Resource instance or None if failed
         """
         try:
+            # Enforce known provider resource types inventory
+            from app.core.models.provider_resource_type import ProviderResourceType
+            from app.core.models.unrecognized_resource import UnrecognizedResource
+            from datetime import datetime
+            import json
+
+            incoming_type = resource_data.get('resource_type')
+            if incoming_type:
+                # Try exact match first
+                known = ProviderResourceType.query.filter_by(
+                    provider_type=provider.provider_type,
+                    unified_type=incoming_type,
+                    enabled=True
+                ).first()
+                # If not found, try alias match and remap to unified type
+                if known is None:
+                    try:
+                        rows = ProviderResourceType.query.filter_by(provider_type=provider.provider_type, enabled=True).all()
+                        for row in rows:
+                            aliases = []
+                            if row.raw_aliases:
+                                try:
+                                    aliases = json.loads(row.raw_aliases)
+                                except Exception:
+                                    aliases = []
+                            if incoming_type and any(incoming_type.lower() == str(a).lower() for a in aliases):
+                                # Remap to unified type for storage/processing
+                                resource_data['resource_type'] = row.unified_type
+                                known = row
+                                break
+                    except Exception:
+                        pass
+
+                if known is None:
+                    # Route to unrecognized resources and also surface in UI as a visible 'unknown' resource
+                    try:
+                        unrec = UnrecognizedResource(
+                            provider_id=provider.id,
+                            resource_id=str(resource_data.get('resource_id', '')),
+                            resource_name=resource_data.get('resource_name', 'Unknown'),
+                            resource_type=incoming_type,
+                            service_type=resource_data.get('service_name'),
+                            billing_data=json.dumps(resource_data, ensure_ascii=False),
+                            user_id=provider.user_id,
+                            sync_snapshot_id=sync_snapshot.id,
+                            discovered_at=datetime.utcnow()
+                        )
+                        db.session.add(unrec)
+                        db.session.commit()
+                        self.logger.info(f"Gated unknown type: {provider.provider_type}:{incoming_type} -> Unrecognized")
+                    except Exception:
+                        db.session.rollback()
+                    # Continue processing but downgrade the type to 'unknown' so it appears in Resources
+                    resource_data['resource_type'] = 'unknown'
             # Extract resource information
             resource_id = resource_data['resource_id']
             resource_name = resource_data['resource_name']

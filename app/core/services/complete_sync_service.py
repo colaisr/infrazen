@@ -9,6 +9,8 @@ from app.core.models.user import User
 from app.core.models.provider import CloudProvider
 from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
 from app.providers import sync_orchestrator
+from app.core.recommendations.orchestrator import RecommendationOrchestrator
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +227,25 @@ class CompleteSyncService:
             }
             
             self.logger.info(f"Complete sync {complete_sync.id} completed: {complete_sync.sync_status}")
+            # Post-sync: run recommendations orchestrator if enabled and sync had any success
+            try:
+                if current_app.config.get('RECOMMENDATIONS_ENABLED', True) and response['success']:
+                    self.logger.info(f"Running recommendations orchestrator for complete_sync {complete_sync.id}")
+                    reco = RecommendationOrchestrator()
+                    reco_summary = reco.run_for_sync(complete_sync.id)
+                    response['recommendations_summary'] = reco_summary
+                    # Persist recommendations summary into sync_config for later retrieval via API
+                    try:
+                        cfg = complete_sync.get_sync_config() or {}
+                        cfg['recommendations_summary'] = reco_summary
+                        complete_sync.set_sync_config(cfg)
+                        db.session.commit()
+                    except Exception as persist_err:
+                        self.logger.error(f"Failed to persist recommendations summary: {persist_err}")
+            except Exception as reco_err:
+                self.logger.error(f"Recommendations orchestrator failed: {reco_err}")
+                response['recommendations_error'] = str(reco_err)
+
             return response
             
         except Exception as e:

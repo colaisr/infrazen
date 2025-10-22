@@ -3673,3 +3673,75 @@ curl http://localhost:8000/
 - **Monitoring**: ✅ systemd logs + journalctl
 
 ---
+
+## 19. Recommendations — Current Implementation (MVP) ✅
+
+#### 19.1. Architecture
+- Central `RecommendationOrchestrator` runs after each Complete Sync and processes two passes:
+  - Resource pass: iterates over all resources and evaluates resource-scoped rules
+  - Global pass: evaluates global rules that require cross-resource context
+- Plugins are discovered via a `RuleRegistry` from `app/core/recommendations/plugins`.
+- Rule interface exposes: `id`, `name`, `scope`, `resource_types`, optional `providers`, `applies(resource, ctx)`, and `evaluate`/`evaluate_global` methods.
+
+#### 19.2. Implemented Rules
+- CPU Underuse (resource): suggests downsizing when avg CPU < 10%, only for `server`/`vm`.
+  - Savings calculated from `ProviderPrice` catalog by finding a 1-step down vCPU option with comparable RAM (±25%) in same region prefix.
+  - Skips resources with ≤1 vCPU.
+- Cross‑provider Price Check (resource): identifies cheaper alternatives across enabled providers using MVP normalization (vCPU, RAM, region heuristic).
+  - Logs top candidates and diagnostics; thresholds configurable (default: no minimums).
+
+#### 19.3. Known vs Unknown Resource Types
+- Curated provider inventory in `provider_resource_types` defines known resource types per provider.
+- During sync, incoming resource types are gated:
+  - If known (or matches a stored alias), resource is saved with the unified type.
+  - Otherwise, an `UnrecognizedResource` is created AND a visible `Resource` with type `unknown` is shown so counts/costs remain accurate.
+- Admin can "Promote to known" from Unrecognized; the backend auto-adds the observed raw type as alias for the chosen unified type.
+
+#### 19.4. Admin — Recommendation Settings
+- Page with two tabs: Global and Per‑resource.
+- Per‑resource: grouped by provider → resource type → rule list with enable/disable toggles and descriptions.
+- Enablement comes from DB model `RecommendationRuleSetting` and is honored by the orchestrator:
+  - Global disabling by `rule_id`.
+  - Scoped disabling by `(rule_id, provider_type[, resource_type])`.
+- Provider info modal shows:
+  - Known (configured) types from curated inventory.
+  - Observed types from current inventory with counts.
+
+#### 19.5. Rule Execution & Observability
+- Orchestrator writes structured INFO logs to `server.log`:
+  - `rule_run_start` / `rule_run_end` with rule_id, provider, resource_id, outputs created/updated, duration.
+  - `rule_skip` with reasons: `config_disabled`, `db_disabled_global`, `db_disabled_scoped`, `not_applicable`.
+- Summary with per-rule timings and suppression counters is attached to the latest Complete Sync and available via `/api/recommendations/summary`.
+
+#### 19.6. Recommendation Cards & Lifecycle
+- Cards localized to Russian with estimated monthly savings and confidence.
+- Actions: implement (applied), dismiss, snooze. Seen status removed.
+  - Snooze default: 1 month; tooltip shows the duration.
+- Suppression logic when rerunning:
+  - Dismissed: suppressed for 60 days unless estimated savings improve by >15%.
+  - Implemented: suppressed for 90 days unless savings improve by >20%.
+  - Snoozed: suppressed until `snoozed_until`.
+- Dedup/update on `(source, resource_id, recommendation_type)`; updates refresh titles/descriptions, savings, and resource metadata.
+
+#### 19.7. Normalization (MVP)
+- `normalize_resource` parses vCPU/memory (from attributes, tags, provider_config) and treats region `global` as no strict filter.
+- `normalize_price_row` standardizes price rows; selection prefers same region prefix, then relaxes region if no candidates.
+
+#### 19.8. UI Enhancements
+- Recommendations page:
+  - Default filter: Новые (Pending). "Все статусы" shows all without backend forcing pending.
+  - Tooltips added for actions; 1‑click snooze with clear duration.
+- Connections page modal: "Сводка рекомендаций" shows last run metrics, suppression stats, per‑rule timings.
+- Admin layout unified across pages; Recommendations Settings uses consistent header and styling.
+
+#### 19.9. Scripts & Operations
+- `scripts/clear_recommendations.py --user-email <email>` removes a user's recommendations.
+- `scripts/reset_beget_db_inventory.py` (dev aid) clears Beget DB known type aliases and unrecognized items for flow testing.
+
+---
+
+## 20. Conclusion
+
+InfraZen's multi-cloud FinOps platform is a comprehensive solution that addresses the challenges of managing cloud costs and optimizing resource utilization across multiple providers. By leveraging advanced analytics, automated recommendations, and a unified interface, InfraZen empowers businesses to make informed decisions about their cloud infrastructure, leading to significant cost savings and operational efficiency.
+
+---

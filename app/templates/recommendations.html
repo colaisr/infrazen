@@ -7,7 +7,7 @@
 
 {% block header_actions %}
 <div style="display: flex; gap: 1rem; align-items: center;">
-    <button id="bulkSeen" class="btn btn-primary" disabled>Отметить просмотренными</button>
+    
     <button id="exportCsv" class="btn btn-secondary">Экспорт CSV</button>
     <a href="/resources" class="btn btn-link">К ресурсам</a>
     </div>
@@ -41,8 +41,7 @@
     </select>
     <select id="status" class="input">
         <option value="">Все статусы</option>
-        <option value="pending">Новые</option>
-        <option value="seen">Просмотрены</option>
+        <option value="pending" selected>Новые</option>
         <option value="snoozed">Отложены</option>
         <option value="implemented">Внедрены</option>
         <option value="dismissed">Скрыты</option>
@@ -118,7 +117,7 @@ function sevClass(sev){
 }
 
 function statusBadge(st){
-  const colors = {pending:'#1a73e8', seen:'#5f6368', snoozed:'#a142f4', implemented:'#34a853', dismissed:'#9aa0a6'};
+  const colors = {pending:'#1a73e8', snoozed:'#a142f4', implemented:'#34a853', dismissed:'#9aa0a6'};
   const c = colors[st]||'#5f6368';
   return `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${c}20;color:${c};text-transform:capitalize;">${st}</span>`;
 }
@@ -138,9 +137,8 @@ function cardTemplate(rec){
   const actionButtons = `
     <div class="rec-actions">
       <input type="checkbox" class="rowCheck" />
-      <button class="btn-icon act" data-act="seen" title="Отметить просмотренной">👁</button>
       <button class="btn-icon act" data-act="implemented" title="Отметить внедрённой">✅</button>
-      <button class="btn-icon act" data-act="snooze" title="Отложить">⏱</button>
+      <button class="btn-icon act" data-act="snooze" title="Отложить на 1 месяц">⏱</button>
       <button class="btn-icon act" data-act="dismiss" title="Скрыть">🗑</button>
     </div>
   `;
@@ -231,11 +229,7 @@ async function actBulk(action){
 
 function enableBulkButtons(){
   const has = selectedIds().length>0;
-  const bulkSeen = qs('#bulkSeen');
   
-  if (bulkSeen) {
-    bulkSeen.disabled = !has;
-  }
 }
 
 // Events
@@ -396,10 +390,7 @@ if (selectAll) {
   });
 }
 
-const bulkSeen = qs('#bulkSeen');
-if (bulkSeen) {
-  bulkSeen.addEventListener('click', ()=>actBulk('seen'));
-}
+ 
 
 const exportCsv = qs('#exportCsv');
 if (exportCsv) {
