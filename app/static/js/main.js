@@ -59,11 +59,13 @@ function showFlashMessage(message, type) {
  */
 function syncProvider(providerId, providerType, button, onSuccess) {
     const originalText = button.innerHTML;
+    const originalColor = button.style.color;
     
     // Show loading state
     button.disabled = true;
     button.classList.add('loading');
-    button.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i><span>Синхронизация...</span>';
+    button.style.color = 'white'; // Ensure text is visible on blue background
+    button.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i><span style="margin-left: 0.5rem;">Синхронизация...</span>';
     
     // Make sync request
     fetch(`/api/providers/${providerType}/${providerId}/sync`, {
@@ -76,7 +78,7 @@ function syncProvider(providerId, providerType, button, onSuccess) {
     .then(data => {
         if (data.success) {
             // Show success state
-            button.innerHTML = '<i class="fa-solid fa-check"></i><span>Синхронизировано</span>';
+            button.innerHTML = '<i class="fa-solid fa-check"></i><span style="margin-left: 0.5rem;">Синхронизировано</span>';
             button.style.background = 'var(--success-green)';
             button.style.borderColor = 'var(--success-green)';
             button.style.color = 'white';
@@ -97,7 +99,7 @@ function syncProvider(providerId, providerType, button, onSuccess) {
         console.error('Sync error:', error);
         
         // Show error state
-        button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span>Ошибка</span>';
+        button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span style="margin-left: 0.5rem;">Ошибка</span>';
         button.style.background = 'var(--error-red)';
         button.style.borderColor = 'var(--error-red)';
         button.style.color = 'white';
