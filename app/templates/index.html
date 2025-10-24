@@ -34,7 +34,7 @@
             
             <div class="hero-actions">
                 <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Начать работу</a>
-                <a href="#demo" class="btn btn-secondary">Посмотреть демо</a>
+                <button onclick="demoLogin()" class="btn btn-secondary">Посмотреть демо</button>
             </div>
 
             <div class="hero-stats">
@@ -140,5 +140,46 @@
             </p>
         </footer>
     </div>
+
+    <script>
+        // Demo login function (same as in login.html)
+        function demoLogin() {
+            fetch('/api/auth/google', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    credential: 'demo-token',
+                    demo: true
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    // For demo, create a mock session
+                    fetch('/api/demo-login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = '/dashboard';
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // For demo purposes, redirect anyway
+                window.location.href = '/dashboard';
+            });
+        }
+    </script>
 </body>
 </html>
