@@ -117,6 +117,17 @@ function syncProvider(providerId, providerType, button, onSuccess) {
 }
 
 /**
+ * Wrapper function for inline onclick handlers
+ * Extracts the button reference and calls syncProvider
+ */
+function syncConnection(connectionId, providerType) {
+    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    const button = event.target.closest('button');
+    
+    syncProvider(numericId, providerType, button);
+}
+
+/**
  * Start a complete sync of all providers
  * @param {HTMLElement} button - The button element that triggered the sync
  */

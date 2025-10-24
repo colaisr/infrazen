@@ -136,10 +136,9 @@
                     </div>
                 </div>
                 <div class="provider-actions">
-                    <button class="btn btn-outline btn-sm sync-btn" 
-                            data-sync-provider="{{ p.id }}" 
-                            data-provider-type="{{ p.code }}">
-                        <i class="fa-solid fa-arrows-rotate"></i>
+                    <button class="action-btn primary sync-btn" 
+                            onclick="syncConnection('{{ p.id }}', '{{ p.code }}')">
+                        <i class="fa-solid fa-sync"></i>
                         <span>Синхронизировать</span>
                     </button>
                 </div>
