@@ -1073,11 +1073,15 @@ class SelectelClient:
             server_id = server.get('id')
             server_name = server.get('name', 'Unknown')
             ram_mb = server.get('ram_mb', 1024)
+            server_region = server.get('region', 'ru-3')  # Use VM's actual region
+            
+            # Convert availability zone (ru-3b) to region (ru-3) if needed
+            if server_region and len(server_region) > 2:
+                if server_region[-1].isalpha() and server_region[-2].isdigit():
+                    server_region = server_region[:-1]
             
             try:
-                # Determine the correct region for this server
-                # For now, try ru-7 since that's where we found the VM
-                server_region = 'ru-7'
+                logger.info(f"Collecting statistics for {server_name} (ID: {server_id[:20]}...) in region {server_region}")
                 
                 # Get CPU statistics
                 cpu_stats = self.get_server_cpu_statistics(server_id, hours=24*30, region=server_region)

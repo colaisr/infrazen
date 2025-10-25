@@ -298,7 +298,8 @@ class SelectelService:
                         server_data_list.append({
                             'id': vm.resource_id,
                             'name': vm.resource_name,
-                            'ram_mb': metadata.get('ram_mb', 1024)
+                            'ram_mb': metadata.get('ram_mb', 1024),
+                            'region': vm.region  # Pass VM's actual region for stats API
                         })
                     
                     statistics = self.client.get_all_server_statistics(server_data_list)
