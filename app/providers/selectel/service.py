@@ -1392,6 +1392,21 @@ class SelectelService:
             else:
                 normalized_status = raw_status_upper
             
+            # Extract external IP from ip_addresses (prefer public/floating IPs over private)
+            external_ip = None
+            if 'ip_addresses' in metadata and metadata['ip_addresses']:
+                # Try to find a public IP (typically starts with something other than 10., 172.16-31., 192.168.)
+                for ip in metadata['ip_addresses']:
+                    if ip and not ip.startswith(('10.', '172.16.', '172.17.', '172.18.', '172.19.', 
+                                                  '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', 
+                                                  '172.25.', '172.26.', '172.27.', '172.28.', '172.29.', 
+                                                  '172.30.', '172.31.', '192.168.')):
+                        external_ip = ip
+                        break
+                # If no public IP found, use the first one
+                if not external_ip and metadata['ip_addresses']:
+                    external_ip = metadata['ip_addresses'][0]
+            
             unified_resource = {
                 'resource_id': resource_id,
                 'resource_name': name,
@@ -1400,7 +1415,8 @@ class SelectelService:
                 'region': region or ('global' if resource_type == 'account' else 'unknown'),
                 'status': normalized_status,
                 'effective_cost': 0.0,
-                'provider_config': metadata
+                'provider_config': metadata,
+                'external_ip': external_ip
             }
             
             if existing_resource:
@@ -1443,6 +1459,8 @@ class SelectelService:
                         existing_resource.region = region
                     if service_name:
                         existing_resource.service_name = service_name
+                    # Update external IP
+                    existing_resource.external_ip = external_ip
                 
                 # Create resource state
                 resource_state = ResourceState(
@@ -1479,6 +1497,7 @@ class SelectelService:
                     service_name=service_name or ('Account' if resource_type == 'account' else resource_type.title()),
                     status=normalized_status,  # Set normalized status
                     provider_config=json.dumps(metadata),
+                    external_ip=external_ip,  # Set external IP
                     last_sync=datetime.now(),
                     is_active=True
                 )

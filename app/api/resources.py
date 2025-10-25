@@ -37,7 +37,10 @@ def list_resources():
                 'resource_name': r.resource_name,
                 'resource_type': r.resource_type,
                 'status': r.status,
-                'provider_id': r.provider_id
+                'provider_id': r.provider_id,
+                'external_ip': r.external_ip,
+                'region': r.region,
+                'daily_cost': r.daily_cost
             } for r in resources
         ]
     })

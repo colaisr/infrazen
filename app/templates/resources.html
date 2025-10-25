@@ -157,13 +157,8 @@
 
                         <div class="resource-details">
                             <div class="detail-row">
-                                <span class="detail-label">Провайдер</span>
-                                <span class="provider-badge provider-{{ resource.provider.provider_type|lower }}">
-                                    {% if resource.provider.provider_type == 'beget' %}BEGET
-                                    {% elif resource.provider.provider_type == 'yandex' %}YC
-                                    {% elif resource.provider.provider_type == 'selectel' %}SEL
-                                    {% else %}{{ resource.provider.provider_type[:3]|upper }}{% endif %}
-                                </span>
+                                <span class="detail-label">Внешний IP</span>
+                                <span class="detail-value external-ip-value">{{ resource.external_ip if resource.external_ip else '—' }}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">Регион</span>
@@ -483,23 +478,6 @@
                             {% endif %}
                         {% endif %}
 
-            <div class="resource-actions">
-                <button class="action-button action-primary" title="Подробнее">
-                    <i class="fa-solid fa-info"></i>
-                </button>
-                <button class="action-button action-secondary" title="Настройки">
-                    <i class="fa-solid fa-gear"></i>
-                </button>
-                {% if resource.status == 'RUNNING' %}
-                <button class="action-button action-warning" title="Остановить">
-                    <i class="fa-solid fa-stop"></i>
-                </button>
-                {% else %}
-                <button class="action-button action-success" title="Запустить">
-                    <i class="fa-solid fa-play"></i>
-                </button>
-                {% endif %}
-            </div>
                 </div>
                 {% endfor %}
             </div>

@@ -286,7 +286,7 @@ function exportResourcesToCSV() {
     
     // Add data header
     csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
-    csvContent += 'Провайдер,Ресурс,Тип,Статус,Регион,Стоимость (₽/день)\n';
+    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Стоимость (₽/день)\n';
     
     // Process each provider section
     providerSections.forEach(section => {
@@ -294,16 +294,17 @@ function exportResourcesToCSV() {
         const resourceCards = section.querySelectorAll('.resource-card');
         
         if (resourceCards.length === 0) {
-            csvContent += `"${providerName}","Нет ресурсов","","","",""\n`;
+            csvContent += `"${providerName}","Нет ресурсов","","","","",""\n`;
         } else {
             resourceCards.forEach(card => {
                 const resourceName = card.querySelector('.resource-name').textContent;
                 const resourceType = card.querySelector('.resource-type').textContent;
                 const status = card.querySelector('.status-badge').textContent.trim();
+                const externalIp = card.querySelector('.detail-row:nth-child(1) .detail-value').textContent;
                 const region = card.querySelector('.detail-row:nth-child(2) .detail-value').textContent;
                 const cost = card.querySelector('.detail-row:nth-child(3) .detail-value').textContent;
                 
-                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${region}","${cost}"\n`;
+                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${cost}"\n`;
             });
         }
     });

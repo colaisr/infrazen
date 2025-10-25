@@ -756,18 +756,37 @@ class BegetProviderPlugin(ProviderPlugin):
             effective_cost = 0.0
             billing_period = 'monthly'
 
+        # Extract external IP address
+        external_ip = vps_data.get('ip_address', '')
+        
+        # If ip_address is not at top level, check in configuration
+        if not external_ip:
+            external_ip = config.get('ip_address', '')
+        
+        # Check for mysql_config public IPs (for databases)
+        if not external_ip:
+            mysql_config = config.get('mysql_config', {})
+            address_info = mysql_config.get('address_info', {})
+            public_ips = address_info.get('public', [])
+            if public_ips and len(public_ips) > 0:
+                external_ip = public_ips[0].get('ip', '')
+
+        # Extract region from VPS data
+        region = vps_data.get('region', vps_data.get('location', 'global'))
+
         unified_resource = ProviderResource(
             resource_id=str(vps_data.get('id', '')),
             resource_name=vps_data.get('name', vps_data.get('display_name', 'Unknown')),
             resource_type='server',
             service_name='Compute',
-            region='global',  # Beget is global
+            region=region,
             status=unified_status,
             effective_cost=effective_cost,
             currency='RUB',
             billing_period=billing_period,
             provider_config=vps_data,
-            provider_type='beget'
+            provider_type='beget',
+            external_ip=external_ip
         )
 
         # Add VPS-specific tags
@@ -810,12 +829,15 @@ class BegetProviderPlugin(ProviderPlugin):
             effective_cost = 0.0
             billing_period = 'monthly'
 
+        # Domains are global services (no specific region)
+        region = domain_data.get('region', 'global')
+
         unified_resource = ProviderResource(
             resource_id=str(domain_data.get('id', domain_data.get('name', ''))),
             resource_name=domain_data.get('name', domain_data.get('fqdn', 'Unknown')),
             resource_type='domain',
             service_name='DNS',
-            region='global',
+            region=region,
             status=domain_data.get('status', 'active'),
             effective_cost=effective_cost,
             currency='RUB',
@@ -841,12 +863,15 @@ class BegetProviderPlugin(ProviderPlugin):
 
     def _create_unified_database(self, db_data: Dict[str, Any]) -> ProviderResource:
         """Create unified resource for database"""
+        # Extract region from database data
+        region = db_data.get('region', 'global')
+        
         unified_resource = ProviderResource(
             resource_id=str(db_data.get('id', db_data.get('name', ''))),
             resource_name=db_data.get('name', 'Unknown'),
             resource_type='database',
             service_name='Database',
-            region='global',
+            region=region,
             status='active',  # Assume active if returned
             effective_cost=float(db_data.get('monthly_cost', 0.0)),
             currency='RUB',
@@ -920,12 +945,15 @@ class BegetProviderPlugin(ProviderPlugin):
         if service_type == 'Storage' and daily_cost == 0:
             daily_cost = 0.01  # Minimal cost to indicate resource is tracked
         
+        # Extract region from service data
+        region = service_data.get('region', 'global')
+        
         unified_resource = ProviderResource(
             resource_id=str(service_data.get('id', service_data.get('name', ''))),
             resource_name=service_name,
             resource_type=resource_type,
             service_name=service_name_display,
-            region='global',  # Beget is global
+            region=region,
             status=service_data.get('status', 'unknown'),
             effective_cost=daily_cost,
             currency='RUB',

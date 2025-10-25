@@ -17,6 +17,7 @@ class Resource(BaseModel):
     resource_id = db.Column(db.String(100), nullable=False)  # Provider's resource ID
     resource_name = db.Column(db.String(255), nullable=False)
     region = db.Column(db.String(100), nullable=False)
+    external_ip = db.Column(db.String(45))  # External/Public IP address (IPv4 or IPv6)
     
     # Classification
     service_name = db.Column(db.String(100), nullable=False)  # e.g., 'Compute', 'Storage', 'Database'
@@ -180,6 +181,7 @@ class Resource(BaseModel):
             'resource_id': self.resource_id,
             'resource_name': self.resource_name,
             'region': self.region,
+            'external_ip': self.external_ip,
             'service_name': self.service_name,
             'resource_type': self.resource_type,
             'status': self.status,

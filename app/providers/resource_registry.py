@@ -23,6 +23,7 @@ class ProviderResource:
     billing_period: str
     provider_config: Dict[str, Any]
     provider_type: str
+    external_ip: str = None
     tags: Dict[str, str] = None
 
     def __post_init__(self):
@@ -43,6 +44,7 @@ class ProviderResource:
             'billing_period': self.billing_period,
             'provider_config': self.provider_config,
             'provider_type': self.provider_type,
+            'external_ip': self.external_ip,
             'tags': self.tags
         }
 

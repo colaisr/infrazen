@@ -608,6 +608,7 @@ class SyncOrchestrator:
             billing_period = resource_data.get('billing_period', 'monthly')
             provider_config = resource_data.get('provider_config', resource_data)
             tags = resource_data.get('tags', {})
+            external_ip = resource_data.get('external_ip')
 
             # Get or create the base Resource record (for reference)
             existing_resource = Resource.query.filter_by(
@@ -627,6 +628,7 @@ class SyncOrchestrator:
                 resource.currency = currency
                 resource.billing_period = billing_period
                 resource.provider_config = json.dumps(provider_config)
+                resource.external_ip = external_ip
                 resource.last_sync = datetime.now()
                 resource.is_active = True
             else:
@@ -643,6 +645,7 @@ class SyncOrchestrator:
                     currency=currency,
                     billing_period=billing_period,
                     provider_config=json.dumps(provider_config),
+                    external_ip=external_ip,
                     last_sync=datetime.now(),
                     is_active=True
                 )
