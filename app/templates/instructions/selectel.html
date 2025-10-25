@@ -22,14 +22,25 @@
         
         <ol>
             <li>Войдите в <a href="https://my.selectel.ru" target="_blank">панель управления Selectel</a></li>
-            <li>Перейдите в раздел <strong>"API"</strong> в верхнем меню</li>
-            <li>Нажмите <strong>"Создать ключ"</strong></li>
+            <li>В верхнем меню перейдите в раздел <strong>"Аккаунт"</strong></li>
+            <li>В левом боковом меню выберите <strong>"Доступ"</strong></li>
+            <li>Перейдите на вкладку <strong>"API-ключи"</strong></li>
+            <li>Нажмите кнопку <strong>"Добавить ключ"</strong></li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/selectel_step_1.png') }}" 
+             alt="Selectel панель управления - раздел API-ключи" 
+             class="instruction-image">
+        <p class="image-caption">Раздел управления API-ключами: Аккаунт → Доступ → API-ключи</p>
+        
+        <ol start="6">
+            <li>Задайте имя для ключа (например, "InfraZen")</li>
             <li>Скопируйте сгенерированный API ключ</li>
         </ol>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
-            <strong>Важно:</strong> Сохраните API ключ в безопасном месте. Он показывается только один раз!
+            <strong>Важно:</strong> Сохраните API ключ в безопасном месте. Он показывается только один раз после создания!
         </div>
     </div>
 
