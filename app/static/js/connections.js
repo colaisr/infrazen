@@ -641,7 +641,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function openInstructions() {
     // Get selected provider from dropdown
-    const providerSelect = document.getElementById('provider_type');
+    const providerSelect = document.getElementById('provider_select');
     if (!providerSelect || !providerSelect.value) {
         showFlashMessage('Выберите провайдера', 'warning');
         return;
