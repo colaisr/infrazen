@@ -172,6 +172,30 @@
     color: var(--text-primary);
 }
 
+.provider-sync.sync-warning {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.provider-sync-error {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(251, 191, 36, 0.1);
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #92400e;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.provider-sync-error i {
+    color: #f59e0b;
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
 .provider-actions {
     margin-top: 0.75rem;
     display: flex;

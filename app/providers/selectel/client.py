@@ -1283,36 +1283,69 @@ class SelectelClient:
     def test_connection(self) -> Dict[str, Any]:
         """
         Test the API connection and return account information
+        Tests both API key (billing) and service user credentials (OpenStack)
         
         Returns:
             Dict containing connection test results
         """
         try:
-            # Test with /accounts endpoint
+            # Test 1: API Key (billing/account endpoints)
             response = self.session.get(f"{self.base_url}/accounts", timeout=90)
             
-            if response.status_code == 200:
-                account_data = response.json()
-                account_info = account_data.get('account', {})
-                
-                return {
-                    'success': True,
-                    'status_code': response.status_code,
-                    'account_info': {
-                        'name': account_info.get('name'),
-                        'enabled': account_info.get('enabled'),
-                        'locked': account_info.get('locked'),
-                        'onboarding': account_info.get('onboarding')
-                    },
-                    'message': 'Connection successful'
-                }
-            else:
+            if response.status_code != 200:
                 return {
                     'success': False,
                     'status_code': response.status_code,
                     'error': response.text,
-                    'message': f'API request failed with status {response.status_code}'
+                    'message': f'API Key test failed with status {response.status_code}'
                 }
+            
+            account_data = response.json()
+            account_info = account_data.get('account', {})
+            
+            # Test 2: Service User Credentials (OpenStack IAM)
+            openstack_test = {'success': False, 'message': 'Not tested'}
+            if self.service_username and self.service_password:
+                try:
+                    # Try to generate IAM token
+                    iam_token = self._get_iam_token()
+                    if iam_token:
+                        openstack_test = {
+                            'success': True,
+                            'message': 'OpenStack authentication successful',
+                            'token_length': len(iam_token)
+                        }
+                except Exception as iam_error:
+                    openstack_test = {
+                        'success': False,
+                        'error': str(iam_error),
+                        'message': 'OpenStack authentication failed - check service user credentials'
+                    }
+            else:
+                openstack_test = {
+                    'success': False,
+                    'message': 'Service user credentials not provided'
+                }
+            
+            # Connection is only fully successful if both tests pass
+            fully_successful = openstack_test.get('success', False)
+            
+            return {
+                'success': fully_successful,
+                'status_code': response.status_code,
+                'account_info': {
+                    'name': account_info.get('name'),
+                    'enabled': account_info.get('enabled'),
+                    'locked': account_info.get('locked'),
+                    'onboarding': account_info.get('onboarding')
+                },
+                'api_key_test': {
+                    'success': True,
+                    'message': 'API key valid'
+                },
+                'openstack_test': openstack_test,
+                'message': 'Connection fully successful' if fully_successful else f'API key works but OpenStack auth failed: {openstack_test.get("message")}'
+            }
                 
         except requests.exceptions.RequestException as e:
             return {

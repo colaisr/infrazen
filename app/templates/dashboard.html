@@ -130,10 +130,21 @@
                         <i class="fa-solid fa-calendar-plus"></i>
                         <span>Добавлен: {{ p.added_at }}</span>
                     </div>
-                    <div class="provider-sync">
-                        <i class="fa-solid fa-arrows-rotate"></i>
-                        <span>Синхронизация: {{ p.last_sync or 'Никогда' }}</span>
+                    <div class="provider-sync {% if p.sync_error %}sync-warning{% endif %}">
+                        {% if p.sync_error %}
+                            <i class="fa-solid fa-exclamation-triangle"></i>
+                            <span>⚠️ Частичная: {{ p.last_sync or 'Никогда' }}</span>
+                        {% else %}
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>Синхронизация: {{ p.last_sync or 'Никогда' }}</span>
+                        {% endif %}
                     </div>
+                    {% if p.sync_error %}
+                    <div class="provider-sync-error">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <span>{{ p.sync_error }}</span>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="provider-actions">
                     <button class="action-btn primary sync-btn" 

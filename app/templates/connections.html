@@ -136,10 +136,23 @@
                 <div class="sync-info">
                     {% if provider.status == 'connected' %}
                         {% if provider.last_sync %}
-                            <div class="sync-status success">
-                                <i class="fa-solid fa-check-circle"></i>
-                                <span>Синхронизирован {{ provider.last_sync.strftime('%d.%m.%Y в %H:%M') }}</span>
-                            </div>
+                            {% if provider.sync_error %}
+                                {# Partial sync - success with warnings #}
+                                <div class="sync-status warning">
+                                    <i class="fa-solid fa-exclamation-triangle"></i>
+                                    <span>⚠️ Частичная синхронизация {{ provider.last_sync.strftime('%d.%m.%Y в %H:%M') }}</span>
+                                </div>
+                                <div class="sync-error-message">
+                                    <i class="fa-solid fa-info-circle"></i>
+                                    <span>{{ provider.sync_error }}</span>
+                                </div>
+                            {% else %}
+                                {# Full success #}
+                                <div class="sync-status success">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    <span>Синхронизирован {{ provider.last_sync.strftime('%d.%m.%Y в %H:%M') }}</span>
+                                </div>
+                            {% endif %}
                         {% else %}
                             <div class="sync-status pending">
                                 <i class="fa-solid fa-clock"></i>

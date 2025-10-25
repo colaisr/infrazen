@@ -621,5 +621,17 @@ document.addEventListener('DOMContentLoaded', function() {
             closeRecoSummary();
         }
     });
+    
+    // Clear any stale success flash messages on page load if there are warnings
+    // This handles cases where old success messages are still in the session
+    setTimeout(() => {
+        const existingFlashes = document.querySelectorAll('.flash-message.flash-success');
+        const hasWarnings = document.querySelector('.sync-status.warning') !== null;
+        
+        if (hasWarnings && existingFlashes.length > 0) {
+            // There are warnings on the page but stale success messages - clear them
+            existingFlashes.forEach(flash => flash.remove());
+        }
+    }, 100);
 });
 

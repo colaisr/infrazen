@@ -372,6 +372,30 @@
     color: var(--error-red);
 }
 
+.sync-status.warning {
+    background: rgba(251, 191, 36, 0.1);
+    color: #f59e0b;
+}
+
+.sync-error-message {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(251, 191, 36, 0.05);
+    border-left: 3px solid #f59e0b;
+    border-radius: 4px;
+    font-size: 0.813rem;
+    color: #92400e;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.sync-error-message i {
+    color: #f59e0b;
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+}
+
 .sync-status.add-status {
     background: rgba(59, 130, 246, 0.1);
     color: var(--primary-blue);

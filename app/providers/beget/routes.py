@@ -158,6 +158,9 @@ def edit_connection(provider_id):
             provider.auto_sync = auto_sync
             provider.sync_interval = sync_interval
             
+            # Clear sync_error since credentials were successfully tested
+            provider.sync_error = None
+            
             db.session.commit()
             return jsonify({'success': True, 'message': 'Connection updated successfully'})
         
@@ -211,8 +214,11 @@ def sync_connection(provider_id):
                 'message': sync_result['message'],
                 'snapshot_id': sync_result['sync_snapshot_id'],
                 'status': 'success',
+                'resources_synced': sync_result['resources_synced'],
                 'total_resources': sync_result['resources_synced'],
+                'total_daily_cost': sync_result.get('total_cost', 0),
                 'total_cost': sync_result.get('total_cost', 0),
+                'openstack_auth_ok': True,  # Beget doesn't use OpenStack
                 'errors': sync_result['errors']
             })
         else:

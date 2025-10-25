@@ -171,9 +171,17 @@ def sync_resources(provider_id):
         sync_result = service.sync_resources()
         
         if sync_result.get('success'):
+            # Return ALL sync result data to frontend for proper UI updates
             return jsonify({
                 'success': True,
-                'message': f"Successfully synced {sync_result.get('resources_synced')} resources"
+                'message': sync_result.get('message'),
+                'resources_synced': sync_result.get('resources_synced'),
+                'total_daily_cost': sync_result.get('total_daily_cost'),
+                'total_monthly_cost': sync_result.get('total_daily_cost', 0) * 30,
+                'openstack_auth_ok': sync_result.get('openstack_auth_ok'),
+                'orphan_volumes': sync_result.get('orphan_volumes'),
+                'zombie_resources': sync_result.get('zombie_resources'),
+                'service_types': sync_result.get('service_types', [])
             })
         else:
             return jsonify({
@@ -326,6 +334,10 @@ def update_connection(provider_id):
         provider.provider_metadata = json.dumps(updated_metadata)
         provider.auto_sync = auto_sync
         provider.sync_interval = sync_interval_seconds
+        
+        # Clear sync_error since credentials were successfully tested
+        # This prevents stale warning messages from showing after credentials are fixed
+        provider.sync_error = None
         
         db.session.commit()
         

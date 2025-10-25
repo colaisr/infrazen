@@ -235,6 +235,7 @@ def connections():
                 'connection_name': provider.connection_name,
                 'status': 'connected' if provider.is_active else 'disconnected',
                 'last_sync': provider.last_sync,
+                'sync_error': provider.sync_error,  # Add sync_error for partial sync warnings
                 'auto_sync': provider.auto_sync,  # Add auto_sync field for template
                 'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
                 'provider_metadata': provider.provider_metadata,  # Add this line
@@ -255,6 +256,9 @@ def connections():
     # Get last complete sync data for accurate statistics
     from app.core.models.complete_sync import CompleteSync
     last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    
+    # Note: We don't flash warnings on page load - the card UI shows them clearly
+    # This prevents annoying toast popups on every page refresh
     
     return render_template('connections.html', 
                         user=user,
@@ -558,7 +562,8 @@ def get_real_user_overview(user_id):
             'name': provider.connection_name,
             'status': 'connected' if provider.is_active else 'disconnected',
             'added_at': provider.created_at.strftime('%d.%m.%Y') if provider.created_at else 'Неизвестно',
-            'last_sync': provider.last_sync.strftime('%d.%m.%Y %H:%M') if provider.last_sync else 'Никогда'
+            'last_sync': provider.last_sync.strftime('%d.%m.%Y %H:%M') if provider.last_sync else 'Никогда',
+            'sync_error': provider.sync_error  # Add sync_error for partial sync warnings
         })
     
     # Calculate savings percentage

@@ -91,6 +91,19 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
+            # PHASE 0: Validate OpenStack authentication (critical for VM/volume details)
+            logger.info("PHASE 0: Validating OpenStack authentication")
+            openstack_auth_ok = False
+            try:
+                iam_token = self.client._get_iam_token()
+                if iam_token:
+                    openstack_auth_ok = True
+                    logger.info("✅ OpenStack authentication successful")
+            except Exception as auth_error:
+                logger.error(f"❌ OpenStack authentication FAILED: {auth_error}")
+                logger.warning("⚠️  Sync will continue with billing data only - VMs will lack CPU/RAM/IP details")
+                logger.warning("⚠️  Fix: Check service user credentials and permissions in Selectel admin panel")
+            
             # PHASE 1: Get all billed resources (2h window for current active resources only)
             logger.info("PHASE 1: Fetching billing data (2h window - current active resources only)")
             billed_resources = self.client.get_resource_costs(hours=2)
@@ -312,6 +325,7 @@ class SelectelService:
             sync_config = json.loads(sync_snapshot.sync_config) if sync_snapshot.sync_config else {}
             sync_config.update({
                 'sync_method': 'billing_first',
+                'openstack_auth_ok': openstack_auth_ok,
                 'orphan_volumes': len(orphan_volumes),
                 'zombie_resources': len(zombie_resources),
                 'unified_vms': len(unified_vms),
@@ -323,10 +337,18 @@ class SelectelService:
             })
             sync_snapshot.sync_config = json.dumps(sync_config)
             
-            # Update provider
+            # Update provider - set status based on OpenStack auth
             self.provider.last_sync = datetime.now()
-            self.provider.sync_status = 'success'
-            self.provider.sync_error = None
+            
+            if not openstack_auth_ok:
+                # OpenStack auth failed - sync succeeded but with degraded data
+                self.provider.sync_status = 'success'  # Still success (billing worked)
+                self.provider.sync_error = 'OpenStack authentication failed - VMs have limited details. Check service user credentials.'
+                logger.warning("⚠️  Sync completed with WARNINGS - OpenStack enrichment unavailable")
+            else:
+                # Full success
+                self.provider.sync_status = 'success'
+                self.provider.sync_error = None
             
             db.session.commit()
             
@@ -334,6 +356,15 @@ class SelectelService:
             logger.info(f"  - Active: {len(synced_resources) - len(zombie_resources)}")
             logger.info(f"  - Zombies: {len(zombie_resources)} ({zombie_cost:.2f} ₽/day)")
             logger.info(f"  - Orphan volumes: {len(orphan_volumes)} ({orphan_cost:.2f} ₽/day)")
+            
+            if not openstack_auth_ok:
+                logger.error("❌ CRITICAL: OpenStack authentication failed - VMs are missing CPU/RAM/IP details")
+                logger.error("❌ ACTION REQUIRED: Update service user credentials in connection settings")
+            
+            # Build success message with prominent warning if OpenStack auth failed
+            base_message = f'Successfully synced {len(synced_resources)} resources ({total_cost:.2f} ₽/day)'
+            if not openstack_auth_ok:
+                base_message = f'⚠️ PARTIAL SYNC: {len(synced_resources)} resources found but OpenStack auth FAILED - VMs lack CPU/RAM/IP details. Update service user credentials!'
             
             return {
                 'success': True,
@@ -345,7 +376,8 @@ class SelectelService:
                 'orphan_daily_cost': round(orphan_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'service_types': list(resources_by_type.keys()),
-                'message': f'Successfully synced {len(synced_resources)} resources ({total_cost:.2f} ₽/day)'
+                'openstack_auth_ok': openstack_auth_ok,
+                'message': base_message
             }
             
         except Exception as e:
@@ -617,46 +649,47 @@ class SelectelService:
                 
                 return resource
             else:
-                # VM not found in OpenStack - could be deleted VM or orphaned volume
-                # Check if this is actually just orphaned volumes (VM deleted but volumes remain)
-                attached_volumes = billing_data.get('attached_volumes', [])
+                # VM not found in OpenStack - BILLING-FIRST: Create resource from billing data
+                # This could mean:
+                # 1. OpenStack authentication/permissions issue (our bug, not user's)
+                # 2. VM is truly deleted but still being billed (user's issue)
+                # 
+                # We MUST create the resource either way (billing = source of truth)
+                logger.warning(f"VM {resource_id} ({billing_data['name']}) found in billing but not in OpenStack - creating with limited info")
                 
-                if attached_volumes and len(attached_volumes) > 0:
-                    # This "VM" is actually orphaned volumes - the VM was deleted
-                    # Don't create a zombie VM resource - volumes will be processed separately
-                    logger.info(f"Skipping deleted VM {resource_id} - {len(attached_volumes)} orphaned volumes will be processed separately")
-                    return None
-                else:
-                    # True zombie VM - deleted but still billed (no volumes)
-                    logger.warning(f"Zombie VM: {resource_id} ({billing_data['name']}) - billed but not in OpenStack")
-                    
-                    # Extract provision date from billing data
-                    created_at = self._extract_provision_date_from_billing(resource_id)
-                    
-                    resource = self._create_resource(
-                        resource_type='server',
-                        resource_id=resource_id,
-                        name=billing_data['name'],
-                        metadata={
-                            'billing': billing_data,
-                            'is_zombie': True,
-                            'note': 'Deleted from OpenStack but still billed',
-                            'created_at': created_at
-                        },
-                        sync_snapshot_id=sync_snapshot_id,
-                        region='unknown',
-                        service_name='Compute'
-                    )
-                    
-                    if resource:
-                        resource.status = 'DELETED_BILLED'
-                        resource.daily_cost = billing_data['daily_cost_rubles']
-                        resource.effective_cost = billing_data['daily_cost_rubles']
-                        resource.original_cost = billing_data['monthly_cost_rubles']
-                        resource.currency = 'RUB'
-                        resource.add_tag('is_zombie', 'true')
-                        resource.add_tag('recommendation', 'Contact support - billed for deleted resource')
-                        resource.add_tag('cost_source', 'billing_api')
+                # Extract provision date from billing data
+                created_at = self._extract_provision_date_from_billing(resource_id)
+                
+                # Use billing region if available
+                region = billing_data.get('region', 'unknown')
+                
+                resource = self._create_resource(
+                    resource_type='server',
+                    resource_id=resource_id,
+                    name=billing_data['name'],
+                    metadata={
+                        'billing': billing_data,
+                        'openstack_enrichment_failed': True,
+                        'note': 'Created from billing data only - OpenStack details unavailable',
+                        'created_at': created_at,
+                        # Try to extract any available info from billing metrics
+                        'metrics': billing_data.get('metrics', {})
+                    },
+                    sync_snapshot_id=sync_snapshot_id,
+                    region=region,
+                    service_name='Compute'
+                )
+                
+                if resource:
+                    # Resource is RUNNING (has costs in billing) but missing details
+                    resource.status = 'RUNNING'  # Active if being billed
+                    resource.daily_cost = billing_data['daily_cost_rubles']
+                    resource.effective_cost = billing_data['daily_cost_rubles']
+                    resource.original_cost = billing_data['monthly_cost_rubles']
+                    resource.currency = 'RUB'
+                    resource.add_tag('openstack_enrichment_failed', 'true')
+                    resource.add_tag('cost_source', 'billing_api')
+                    resource.add_tag('warning', 'Missing CPU/RAM/IP details - check service user permissions')
                 
                 return resource
                 
