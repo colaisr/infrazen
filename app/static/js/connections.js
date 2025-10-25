@@ -635,3 +635,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 100);
 });
 
+// ============================================================================
+// Instructions
+// ============================================================================
+
+function openInstructions() {
+    // Get selected provider from dropdown
+    const providerSelect = document.getElementById('provider_type');
+    if (!providerSelect || !providerSelect.value) {
+        showFlashMessage('Выберите провайдера', 'warning');
+        return;
+    }
+    
+    const providerType = providerSelect.value;
+    
+    // Open instructions page in new tab
+    const instructionsUrl = `/instructions/${providerType}`;
+    window.open(instructionsUrl, '_blank');
+}
+

@@ -1,0 +1,153 @@
+{% extends "instructions_base.html" %}
+
+{% block title %}Инструкция по подключению Selectel{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 2rem auto; padding: 2rem;">
+    <div class="instructions-header" style="margin-bottom: 2rem;">
+        <h1 style="color: #1E40AF; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-book"></i> Инструкция по подключению Selectel
+        </h1>
+        <p style="color: #6B7280; font-size: 1.1rem;">Пошаговое руководство для интеграции Selectel с InfraZen</p>
+    </div>
+
+    <!-- Prerequisites -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <i class="fa-solid fa-clipboard-check"></i> Требования
+        </h2>
+        <ul style="line-height: 1.8; color: #374151;">
+            <li>Активный аккаунт Selectel</li>
+            <li>Доступ к панели управления Selectel</li>
+            <li>Права администратора в InfraZen</li>
+        </ul>
+    </div>
+
+    <!-- Step 1: Get API Key -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">1</span>
+            Получение API ключа
+        </h2>
+        
+        <ol style="line-height: 2; color: #374151;">
+            <li>Войдите в <a href="https://my.selectel.ru" target="_blank" style="color: #3B82F6;">панель управления Selectel</a></li>
+            <li>Перейдите в раздел <strong>"API"</strong> в верхнем меню</li>
+            <li>Нажмите <strong>"Создать ключ"</strong></li>
+            <li>Скопируйте сгенерированный API ключ</li>
+        </ol>
+        
+        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+            <p style="color: #92400E; margin: 0;">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+                <strong>Важно:</strong> Сохраните API ключ в безопасном месте. Он показывается только один раз!
+            </p>
+        </div>
+    </div>
+
+    <!-- Step 2: Create Service User -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">2</span>
+            Создание сервисного пользователя (для OpenStack)
+        </h2>
+        
+        <ol style="line-height: 2; color: #374151;">
+            <li>В панели Selectel перейдите в <strong>"Пользователи и роли"</strong></li>
+            <li>Нажмите <strong>"Создать пользователя"</strong></li>
+            <li>Укажите имя пользователя (например, "InfraZen")</li>
+            <li>Создайте пароль для пользователя</li>
+            <li><strong>Важно:</strong> Назначьте роль <strong>"member"</strong> на уровне аккаунта</li>
+            <li>Сохраните имя пользователя и пароль</li>
+        </ol>
+        
+        <div style="background: #DBEAFE; border-left: 4px solid #3B82F6; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+            <p style="color: #1E40AF; margin: 0;">
+                <i class="fa-solid fa-info-circle"></i>
+                <strong>Зачем это нужно?</strong> Сервисный пользователь с ролью "member" необходим для получения статистики использования VM (CPU, RAM) и деталей о дисках через OpenStack API.
+            </p>
+        </div>
+    </div>
+
+    <!-- Step 3: Add Connection -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">3</span>
+            Добавление подключения в InfraZen
+        </h2>
+        
+        <ol style="line-height: 2; color: #374151;">
+            <li>Перейдите в раздел <strong>"Подключения"</strong></li>
+            <li>Нажмите кнопку <strong>"+ Добавить подключение"</strong></li>
+            <li>Выберите провайдера <strong>"Selectel"</strong> из выпадающего списка</li>
+            <li>Заполните поля:
+                <ul style="margin-top: 0.5rem;">
+                    <li><strong>Название подключения:</strong> Любое удобное имя (например, "Selectel Production")</li>
+                    <li><strong>API Key:</strong> Ваш API ключ из шага 1</li>
+                    <li><strong>Service Username:</strong> Имя сервисного пользователя из шага 2</li>
+                    <li><strong>Service Password:</strong> Пароль сервисного пользователя</li>
+                </ul>
+            </li>
+            <li>Нажмите <strong>"Тест подключения"</strong> для проверки</li>
+            <li>Если тест успешен, нажмите <strong>"Сохранить"</strong></li>
+        </ol>
+        
+        <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+            <p style="color: #92400E; margin: 0;">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+                <strong>Распространенная ошибка:</strong> Если роль сервисного пользователя установлена как "reader" вместо "member", 
+                InfraZen не сможет получить статистику использования ресурсов.
+            </p>
+        </div>
+    </div>
+
+    <!-- Step 4: Sync -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">4</span>
+            Первая синхронизация
+        </h2>
+        
+        <p style="color: #374151; line-height: 1.6; margin-bottom: 1rem;">
+            После сохранения подключения InfraZen автоматически начнет синхронизацию:
+        </p>
+        
+        <ul style="line-height: 1.8; color: #374151;">
+            <li>Виртуальные машины (VM) с деталями конфигурации</li>
+            <li>Статистика использования CPU и памяти (за последние 30 дней)</li>
+            <li>Диски и объемы хранения</li>
+            <li>Load Balancers</li>
+            <li>Kubernetes кластеры</li>
+            <li>Базы данных</li>
+            <li>Стоимость всех ресурсов из биллинга</li>
+        </ul>
+        
+        <div style="background: #DBEAFE; border-left: 4px solid #3B82F6; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+            <p style="color: #1E40AF; margin: 0;">
+                <i class="fa-solid fa-info-circle"></i>
+                <strong>Совет:</strong> Первая синхронизация может занять 1-3 минуты в зависимости от количества ресурсов. 
+                Сбор статистики использования добавляет ~30 секунд на каждую виртуальную машину.
+            </p>
+        </div>
+    </div>
+
+    <!-- Support -->
+    <div class="instruction-section" style="background: #F9FAFB; border-radius: 12px; padding: 2rem; margin-bottom: 2rem;">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <i class="fa-solid fa-life-ring"></i> Нужна помощь?
+        </h2>
+        <p style="color: #374151; line-height: 1.6;">
+            Если у вас возникли проблемы с подключением Selectel, свяжитесь с нашей службой поддержки или ознакомьтесь с 
+            <a href="https://docs.selectel.ru" target="_blank" style="color: #3B82F6;">документацией Selectel</a>.
+        </p>
+    </div>
+
+    <!-- Back Button -->
+    <div style="text-align: center; margin-top: 3rem;">
+        <button onclick="window.close()" class="btn btn-secondary" style="padding: 0.75rem 2rem;">
+            <i class="fa-solid fa-arrow-left"></i> Закрыть
+        </button>
+    </div>
+</div>
+{% endblock %}
+

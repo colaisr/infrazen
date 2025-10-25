@@ -812,3 +812,22 @@ def get_expense_dynamics_data(user_id):
         'savings': implemented_savings,
         'trend_data': trend_data
     }
+
+
+@main_bp.route('/instructions/<provider_type>')
+def instructions(provider_type):
+    """Display provider-specific setup instructions"""
+    # Map provider types to template files
+    provider_templates = {
+        'beget': 'instructions/beget.html',
+        'selectel': 'instructions/selectel.html',
+        'yandex': 'instructions/yandex.html',
+        'aws': 'instructions/aws.html'
+    }
+    
+    template = provider_templates.get(provider_type)
+    if not template:
+        # Fallback to generic instructions
+        return render_template('instructions/generic.html', provider_type=provider_type)
+    
+    return render_template(template)

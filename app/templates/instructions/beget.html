@@ -1,0 +1,122 @@
+{% extends "instructions_base.html" %}
+
+{% block title %}Инструкция по подключению Beget{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 2rem auto; padding: 2rem;">
+    <div class="instructions-header" style="margin-bottom: 2rem;">
+        <h1 style="color: #1E40AF; margin-bottom: 0.5rem;">
+            <i class="fa-solid fa-book"></i> Инструкция по подключению Beget
+        </h1>
+        <p style="color: #6B7280; font-size: 1.1rem;">Пошаговое руководство для интеграции Beget с InfraZen</p>
+    </div>
+
+    <!-- Prerequisites -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <i class="fa-solid fa-clipboard-check"></i> Требования
+        </h2>
+        <ul style="line-height: 1.8; color: #374151;">
+            <li>Активный аккаунт Beget</li>
+            <li>Доступ к панели управления Beget</li>
+            <li>Права администратора в InfraZen</li>
+        </ul>
+    </div>
+
+    <!-- Step 1: Get Credentials -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">1</span>
+            Получение учетных данных Beget
+        </h2>
+        
+        <div style="margin-top: 1.5rem;">
+            <h3 style="color: #374151; font-size: 1.1rem; margin-bottom: 0.75rem;">Имя пользователя</h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Ваше имя пользователя (логин) в системе Beget. Обычно это имя вашего аккаунта.
+            </p>
+            
+            <h3 style="color: #374151; font-size: 1.1rem; margin-bottom: 0.75rem; margin-top: 1.5rem;">Пароль</h3>
+            <p style="color: #6B7280; line-height: 1.6;">
+                Пароль от вашего аккаунта Beget.
+            </p>
+            
+            <div style="background: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+                <p style="color: #92400E; margin: 0;">
+                    <i class="fa-solid fa-exclamation-triangle"></i>
+                    <strong>Важно:</strong> InfraZen безопасно хранит ваши учетные данные в зашифрованном виде.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Add Connection -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">2</span>
+            Добавление подключения в InfraZen
+        </h2>
+        
+        <ol style="line-height: 2; color: #374151;">
+            <li>Перейдите в раздел <strong>"Подключения"</strong></li>
+            <li>Нажмите кнопку <strong>"+ Добавить подключение"</strong></li>
+            <li>Выберите провайдера <strong>"Beget"</strong> из выпадающего списка</li>
+            <li>Заполните поля:
+                <ul style="margin-top: 0.5rem;">
+                    <li><strong>Название подключения:</strong> Любое удобное имя (например, "Beget Production")</li>
+                    <li><strong>Имя пользователя:</strong> Ваш логин Beget</li>
+                    <li><strong>Пароль:</strong> Ваш пароль Beget</li>
+                </ul>
+            </li>
+            <li>Нажмите <strong>"Тест подключения"</strong> для проверки</li>
+            <li>Если тест успешен, нажмите <strong>"Сохранить"</strong></li>
+        </ol>
+    </div>
+
+    <!-- Step 3: Sync -->
+    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <span style="background: #1E40AF; color: white; padding: 0.25rem 0.75rem; border-radius: 50%; margin-right: 0.5rem;">3</span>
+            Первая синхронизация
+        </h2>
+        
+        <p style="color: #374151; line-height: 1.6; margin-bottom: 1rem;">
+            После сохранения подключения InfraZen автоматически начнет синхронизацию:
+        </p>
+        
+        <ul style="line-height: 1.8; color: #374151;">
+            <li>VPS серверы (конфигурация, использование CPU/RAM/HD)</li>
+            <li>Виртуальный хостинг</li>
+            <li>S3 хранилища</li>
+            <li>MySQL базы данных</li>
+            <li>Стоимость всех ресурсов</li>
+        </ul>
+        
+        <div style="background: #DBEAFE; border-left: 4px solid #3B82F6; padding: 1rem; margin-top: 1rem; border-radius: 4px;">
+            <p style="color: #1E40AF; margin: 0;">
+                <i class="fa-solid fa-info-circle"></i>
+                <strong>Совет:</strong> Первая синхронизация может занять 1-2 минуты в зависимости от количества ресурсов.
+            </p>
+        </div>
+    </div>
+
+    <!-- Support -->
+    <div class="instruction-section" style="background: #F9FAFB; border-radius: 12px; padding: 2rem; margin-bottom: 2rem;">
+        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
+            <i class="fa-solid fa-life-ring"></i> Нужна помощь?
+        </h2>
+        <p style="color: #374151; line-height: 1.6;">
+            Если у вас возникли проблемы с подключением Beget, свяжитесь с нашей службой поддержки или ознакомьтесь с 
+            <a href="https://beget.com/ru/kb" target="_blank" style="color: #3B82F6;">документацией Beget</a>.
+        </p>
+    </div>
+
+    <!-- Back Button -->
+    <div style="text-align: center; margin-top: 3rem;">
+        <button onclick="window.close()" class="btn btn-secondary" style="padding: 0.75rem 2rem;">
+            <i class="fa-solid fa-arrow-left"></i> Закрыть
+        </button>
+    </div>
+</div>
+{% endblock %}
+
