@@ -61,12 +61,20 @@
              class="instruction-image">
         <p class="image-caption">Раздел управления сервисными пользователями: Аккаунт → Сервисные пользователи</p>
         
+        <p>В открывшейся форме создания сервисного пользователя:</p>
+        
         <ol start="4">
             <li>Укажите имя пользователя (например, <code>infrazen-service</code>)</li>
             <li>Создайте надежный пароль</li>
             <li><strong>Критически важно:</strong> Назначьте роль <strong>"member"</strong> на уровне аккаунта или проекта</li>
-            <li>Сохраните имя пользователя и пароль</li>
+            <li>Нажмите <strong>"Создать"</strong></li>
+            <li>Сохраните имя пользователя и пароль для использования в InfraZen</li>
         </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/selectel_step_3.png') }}" 
+             alt="Selectel форма создания сервисного пользователя" 
+             class="instruction-image">
+        <p class="image-caption">Форма создания сервисного пользователя: укажите имя, пароль и роль "member"</p>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
