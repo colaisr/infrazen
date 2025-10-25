@@ -66,7 +66,7 @@
         <ol start="4">
             <li>Укажите имя пользователя (например, <code>infrazen-service</code>)</li>
             <li>Создайте надежный пароль</li>
-            <li><strong>Критически важно:</strong> Назначьте роль <strong>"member"</strong> на уровне аккаунта или проекта</li>
+            <li><strong>Критически важно:</strong> Назначьте роль <strong>"reader"</strong> на уровне аккаунта или проекта</li>
             <li>Нажмите <strong>"Создать"</strong></li>
             <li>Сохраните имя пользователя и пароль для использования в InfraZen</li>
         </ol>
@@ -74,11 +74,11 @@
         <img src="{{ url_for('static', filename='instructions/selectel_step_3.png') }}" 
              alt="Selectel форма создания сервисного пользователя" 
              class="instruction-image">
-        <p class="image-caption">Форма создания сервисного пользователя: укажите имя, пароль и роль "member"</p>
+        <p class="image-caption">Форма создания сервисного пользователя: укажите имя, пароль и роль "reader"</p>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
-            <strong>Распространенная ошибка:</strong> Роль "reader" НЕ работает. Обязательно используйте роль "member" для получения статистики использования CPU и памяти.
+            <strong>Распространенная ошибка:</strong> Роль "member" НЕ работает для InfraZen. Обязательно используйте роль "reader" для получения доступа к информации о ресурсах и статистике.
         </div>
     </div>
 
