@@ -171,14 +171,22 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
     button.style.color = 'white'; // Ensure text is visible on blue background
     button.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i><span style="margin-left: 0.5rem;">Синхронизация...</span>';
     
-    // Make sync request
+    // Create AbortController for timeout (120 seconds for statistics collection)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+    
+    // Make sync request with extended timeout
     fetch(`/api/providers/${providerType}/${providerId}/sync`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-        }
+        },
+        signal: controller.signal
     })
-    .then(response => response.json())
+    .then(response => {
+        clearTimeout(timeoutId); // Clear timeout on successful response
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Check if this was a partial sync (OpenStack auth failed)
@@ -232,7 +240,14 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
         }
     })
     .catch(error => {
+        clearTimeout(timeoutId); // Clear timeout on error
         console.error('Sync error:', error);
+        
+        // Check if it was a timeout
+        const isTimeout = error.name === 'AbortError';
+        const errorMessage = isTimeout 
+            ? 'Превышено время ожидания (>120 сек) - попробуйте отключить сбор статистики'
+            : error.message;
         
         // Show error state
         button.innerHTML = '<i class="fa-solid fa-exclamation-triangle"></i><span style="margin-left: 0.5rem;">Ошибка</span>';
@@ -240,7 +255,7 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
         button.style.borderColor = 'var(--error-red)';
         button.style.color = 'white';
         
-        showFlashMessage('❌ Ошибка синхронизации: ' + error.message, 'error');
+        showFlashMessage('❌ Ошибка синхронизации: ' + errorMessage, 'error');
         
         // Reset after 3 seconds
         setTimeout(() => {
@@ -277,7 +292,11 @@ function startCompleteSync(button) {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Синхронизация всех...</span>';
     button.disabled = true;
     
-    // Make complete sync request
+    // Create AbortController for timeout (180 seconds for multiple providers with stats)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 second timeout
+    
+    // Make complete sync request with extended timeout
     fetch('/api/complete-sync', {
         method: 'POST',
         headers: {
@@ -285,9 +304,13 @@ function startCompleteSync(button) {
         },
         body: JSON.stringify({
             sync_type: 'manual'
-        })
+        }),
+        signal: controller.signal
     })
-    .then(response => response.json())
+    .then(response => {
+        clearTimeout(timeoutId); // Clear timeout on response
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Show success message with aggregated results
@@ -320,7 +343,14 @@ function startCompleteSync(button) {
         }
     })
     .catch(error => {
-        showFlashMessage('❌ Ошибка полной синхронизации', 'error');
+        clearTimeout(timeoutId); // Clear timeout on error
+        
+        const isTimeout = error.name === 'AbortError';
+        const errorMessage = isTimeout
+            ? 'Превышено время ожидания (>180 сек) - синхронизация может продолжаться на сервере'
+            : error.message || 'Неизвестная ошибка';
+        
+        showFlashMessage('❌ Ошибка полной синхронизации: ' + errorMessage, 'error');
         console.error('Complete sync error:', error);
         button.innerHTML = originalText;
         button.disabled = false;
