@@ -16,25 +16,49 @@
         </ul>
     </div>
 
-    <!-- Step 1: Get Credentials -->
+    <!-- Step 1: Enable Beget API -->
     <div class="section">
-        <h2><span class="step-number">1</span>Получение учетных данных Beget</h2>
+        <h2><span class="step-number">1</span>Включение API доступа в Beget</h2>
         
-        <h3>Имя пользователя</h3>
-        <p>Ваше имя пользователя (логин) в системе Beget. Обычно это имя вашего аккаунта.</p>
+        <p>Для работы с InfraZen необходимо настроить API доступ в панели управления Beget:</p>
         
-        <h3>Пароль</h3>
-        <p>Пароль от вашего аккаунта Beget.</p>
+        <ol>
+            <li>Войдите в <a href="https://cp.beget.com" target="_blank">панель управления Beget</a></li>
+            <li>В нижней части страницы найдите и откройте раздел <strong>"Настройки аккаунта"</strong> (Account settings)</li>
+            <li>Перейдите на вкладку <strong>"Ограничение доступа"</strong> (Access restriction)</li>
+            <li>Выберите <strong>"Beget API"</strong></li>
+            <li>Включите переключатель <strong>"Разрешить API-аутентификацию"</strong></li>
+            <li>Нажмите кнопку <strong>"Установить новый пароль для API"</strong></li>
+            <li>Создайте и сохраните отдельный пароль для API (он будет отличаться от вашего основного пароля)</li>
+        </ol>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
-            <strong>Важно:</strong> InfraZen безопасно хранит ваши учетные данные в зашифрованном виде.
+            <strong>Критически важно:</strong> API пароль — это <strong>отдельный пароль</strong>, специально созданный для API. Не используйте пароль от вашего основного аккаунта!
         </div>
     </div>
 
-    <!-- Step 2: Add Connection -->
+    <!-- Step 2: Get Credentials -->
     <div class="section">
-        <h2><span class="step-number">2</span>Добавление подключения в InfraZen</h2>
+        <h2><span class="step-number">2</span>Учетные данные для InfraZen</h2>
+        
+        <p>После настройки API вам потребуются:</p>
+        
+        <h3>Имя пользователя</h3>
+        <p>Ваш обычный логин (имя пользователя) в системе Beget.</p>
+        
+        <h3>Пароль для API</h3>
+        <p><strong>Отдельный пароль для API</strong>, который вы создали на предыдущем шаге (НЕ пароль от основного аккаунта).</p>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-lightbulb"></i>
+            <strong>Пример:</strong> Если ваш логин <code>myusername</code>, а API пароль <code>api_secure_123</code>, то в InfraZen вы укажете именно эти данные.
+        </div>
+    </div>
+
+    <!-- Step 3: Add Connection -->
+    <div class="section">
+        <h2><span class="step-number">3</span>Добавление подключения в InfraZen</h2>
         
         <ol>
             <li>Перейдите в раздел <strong>"Подключения"</strong></li>
@@ -43,18 +67,23 @@
             <li>Заполните поля:
                 <ul>
                     <li><strong>Название подключения:</strong> Любое удобное имя (например, "Beget Production")</li>
-                    <li><strong>Имя пользователя:</strong> Ваш логин Beget</li>
-                    <li><strong>Пароль:</strong> Ваш пароль Beget</li>
+                    <li><strong>Имя пользователя:</strong> Ваш логин Beget (обычный логин аккаунта)</li>
+                    <li><strong>Пароль:</strong> Ваш API пароль (созданный в шаге 1, НЕ основной пароль)</li>
                 </ul>
             </li>
             <li>Нажмите <strong>"Тест подключения"</strong> для проверки</li>
             <li>Если тест успешен, нажмите <strong>"Сохранить"</strong></li>
         </ol>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-lightbulb"></i>
+            <strong>Совет:</strong> Если тест подключения не проходит, убедитесь что API аутентификация включена в Beget и вы используете именно API пароль.
+        </div>
     </div>
 
-    <!-- Step 3: Sync -->
+    <!-- Step 4: Sync -->
     <div class="section">
-        <h2><span class="step-number">3</span>Первая синхронизация</h2>
+        <h2><span class="step-number">4</span>Первая синхронизация</h2>
         
         <p>После сохранения подключения InfraZen автоматически начнет синхронизацию:</p>
         
