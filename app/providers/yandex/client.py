@@ -774,4 +774,161 @@ class YandexClient:
         except Exception as e:
             logger.error(f"Failed to get resource costs: {e}")
             return {}
+    
+    def get_instance_cpu_statistics(self, instance_id: str, folder_id: str = None, days: int = 30) -> Dict[str, Any]:
+        """
+        Get CPU usage statistics for a compute instance
+        
+        Args:
+            instance_id: Instance ID
+            folder_id: Folder ID (uses self.folder_id if not provided)
+            days: Number of days of historical data (default: 30)
+        
+        Returns:
+            Dict containing CPU statistics:
+            - avg_cpu_usage: Average CPU percentage
+            - max_cpu_usage: Maximum CPU percentage
+            - min_cpu_usage: Minimum CPU percentage
+            - trend: CPU usage variance
+            - performance_tier: low/medium/high
+            - data_points: Number of raw data points
+            - daily_aggregated: List of daily averages for charting
+        """
+        try:
+            from collections import defaultdict
+            
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                # Try to get folder from service account
+                folder_id = self._get_service_account_folder()
+            
+            if not folder_id:
+                raise Exception("No folder_id available for metrics query")
+            
+            # Set time range
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(days=days)
+            
+            # Query Yandex Monitoring API
+            url = f'{self.monitoring_url}/data/read'
+            params = {'folderId': folder_id}
+            
+            # Use cpu_usage metric (aggregate across all CPU cores)
+            body = {
+                'query': f'cpu_usage{{resource_id="{instance_id}"}}',
+                'fromTime': start_time.isoformat() + 'Z',
+                'toTime': end_time.isoformat() + 'Z',
+                'downsampling': {
+                    'gridAggregation': 'AVG',
+                    'maxPoints': days * 24  # Hourly granularity
+                }
+            }
+            
+            headers = self._get_headers()
+            response = requests.post(url, json=body, params=params, headers=headers, timeout=90)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract metrics data
+            metrics = data.get('metrics', [])
+            if not metrics or len(metrics) == 0:
+                # No metrics available (VM might be too new or monitoring not enabled)
+                logger.warning(f"No CPU metrics available for instance {instance_id}")
+                return {
+                    'avg_cpu_usage': 0,
+                    'max_cpu_usage': 0,
+                    'min_cpu_usage': 0,
+                    'trend': 0,
+                    'performance_tier': 'unknown',
+                    'data_points': 0,
+                    'daily_data_points': 0,
+                    'period': 'DAY',
+                    'collection_timestamp': datetime.utcnow().isoformat(),
+                    'daily_aggregated': [],
+                    'no_data': True
+                }
+            
+            # Get timeseries data
+            timeseries = metrics[0].get('timeseries', {})
+            timestamps = timeseries.get('timestamps', [])
+            values = timeseries.get('doubleValues', [])
+            
+            if not values or len(values) == 0:
+                logger.warning(f"No CPU data points for instance {instance_id}")
+                return {
+                    'avg_cpu_usage': 0,
+                    'max_cpu_usage': 0,
+                    'min_cpu_usage': 0,
+                    'trend': 0,
+                    'performance_tier': 'unknown',
+                    'data_points': 0,
+                    'no_data': True
+                }
+            
+            # Aggregate hourly/sub-hourly data into daily points for UI display
+            daily_data = defaultdict(list)
+            
+            for i, timestamp in enumerate(timestamps):
+                if i < len(values) and values[i] is not None:
+                    # Convert timestamp (milliseconds since epoch) to date
+                    dt = datetime.fromtimestamp(timestamp / 1000.0)
+                    date_key = dt.strftime('%Y-%m-%d')
+                    daily_data[date_key].append(values[i])
+            
+            # Calculate statistics
+            all_values = [v for v in values if v is not None]
+            
+            if not all_values:
+                return {'avg_cpu_usage': 0, 'max_cpu_usage': 0, 'min_cpu_usage': 0, 'no_data': True}
+            
+            avg_cpu = sum(all_values) / len(all_values)
+            max_cpu = max(all_values)
+            min_cpu = min(all_values)
+            trend = max_cpu - min_cpu
+            
+            # Determine performance tier (same thresholds as Selectel)
+            if avg_cpu < 20:
+                performance_tier = 'low'
+            elif avg_cpu < 60:
+                performance_tier = 'medium'
+            else:
+                performance_tier = 'high'
+            
+            # Create daily aggregated data for chart display
+            daily_points = []
+            for date in sorted(daily_data.keys()):
+                day_values = daily_data[date]
+                day_avg = sum(day_values) / len(day_values)
+                daily_points.append({
+                    'date': date,
+                    'value': round(day_avg, 2),
+                    'samples': len(day_values)
+                })
+            
+            logger.info(f"✅ CPU statistics for {instance_id}: avg={avg_cpu:.2f}%, max={max_cpu:.2f}%, {len(all_values)} points")
+            
+            return {
+                'avg_cpu_usage': round(avg_cpu, 2),
+                'max_cpu_usage': round(max_cpu, 2),
+                'min_cpu_usage': round(min_cpu, 2),
+                'trend': round(trend, 2),
+                'performance_tier': performance_tier,
+                'data_points': len(all_values),
+                'daily_data_points': len(daily_points),
+                'period': 'DAY',
+                'collection_timestamp': datetime.utcnow().isoformat(),
+                'daily_aggregated': daily_points,  # For chart display
+                'metric_source': 'yandex_monitoring'
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to get CPU statistics for instance {instance_id}: {e}")
+            return {
+                'avg_cpu_usage': 0,
+                'max_cpu_usage': 0,
+                'min_cpu_usage': 0,
+                'error': str(e),
+                'no_data': True
+            }
 

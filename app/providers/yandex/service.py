@@ -175,6 +175,76 @@ class YandexService:
             }
             sync_snapshot.sync_config = json.dumps(sync_config)
             
+            # PHASE 3: Collect performance statistics (CPU usage) - OPTIONAL
+            # Controlled by provider metadata setting (like Selectel)
+            provider_metadata = json.loads(self.provider.provider_metadata) if self.provider.provider_metadata else {}
+            collect_stats = provider_metadata.get('collect_performance_stats', True)  # Default: True for Yandex
+            
+            logger.info(f"PHASE 3: Performance statistics {'ENABLED' if collect_stats else 'DISABLED (set in provider settings)'}")
+            
+            vm_resources = [r for r in synced_resources if r.resource_type == 'server']
+            
+            if vm_resources and collect_stats:
+                logger.info(f"Collecting CPU statistics for {len(vm_resources)} VMs...")
+                
+                for vm_resource in vm_resources:
+                    try:
+                        # Get CPU statistics (30-day history)
+                        cpu_stats = self.client.get_instance_cpu_statistics(
+                            instance_id=vm_resource.resource_id,
+                            folder_id=folder_id,
+                            days=30
+                        )
+                        
+                        if cpu_stats and not cpu_stats.get('no_data'):
+                            # Store CPU stats as resource tags (Beget/Selectel pattern)
+                            vm_resource.add_tag('cpu_avg_usage', str(cpu_stats.get('avg_cpu_usage', 0)))
+                            vm_resource.add_tag('cpu_max_usage', str(cpu_stats.get('max_cpu_usage', 0)))
+                            vm_resource.add_tag('cpu_min_usage', str(cpu_stats.get('min_cpu_usage', 0)))
+                            vm_resource.add_tag('cpu_performance_tier', cpu_stats.get('performance_tier', 'unknown'))
+                            
+                            # Store daily aggregated data for chart (same format as Selectel)
+                            if cpu_stats.get('daily_aggregated'):
+                                daily_data = cpu_stats['daily_aggregated']
+                                raw_data = {
+                                    'dates': [d['date'] for d in daily_data],
+                                    'values': [d['value'] for d in daily_data]
+                                }
+                                vm_resource.add_tag('cpu_raw_data', json.dumps(raw_data))
+                            
+                            # Also add to provider_config for UI display
+                            if vm_resource.provider_config:
+                                config = json.loads(vm_resource.provider_config)
+                                config['usage_statistics'] = {
+                                    'cpu': {
+                                        'avg_usage': cpu_stats.get('avg_cpu_usage', 0),
+                                        'max_usage': cpu_stats.get('max_cpu_usage', 0),
+                                        'min_usage': cpu_stats.get('min_cpu_usage', 0),
+                                        'trend': cpu_stats.get('trend', 0),
+                                        'performance_tier': cpu_stats.get('performance_tier', 'unknown')
+                                    },
+                                    'memory': {
+                                        'note': 'Memory metrics require Yandex Unified Agent'
+                                    },
+                                    'disk': {
+                                        'note': 'Disk usage metrics require Yandex Unified Agent'
+                                    }
+                                }
+                                vm_resource.provider_config = json.dumps(config)
+                                vm_resource.last_sync = datetime.now()
+                                db.session.add(vm_resource)
+                            
+                            logger.info(f"   ✅ {vm_resource.resource_name}: CPU avg={cpu_stats.get('avg_cpu_usage')}%")
+                        else:
+                            logger.warning(f"   ⚠️  {vm_resource.resource_name}: No CPU data available")
+                    
+                    except Exception as stats_error:
+                        logger.error(f"   ❌ Error getting CPU stats for {vm_resource.resource_name}: {stats_error}")
+                        # Continue with other VMs even if one fails
+                
+                db.session.commit()
+                logger.info(f"Performance statistics collection completed")
+            
             # Update provider
             self.provider.last_sync = datetime.now()
             self.provider.sync_status = 'success'
@@ -191,6 +261,7 @@ class YandexService:
                 'total_disks': total_disks,
                 'estimated_daily_cost': round(total_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
+                'cpu_stats_collected': collect_stats and len(vm_resources) > 0,
                 'message': f'Successfully synced {len(synced_resources)} resources (estimated cost: {total_cost:.2f} ₽/day)'
             }
             
