@@ -461,6 +461,13 @@
                                         </div>
                                         <div class="usage-text">{{ config.disk_used_gb|round(1) }} GB / {{ (config.disk_used_gb + config.disk_left_gb)|round(1) }} GB</div>
                                     </div>
+                                    {% elif config.get('billing', {}).get('total_storage_gb') and config.get('billing', {}).get('total_storage_gb') > 0 %}
+                                    <!-- Selectel: Show total storage from billing (usage stats not available from OpenStack API) -->
+                                    <div class="usage-item">
+                                        <div class="usage-label">HD</div>
+                                        <div class="usage-text" style="text-align: center; color: #6B7280;">{{ config.billing.total_storage_gb|round(1) }} GB Общий объем</div>
+                                        <div class="usage-text" style="text-align: center; font-size: 0.75rem; color: #9CA3AF; margin-top: 0.25rem;">Детализация использования недоступна</div>
+                                    </div>
                                     {% elif mysql_config.get('disk_used_bytes') and mysql_config.get('disk_left_bytes') %}
                                     <div class="usage-item">
                                         <div class="usage-label">HD</div>
