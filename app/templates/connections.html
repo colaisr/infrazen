@@ -9,7 +9,6 @@
     <div class="header-actions">
         {% if user.role != 'demouser' %}
         <button class="btn btn-secondary" data-complete-sync id="complete-sync-btn"><i class="fa-solid fa-arrows-rotate"></i><span>Обновить все</span></button>
-        <button class="btn btn-primary" onclick="showProviderModal()"><i class="fa-solid fa-plus"></i><span>Добавить провайдера</span></button>
         {% else %}
         <div class="demo-user-notice">
             <i class="fa-solid fa-info-circle"></i>
