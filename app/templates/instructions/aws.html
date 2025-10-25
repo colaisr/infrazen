@@ -3,48 +3,37 @@
 {% block title %}Инструкция по подключению Amazon Web Services{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 900px; margin: 2rem auto; padding: 2rem;">
-    <div class="instructions-header" style="margin-bottom: 2rem;">
-        <h1 style="color: #1E40AF; margin-bottom: 0.5rem;">
-            <i class="fa-solid fa-book"></i> Инструкция по подключению AWS
-        </h1>
-        <p style="color: #6B7280; font-size: 1.1rem;">Пошаговое руководство для интеграции Amazon Web Services с InfraZen</p>
-    </div>
+<div class="container">
+    <h1><i class="fa-solid fa-book"></i>Инструкция по подключению AWS</h1>
+    <p class="subtitle">Пошаговое руководство для интеграции Amazon Web Services с InfraZen</p>
 
     <!-- Coming Soon Notice -->
-    <div class="instruction-section" style="background: #FEF3C7; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; border-left: 4px solid #F59E0B;">
-        <h2 style="color: #92400E; margin-bottom: 1rem;">
-            <i class="fa-solid fa-construction"></i> В разработке
-        </h2>
-        <p style="color: #78350F; line-height: 1.6; margin-bottom: 0;">
-            Интеграция с Amazon Web Services находится в разработке и скоро будет доступна. 
-            Следите за обновлениями!
-        </p>
+    <div class="notice notice-coming-soon" style="margin-bottom: 2.5rem;">
+        <i class="fa-solid fa-hourglass-half"></i>
+        <strong>В разработке.</strong> Интеграция с Amazon Web Services находится в активной разработке и скоро будет доступна.
     </div>
 
     <!-- Features Preview -->
-    <div class="instruction-section" style="background: white; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <h2 style="color: #1E40AF; margin-bottom: 1rem;">
-            <i class="fa-solid fa-sparkles"></i> Планируемые возможности
-        </h2>
-        <ul style="line-height: 1.8; color: #374151;">
+    <div class="section">
+        <h2><i class="fa-solid fa-sparkles"></i>Планируемые возможности</h2>
+        <ul>
             <li>Синхронизация EC2 инстансов</li>
             <li>Анализ затрат через Cost Explorer API</li>
-            <li>Мониторинг использования ресурсов через CloudWatch</li>
+            <li>Мониторинг использования через CloudWatch</li>
             <li>Управление EBS томами и снапшотами</li>
             <li>Интеграция с S3 хранилищами</li>
             <li>RDS базы данных</li>
             <li>Lambda функции и их стоимость</li>
             <li>Поддержка multi-region</li>
+            <li>Reserved Instances и Savings Plans анализ</li>
         </ul>
     </div>
 
     <!-- Back Button -->
-    <div style="text-align: center; margin-top: 3rem;">
-        <button onclick="window.close()" class="btn btn-secondary" style="padding: 0.75rem 2rem;">
+    <div class="actions">
+        <button onclick="window.close()" class="btn btn-secondary">
             <i class="fa-solid fa-arrow-left"></i> Закрыть
         </button>
     </div>
 </div>
 {% endblock %}
-
