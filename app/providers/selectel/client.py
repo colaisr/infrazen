@@ -560,13 +560,14 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get OpenStack ports from {region or 'default region'}: {str(e)}")
     
-    def get_server_cpu_statistics(self, server_id: str, hours: int = 24 * 30, region: str = None) -> Dict[str, Any]:
+    def get_server_cpu_statistics(self, server_id: str, hours: int = 24 * 30, region: str = None, project_id: str = None) -> Dict[str, Any]:
         """
         Get CPU usage statistics for a server
         
         Args:
             server_id: Server UUID
             hours: Number of hours of historical data (default: 1)
+            project_id: Project ID for token scoping (critical - VM must be in this project)
             
         Returns:
             Dict containing CPU statistics in Beget-compatible format:
@@ -580,7 +581,11 @@ class SelectelClient:
         try:
             from datetime import datetime, timedelta
             
-            iam_token = self._get_iam_token()
+            # Get IAM token scoped to the VM's project (critical for metrics access)
+            if project_id:
+                iam_token = self._get_project_scoped_token(project_id)
+            else:
+                iam_token = self._get_iam_token()
             
             # Set time range
             stop_time = datetime.utcnow()
@@ -589,10 +594,12 @@ class SelectelClient:
             start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
-            # Request CPU metrics with daily granularity (86400 seconds = 24 hours)
+            # Request CPU metrics with 5-minute granularity (300 seconds)
+            # Daily granularity (86400) returns 404 for new VMs without enough data
+            # We'll aggregate the 5-minute points ourselves for daily display
             # Use the correct region for metrics API
             base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
-            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=86400&start={start_iso}&stop={stop_iso}"
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(max (metric cpu_util mean) (/ (clip_min (rateofchangesec (metric cpu_average mean)) 0) 10000000)))",
@@ -614,12 +621,25 @@ class SelectelClient:
             # Extract and process data points
             if 'measures' in data and 'aggregated' in data['measures']:
                 data_points = data['measures']['aggregated']
-                cpu_values = [point[2] for point in data_points if point[2] is not None]
+                # data_points format: [[timestamp, granularity, value], ...]
                 
-                if cpu_values:
-                    avg_cpu = sum(cpu_values) / len(cpu_values)
-                    max_cpu = max(cpu_values)
-                    min_cpu = min(cpu_values)
+                # Aggregate 5-minute data into daily points for UI display
+                from collections import defaultdict
+                daily_data = defaultdict(list)
+                
+                for point in data_points:
+                    if point[2] is not None:
+                        # Group by date (YYYY-MM-DD)
+                        timestamp = point[0]  # ISO string like "2025-10-24T10:00:00+00:00"
+                        date = timestamp[:10]  # Extract YYYY-MM-DD
+                        daily_data[date].append(point[2])
+                
+                if daily_data:
+                    # Calculate overall statistics
+                    all_values = [v for values in daily_data.values() for v in values]
+                    avg_cpu = sum(all_values) / len(all_values)
+                    max_cpu = max(all_values)
+                    min_cpu = min(all_values)
                     trend = max_cpu - min_cpu
                     
                     # Determine performance tier
@@ -630,16 +650,27 @@ class SelectelClient:
                     else:
                         performance_tier = 'high'
                     
+                    # Create daily aggregated data for chart display
+                    daily_points = []
+                    for date in sorted(daily_data.keys()):
+                        day_avg = sum(daily_data[date]) / len(daily_data[date])
+                        daily_points.append({
+                            'date': date,
+                            'value': round(day_avg, 2),
+                            'samples': len(daily_data[date])
+                        })
+                    
                     return {
                         'avg_cpu_usage': round(avg_cpu, 2),
                         'max_cpu_usage': round(max_cpu, 2),
                         'min_cpu_usage': round(min_cpu, 2),
                         'trend': round(trend, 2),
                         'performance_tier': performance_tier,
-                        'data_points': len(cpu_values),
+                        'data_points': len(all_values),
+                        'daily_data_points': len(daily_points),
                         'period': 'DAY',
                         'collection_timestamp': datetime.utcnow().isoformat(),
-                        'raw_data': data_points
+                        'daily_aggregated': daily_points  # For chart display
                     }
             
             return {}
@@ -647,7 +678,7 @@ class SelectelClient:
         except Exception as e:
             raise Exception(f"Failed to get CPU statistics for server {server_id}: {str(e)}")
     
-    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 24 * 30, region: str = None) -> Dict[str, Any]:
+    def get_server_memory_statistics(self, server_id: str, ram_mb: int, hours: int = 24 * 30, region: str = None, project_id: str = None) -> Dict[str, Any]:
         """
         Get memory usage statistics for a server
         
@@ -669,7 +700,11 @@ class SelectelClient:
         try:
             from datetime import datetime, timedelta
             
-            iam_token = self._get_iam_token()
+            # Get IAM token scoped to the VM's project (critical for metrics access)
+            if project_id:
+                iam_token = self._get_project_scoped_token(project_id)
+            else:
+                iam_token = self._get_iam_token()
             
             # Set time range
             stop_time = datetime.utcnow()
@@ -678,10 +713,11 @@ class SelectelClient:
             start_iso = start_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             stop_iso = stop_time.strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
-            # Request memory metrics with daily granularity (86400 seconds = 24 hours)
+            # Request memory metrics with 5-minute granularity (300 seconds)
+            # Daily granularity (86400) returns 404 for new VMs without enough data
             # Use the correct region for metrics API
             base_url = self.regions.get(region, self.openstack_base_url) if region else self.openstack_base_url
-            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=86400&start={start_iso}&stop={stop_iso}"
+            url = f"{base_url}/metric/v1/aggregates?details=false&granularity=300&start={start_iso}&stop={stop_iso}"
             
             body = {
                 "operations": "(metric memory.usage mean)",
@@ -706,12 +742,23 @@ class SelectelClient:
                 
                 if 'memory.usage' in server_metrics and 'mean' in server_metrics['memory.usage']:
                     data_points = server_metrics['memory.usage']['mean']
-                    mem_values = [point[2] for point in data_points if point[2] is not None]
                     
-                    if mem_values:
-                        avg_mem_mb = sum(mem_values) / len(mem_values)
-                        max_mem_mb = max(mem_values)
-                        min_mem_mb = min(mem_values)
+                    # Aggregate 5-minute data into daily points
+                    from collections import defaultdict
+                    daily_data = defaultdict(list)
+                    
+                    for point in data_points:
+                        if point[2] is not None:
+                            timestamp = point[0]
+                            date = timestamp[:10]
+                            daily_data[date].append(point[2])
+                    
+                    if daily_data:
+                        # Calculate overall statistics
+                        all_values = [v for values in daily_data.values() for v in values]
+                        avg_mem_mb = sum(all_values) / len(all_values)
+                        max_mem_mb = max(all_values)
+                        min_mem_mb = min(all_values)
                         avg_mem_percent = (avg_mem_mb / ram_mb) * 100 if ram_mb > 0 else 0
                         trend = max_mem_mb - min_mem_mb
                         
@@ -723,6 +770,16 @@ class SelectelClient:
                         else:
                             memory_tier = 'high'
                         
+                        # Create daily aggregated data for chart
+                        daily_points = []
+                        for date in sorted(daily_data.keys()):
+                            day_avg = sum(daily_data[date]) / len(daily_data[date])
+                            daily_points.append({
+                                'date': date,
+                                'value': round(day_avg, 2),
+                                'samples': len(daily_data[date])
+                            })
+                        
                         return {
                             'avg_memory_usage_mb': round(avg_mem_mb, 2),
                             'max_memory_usage_mb': round(max_mem_mb, 2),
@@ -730,10 +787,11 @@ class SelectelClient:
                             'memory_usage_percent': round(avg_mem_percent, 2),
                             'trend': round(trend, 2),
                             'memory_tier': memory_tier,
-                            'data_points': len(mem_values),
+                            'data_points': len(all_values),
+                            'daily_data_points': len(daily_points),
                             'period': 'DAY',
                             'collection_timestamp': datetime.utcnow().isoformat(),
-                            'raw_data': data_points
+                            'daily_aggregated': daily_points  # For chart display
                         }
             
             return {}
@@ -1074,6 +1132,7 @@ class SelectelClient:
             server_name = server.get('name', 'Unknown')
             ram_mb = server.get('ram_mb', 1024)
             server_region = server.get('region', 'ru-3')  # Use VM's actual region
+            server_project_id = server.get('project_id')  # Get VM's project ID for token scoping
             
             # Convert availability zone (ru-3b) to region (ru-3) if needed
             if server_region and len(server_region) > 2:
@@ -1081,13 +1140,13 @@ class SelectelClient:
                     server_region = server_region[:-1]
             
             try:
-                logger.info(f"Collecting statistics for {server_name} (ID: {server_id[:20]}...) in region {server_region}")
+                logger.info(f"Collecting statistics for {server_name} (ID: {server_id[:20]}...) in region {server_region}, project {server_project_id[:20] if server_project_id else 'default'}...")
                 
-                # Get CPU statistics
-                cpu_stats = self.get_server_cpu_statistics(server_id, hours=24*30, region=server_region)
+                # Get CPU statistics (pass project_id for correct token scoping)
+                cpu_stats = self.get_server_cpu_statistics(server_id, hours=24*30, region=server_region, project_id=server_project_id)
                 
-                # Get memory statistics
-                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=24*30, region=server_region)
+                # Get memory statistics (pass project_id for correct token scoping)
+                memory_stats = self.get_server_memory_statistics(server_id, ram_mb, hours=24*30, region=server_region, project_id=server_project_id)
                 
                 all_statistics[server_id] = {
                     'server_name': server_name,

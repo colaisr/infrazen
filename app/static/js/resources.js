@@ -180,7 +180,8 @@ function createMemoryChart(canvas, resourceId) {
                         month: '2-digit' 
                     });
                 });
-                memoryData = rawData.values;
+                // Convert memory values from MB to GB for display
+                memoryData = rawData.values.map(mb => mb / 1024);
             }
         } catch (e) {
             console.log('Could not parse memory raw data:', e);
@@ -204,7 +205,16 @@ function createMemoryChart(canvas, resourceId) {
         }
     }
     
-    const maxMemory = Math.max.apply(null, memoryData) * 1.2;
+    // Get total RAM from VM metadata to set Y-axis maximum
+    let maxMemory = Math.max.apply(null, memoryData) * 1.2; // Fallback to auto-scale
+    const totalRamInput = document.getElementById(`total-ram-mb-${resourceId}`);
+    if (totalRamInput && totalRamInput.value) {
+        const totalRamMB = parseFloat(totalRamInput.value);
+        if (totalRamMB > 0) {
+            // Convert MB to GB and use as Y-axis maximum
+            maxMemory = totalRamMB / 1024;
+        }
+    }
     
     canvas.chart = new Chart(ctx, {
         type: 'line',

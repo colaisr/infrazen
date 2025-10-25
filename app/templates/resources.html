@@ -383,6 +383,7 @@
                             {% endif %}
                             {% if tags.get('memory_raw_data') %}
                             <input type="hidden" id="memory-raw-data-{{ resource.id }}" value="{{ tags.get('memory_raw_data') }}">
+                            <input type="hidden" id="total-ram-mb-{{ resource.id }}" value="{{ config.get('ram_mb') or mysql_config.get('memory_mb', 1024) }}">
                             {% endif %}
                             
                             {% if tags.get('note') or tags.get('status') or tags.get('attachment_status') %}

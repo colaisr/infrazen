@@ -295,11 +295,14 @@ class SelectelService:
                     server_data_list = []
                     for vm in active_servers:
                         metadata = json.loads(vm.provider_config) if vm.provider_config else {}
+                        billing_data = metadata.get('billing', {})
+                        
                         server_data_list.append({
                             'id': vm.resource_id,
                             'name': vm.resource_name,
                             'ram_mb': metadata.get('ram_mb', 1024),
-                            'region': vm.region  # Pass VM's actual region for stats API
+                            'region': vm.region,  # Pass VM's actual region for stats API
+                            'project_id': billing_data.get('project_id')  # CRITICAL: Pass project ID for token scoping
                         })
                     
                     statistics = self.client.get_all_server_statistics(server_data_list)
@@ -1624,6 +1627,7 @@ class SelectelService:
             statistics: Dict mapping server_id to CPU/memory statistics
         """
         from app.core.models.resource import Resource
+        import json
         
         for server_id, stats in statistics.items():
             try:
@@ -1649,6 +1653,15 @@ class SelectelService:
                     server_resource.add_tag('cpu_data_points', str(cpu_stats.get('data_points', 0)))
                     server_resource.add_tag('cpu_period', cpu_stats.get('period', 'HOUR'))
                     server_resource.add_tag('cpu_collection_timestamp', cpu_stats.get('collection_timestamp', ''))
+                    
+                    # Add daily aggregated data for UI charts
+                    if cpu_stats.get('daily_aggregated'):
+                        daily_data = cpu_stats['daily_aggregated']
+                        raw_data = {
+                            'dates': [d['date'] for d in daily_data],
+                            'values': [d['value'] for d in daily_data]
+                        }
+                        server_resource.add_tag('cpu_raw_data', json.dumps(raw_data))
                 
                 # Add memory statistics tags (same format as Beget)
                 if stats.get('memory_statistics'):
@@ -1662,6 +1675,15 @@ class SelectelService:
                     server_resource.add_tag('memory_data_points', str(mem_stats.get('data_points', 0)))
                     server_resource.add_tag('memory_period', mem_stats.get('period', 'HOUR'))
                     server_resource.add_tag('memory_collection_timestamp', mem_stats.get('collection_timestamp', ''))
+                    
+                    # Add daily aggregated data for UI charts
+                    if mem_stats.get('daily_aggregated'):
+                        daily_data = mem_stats['daily_aggregated']
+                        raw_data = {
+                            'dates': [d['date'] for d in daily_data],
+                            'values': [d['value'] for d in daily_data]
+                        }
+                        server_resource.add_tag('memory_raw_data', json.dumps(raw_data))
                 
                 # Also add usage statistics to provider_config for UI display
                 if server_resource.provider_config:
