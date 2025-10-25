@@ -25,12 +25,25 @@
         <ol>
             <li>Войдите в <a href="https://cp.beget.com" target="_blank">панель управления Beget</a></li>
             <li>В нижней части страницы найдите и откройте раздел <strong>"Настройки аккаунта"</strong> (Account settings)</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/beget_step1_account_settings.png') }}" 
+             alt="Beget панель управления - раздел Настройки аккаунта" 
+             class="instruction-image">
+        <p class="image-caption">Раздел "Настройки аккаунта" в нижней части панели управления Beget</p>
+        
+        <ol start="3">
             <li>Перейдите на вкладку <strong>"Ограничение доступа"</strong> (Access restriction)</li>
             <li>Выберите <strong>"Beget API"</strong></li>
             <li>Включите переключатель <strong>"Разрешить API-аутентификацию"</strong></li>
             <li>Нажмите кнопку <strong>"Установить новый пароль для API"</strong></li>
             <li>Создайте и сохраните отдельный пароль для API (он будет отличаться от вашего основного пароля)</li>
         </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/beget_step2_api_settings.png') }}" 
+             alt="Beget API настройки - включение API аутентификации" 
+             class="instruction-image">
+        <p class="image-caption">Настройки Beget API: включите аутентификацию и создайте API пароль</p>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
