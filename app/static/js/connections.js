@@ -10,12 +10,16 @@
 const providers = {
     yandex: {
         name: 'Yandex Cloud',
-        description: 'Yandex Cloud — российская облачная платформа, предоставляющая услуги виртуальных машин, баз данных, хранилищ и других облачных сервисов.',
+        description: 'Yandex Cloud — российская облачная платформа. Для подключения требуется JSON-ключ сервисного аккаунта (Authorized Key).',
         fields: [
-            { name: 'access_key', label: 'Access Key ID *', type: 'text', placeholder: 'AQVN...', required: true },
-            { name: 'secret_key', label: 'Secret Access Key *', type: 'password', placeholder: '••••••••', required: true },
-            { name: 'organization_id', label: 'Organization ID *', type: 'text', placeholder: 'org-1234567890', required: true },
-            { name: 'cloud_id', label: 'Cloud ID *', type: 'text', placeholder: 'b1g1234567890', required: true }
+            { 
+                name: 'service_account_key', 
+                label: 'Service Account Key (JSON) *', 
+                type: 'textarea', 
+                placeholder: '{\n  "id": "ajel...",\n  "service_account_id": "aje...",\n  "private_key": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"\n}',
+                required: true,
+                rows: 8
+            }
         ]
     },
     selectel: {
@@ -118,6 +122,8 @@ function changeProvider() {
             form.action = '/api/providers/selectel/add';
         } else if (selectedProvider === 'beget') {
             form.action = '/api/providers/beget/add';
+        } else if (selectedProvider === 'yandex') {
+            form.action = '/api/providers/yandex/add';
         } else {
             form.action = '/api/providers/beget/add';
         }
@@ -149,13 +155,15 @@ function createFieldHtml(field) {
     const required = field.required ? 'required' : '';
     const placeholder = field.placeholder || '';
     const defaultValue = field.default ? `value="${field.default}"` : '';
+    const rows = field.rows || 4;
     
     if (field.type === 'textarea') {
         return `
             <div class="form-group">
                 <label class="form-label" for="${field.name}">${field.label}</label>
                 <textarea class="form-control form-textarea" id="${field.name}" name="${field.name}" 
-                          placeholder="${placeholder}" ${required}>${field.default || ''}</textarea>
+                          rows="${rows}" placeholder="${placeholder}" ${required}>${field.default || ''}</textarea>
+                ${field.name === 'service_account_key' ? '<small class="form-text text-muted">Вставьте полный JSON-ключ сервисного аккаунта из Yandex Cloud</small>' : ''}
             </div>
         `;
     } else if (field.type === 'password') {
@@ -382,7 +390,12 @@ function testConnection() {
     
     showTestResult('Тестирование подключения...', 'info');
     
-    const testEndpoint = selectedProvider === 'selectel' ? '/api/providers/selectel/test' : '/api/providers/beget/test';
+    let testEndpoint = '/api/providers/beget/test';
+    if (selectedProvider === 'selectel') {
+        testEndpoint = '/api/providers/selectel/test';
+    } else if (selectedProvider === 'yandex') {
+        testEndpoint = '/api/providers/yandex/test';
+    }
     fetch(testEndpoint, {
         method: 'POST',
         headers: {
@@ -537,6 +550,11 @@ function fillEditForm(connectionData) {
         if (servicePasswordField) {
             servicePasswordField.value = connectionData.service_password || '';
             servicePasswordField.placeholder = 'Введите новый пароль (оставьте пустым, чтобы не менять)';
+        }
+    } else if (provider === 'yandex') {
+        const serviceAccountKeyField = document.querySelector('textarea[name="service_account_key"]');
+        if (serviceAccountKeyField) {
+            serviceAccountKeyField.value = connectionData.service_account_key || '';
         }
     }
     
