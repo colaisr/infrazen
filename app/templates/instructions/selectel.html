@@ -51,11 +51,20 @@
         <p>Сервисный пользователь необходим для доступа к OpenStack API (статистика VM, диски, сети).</p>
         
         <ol>
-            <li>В панели Selectel перейдите в <strong>"Пользователи и роли"</strong></li>
-            <li>Нажмите <strong>"Создать пользователя"</strong></li>
-            <li>Укажите имя пользователя (например, <code>InfraZen</code>)</li>
+            <li>В верхнем меню перейдите в раздел <strong>"Аккаунт"</strong></li>
+            <li>В левом боковом меню выберите <strong>"Сервисные пользователи"</strong></li>
+            <li>Нажмите кнопку <strong>"Добавить сервисного пользователя"</strong></li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/selectel_step_2.png') }}" 
+             alt="Selectel панель управления - раздел Сервисные пользователи" 
+             class="instruction-image">
+        <p class="image-caption">Раздел управления сервисными пользователями: Аккаунт → Сервисные пользователи</p>
+        
+        <ol start="4">
+            <li>Укажите имя пользователя (например, <code>infrazen-service</code>)</li>
             <li>Создайте надежный пароль</li>
-            <li><strong>Критически важно:</strong> Назначьте роль <strong>"member"</strong> на уровне аккаунта</li>
+            <li><strong>Критически важно:</strong> Назначьте роль <strong>"member"</strong> на уровне аккаунта или проекта</li>
             <li>Сохраните имя пользователя и пароль</li>
         </ol>
         
