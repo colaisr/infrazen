@@ -678,10 +678,14 @@ function initializeCanvas() {
     if (currentBoard.canvas_state) {
         try {
             fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
-                // Remove group-related objects from canvas_state (they'll be loaded from database)
+                // Remove group and resource objects from canvas_state (they'll be loaded from database)
                 const objectsToRemove = [];
                 fabricCanvas.getObjects().forEach(obj => {
-                    if (obj.objectType === 'group' || obj.objectType === 'groupText' || obj.objectType === 'groupCost') {
+                    if (obj.objectType === 'group' || 
+                        obj.objectType === 'groupText' || 
+                        obj.objectType === 'groupCost' ||
+                        obj.objectType === 'resource' ||
+                        obj.objectType === 'resourceText') {
                         objectsToRemove.push(obj);
                     }
                 });
@@ -692,15 +696,24 @@ function initializeCanvas() {
                     loadGroupsOnCanvas(currentBoard.groups);
                 }
                 
+                // Load placed resources from database
+                if (currentBoard.resources && currentBoard.resources.length > 0) {
+                    loadResourcesOnCanvas(currentBoard.resources);
+                }
+                
                 fabricCanvas.renderAll();
             });
         } catch (error) {
             console.error('Error loading canvas state:', error);
         }
     } else {
-        // No canvas state, just load groups
+        // No canvas state, just load groups and resources
         if (currentBoard.groups && currentBoard.groups.length > 0) {
             loadGroupsOnCanvas(currentBoard.groups);
+        }
+        
+        if (currentBoard.resources && currentBoard.resources.length > 0) {
+            loadResourcesOnCanvas(currentBoard.resources);
         }
     }
     
@@ -1307,7 +1320,16 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         selectable: false,
         evented: false,
         objectType: 'resourceText',
-        parentResourceId: boardResourceId
+        parentResourceId: boardResourceId,
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
     });
     
     // Resource type and IP text
@@ -1322,7 +1344,16 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         selectable: false,
         evented: false,
         objectType: 'resourceText',
-        parentResourceId: boardResourceId
+        parentResourceId: boardResourceId,
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
     });
     
     // Add to canvas
@@ -1964,6 +1995,46 @@ function loadGroupsOnCanvas(groups) {
         });
         } catch (error) {
             console.error('Error loading group:', error);
+        }
+    });
+    
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Load placed resources from board data and render on canvas
+ */
+function loadResourcesOnCanvas(boardResources) {
+    if (!fabricCanvas || !boardResources) {
+        return;
+    }
+    
+    boardResources.forEach(boardResource => {
+        try {
+            const resourceData = boardResource.resource;
+            if (!resourceData) {
+                console.warn('Board resource missing resource data:', boardResource);
+                return;
+            }
+            
+            // Convert API data format to match expected format
+            const formattedResource = {
+                id: resourceData.id,
+                name: resourceData.resource_name || 'Unknown',
+                type: resourceData.resource_type || 'Resource',
+                ip: resourceData.external_ip || resourceData.region || null
+            };
+            
+            // Create resource object on canvas
+            createResourceObject(
+                formattedResource,
+                boardResource.position.x,
+                boardResource.position.y,
+                boardResource.id,
+                boardResource.group_id
+            );
+        } catch (error) {
+            console.error('Error loading resource:', error, boardResource);
         }
     });
     
