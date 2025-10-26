@@ -22,6 +22,9 @@ from .provider_catalog import ProviderCatalog
 from .pricing import ProviderPrice, PriceHistory, PriceComparisonRecommendation
 from .provider_admin_credentials import ProviderAdminCredentials
 from .provider_resource_type import ProviderResourceType
+from .business_board import BusinessBoard
+from .board_resource import BoardResource
+from .board_group import BoardGroup
 
 __all__ = [
     'db',
@@ -47,6 +50,9 @@ __all__ = [
     'ProviderPrice',
     'PriceHistory',
     'PriceComparisonRecommendation',
-    'ProviderAdminCredentials'
-    , 'ProviderResourceType'
+    'ProviderAdminCredentials',
+    'ProviderResourceType',
+    'BusinessBoard',
+    'BoardResource',
+    'BoardGroup'
 ]

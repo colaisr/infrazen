@@ -428,17 +428,11 @@ def business_context():
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
     
-    if is_demo_user:
-        overview = get_overview()
-    else:
-        overview = get_real_user_overview(user['id'])
-    
-    return render_template('page.html', 
+    return render_template('business_context.html', 
                         user=user,
-                        active_page='business_context',
+                        active_page='business-context',
                         page_title='Бизнес-контекст',
-                        page_subtitle='Управление бизнес-контекстом ресурсов',
-                        overview=overview,
+                        page_subtitle='Визуальное распределение ресурсов',
                         is_demo_user=is_demo_user)
 
 @main_bp.route('/reports')

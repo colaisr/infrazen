@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Бизнес-контекст - InfraZen FinOps Platform{% endblock %}
+
+{% block page_title %}Бизнес-контекст{% endblock %}
+{% block page_subtitle %}Визуальное распределение ресурсов по бизнес-контекстам{% endblock %}
+{% block header_actions %}
+<button class="btn btn-primary" id="createBoardBtnHeader">
+    <i class="fa-solid fa-plus"></i>
+    Создать доску
+</button>
+{% endblock %}
+{% block header %}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/business_context.css') }}?v={{ range(1000, 9999) | random }}">
+{% endblock %}
+
+{% block content %}
+<div class="business-context-container">
+    <!-- Board Selection / List View (initial state) -->
+    <div id="boardListView" class="board-list-view">
+        <div class="boards-grid" id="boardsGrid">
+            <!-- Boards will be loaded here by JavaScript -->
+            <div class="loading-spinner">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <p>Загрузка досок...</p>
+            </div>
+        </div>
+        
+        <!-- Empty state -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-diagram-project"></i>
+            </div>
+            <h2>У вас пока нет досок</h2>
+            <p>Создайте первую доску для визуализации распределения ресурсов</p>
+            <button class="btn btn-primary" onclick="document.getElementById('createBoardBtnHeader').click()">
+                <i class="fa-solid fa-plus"></i>
+                Создать первую доску
+            </button>
+        </div>
+    </div>
+    
+    <!-- Canvas View (when board is opened) -->
+    <div id="canvasView" class="canvas-view" style="display: none;">
+        <!-- Canvas Toolbar -->
+        <div class="canvas-toolbar">
+            <div class="toolbar-left">
+                <button class="btn btn-icon" id="backToListBtn" title="Вернуться к списку досок">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <div class="board-name-container">
+                    <h2 id="currentBoardName" contenteditable="true">Board Name</h2>
+                    <span class="save-indicator" id="saveIndicator">Сохранено</span>
+                </div>
+            </div>
+            
+            <div class="toolbar-center">
+                <div class="zoom-controls">
+                    <button class="btn btn-icon" id="zoomOutBtn" title="Уменьшить (Ctrl -)">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                    <button class="btn btn-icon" id="zoomInBtn" title="Увеличить (Ctrl +)">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button class="btn btn-icon" id="zoomResetBtn" title="Сбросить (Ctrl 0)">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="toolbar-right">
+                <button class="btn btn-secondary" id="toggleToolboxBtn">
+                    <i class="fa-solid fa-toolbox"></i>
+                    <span>Инструменты</span>
+                </button>
+                <button class="btn btn-secondary" id="saveBoardBtn" title="Сохранить (Ctrl S)">
+                    <i class="fa-solid fa-save"></i>
+                    <span>Сохранить</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Main Canvas Area -->
+        <div class="canvas-main">
+            <!-- Left Toolbox -->
+            <div class="toolbox" id="toolbox">
+                <div class="toolbox-header">
+                    <h3>Инструменты</h3>
+                    <button class="btn btn-icon" id="closeToolboxBtn">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="toolbox-content">
+                    <!-- Groups Section -->
+                    <div class="toolbox-section">
+                        <div class="toolbox-section-header" data-section="groups">
+                            <i class="fa-solid fa-chevron-right"></i>
+                            <span>Группы</span>
+                        </div>
+                        <div class="toolbox-section-content" id="groupsToolbox">
+                            <div class="toolbox-item" data-tool="group">
+                                <div class="tool-icon">
+                                    <i class="fa-solid fa-object-group"></i>
+                                </div>
+                                <span class="tool-name">Группа</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Resources Section -->
+                    <div class="toolbox-section expanded">
+                        <div class="toolbox-section-header" data-section="resources">
+                            <i class="fa-solid fa-chevron-right"></i>
+                            <span>Ресурсы</span>
+                            <span class="resource-badge" id="unplacedBadge">0</span>
+                        </div>
+                        <div class="toolbox-section-content" id="resourcesToolbox">
+                            <div class="resources-filters">
+                                <div class="filter-buttons">
+                                    <button class="filter-btn active" data-filter="all">Все</button>
+                                    <button class="filter-btn" data-filter="unplaced">Не размещены</button>
+                                    <button class="filter-btn" data-filter="placed">Размещены</button>
+                                </div>
+                                <input type="text" class="search-input" id="resourceSearch" placeholder="Поиск...">
+                            </div>
+                            <div class="resources-list" id="resourcesList">
+                                <div class="loading-spinner">
+                                    <i class="fa-solid fa-spinner fa-spin"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Free Objects Section -->
+                    <div class="toolbox-section">
+                        <div class="toolbox-section-header" data-section="objects">
+                            <i class="fa-solid fa-chevron-right"></i>
+                            <span>Объекты</span>
+                        </div>
+                        <div class="toolbox-section-content" id="objectsToolbox">
+                            <div class="toolbox-item" data-tool="text">
+                                <div class="tool-icon">
+                                    <i class="fa-solid fa-font"></i>
+                                </div>
+                                <span class="tool-name">Текст</span>
+                            </div>
+                            <div class="toolbox-item" data-tool="rectangle">
+                                <div class="tool-icon">
+                                    <i class="fa-solid fa-square"></i>
+                                </div>
+                                <span class="tool-name">Прямоугольник</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Canvas Container -->
+            <div class="canvas-container" id="canvasContainer">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Board Modal -->
+<div id="createBoardModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Создать новую доску</h3>
+            <button class="modal-close" onclick="closeCreateBoardModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="createBoardForm">
+                <div class="form-group">
+                    <label for="boardName">Название доски</label>
+                    <input type="text" id="boardName" name="boardName" class="form-control" placeholder="Например: Production Environment" required>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCreateBoardModal()">Отмена</button>
+            <button class="btn btn-primary" onclick="createBoard()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Resource Info Modal -->
+<div id="resourceInfoModal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Информация о ресурсе</h3>
+            <button class="modal-close" onclick="closeResourceInfoModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="resourceInfoContent">
+            <!-- Resource details will be loaded here -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeResourceInfoModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
+
+<!-- Resource Notes Modal -->
+<div id="resourceNotesModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Заметки о ресурсе</h3>
+            <button class="modal-close" onclick="closeResourceNotesModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="resourceNotes">Заметки</label>
+                <textarea id="resourceNotes" class="form-control" rows="8" placeholder="Добавьте заметки о ресурсе..."></textarea>
+                <small class="form-text">Заметки сохраняются автоматически и видны только вам</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeResourceNotesModal()">Закрыть</button>
+            <button class="btn btn-primary" onclick="saveResourceNotes()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Fabric.js for canvas manipulation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+<!-- Business Context JavaScript -->
+<script src="{{ url_for('static', filename='js/business_context.js') }}?v={{ range(1000, 9999) | random }}"></script>
+{% endblock %}
+

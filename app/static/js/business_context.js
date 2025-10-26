@@ -1,0 +1,834 @@
+/**
+ * Business Context - Visual Resource Mapping
+ * 
+ * This module handles the visual board interface for mapping cloud resources
+ * to business contexts (customers, features, departments, etc.)
+ */
+
+// Global state
+let currentBoard = null;
+let fabricCanvas = null;
+let allResources = [];
+let currentFilter = 'all';
+let autoSaveTimer = null;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initializeBusinessContext();
+});
+
+/**
+ * Main initialization function
+ */
+function initializeBusinessContext() {
+    setupEventListeners();
+    
+    // Check if we should restore a previously opened board
+    const lastBoardId = localStorage.getItem('business_context_last_board');
+    
+    if (lastBoardId && lastBoardId !== 'list') {
+        // Try to open the last board
+        openBoard(parseInt(lastBoardId));
+    } else {
+        // Show board list
+        loadBoards();
+    }
+}
+
+/**
+ * Setup event listeners
+ */
+function setupEventListeners() {
+    // Create board button (in header)
+    const createBoardBtnHeader = document.getElementById('createBoardBtnHeader');
+    if (createBoardBtnHeader) {
+        createBoardBtnHeader.addEventListener('click', openCreateBoardModal);
+    }
+    
+    // Keep backward compatibility with old button ID
+    const createBoardBtn = document.getElementById('createBoardBtn');
+    if (createBoardBtn) {
+        createBoardBtn.addEventListener('click', openCreateBoardModal);
+    }
+    
+    // Back to list button
+    const backToListBtn = document.getElementById('backToListBtn');
+    if (backToListBtn) {
+        backToListBtn.addEventListener('click', backToList);
+    }
+    
+    // Zoom controls
+    document.getElementById('zoomInBtn')?.addEventListener('click', zoomIn);
+    document.getElementById('zoomOutBtn')?.addEventListener('click', zoomOut);
+    document.getElementById('zoomResetBtn')?.addEventListener('click', zoomReset);
+    
+    // Toolbox toggle
+    document.getElementById('toggleToolboxBtn')?.addEventListener('click', toggleToolbox);
+    document.getElementById('closeToolboxBtn')?.addEventListener('click', toggleToolbox);
+    
+    // Save board button
+    document.getElementById('saveBoardBtn')?.addEventListener('click', saveBoard);
+    
+    // Board name editing
+    const boardNameEl = document.getElementById('currentBoardName');
+    if (boardNameEl) {
+        boardNameEl.addEventListener('blur', function() {
+            if (currentBoard && boardNameEl.textContent.trim() !== currentBoard.name) {
+                updateBoardName(boardNameEl.textContent.trim());
+            }
+        });
+        
+        boardNameEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                boardNameEl.blur();
+            }
+        });
+    }
+    
+    // Toolbox section toggle
+    document.querySelectorAll('.toolbox-section-header').forEach(header => {
+        header.addEventListener('click', function() {
+            const section = this.closest('.toolbox-section');
+            section.classList.toggle('expanded');
+        });
+    });
+    
+    // Resource filters
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilter = this.dataset.filter;
+            filterResources();
+        });
+    });
+    
+    // Resource search
+    const searchInput = document.getElementById('resourceSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            filterResources();
+        });
+    }
+}
+
+/**
+ * Load boards list from API
+ */
+async function loadBoards() {
+    const boardsGrid = document.getElementById('boardsGrid');
+    const emptyState = document.getElementById('emptyState');
+    
+    try {
+        const response = await fetch('/api/business-context/boards');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayBoards(data.boards);
+        } else {
+            // Check for authentication error
+            if (response.status === 401 || data.redirect) {
+                window.location.href = data.redirect || '/api/auth/login';
+                return;
+            }
+            
+            // Show empty state on other errors
+            boardsGrid.style.display = 'none';
+            emptyState.style.display = 'block';
+            showFlashMessage('error', data.error || 'Failed to load boards');
+        }
+    } catch (error) {
+        console.error('Error loading boards:', error);
+        boardsGrid.style.display = 'none';
+        emptyState.style.display = 'block';
+        showFlashMessage('error', 'Failed to load boards. Please refresh the page.');
+    }
+}
+
+/**
+ * Display boards in grid
+ */
+function displayBoards(boards) {
+    const boardsGrid = document.getElementById('boardsGrid');
+    const emptyState = document.getElementById('emptyState');
+    
+    if (!boards || boards.length === 0) {
+        boardsGrid.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    boardsGrid.style.display = 'grid';
+    emptyState.style.display = 'none';
+    
+    boardsGrid.innerHTML = boards.map(board => `
+        <div class="board-card" onclick="openBoard(${board.id})">
+            <div class="board-card-header">
+                <h3 class="board-card-title">${escapeHtml(board.name)}</h3>
+                ${board.is_default ? '<span class="board-card-badge">По умолчанию</span>' : ''}
+            </div>
+            <div class="board-card-meta">
+                <div class="board-card-meta-item">
+                    <i class="fa-solid fa-cube"></i>
+                    <span>${board.resource_count} ресурсов</span>
+                </div>
+                <div class="board-card-meta-item">
+                    <i class="fa-solid fa-object-group"></i>
+                    <span>${board.group_count} групп</span>
+                </div>
+            </div>
+            <div class="board-card-actions" onclick="event.stopPropagation()">
+                <button class="board-card-btn btn-delete" onclick="deleteBoard(${board.id})">
+                    <i class="fa-solid fa-trash"></i>
+                    Удалить
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Open create board modal
+ */
+function openCreateBoardModal() {
+    const modal = document.getElementById('createBoardModal');
+    modal.classList.add('active');
+    document.getElementById('boardName').focus();
+}
+
+/**
+ * Close create board modal
+ */
+function closeCreateBoardModal() {
+    const modal = document.getElementById('createBoardModal');
+    modal.classList.remove('active');
+    document.getElementById('boardName').value = '';
+}
+
+/**
+ * Create new board
+ */
+async function createBoard() {
+    const nameInput = document.getElementById('boardName');
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        showFlashMessage('error', 'Please enter a board name');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/business-context/boards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeCreateBoardModal();
+            openBoard(data.board.id);
+        } else {
+            showFlashMessage('error', data.error || 'Failed to create board');
+        }
+    } catch (error) {
+        console.error('Error creating board:', error);
+        showFlashMessage('error', 'Failed to create board');
+    }
+}
+
+/**
+ * Delete board
+ */
+async function deleteBoard(boardId) {
+    if (!confirm('Вы уверены, что хотите удалить эту доску? Это действие нельзя отменить.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/business-context/boards/${boardId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // If we deleted the currently viewed board, clear the saved state
+            const lastBoardId = localStorage.getItem('business_context_last_board');
+            if (lastBoardId == boardId) {
+                localStorage.setItem('business_context_last_board', 'list');
+            }
+            
+            loadBoards();
+        } else {
+            showFlashMessage('error', data.error || 'Failed to delete board');
+        }
+    } catch (error) {
+        console.error('Error deleting board:', error);
+        showFlashMessage('error', 'Failed to delete board');
+    }
+}
+
+/**
+ * Open board in canvas view
+ */
+async function openBoard(boardId) {
+    try {
+        const response = await fetch(`/api/business-context/boards/${boardId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            currentBoard = data.board;
+            
+            // Save to localStorage for state persistence
+            localStorage.setItem('business_context_last_board', boardId);
+            
+            switchToCanvasView();
+            loadResources();
+        } else {
+            // Board not found or error - go back to list
+            localStorage.setItem('business_context_last_board', 'list');
+            loadBoards();
+            showFlashMessage('error', data.error || 'Failed to load board');
+        }
+    } catch (error) {
+        console.error('Error opening board:', error);
+        localStorage.setItem('business_context_last_board', 'list');
+        loadBoards();
+        showFlashMessage('error', 'Failed to load board');
+    }
+}
+
+/**
+ * Switch to canvas view
+ */
+function switchToCanvasView() {
+    document.getElementById('boardListView').style.display = 'none';
+    document.getElementById('canvasView').style.display = 'flex';
+    
+    // Update board name
+    document.getElementById('currentBoardName').textContent = currentBoard.name;
+    
+    // Wait for layout to settle before initializing canvas
+    setTimeout(function() {
+        if (!fabricCanvas) {
+            initializeCanvas();
+        }
+    }, 50);
+}
+
+/**
+ * Back to board list
+ */
+function backToList() {
+    if (fabricCanvas) {
+        fabricCanvas.dispose();
+        fabricCanvas = null;
+    }
+    
+    currentBoard = null;
+    
+    // Save to localStorage that we're on the list view
+    localStorage.setItem('business_context_last_board', 'list');
+    
+    document.getElementById('canvasView').style.display = 'none';
+    document.getElementById('boardListView').style.display = 'block';
+    loadBoards();
+}
+
+/**
+ * Initialize Fabric.js canvas
+ */
+function initializeCanvas() {
+    const canvasEl = document.getElementById('canvas');
+    const container = document.getElementById('canvasContainer');
+    
+    // Set initial canvas size (will be resized properly after init)
+    const padding = 4; // 2px on each side = 4px total
+    const initialWidth = Math.max(container.offsetWidth - padding, 100);
+    const initialHeight = Math.max(container.offsetHeight - padding, 100);
+    
+    canvasEl.width = initialWidth;
+    canvasEl.height = initialHeight;
+    
+    // Initialize Fabric canvas
+    fabricCanvas = new fabric.Canvas('canvas', {
+        backgroundColor: '#FFFFFF',
+        selection: true,
+        preserveObjectStacking: true,
+        width: initialWidth,
+        height: initialHeight
+    });
+    
+    // Load canvas state if exists
+    if (currentBoard.canvas_state) {
+        fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
+            fabricCanvas.renderAll();
+        });
+    }
+    
+    // Restore viewport
+    if (currentBoard.viewport) {
+        const viewport = currentBoard.viewport;
+        fabricCanvas.setZoom(viewport.zoom || 1.0);
+        fabricCanvas.absolutePan({ x: viewport.pan_x || 0, y: viewport.pan_y || 0 });
+        updateZoomDisplay();
+    }
+    
+    // Set up canvas event listeners
+    setupCanvasEvents();
+    
+    // Initial resize to ensure proper dimensions - wait for DOM to settle
+    requestAnimationFrame(function() {
+        setTimeout(resizeCanvas, 50);
+    });
+    
+    // Handle window resize with debounce
+    let windowResizeTimeout;
+    window.addEventListener('resize', function() {
+        if (windowResizeTimeout) {
+            clearTimeout(windowResizeTimeout);
+        }
+        windowResizeTimeout = setTimeout(function() {
+            requestAnimationFrame(resizeCanvas);
+        }, 150);
+    });
+    
+    // Listen for InfraZen sidebar collapse/expand
+    const appContainer = document.querySelector('.app-container');
+    if (appContainer) {
+        let sidebarResizeTimeout;
+        const sidebarObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'class') {
+                    // Debounce resize
+                    if (sidebarResizeTimeout) {
+                        clearTimeout(sidebarResizeTimeout);
+                    }
+                    sidebarResizeTimeout = setTimeout(function() {
+                        requestAnimationFrame(resizeCanvas);
+                        sidebarResizeTimeout = null;
+                    }, 350);
+                }
+            });
+        });
+        
+        sidebarObserver.observe(appContainer, { attributes: true });
+    }
+}
+
+/**
+ * Setup canvas event listeners
+ */
+function setupCanvasEvents() {
+    // Mouse wheel zoom
+    fabricCanvas.on('mouse:wheel', function(opt) {
+        const delta = opt.e.deltaY;
+        let zoom = fabricCanvas.getZoom();
+        zoom *= 0.999 ** delta;
+        
+        // Limit zoom
+        if (zoom > 5) zoom = 5;
+        if (zoom < 0.1) zoom = 0.1;
+        
+        fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        updateZoomDisplay();
+        
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+        
+        scheduleAutoSave();
+    });
+    
+    // Pan with space key or middle mouse button
+    let isPanning = false;
+    let lastPosX, lastPosY;
+    
+    fabricCanvas.on('mouse:down', function(opt) {
+        const evt = opt.e;
+        if (evt.button === 1 || (evt.button === 0 && evt.spaceKey)) {
+            isPanning = true;
+            fabricCanvas.selection = false;
+            lastPosX = evt.clientX;
+            lastPosY = evt.clientY;
+            fabricCanvas.defaultCursor = 'grab';
+        }
+    });
+    
+    fabricCanvas.on('mouse:move', function(opt) {
+        if (isPanning) {
+            const evt = opt.e;
+            const vpt = fabricCanvas.viewportTransform;
+            vpt[4] += evt.clientX - lastPosX;
+            vpt[5] += evt.clientY - lastPosY;
+            fabricCanvas.requestRenderAll();
+            lastPosX = evt.clientX;
+            lastPosY = evt.clientY;
+            
+            scheduleAutoSave();
+        }
+    });
+    
+    fabricCanvas.on('mouse:up', function() {
+        if (isPanning) {
+            isPanning = false;
+            fabricCanvas.selection = true;
+            fabricCanvas.defaultCursor = 'default';
+        }
+    });
+    
+    // Object modified - trigger autosave
+    fabricCanvas.on('object:modified', function() {
+        scheduleAutoSave();
+    });
+    
+    fabricCanvas.on('object:added', function() {
+        scheduleAutoSave();
+    });
+    
+    fabricCanvas.on('object:removed', function() {
+        scheduleAutoSave();
+    });
+}
+
+/**
+ * Resize canvas to fit container
+ */
+function resizeCanvas() {
+    if (!fabricCanvas) return;
+    
+    const container = document.getElementById('canvasContainer');
+    if (!container) return;
+    
+    // Get actual container dimensions
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+    
+    // Account for padding (2px on each side = 4px total)
+    const padding = 4;
+    const width = Math.max(containerWidth - padding, 100);
+    const height = Math.max(containerHeight - padding, 100);
+    
+    // Update canvas element size
+    const canvasEl = document.getElementById('canvas');
+    if (canvasEl) {
+        canvasEl.width = width;
+        canvasEl.height = height;
+    }
+    
+    // Update Fabric canvas dimensions
+    fabricCanvas.setWidth(width);
+    fabricCanvas.setHeight(height);
+    fabricCanvas.calcOffset();
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Zoom controls
+ */
+function zoomIn() {
+    if (!fabricCanvas) return;
+    let zoom = fabricCanvas.getZoom();
+    zoom = Math.min(zoom * 1.1, 5);
+    fabricCanvas.setZoom(zoom);
+    updateZoomDisplay();
+    scheduleAutoSave();
+}
+
+function zoomOut() {
+    if (!fabricCanvas) return;
+    let zoom = fabricCanvas.getZoom();
+    zoom = Math.max(zoom * 0.9, 0.1);
+    fabricCanvas.setZoom(zoom);
+    updateZoomDisplay();
+    scheduleAutoSave();
+}
+
+function zoomReset() {
+    if (!fabricCanvas) return;
+    fabricCanvas.setZoom(1);
+    fabricCanvas.absolutePan({ x: 0, y: 0 });
+    updateZoomDisplay();
+    scheduleAutoSave();
+}
+
+function updateZoomDisplay() {
+    if (!fabricCanvas) return;
+    const zoom = Math.round(fabricCanvas.getZoom() * 100);
+    document.getElementById('zoomLevel').textContent = zoom + '%';
+}
+
+/**
+ * Toggle toolbox visibility
+ */
+function toggleToolbox() {
+    const toolbox = document.getElementById('toolbox');
+    const wasHidden = toolbox.classList.contains('hidden');
+    toolbox.classList.toggle('hidden');
+    
+    // Resize canvas after toolbox animation completes (if needed)
+    // Canvas is now full-width regardless, but this ensures proper rendering
+    if (fabricCanvas) {
+        setTimeout(function() {
+            fabricCanvas.calcOffset();
+            fabricCanvas.renderAll();
+        }, 300);
+    }
+}
+
+/**
+ * Load available resources
+ */
+async function loadResources() {
+    try {
+        const response = await fetch('/api/business-context/available-resources');
+        const data = await response.json();
+        
+        if (data.success) {
+            allResources = data.resources;
+            displayResources();
+            
+            // Update unplaced badge
+            document.getElementById('unplacedBadge').textContent = data.unplaced_count;
+        } else {
+            showFlashMessage('error', data.error || 'Failed to load resources');
+        }
+    } catch (error) {
+        console.error('Error loading resources:', error);
+        showFlashMessage('error', 'Failed to load resources');
+    }
+}
+
+/**
+ * Display resources in toolbox
+ */
+function displayResources() {
+    const resourcesList = document.getElementById('resourcesList');
+    
+    if (!allResources || allResources.length === 0) {
+        resourcesList.innerHTML = '<div class="empty-state"><p>No resources available</p></div>';
+        return;
+    }
+    
+    const html = allResources.map(provider => `
+        <div class="resource-provider-group">
+            <div class="resource-provider-header">
+                <i class="fa-solid fa-cloud"></i>
+                <span>${escapeHtml(provider.provider_name)} (${provider.resources.length})</span>
+            </div>
+            ${provider.resources.map(resource => `
+                <div class="resource-item ${resource.is_placed ? 'placed' : ''}" 
+                     data-resource-id="${resource.id}"
+                     draggable="${!resource.is_placed}">
+                    <div class="resource-icon">
+                        <i class="fa-solid fa-server"></i>
+                        <div class="resource-info-icon" onclick="showResourceInfo(${resource.id})">
+                            <i class="fa-solid fa-info"></i>
+                        </div>
+                        <div class="resource-notes-icon ${resource.has_notes ? 'has-notes' : ''}" 
+                             onclick="showResourceNotes(${resource.id})">
+                            <i class="fa-solid fa-note-sticky"></i>
+                        </div>
+                    </div>
+                    <div class="resource-details">
+                        <div class="resource-name">${escapeHtml(resource.name)}</div>
+                        <div class="resource-meta">${resource.type} • ${resource.ip || 'No IP'}</div>
+                    </div>
+                    ${resource.is_placed ? '<span class="resource-badge">Placed</span>' : ''}
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+    
+    resourcesList.innerHTML = html;
+    
+    // Make resources draggable (simplified for Phase 1)
+    // Full drag-drop implementation will be in Phase 5
+}
+
+/**
+ * Filter resources
+ */
+function filterResources() {
+    const searchTerm = document.getElementById('resourceSearch').value.toLowerCase();
+    const items = document.querySelectorAll('.resource-item');
+    
+    items.forEach(item => {
+        const resourceName = item.querySelector('.resource-name').textContent.toLowerCase();
+        const resourceMeta = item.querySelector('.resource-meta').textContent.toLowerCase();
+        const isPlaced = item.classList.contains('placed');
+        
+        let showByFilter = true;
+        if (currentFilter === 'placed') showByFilter = isPlaced;
+        if (currentFilter === 'unplaced') showByFilter = !isPlaced;
+        
+        const showBySearch = resourceName.includes(searchTerm) || resourceMeta.includes(searchTerm);
+        
+        item.style.display = (showByFilter && showBySearch) ? 'flex' : 'none';
+    });
+}
+
+/**
+ * Show resource info modal
+ */
+function showResourceInfo(resourceId) {
+    // TODO: Implement in Phase 5
+    alert('Информация о ресурсе - Скоро будет доступно');
+}
+
+/**
+ * Show resource notes modal
+ */
+function showResourceNotes(resourceId) {
+    // TODO: Implement in Phase 5
+    alert('Заметки о ресурсе - Скоро будет доступно');
+}
+
+/**
+ * Close resource info modal
+ */
+function closeResourceInfoModal() {
+    document.getElementById('resourceInfoModal').classList.remove('active');
+}
+
+/**
+ * Close resource notes modal
+ */
+function closeResourceNotesModal() {
+    document.getElementById('resourceNotesModal').classList.remove('active');
+}
+
+/**
+ * Save resource notes
+ */
+function saveResourceNotes() {
+    // TODO: Implement in Phase 5
+    closeResourceNotesModal();
+}
+
+/**
+ * Update board name
+ */
+async function updateBoardName(newName) {
+    if (!currentBoard || !newName) return;
+    
+    try {
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentBoard.name = newName;
+            showFlashMessage('success', 'Board name updated');
+        } else {
+            showFlashMessage('error', data.error || 'Failed to update board name');
+            document.getElementById('currentBoardName').textContent = currentBoard.name;
+        }
+    } catch (error) {
+        console.error('Error updating board name:', error);
+        showFlashMessage('error', 'Failed to update board name');
+        document.getElementById('currentBoardName').textContent = currentBoard.name;
+    }
+}
+
+/**
+ * Schedule auto-save
+ */
+function scheduleAutoSave() {
+    const indicator = document.getElementById('saveIndicator');
+    indicator.textContent = 'Изменения...';
+    indicator.className = 'save-indicator saving';
+    
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+    }
+    
+    autoSaveTimer = setTimeout(() => {
+        saveBoard(true);
+    }, 3000); // 3 seconds debounce
+}
+
+/**
+ * Save board
+ */
+async function saveBoard(isAutoSave = false) {
+    if (!currentBoard || !fabricCanvas) return;
+    
+    const indicator = document.getElementById('saveIndicator');
+    
+    if (!isAutoSave) {
+        indicator.textContent = 'Сохранение...';
+        indicator.className = 'save-indicator saving';
+    }
+    
+    const canvasState = fabricCanvas.toJSON();
+    const viewport = {
+        zoom: fabricCanvas.getZoom(),
+        pan_x: fabricCanvas.viewportTransform[4],
+        pan_y: fabricCanvas.viewportTransform[5]
+    };
+    
+    try {
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                canvas_state: canvasState,
+                viewport: viewport
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            indicator.textContent = 'Сохранено';
+            indicator.className = 'save-indicator saved';
+            
+            if (!isAutoSave) {
+                showFlashMessage('success', 'Board saved successfully');
+            }
+        } else {
+            indicator.textContent = 'Ошибка';
+            indicator.className = 'save-indicator';
+            showFlashMessage('error', data.error || 'Failed to save board');
+        }
+    } catch (error) {
+        console.error('Error saving board:', error);
+        indicator.textContent = 'Ошибка';
+        indicator.className = 'save-indicator';
+        showFlashMessage('error', 'Failed to save board');
+    }
+}
+
+/**
+ * Utility: Escape HTML
+ */
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+/**
+ * Show flash message
+ */
+function showFlashMessage(type, message) {
+    // Use existing flash message system from main.js if available
+    if (typeof window.showMessage === 'function') {
+        window.showMessage(type, message);
+    } else {
+        alert(message);
+    }
+}
+
