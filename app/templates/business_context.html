@@ -293,28 +293,6 @@
 </div>
 
 <!-- Resource Notes Modal -->
-<div id="resourceNotesModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Заметки о ресурсе</h3>
-            <button class="modal-close" onclick="closeResourceNotesModal()">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label for="resourceNotes">Заметки</label>
-                <textarea id="resourceNotes" class="form-control" rows="8" placeholder="Добавьте заметки о ресурсе..."></textarea>
-                <small class="form-text">Заметки сохраняются автоматически и видны только вам</small>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeResourceNotesModal()">Закрыть</button>
-            <button class="btn btn-primary" onclick="saveResourceNotes()">Сохранить</button>
-        </div>
-    </div>
-</div>
-
 <!-- Custom Context Menu -->
 <div id="contextMenu" class="context-menu" style="display: none;">
     <!-- Group-specific options -->
@@ -342,7 +320,7 @@
 </div>
 
 <!-- Resource Info Modal -->
-<div id="resourceInfoModal" class="modal" style="display: none;">
+<div id="resourceInfoModal" class="modal">
     <div class="modal-backdrop" onclick="closeResourceInfoModal()"></div>
     <div class="modal-content">
         <div class="modal-header">
@@ -360,7 +338,7 @@
 </div>
 
 <!-- Resource Notes Modal -->
-<div id="resourceNotesModal" class="modal" style="display: none;">
+<div id="resourceNotesModal" class="modal">
     <div class="modal-backdrop" onclick="closeResourceNotesModal()"></div>
     <div class="modal-content">
         <div class="modal-header">

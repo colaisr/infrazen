@@ -1646,6 +1646,8 @@ async function showResourceNotes(resourceId) {
     const header = document.getElementById('resourceNotesHeader');
     const textarea = document.getElementById('resourceNotesText');
     
+    console.log('Opening notes for resource ID:', resourceId);
+    
     // Store resource ID for save
     textarea.dataset.resourceId = resourceId;
     
@@ -1662,6 +1664,8 @@ async function showResourceNotes(resourceId) {
         }
     }
     
+    console.log('Found resource:', resource);
+    
     if (!resource) {
         showFlashMessage('error', 'Ресурс не найден');
         return;
@@ -1677,6 +1681,7 @@ async function showResourceNotes(resourceId) {
     `;
     
     // Load existing notes from resource
+    console.log('Loading notes for resource:', { id: resource.id, name: resource.name, notes: resource.notes });
     textarea.value = resource.notes || '';
     
     // Show modal
@@ -1688,7 +1693,15 @@ async function showResourceNotes(resourceId) {
  * Close resource notes modal
  */
 function closeResourceNotesModal() {
-    document.getElementById('resourceNotesModal').classList.remove('active');
+    const modal = document.getElementById('resourceNotesModal');
+    const textarea = document.getElementById('resourceNotesText');
+    
+    // Clear textarea when closing
+    textarea.value = '';
+    textarea.dataset.resourceId = '';
+    
+    // Hide modal
+    modal.classList.remove('active');
 }
 
 /**
@@ -1699,6 +1712,8 @@ async function saveResourceNotes() {
     const resourceId = parseInt(textarea.dataset.resourceId);
     const notes = textarea.value;
     
+    console.log('Saving notes for resource:', { resourceId, notes });
+    
     try {
         const response = await fetch(`/api/business-context/resources/${resourceId}/notes`, {
             method: 'PUT',
@@ -1707,13 +1722,18 @@ async function saveResourceNotes() {
         });
         
         const data = await response.json();
+        console.log('Save response:', data);
         
         if (data.success) {
+            console.log('Notes saved successfully! Reloading resources...');
+            
             // Close modal
             closeResourceNotesModal();
             
             // Reload resources to update "has notes" indicator
             await loadResources();
+            
+            console.log('Resources reloaded');
         } else {
             showFlashMessage('error', data.error || 'Ошибка сохранения заметок');
         }
