@@ -1343,7 +1343,16 @@ async function createGroupOnCanvas() {
         selectable: false,
         evented: false,
         objectType: 'groupText',
-        parentFabricId: fabricId
+        parentFabricId: fabricId,
+        // Preserve custom properties in JSON
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentFabricId: this.parentFabricId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
     });
     
     // Create cost badge text
@@ -1356,7 +1365,16 @@ async function createGroupOnCanvas() {
         selectable: false,
         evented: false,
         objectType: 'groupCost',
-        parentFabricId: fabricId
+        parentFabricId: fabricId,
+        // Preserve custom properties in JSON
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentFabricId: this.parentFabricId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
     });
     
     // Add objects to canvas
@@ -1478,15 +1496,11 @@ function createRectangleOnCanvas() {
  */
 function loadGroupsOnCanvas(groups) {
     if (!fabricCanvas || !groups) {
-        console.log('loadGroupsOnCanvas: canvas or groups missing', { fabricCanvas: !!fabricCanvas, groups });
         return;
     }
     
-    console.log('Loading groups on canvas:', groups);
-    
     groups.forEach(group => {
         try {
-            console.log('Loading group:', group);
             // Create group rectangle
             const groupRect = new fabric.Rect({
             left: group.position.x,
@@ -1532,7 +1546,16 @@ function loadGroupsOnCanvas(groups) {
             selectable: false,
             evented: false,
             objectType: 'groupText',
-            parentFabricId: group.fabric_id
+            parentFabricId: group.fabric_id,
+            // Preserve custom properties in JSON
+            toObject: (function(toObject) {
+                return function() {
+                    return fabric.util.object.extend(toObject.call(this), {
+                        objectType: this.objectType,
+                        parentFabricId: this.parentFabricId
+                    });
+                };
+            })(fabric.Text.prototype.toObject)
         });
         
         // Create cost badge text
@@ -1546,7 +1569,16 @@ function loadGroupsOnCanvas(groups) {
             selectable: false,
             evented: false,
             objectType: 'groupCost',
-            parentFabricId: group.fabric_id
+            parentFabricId: group.fabric_id,
+            // Preserve custom properties in JSON
+            toObject: (function(toObject) {
+                return function() {
+                    return fabric.util.object.extend(toObject.call(this), {
+                        objectType: this.objectType,
+                        parentFabricId: this.parentFabricId
+                    });
+                };
+            })(fabric.Text.prototype.toObject)
         });
         
         // Add to canvas
