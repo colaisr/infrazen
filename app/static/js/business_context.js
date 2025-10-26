@@ -1361,9 +1361,9 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         })(fabric.Text.prototype.toObject)
     });
     
-    // Info icon circle (top-right)
+    // Info icon circle (top-left)
     const infoIconCircle = new fabric.Circle({
-        left: x + 60 - 12,
+        left: x - 60 + 12,
         top: y - 40 + 4,
         radius: 8,
         fill: '#FFFFFF',
@@ -1388,7 +1388,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     });
     
     const infoIconText = new fabric.Text('i', {
-        left: x + 60 - 12,
+        left: x - 60 + 12,
         top: y - 40 + 4,
         fontSize: 10,
         fontWeight: 'bold',
@@ -1410,11 +1410,11 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         })(fabric.Text.prototype.toObject)
     });
     
-    // Notes icon circle (top-right, below info icon)
+    // Notes icon circle (top-right)
     const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
     const notesIconCircle = new fabric.Circle({
         left: x + 60 - 12,
-        top: y - 40 + 24,
+        top: y - 40 + 4,
         radius: 8,
         fill: hasNotes ? '#10B981' : '#FFFFFF',
         stroke: '#10B981',
@@ -1441,7 +1441,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     
     const notesIconText = new fabric.Text('n', {
         left: x + 60 - 12,
-        top: y - 40 + 24,
+        top: y - 40 + 4,
         fontSize: 10,
         fontWeight: 'bold',
         fill: hasNotes ? '#FFFFFF' : '#10B981',
@@ -1496,20 +1496,20 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         });
         // Move icons with card
         infoIconCircle.set({
-            left: this.left + this.width - 12,
+            left: this.left + 12,
             top: this.top + 4
         });
         infoIconText.set({
-            left: this.left + this.width - 12,
+            left: this.left + 12,
             top: this.top + 4
         });
         notesIconCircle.set({
             left: this.left + this.width - 12,
-            top: this.top + 24
+            top: this.top + 4
         });
         notesIconText.set({
             left: this.left + this.width - 12,
-            top: this.top + 24
+            top: this.top + 4
         });
         fabricCanvas.renderAll();
     });
@@ -1526,20 +1526,20 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         });
         // Update icon positions
         infoIconCircle.set({
-            left: this.left + this.width - 12,
+            left: this.left + 12,
             top: this.top + 4
         });
         infoIconText.set({
-            left: this.left + this.width - 12,
+            left: this.left + 12,
             top: this.top + 4
         });
         notesIconCircle.set({
             left: this.left + this.width - 12,
-            top: this.top + 24
+            top: this.top + 4
         });
         notesIconText.set({
             left: this.left + this.width - 12,
-            top: this.top + 24
+            top: this.top + 4
         });
         fabricCanvas.renderAll();
         
