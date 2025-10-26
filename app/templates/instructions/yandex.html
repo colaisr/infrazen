@@ -95,6 +95,11 @@
              class="instruction-image">
         <p class="image-caption">Окно с созданным авторизованным ключом (JSON) — скопируйте полностью</p>
         
+        <img src="{{ url_for('static', filename='instructions/yandex_5.png') }}" 
+             alt="InfraZen - вставка JSON ключа в форму подключения" 
+             class="instruction-image">
+        <p class="image-caption">Вставьте скопированный JSON-ключ в поле "Service Account Key" в InfraZen</p>
+        
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
             <strong>Важно:</strong> Ключ показывается только один раз! Обязательно сохраните его в безопасном месте. Если потеряете ключ, придется создать новый.
@@ -124,11 +129,6 @@
             <li><strong>Обязательно:</strong> Нажмите <strong>"Тест подключения"</strong> — должна появиться галочка ✅</li>
             <li>Если тест успешен, нажмите <strong>"Сохранить"</strong></li>
         </ol>
-        
-        <img src="{{ url_for('static', filename='instructions/yandex_5.png') }}" 
-             alt="InfraZen - форма добавления Yandex Cloud подключения" 
-             class="instruction-image">
-        <p class="image-caption">Форма добавления подключения в InfraZen: вставьте JSON-ключ и протестируйте</p>
         
         <div class="notice notice-warning">
             <i class="fa-solid fa-exclamation-triangle"></i>
