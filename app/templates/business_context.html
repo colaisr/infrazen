@@ -232,6 +232,23 @@
     </div>
 </div>
 
+<!-- Custom Context Menu -->
+<div id="contextMenu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" data-action="rename">
+        <i class="fa-solid fa-edit"></i>
+        <span>Переименовать</span>
+    </div>
+    <div class="context-menu-item" data-action="change-color">
+        <i class="fa-solid fa-palette"></i>
+        <span>Изменить цвет</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item context-menu-item-danger" data-action="delete">
+        <i class="fa-solid fa-trash"></i>
+        <span>Удалить</span>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}

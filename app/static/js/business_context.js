@@ -443,32 +443,39 @@ function initializeCanvas() {
  * Setup canvas event listeners
  */
 function setupCanvasEvents() {
-    // Mouse wheel and touchpad zoom (supports pinch gesture)
+    // Mouse wheel and touchpad gestures
     fabricCanvas.on('mouse:wheel', function(opt) {
         const evt = opt.e;
-        const delta = evt.deltaY;
-        let zoom = fabricCanvas.getZoom();
         
         // Check if it's a pinch gesture (ctrlKey is set on macOS trackpad pinch)
         if (evt.ctrlKey) {
-            // Pinch zoom (touchpad) - more sensitive
+            // PINCH TO ZOOM (macOS touchpad)
+            const delta = evt.deltaY;
+            let zoom = fabricCanvas.getZoom();
             zoom *= 0.99 ** delta;
+            
+            // Limit zoom
+            if (zoom > 5) zoom = 5;
+            if (zoom < 0.1) zoom = 0.1;
+            
+            fabricCanvas.zoomToPoint({ x: evt.offsetX, y: evt.offsetY }, zoom);
+            updateZoomDisplay();
+            scheduleAutoSave();
         } else {
-            // Regular mouse wheel zoom
-            zoom *= 0.999 ** delta;
+            // 2-FINGER SCROLL TO PAN (macOS touchpad) or mouse wheel
+            const deltaX = evt.deltaX || 0;
+            const deltaY = evt.deltaY || 0;
+            
+            // Pan the canvas
+            const vpt = fabricCanvas.viewportTransform;
+            vpt[4] -= deltaX;
+            vpt[5] -= deltaY;
+            fabricCanvas.requestRenderAll();
+            scheduleAutoSave();
         }
-        
-        // Limit zoom
-        if (zoom > 5) zoom = 5;
-        if (zoom < 0.1) zoom = 0.1;
-        
-        fabricCanvas.zoomToPoint({ x: evt.offsetX, y: evt.offsetY }, zoom);
-        updateZoomDisplay();
         
         evt.preventDefault();
         evt.stopPropagation();
-        
-        scheduleAutoSave();
     });
     
     // Miro-style panning: drag on empty space or hold space key
@@ -548,6 +555,79 @@ function setupCanvasEvents() {
     
     fabricCanvas.on('object:removed', function() {
         scheduleAutoSave();
+    });
+    
+    // Custom context menu
+    setupContextMenu();
+}
+
+/**
+ * Setup custom context menu
+ */
+function setupContextMenu() {
+    const contextMenu = document.getElementById('contextMenu');
+    let contextTarget = null;
+    
+    // Prevent default browser context menu on canvas
+    const canvasWrapper = document.querySelector('.canvas-wrapper-for-context') || fabricCanvas.wrapperEl;
+    if (canvasWrapper) {
+        canvasWrapper.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    }
+    
+    // Show custom context menu on right-click
+    fabricCanvas.on('mouse:down', function(opt) {
+        if (opt.button === 3) { // Right click
+            const target = opt.target;
+            
+            if (target && target.objectType === 'group') {
+                opt.e.preventDefault();
+                contextTarget = target;
+                
+                // Position menu at mouse location
+                contextMenu.style.left = opt.e.clientX + 'px';
+                contextMenu.style.top = opt.e.clientY + 'px';
+                contextMenu.style.display = 'block';
+            } else {
+                contextMenu.style.display = 'none';
+            }
+        }
+    });
+    
+    // Hide context menu when clicking elsewhere
+    document.addEventListener('click', function() {
+        contextMenu.style.display = 'none';
+    });
+    
+    // Handle context menu actions
+    document.querySelectorAll('.context-menu-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const action = this.dataset.action;
+            
+            if (!contextTarget) return;
+            
+            switch(action) {
+                case 'rename':
+                    const groupText = fabricCanvas.getObjects().find(obj => 
+                        obj.objectType === 'groupText' && obj.parentFabricId === contextTarget.fabricId
+                    );
+                    editGroupName(contextTarget, groupText);
+                    break;
+                    
+                case 'change-color':
+                    changeGroupColor(contextTarget);
+                    break;
+                    
+                case 'delete':
+                    deleteGroup(contextTarget);
+                    break;
+            }
+            
+            contextMenu.style.display = 'none';
+            contextTarget = null;
+        });
     });
 }
 
@@ -1084,6 +1164,39 @@ function editGroupName(groupRect, groupText) {
     if (newName && newName.trim()) {
         groupRect.groupName = newName.trim();
         groupText.set('text', newName.trim());
+        fabricCanvas.renderAll();
+        
+        // Update in database
+        updateGroupInDatabase(groupRect);
+        scheduleAutoSave();
+    }
+}
+
+/**
+ * Change group color
+ */
+function changeGroupColor(groupRect) {
+    const colors = [
+        { name: 'Синий', value: '#3B82F6' },
+        { name: 'Зелёный', value: '#10B981' },
+        { name: 'Фиолетовый', value: '#8B5CF6' },
+        { name: 'Оранжевый', value: '#F59E0B' },
+        { name: 'Красный', value: '#EF4444' },
+        { name: 'Розовый', value: '#EC4899' },
+        { name: 'Серый', value: '#6B7280' }
+    ];
+    
+    const colorOptions = colors.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
+    const choice = prompt(`Выберите цвет (1-${colors.length}):\n\n${colorOptions}`);
+    
+    const index = parseInt(choice) - 1;
+    if (index >= 0 && index < colors.length) {
+        const newColor = colors[index].value;
+        groupRect.groupColor = newColor;
+        groupRect.set({
+            stroke: newColor,
+            fill: hexToRgba(newColor, 0.05)
+        });
         fabricCanvas.renderAll();
         
         // Update in database

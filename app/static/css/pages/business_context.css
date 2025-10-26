@@ -771,6 +771,60 @@ textarea.form-control {
 }
 
 /* ============================================================================
+   CUSTOM CONTEXT MENU
+   ============================================================================ */
+
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 180px;
+    z-index: 1000;
+    padding: 0.25rem 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 0.875rem;
+    color: #1F2937;
+}
+
+.context-menu-item:hover {
+    background: #F8FAFC;
+}
+
+.context-menu-item i {
+    width: 16px;
+    text-align: center;
+    color: #6B7280;
+}
+
+.context-menu-item-danger {
+    color: #DC2626;
+}
+
+.context-menu-item-danger:hover {
+    background: #FEE2E2;
+}
+
+.context-menu-item-danger i {
+    color: #DC2626;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #E5E7EB;
+    margin: 0.25rem 0;
+}
+
+/* ============================================================================
    LOADING SPINNER
    ============================================================================ */
 
