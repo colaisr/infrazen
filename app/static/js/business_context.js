@@ -674,16 +674,11 @@ function initializeCanvas() {
         height: initialHeight
     });
     
-    // Load existing groups from board data
-    if (currentBoard.groups && currentBoard.groups.length > 0) {
-        loadGroupsOnCanvas(currentBoard.groups);
-    }
-    
     // Load canvas state if exists (for free objects only)
     if (currentBoard.canvas_state) {
         try {
             fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
-                // Remove group-related objects (they're loaded from database)
+                // Remove group-related objects from canvas_state (they'll be loaded from database)
                 const objectsToRemove = [];
                 fabricCanvas.getObjects().forEach(obj => {
                     if (obj.objectType === 'group' || obj.objectType === 'groupText' || obj.objectType === 'groupCost') {
@@ -691,10 +686,21 @@ function initializeCanvas() {
                     }
                 });
                 objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
+                
+                // Now load groups from database (after clearing old ones from canvas_state)
+                if (currentBoard.groups && currentBoard.groups.length > 0) {
+                    loadGroupsOnCanvas(currentBoard.groups);
+                }
+                
                 fabricCanvas.renderAll();
             });
         } catch (error) {
             console.error('Error loading canvas state:', error);
+        }
+    } else {
+        // No canvas state, just load groups
+        if (currentBoard.groups && currentBoard.groups.length > 0) {
+            loadGroupsOnCanvas(currentBoard.groups);
         }
     }
     
@@ -1472,11 +1478,15 @@ function createRectangleOnCanvas() {
  */
 function loadGroupsOnCanvas(groups) {
     if (!fabricCanvas || !groups) {
+        console.log('loadGroupsOnCanvas: canvas or groups missing', { fabricCanvas: !!fabricCanvas, groups });
         return;
     }
     
+    console.log('Loading groups on canvas:', groups);
+    
     groups.forEach(group => {
         try {
+            console.log('Loading group:', group);
             // Create group rectangle
             const groupRect = new fabric.Rect({
             left: group.position.x,
