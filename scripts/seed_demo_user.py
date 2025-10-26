@@ -897,6 +897,7 @@ def seed_business_context(demo_user, providers):
     db.session.add(board1)
     db.session.commit()
     boards_created += 1
+    print(f"     ✓ Board 1 created (ID: {board1.id})")
     
     # Create groups for Board 1
     group1_1 = BoardGroup(
@@ -1036,6 +1037,7 @@ def seed_business_context(demo_user, providers):
     db.session.add(board2)
     db.session.commit()
     boards_created += 1
+    print(f"     ✓ Board 2 created (ID: {board2.id})")
     
     # Create groups for Board 2
     group2_1 = BoardGroup(
@@ -1174,6 +1176,7 @@ def seed_business_context(demo_user, providers):
     db.session.add(board3)
     db.session.commit()
     boards_created += 1
+    print(f"     ✓ Board 3 created (ID: {board3.id})")
     
     # Create groups for Board 3
     group3_1 = BoardGroup(
@@ -1323,6 +1326,7 @@ def seed_business_context(demo_user, providers):
     db.session.add(board4)
     db.session.commit()
     boards_created += 1
+    print(f"     ✓ Board 4 created (ID: {board4.id})")
     
     # Create groups for Board 4 (Kanban-style)
     group4_1 = BoardGroup(
@@ -1545,11 +1549,24 @@ def seed_business_context(demo_user, providers):
     db.session.commit()
     print(f"     Added descriptions to {len(board_descriptions)} boards")
     
+    # Final verification
+    print(f"\n📊 Verifying Business Context data...")
+    final_boards = BusinessBoard.query.filter_by(user_id=demo_user.id).all()
+    final_groups = BoardGroup.query.join(BusinessBoard).filter(BusinessBoard.user_id == demo_user.id).all()
+    final_resources = BoardResource.query.join(BusinessBoard).filter(BusinessBoard.user_id == demo_user.id).all()
+    
     print(f"\n✅ Business Context seeding completed!")
     print(f"   Boards created: {boards_created}")
     print(f"   Groups created: {groups_created}")
     print(f"   Resources placed: {resources_placed}")
     print(f"   Notes added: {len([r for r in Resource.query.join(CloudProvider).filter(CloudProvider.user_id == demo_user.id).all() if r.notes])}")
+    print(f"\n🔍 Database verification:")
+    print(f"   Boards in DB: {len(final_boards)}")
+    if len(final_boards) > 0:
+        for board in final_boards:
+            print(f"      - {board.name} (ID: {board.id}, default: {board.is_default})")
+    print(f"   Groups in DB: {len(final_groups)}")
+    print(f"   Resources in DB: {len(final_resources)}")
 
 def main():
     """Main seeding function"""
