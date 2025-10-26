@@ -54,6 +54,11 @@
              class="instruction-image">
         <p class="image-caption">Форма создания сервисного аккаунта: укажите имя и роль "viewer"</p>
         
+        <img src="{{ url_for('static', filename='instructions/yandex_3.png') }}" 
+             alt="Yandex Cloud назначение роли сервисному аккаунту" 
+             class="instruction-image">
+        <p class="image-caption">Назначение роли "viewer" сервисному аккаунту</p>
+        
         <div class="notice notice-info">
             <i class="fa-solid fa-lightbulb"></i>
             <strong>Совет:</strong> Роль <code>viewer</code> предоставляет доступ только для чтения — InfraZen не сможет изменить или удалить ваши ресурсы.
@@ -73,11 +78,6 @@
             <li>Нажмите кнопку <strong>"Создать новый ключ"</strong></li>
             <li>Выберите тип ключа: <strong>"Создать авторизованный ключ"</strong></li>
         </ol>
-        
-        <img src="{{ url_for('static', filename='instructions/yandex_3.png') }}" 
-             alt="Yandex Cloud создание авторизованного ключа" 
-             class="instruction-image">
-        <p class="image-caption">Страница сервисного аккаунта: Авторизованные ключи → Создать новый ключ</p>
         
         <ol start="6">
             <li>В диалоге создания ключа:
