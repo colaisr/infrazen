@@ -1262,39 +1262,17 @@ async function placeResourceOnCanvas(resourceId, x, y) {
  * Create Fabric.js object for resource on canvas
  */
 function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
-    // Create resource container group
-    const resourceIcon = new fabric.Rect({
+    // Create resource card as a simple rectangle with overlaid text
+    const resourceCard = new fabric.Rect({
+        left: x - 60,
+        top: y - 40,
         width: 120,
         height: 80,
         fill: '#FFFFFF',
         stroke: '#E5E7EB',
-        strokeWidth: 1,
+        strokeWidth: 2,
         rx: 8,
-        ry: 8
-    });
-    
-    // Resource name text
-    const nameText = new fabric.Text(resourceData.name, {
-        fontSize: 14,
-        fontWeight: 'bold',
-        fill: '#1F2937',
-        originX: 'center',
-        originY: 'top'
-    });
-    
-    // Resource type and IP text
-    const metaText = new fabric.Text(`${resourceData.type}\n${resourceData.ip || 'No IP'}`, {
-        fontSize: 11,
-        fill: '#6B7280',
-        originX: 'center',
-        originY: 'top',
-        textAlign: 'center'
-    });
-    
-    // Create group
-    const resourceGroup = new fabric.Group([resourceIcon, nameText, metaText], {
-        left: x - 60,
-        top: y - 40,
+        ry: 8,
         selectable: true,
         hasControls: false,
         hasBorders: true,
@@ -1314,24 +1292,74 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
                     groupId: this.groupId
                 });
             };
-        })(fabric.Group.prototype.toObject)
+        })(fabric.Rect.prototype.toObject)
     });
     
-    // Position children within group
-    nameText.set({ top: -30 });
-    metaText.set({ top: -5 });
+    // Resource name text
+    const nameText = new fabric.Text(resourceData.name, {
+        left: x,
+        top: y - 25,
+        fontSize: 13,
+        fontWeight: 'bold',
+        fill: '#1F2937',
+        originX: 'center',
+        originY: 'top',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceText',
+        parentResourceId: boardResourceId
+    });
+    
+    // Resource type and IP text
+    const metaText = new fabric.Text(`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`, {
+        left: x,
+        top: y + 0,
+        fontSize: 10,
+        fill: '#6B7280',
+        originX: 'center',
+        originY: 'top',
+        textAlign: 'center',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceText',
+        parentResourceId: boardResourceId
+    });
     
     // Add to canvas
-    fabricCanvas.add(resourceGroup);
+    fabricCanvas.add(resourceCard);
+    fabricCanvas.add(nameText);
+    fabricCanvas.add(metaText);
     fabricCanvas.renderAll();
     
-    // Setup event handlers
-    resourceGroup.on('moving', function() {
+    // Setup event handlers for the card
+    resourceCard.on('moving', function() {
+        // Move text with card
+        nameText.set({
+            left: this.left + this.width / 2,
+            top: this.top + 15
+        });
+        metaText.set({
+            left: this.left + this.width / 2,
+            top: this.top + 40
+        });
+        fabricCanvas.renderAll();
+        
         // Check if moved into/out of groups
         checkResourceGroupAssignment(this);
     });
     
-    resourceGroup.on('modified', function() {
+    resourceCard.on('modified', function() {
+        // Update text positions
+        nameText.set({
+            left: this.left + this.width / 2,
+            top: this.top + 15
+        });
+        metaText.set({
+            left: this.left + this.width / 2,
+            top: this.top + 40
+        });
+        fabricCanvas.renderAll();
+        
         // Save new position to database
         updateResourcePosition(this);
     });
