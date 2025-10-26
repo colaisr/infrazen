@@ -141,12 +141,20 @@ class CompleteSyncService:
                         provider_ref.sync_snapshot_id = sync_result['sync_snapshot_id']
                         provider_ref.sync_status = 'success'
                         provider_ref.resources_synced = sync_result['resources_synced']
-                        provider_ref.provider_cost = sync_result.get('total_cost', 0.0)
+                        
+                        # Get cost from various field names (providers use different names)
+                        provider_cost = (
+                            sync_result.get('total_cost') or 
+                            sync_result.get('total_daily_cost') or 
+                            sync_result.get('estimated_daily_cost') or 
+                            0.0
+                        )
+                        provider_ref.provider_cost = provider_cost
                         provider_ref.sync_duration_seconds = sync_result.get('sync_duration_seconds', 0)
                         
                         # Aggregate costs
-                        total_cost += provider_ref.provider_cost
-                        cost_by_provider[provider.connection_name] = provider_ref.provider_cost
+                        total_cost += provider_cost
+                        cost_by_provider[provider.connection_name] = provider_cost
                         resources_by_provider[provider.connection_name] = provider_ref.resources_synced
                         total_resources += provider_ref.resources_synced
                         successful_providers += 1
