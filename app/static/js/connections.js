@@ -16,7 +16,7 @@ const providers = {
                 name: 'service_account_key', 
                 label: 'Service Account Key (JSON) *', 
                 type: 'textarea', 
-                placeholder: '{\n  "id": "ajel...",\n  "service_account_id": "aje...",\n  "private_key": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"\n}',
+                placeholder: 'Вставьте JSON-ключ сервисного аккаунта из Yandex Cloud',
                 required: true,
                 rows: 8
             }
