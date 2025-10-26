@@ -341,6 +341,50 @@
     </div>
 </div>
 
+<!-- Resource Info Modal -->
+<div id="resourceInfoModal" class="modal" style="display: none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Информация о ресурсе</h3>
+            <button class="modal-close" onclick="closeResourceInfoModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="resourceInfoContent">
+            <div class="loading-spinner">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resource Notes Modal -->
+<div id="resourceNotesModal" class="modal" style="display: none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Заметки</h3>
+            <button class="modal-close" onclick="closeResourceNotesModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="resource-notes-header" id="resourceNotesHeader"></div>
+            <textarea id="resourceNotesText" class="resource-notes-textarea" 
+                      placeholder="Добавьте заметки об этом ресурсе..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeResourceNotesModal()">
+                    Отмена
+                </button>
+                <button class="btn btn-primary" onclick="saveResourceNotes()">
+                    Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}

@@ -1532,40 +1532,211 @@ function filterResources() {
 /**
  * Show resource info modal
  */
-function showResourceInfo(resourceId) {
-    // TODO: Implement in Phase 5
-    alert('Информация о ресурсе - Скоро будет доступно');
-}
-
-/**
- * Show resource notes modal
- */
-function showResourceNotes(resourceId) {
-    // TODO: Implement in Phase 5
-    alert('Заметки о ресурсе - Скоро будет доступно');
+async function showResourceInfo(resourceId) {
+    const modal = document.getElementById('resourceInfoModal');
+    const content = document.getElementById('resourceInfoContent');
+    
+    // Show modal with loading state
+    modal.style.display = 'flex';
+    content.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+    
+    try {
+        // Find resource data
+        let resource = null;
+        for (const provider of allResources) {
+            const found = provider.resources.find(r => r.id === resourceId);
+            if (found) {
+                resource = {
+                    ...found,
+                    provider_name: provider.provider_name
+                };
+                break;
+            }
+        }
+        
+        if (!resource) {
+            content.innerHTML = '<p class="text-error">Ресурс не найден</p>';
+            return;
+        }
+        
+        // Build info HTML
+        const html = `
+            <div class="resource-info-section">
+                <h4>Основная информация</h4>
+                <div class="resource-info-grid">
+                    <div class="resource-info-label">Название:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.name)}</div>
+                    
+                    <div class="resource-info-label">Тип:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.type)}</div>
+                    
+                    <div class="resource-info-label">Провайдер:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.provider_name)}</div>
+                    
+                    <div class="resource-info-label">IP-адрес:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.ip || 'Не указан')}</div>
+                    
+                    <div class="resource-info-label">Регион:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.region || 'Не указан')}</div>
+                    
+                    <div class="resource-info-label">Статус:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.status || 'Неизвестно')}</div>
+                </div>
+            </div>
+            
+            <div class="resource-info-section">
+                <h4>Стоимость</h4>
+                <div class="resource-info-grid">
+                    <div class="resource-info-label">Стоимость:</div>
+                    <div class="resource-info-value">${resource.cost ? resource.cost.toFixed(2) + ' ₽/день' : 'Не указана'}</div>
+                    
+                    <div class="resource-info-label">Модель:</div>
+                    <div class="resource-info-value">${escapeHtml(resource.pricing_model || 'Не указана')}</div>
+                </div>
+            </div>
+            
+            ${resource.created_at ? `
+            <div class="resource-info-section">
+                <h4>Даты</h4>
+                <div class="resource-info-grid">
+                    <div class="resource-info-label">Создан:</div>
+                    <div class="resource-info-value">${new Date(resource.created_at).toLocaleString('ru-RU')}</div>
+                    
+                    ${resource.last_sync ? `
+                    <div class="resource-info-label">Последняя синхронизация:</div>
+                    <div class="resource-info-value">${new Date(resource.last_sync).toLocaleString('ru-RU')}</div>
+                    ` : ''}
+                </div>
+            </div>
+            ` : ''}
+        `;
+        
+        content.innerHTML = html;
+    } catch (error) {
+        console.error('Error showing resource info:', error);
+        content.innerHTML = '<p class="text-error">Ошибка загрузки информации</p>';
+    }
 }
 
 /**
  * Close resource info modal
  */
 function closeResourceInfoModal() {
-    document.getElementById('resourceInfoModal').classList.remove('active');
+    document.getElementById('resourceInfoModal').style.display = 'none';
+}
+
+/**
+ * Show resource notes modal
+ */
+async function showResourceNotes(resourceId) {
+    const modal = document.getElementById('resourceNotesModal');
+    const header = document.getElementById('resourceNotesHeader');
+    const textarea = document.getElementById('resourceNotesText');
+    
+    // Store resource ID for save
+    textarea.dataset.resourceId = resourceId;
+    
+    // Find resource data
+    let resource = null;
+    for (const provider of allResources) {
+        const found = provider.resources.find(r => r.id === resourceId);
+        if (found) {
+            resource = {
+                ...found,
+                provider_name: provider.provider_name
+            };
+            break;
+        }
+    }
+    
+    if (!resource) {
+        showFlashMessage('error', 'Ресурс не найден');
+        return;
+    }
+    
+    // Set header
+    header.innerHTML = `
+        <i class="fa-solid fa-server"></i>
+        <div class="resource-notes-header-text">
+            <div class="resource-notes-header-title">${escapeHtml(resource.name)}</div>
+            <div class="resource-notes-header-meta">${escapeHtml(resource.type)} • ${escapeHtml(resource.provider_name)}</div>
+        </div>
+    `;
+    
+    // Load existing notes if resource is placed
+    textarea.value = '';
+    if (currentBoard && resource.is_placed) {
+        try {
+            // Find board_resource to get notes
+            const boardResource = currentBoard.resources.find(br => br.resource.id === resourceId);
+            if (boardResource && boardResource.notes) {
+                textarea.value = boardResource.notes;
+            }
+        } catch (error) {
+            console.error('Error loading notes:', error);
+        }
+    }
+    
+    // Show modal
+    modal.style.display = 'flex';
+    textarea.focus();
 }
 
 /**
  * Close resource notes modal
  */
 function closeResourceNotesModal() {
-    document.getElementById('resourceNotesModal').classList.remove('active');
+    document.getElementById('resourceNotesModal').style.display = 'none';
 }
 
 /**
  * Save resource notes
  */
-function saveResourceNotes() {
-    // TODO: Implement in Phase 5
-    closeResourceNotesModal();
+async function saveResourceNotes() {
+    const textarea = document.getElementById('resourceNotesText');
+    const resourceId = parseInt(textarea.dataset.resourceId);
+    const notes = textarea.value;
+    
+    if (!currentBoard) {
+        showFlashMessage('error', 'Откройте доску');
+        return;
+    }
+    
+    try {
+        // Find board_resource_id
+        const boardResource = currentBoard.resources.find(br => br.resource.id === resourceId);
+        
+        if (!boardResource) {
+            showFlashMessage('error', 'Ресурс не размещен на доске');
+            return;
+        }
+        
+        const response = await fetch(`/api/business-context/resources/${boardResource.id}/notes`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: notes })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update local data
+            boardResource.notes = notes;
+            
+            // Close modal
+            closeResourceNotesModal();
+            
+            // Reload resources to update "has notes" indicator
+            await loadAvailableResources();
+        } else {
+            showFlashMessage('error', data.error || 'Ошибка сохранения заметок');
+        }
+    } catch (error) {
+        console.error('Error saving notes:', error);
+        showFlashMessage('error', 'Ошибка сохранения заметок');
+    }
 }
+
 
 /**
  * Update board name
