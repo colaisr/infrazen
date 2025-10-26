@@ -317,14 +317,23 @@
 
 <!-- Custom Context Menu -->
 <div id="contextMenu" class="context-menu" style="display: none;">
-    <div class="context-menu-item" data-action="rename">
+    <!-- Group-specific options -->
+    <div class="context-menu-item" data-action="rename" data-for="group">
         <i class="fa-solid fa-edit"></i>
         <span>Переименовать</span>
     </div>
-    <div class="context-menu-item" data-action="change-color">
+    <div class="context-menu-item" data-action="change-color" data-for="group">
         <i class="fa-solid fa-palette"></i>
         <span>Изменить цвет</span>
     </div>
+    
+    <!-- Free object options (text, rectangle) -->
+    <div class="context-menu-item" data-action="properties" data-for="freeText,freeRect">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Свойства</span>
+    </div>
+    
+    <!-- Common options -->
     <div class="context-menu-divider"></div>
     <div class="context-menu-item context-menu-item-danger" data-action="delete">
         <i class="fa-solid fa-trash"></i>

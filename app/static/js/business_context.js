@@ -860,19 +860,6 @@ function setupCanvasEvents() {
         scheduleAutoSave();
     });
     
-    // Selection events for properties panel
-    fabricCanvas.on('selection:created', function(e) {
-        showPropertiesPanel(e.selected[0]);
-    });
-    
-    fabricCanvas.on('selection:updated', function(e) {
-        showPropertiesPanel(e.selected[0]);
-    });
-    
-    fabricCanvas.on('selection:cleared', function() {
-        hidePropertiesPanel();
-    });
-    
     // Custom context menu
     setupContextMenu();
 }
@@ -892,8 +879,19 @@ function setupContextMenu() {
         const pointer = fabricCanvas.getPointer(e);
         const target = fabricCanvas.findTarget(e);
         
-        if (target && target.objectType === 'group') {
+        // Show menu for groups, text, and rectangles
+        if (target && (target.objectType === 'group' || target.objectType === 'freeText' || target.objectType === 'freeRect')) {
             contextTarget = target;
+            
+            // Show/hide menu items based on object type
+            document.querySelectorAll('.context-menu-item').forEach(item => {
+                const itemFor = item.dataset.for;
+                if (itemFor) {
+                    // Check if this item should be shown for this object type
+                    const types = itemFor.split(',');
+                    item.style.display = types.includes(target.objectType) ? 'flex' : 'none';
+                }
+            });
             
             // Position menu at mouse location
             contextMenu.style.left = e.clientX + 'px';
@@ -928,9 +926,23 @@ function setupContextMenu() {
                 case 'change-color':
                     changeGroupColor(contextTarget);
                     break;
+                
+                case 'properties':
+                    // Show properties panel for free objects
+                    showPropertiesPanel(contextTarget);
+                    fabricCanvas.setActiveObject(contextTarget);
+                    fabricCanvas.renderAll();
+                    break;
                     
                 case 'delete':
-                    deleteGroup(contextTarget);
+                    if (contextTarget.objectType === 'group') {
+                        deleteGroup(contextTarget);
+                    } else if (contextTarget.objectType === 'freeText' || contextTarget.objectType === 'freeRect') {
+                        fabricCanvas.remove(contextTarget);
+                        fabricCanvas.renderAll();
+                        hidePropertiesPanel();
+                        scheduleAutoSave();
+                    }
                     break;
             }
             
