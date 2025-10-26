@@ -875,9 +875,18 @@ def seed_business_context(demo_user, providers):
     """
     print("\n🔄 Creating Business Context boards...")
     
+    # Show available providers
+    print(f"  📦 Available providers:")
+    for key, provider in providers.items():
+        resource_count = Resource.query.filter_by(provider_id=provider.id).count()
+        print(f"     - {key}: ID={provider.id}, Resources={resource_count}")
+    
     # Helper to find resource by name and provider
     def find_resource(provider_id, resource_name):
-        return Resource.query.filter_by(provider_id=provider_id, resource_name=resource_name).first()
+        resource = Resource.query.filter_by(provider_id=provider_id, resource_name=resource_name).first()
+        if not resource:
+            print(f"     ⚠️  Resource not found: {resource_name} (provider_id: {provider_id})")
+        return resource
     
     boards_created = 0
     groups_created = 0
@@ -1591,7 +1600,13 @@ def main():
             seed_usage_data_tags(demo_user, providers)
             
             # Create business context boards
-            seed_business_context(demo_user, providers)
+            try:
+                seed_business_context(demo_user, providers)
+            except Exception as bc_error:
+                print(f"\n⚠️  WARNING: Business Context seeding failed: {bc_error}")
+                import traceback
+                traceback.print_exc()
+                print("Continuing with remaining seeding steps...")
             
             print("\n" + "="*60)
             print("🎉 COMPLETE! Demo user fully seeded with 3-month history, usage data, and business context boards!")
