@@ -15,63 +15,80 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Mobile Toggle Button (visible only on mobile when sidebar is closed) -->
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+            <i class="fa-solid fa-cloud"></i>
+        </button>
+        
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <a href="{{ url_for("main.dashboard") }}" class="logo">
-                    <div class="logo-icon"><i class="fa-solid fa-cloud"></i></div>
-                    <div class="logo-text">
-                        <span>InfraZen</span>
-                        <span class="logo-subtitle">FinOps Platform</span>
-                    </div>
-                </a>
+                <div class="logo-container">
+                    <button class="logo-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                        <div class="logo-icon"><i class="fa-solid fa-cloud"></i></div>
+                    </button>
+                    <a href="{{ url_for("main.dashboard") }}" class="logo-link">
+                        <div class="logo-text">
+                            <span>InfraZen</span>
+                            <span class="logo-subtitle">FinOps Platform</span>
+                        </div>
+                    </a>
+                </div>
             </div>
             
             <nav class="sidebar-nav">
                 <a href="{{ url_for("main.dashboard") }}" 
-                   class="nav-item {% if active_page == "dashboard" %}active{% endif %}">
+                   class="nav-item {% if active_page == "dashboard" %}active{% endif %}"
+                   data-tooltip="Дашборд">
                     <div class="nav-icon"><i class="fa-solid fa-chart-column"></i></div>
                     <span>Дашборд</span>
                 </a>
                 
                 <a href="{{ url_for("main.connections") }}" 
-                   class="nav-item {% if active_page == "connections" %}active{% endif %}">
+                   class="nav-item {% if active_page == "connections" %}active{% endif %}"
+                   data-tooltip="Подключения облаков">
                     <div class="nav-icon"><i class="fa-solid fa-cloud"></i></div>
                     <span>Подключения облаков</span>
                 </a>
                 
                 <a href="{{ url_for("main.resources") }}" 
-                   class="nav-item {% if active_page == "resources" %}active{% endif %}">
+                   class="nav-item {% if active_page == "resources" %}active{% endif %}"
+                   data-tooltip="Ресурсы">
                     <div class="nav-icon"><i class="fa-solid fa-database"></i></div>
                     <span>Ресурсы</span>
                 </a>
                 
                 <a href="{{ url_for("main.analytics") }}" 
-                   class="nav-item {% if active_page == "analytics" %}active{% endif %}">
+                   class="nav-item {% if active_page == "analytics" %}active{% endif %}"
+                   data-tooltip="Аналитика расходов">
                     <div class="nav-icon"><i class="fa-solid fa-chart-line"></i></div>
                     <span>Аналитика расходов</span>
                 </a>
                 
                 <a href="{{ url_for("main.recommendations") }}" 
-                   class="nav-item {% if active_page == "recommendations" %}active{% endif %}">
+                   class="nav-item {% if active_page == "recommendations" %}active{% endif %}"
+                   data-tooltip="Рекомендации">
                     <div class="nav-icon"><i class="fa-solid fa-lightbulb"></i></div>
                     <span>Рекомендации</span>
                 </a>
                 
                 <a href="{{ url_for("main.business_context") }}" 
-                   class="nav-item {% if active_page == "business-context" %}active{% endif %}">
+                   class="nav-item {% if active_page == "business-context" %}active{% endif %}"
+                   data-tooltip="Бизнес-контекст">
                     <div class="nav-icon"><i class="fa-solid fa-building"></i></div>
                     <span>Бизнес-контекст</span>
                 </a>
                 
                 <a href="{{ url_for("main.reports") }}" 
-                   class="nav-item {% if active_page == "reports" %}active{% endif %}">
+                   class="nav-item {% if active_page == "reports" %}active{% endif %}"
+                   data-tooltip="Отчёты">
                     <div class="nav-icon"><i class="fa-solid fa-file-alt"></i></div>
                     <span>Отчёты</span>
                 </a>
                 
                 <a href="{{ url_for("main.settings") }}" 
-                   class="nav-item {% if active_page == "settings" %}active{% endif %}">
+                   class="nav-item {% if active_page == "settings" %}active{% endif %}"
+                   data-tooltip="Настройки">
                     <div class="nav-icon"><i class="fa-solid fa-cog"></i></div>
                     <span>Настройки</span>
                 </a>
@@ -80,7 +97,8 @@
                 <div class="nav-divider"></div>
                 <div class="nav-section-title">Администрирование</div>
                 <a href="{{ url_for("admin.dashboard") }}" 
-                   class="nav-item {% if active_page == "admin_dashboard" %}active{% endif %}">
+                   class="nav-item {% if active_page == "admin_dashboard" %}active{% endif %}"
+                   data-tooltip="Админ панель">
                     <div class="nav-icon"><i class="fa-solid fa-cog"></i></div>
                     <span>Админ панель</span>
                 </a>
@@ -207,6 +225,94 @@
                     alert('Failed to stop impersonation');
                 });
         }
+        
+        // Sidebar Toggle Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const desktopToggle = document.getElementById('sidebarToggle');
+            const mobileToggle = document.getElementById('mobileToggle');
+            const sidebar = document.getElementById('sidebar');
+            const appContainer = document.querySelector('.app-container');
+            
+            // Check if there's a saved state in localStorage
+            const sidebarState = localStorage.getItem('sidebarCollapsed');
+            if (sidebarState === 'true' && window.innerWidth >= 769) {
+                sidebar.classList.add('collapsed');
+                appContainer.classList.add('sidebar-collapsed');
+            }
+            
+            // Desktop toggle button (inside sidebar)
+            desktopToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // On desktop, toggle collapsed state
+                if (window.innerWidth >= 769) {
+                    sidebar.classList.toggle('collapsed');
+                    appContainer.classList.toggle('sidebar-collapsed');
+                    
+                    // Save state to localStorage
+                    const isCollapsed = sidebar.classList.contains('collapsed');
+                    localStorage.setItem('sidebarCollapsed', isCollapsed);
+                } else {
+                    // On mobile, close the sidebar
+                    sidebar.classList.remove('open');
+                    // Show mobile toggle again
+                    mobileToggle.style.opacity = '1';
+                    mobileToggle.style.pointerEvents = 'auto';
+                }
+            });
+            
+            // Mobile toggle button (outside sidebar, visible on mobile)
+            mobileToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                sidebar.classList.toggle('open');
+                
+                // Hide mobile toggle when sidebar is open
+                if (sidebar.classList.contains('open')) {
+                    mobileToggle.style.opacity = '0';
+                    mobileToggle.style.pointerEvents = 'none';
+                } else {
+                    mobileToggle.style.opacity = '1';
+                    mobileToggle.style.pointerEvents = 'auto';
+                }
+            });
+            
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', function(event) {
+                if (window.innerWidth < 769) {
+                    const isClickInsideSidebar = sidebar.contains(event.target);
+                    const isClickOnMobileToggle = mobileToggle.contains(event.target);
+                    
+                    if (!isClickInsideSidebar && !isClickOnMobileToggle && sidebar.classList.contains('open')) {
+                        sidebar.classList.remove('open');
+                        // Show mobile toggle again
+                        mobileToggle.style.opacity = '1';
+                        mobileToggle.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth >= 769) {
+                    // Desktop: remove mobile 'open' class and reset mobile toggle
+                    sidebar.classList.remove('open');
+                    mobileToggle.style.opacity = '';
+                    mobileToggle.style.pointerEvents = '';
+                } else {
+                    // Mobile: remove desktop 'collapsed' class
+                    sidebar.classList.remove('collapsed');
+                    appContainer.classList.remove('sidebar-collapsed');
+                    
+                    // Ensure mobile toggle is visible if sidebar is closed
+                    if (!sidebar.classList.contains('open')) {
+                        mobileToggle.style.opacity = '1';
+                        mobileToggle.style.pointerEvents = 'auto';
+                    }
+                }
+            });
+        });
     </script>
     
     {% block scripts %}{% endblock %}
