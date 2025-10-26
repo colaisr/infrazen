@@ -58,7 +58,7 @@
                 </div>
                 <div class="kpi-icon icon-savings"><i class="fa-solid fa-piggy-bank"></i></div>
             </div>
-            <div class="kpi-value">{{ overview.kpis.potential_savings_rub | default(0) }} ₽</div>
+            <div class="kpi-value">{{ "%.0f"|format(overview.kpis.potential_savings_rub | default(0)) }} ₽</div>
             <div class="kpi-secondary">
                 <span class="kpi-secondary-text">{{ overview.kpis.savings_percentage | default(0) }}% от общих расходов</span>
             </div>
@@ -283,7 +283,7 @@
                 <p class="section-meta">Предложения для снижения расходов</p>
             </div>
             <div class="section-actions">
-                <span class="section-meta">Потенциальная экономия: {{ overview.kpis.potential_savings_rub | default(0) }} ₽</span>
+                <span class="section-meta">Потенциальная экономия: {{ "%.0f"|format(overview.kpis.potential_savings_rub | default(0)) }} ₽</span>
                 <button class="icon-button"><i class="fa-solid fa-arrows-rotate"></i></button>
             </div>
         </div>
