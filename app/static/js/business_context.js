@@ -679,12 +679,18 @@ function initializeCanvas() {
         loadGroupsOnCanvas(currentBoard.groups);
     }
     
-    // Load canvas state if exists (for free objects)
-    // Skip this for now since we're loading groups from database
-    // TODO: Filter out group objects from canvas_state to only load free objects
-    if (currentBoard.canvas_state && false) {
+    // Load canvas state if exists (for free objects only)
+    if (currentBoard.canvas_state) {
         try {
             fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
+                // Remove group-related objects (they're loaded from database)
+                const objectsToRemove = [];
+                fabricCanvas.getObjects().forEach(obj => {
+                    if (obj.objectType === 'group' || obj.objectType === 'groupText' || obj.objectType === 'groupCost') {
+                        objectsToRemove.push(obj);
+                    }
+                });
+                objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
                 fabricCanvas.renderAll();
             });
         } catch (error) {
