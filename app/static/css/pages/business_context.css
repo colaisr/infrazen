@@ -492,6 +492,11 @@
     border-color: #E5E7EB;
 }
 
+.resource-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
 .resource-icon {
     width: 36px;
     height: 36px;

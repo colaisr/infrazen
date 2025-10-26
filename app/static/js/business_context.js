@@ -715,6 +715,9 @@ function initializeCanvas() {
     // Set up canvas event listeners
     setupCanvasEvents();
     
+    // Set up canvas as drop zone for resources
+    setupCanvasDropZone();
+    
     // Initial resize to ensure proper dimensions - wait for DOM to settle
     requestAnimationFrame(function() {
         setTimeout(resizeCanvas, 50);
@@ -1122,8 +1125,327 @@ function displayResources() {
     
     resourcesList.innerHTML = html;
     
-    // Make resources draggable (simplified for Phase 1)
-    // Full drag-drop implementation will be in Phase 5
+    // Set up drag event listeners for resources
+    setupResourceDragListeners();
+}
+
+/**
+ * Setup drag listeners for resource items
+ */
+function setupResourceDragListeners() {
+    const resourceItems = document.querySelectorAll('.resource-item[draggable="true"]');
+    
+    resourceItems.forEach(item => {
+        item.addEventListener('dragstart', function(e) {
+            const resourceId = parseInt(this.dataset.resourceId);
+            e.dataTransfer.setData('text/plain', resourceId);
+            e.dataTransfer.effectAllowed = 'copy';
+            
+            // Add dragging class for visual feedback
+            this.classList.add('dragging');
+        });
+        
+        item.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+        });
+    });
+}
+
+/**
+ * Setup canvas drop zone for resources
+ */
+function setupCanvasDropZone() {
+    if (!fabricCanvas) return;
+    
+    const canvasElement = fabricCanvas.wrapperEl;
+    
+    // Prevent default drag behavior
+    canvasElement.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+    
+    // Handle drop
+    canvasElement.addEventListener('drop', async function(e) {
+        e.preventDefault();
+        
+        const resourceId = e.dataTransfer.getData('text/plain');
+        if (!resourceId) return;
+        
+        // Get drop position relative to canvas
+        const rect = canvasElement.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Convert screen coordinates to canvas coordinates
+        const pointer = fabricCanvas.getPointer(e);
+        
+        await placeResourceOnCanvas(parseInt(resourceId), pointer.x, pointer.y);
+    });
+}
+
+/**
+ * Place resource on canvas
+ */
+async function placeResourceOnCanvas(resourceId, x, y) {
+    if (!currentBoard) {
+        showFlashMessage('error', 'Откройте доску');
+        return;
+    }
+    
+    // Find resource data
+    let resourceData = null;
+    for (const provider of allResources) {
+        const found = provider.resources.find(r => r.id === resourceId);
+        if (found) {
+            resourceData = found;
+            break;
+        }
+    }
+    
+    if (!resourceData) {
+        showFlashMessage('error', 'Ресурс не найден');
+        return;
+    }
+    
+    // Check if already placed
+    if (resourceData.is_placed) {
+        showFlashMessage('error', 'Ресурс уже размещен на доске');
+        return;
+    }
+    
+    try {
+        // Check if dropped inside a group
+        const groupId = getGroupAtPosition(x, y);
+        
+        // Save to database
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/resources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resource_id: resourceId,
+                position_x: x,
+                position_y: y,
+                group_id: groupId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create Fabric.js object for resource
+            createResourceObject(resourceData, x, y, data.board_resource.id, groupId);
+            
+            // Update resource status in toolbox
+            resourceData.is_placed = true;
+            displayResources();
+            
+            // Reload resources to update counts
+            await loadAvailableResources();
+            
+            // If placed in group, update group cost
+            if (groupId) {
+                await updateGroupCost(groupId);
+            }
+            
+            scheduleAutoSave();
+        } else {
+            showFlashMessage('error', data.error || 'Ошибка размещения ресурса');
+        }
+    } catch (error) {
+        console.error('Error placing resource:', error);
+        showFlashMessage('error', 'Ошибка размещения ресурса');
+    }
+}
+
+/**
+ * Create Fabric.js object for resource on canvas
+ */
+function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
+    // Create resource container group
+    const resourceIcon = new fabric.Rect({
+        width: 120,
+        height: 80,
+        fill: '#FFFFFF',
+        stroke: '#E5E7EB',
+        strokeWidth: 1,
+        rx: 8,
+        ry: 8
+    });
+    
+    // Resource name text
+    const nameText = new fabric.Text(resourceData.name, {
+        fontSize: 14,
+        fontWeight: 'bold',
+        fill: '#1F2937',
+        originX: 'center',
+        originY: 'top'
+    });
+    
+    // Resource type and IP text
+    const metaText = new fabric.Text(`${resourceData.type}\n${resourceData.ip || 'No IP'}`, {
+        fontSize: 11,
+        fill: '#6B7280',
+        originX: 'center',
+        originY: 'top',
+        textAlign: 'center'
+    });
+    
+    // Create group
+    const resourceGroup = new fabric.Group([resourceIcon, nameText, metaText], {
+        left: x - 60,
+        top: y - 40,
+        selectable: true,
+        hasControls: false,
+        hasBorders: true,
+        lockRotation: true,
+        objectType: 'resource',
+        resourceId: resourceData.id,
+        boardResourceId: boardResourceId,
+        groupId: groupId,
+        resourceData: resourceData,
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    resourceId: this.resourceId,
+                    boardResourceId: this.boardResourceId,
+                    groupId: this.groupId
+                });
+            };
+        })(fabric.Group.prototype.toObject)
+    });
+    
+    // Position children within group
+    nameText.set({ top: -30 });
+    metaText.set({ top: -5 });
+    
+    // Add to canvas
+    fabricCanvas.add(resourceGroup);
+    fabricCanvas.renderAll();
+    
+    // Setup event handlers
+    resourceGroup.on('moving', function() {
+        // Check if moved into/out of groups
+        checkResourceGroupAssignment(this);
+    });
+    
+    resourceGroup.on('modified', function() {
+        // Save new position to database
+        updateResourcePosition(this);
+    });
+}
+
+/**
+ * Get group at specific position (for drop detection)
+ */
+function getGroupAtPosition(x, y) {
+    const objects = fabricCanvas.getObjects();
+    
+    for (const obj of objects) {
+        if (obj.objectType === 'group') {
+            const bounds = obj.getBoundingRect();
+            if (x >= bounds.left && x <= bounds.left + bounds.width &&
+                y >= bounds.top && y <= bounds.top + bounds.height) {
+                return obj.dbId;
+            }
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Check if resource should be assigned to a group
+ */
+function checkResourceGroupAssignment(resourceObj) {
+    const center = resourceObj.getCenterPoint();
+    const newGroupId = getGroupAtPosition(center.x, center.y);
+    
+    if (newGroupId !== resourceObj.groupId) {
+        const oldGroupId = resourceObj.groupId;
+        resourceObj.groupId = newGroupId;
+        
+        // Update database and group costs
+        updateResourceGroupAssignment(resourceObj.boardResourceId, newGroupId, oldGroupId);
+    }
+}
+
+/**
+ * Update resource position in database
+ */
+async function updateResourcePosition(resourceObj) {
+    if (!resourceObj.boardResourceId) return;
+    
+    try {
+        await fetch(`/api/business-context/resources/${resourceObj.boardResourceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                position_x: resourceObj.left,
+                position_y: resourceObj.top
+            })
+        });
+    } catch (error) {
+        console.error('Error updating resource position:', error);
+    }
+}
+
+/**
+ * Update resource group assignment
+ */
+async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGroupId) {
+    try {
+        await fetch(`/api/business-context/resources/${boardResourceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                group_id: newGroupId
+            })
+        });
+        
+        // Update costs for affected groups
+        if (oldGroupId) await updateGroupCost(oldGroupId);
+        if (newGroupId) await updateGroupCost(newGroupId);
+        
+    } catch (error) {
+        console.error('Error updating resource group assignment:', error);
+    }
+}
+
+/**
+ * Update group cost badge
+ */
+async function updateGroupCost(groupDbId) {
+    try {
+        const response = await fetch(`/api/business-context/groups/${groupDbId}/cost`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Find group object on canvas and update cost display
+            const objects = fabricCanvas.getObjects();
+            for (const obj of objects) {
+                if (obj.objectType === 'group' && obj.dbId === groupDbId) {
+                    obj.calculatedCost = data.cost;
+                    
+                    // Update cost badge text
+                    const costBadgeText = objects.find(o => 
+                        o.objectType === 'groupCost' && o.parentFabricId === obj.fabricId
+                    );
+                    if (costBadgeText) {
+                        const costText = data.cost > 0 ? `${data.cost.toFixed(2)} ₽/день` : '0 ₽/день';
+                        costBadgeText.set('text', costText);
+                    }
+                    
+                    fabricCanvas.renderAll();
+                    break;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error updating group cost:', error);
+    }
 }
 
 /**
