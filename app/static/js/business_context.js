@@ -425,8 +425,30 @@ function pasteObject(obj) {
     obj.clone(function(cloned) {
         cloned.set({
             left: cloned.left + 20,
-            top: cloned.top + 20
+            top: cloned.top + 20,
+            // Explicitly preserve custom properties
+            objectType: obj.objectType
         });
+        
+        // Set up toObject method for the cloned object
+        if (obj.objectType === 'freeText') {
+            cloned.toObject = (function(toObject) {
+                return function() {
+                    return fabric.util.object.extend(toObject.call(this), {
+                        objectType: this.objectType
+                    });
+                };
+            })(fabric.Text.prototype.toObject);
+        } else if (obj.objectType === 'freeRect') {
+            cloned.toObject = (function(toObject) {
+                return function() {
+                    return fabric.util.object.extend(toObject.call(this), {
+                        objectType: this.objectType
+                    });
+                };
+            })(fabric.Rect.prototype.toObject);
+        }
+        
         fabricCanvas.add(cloned);
         fabricCanvas.setActiveObject(cloned);
         fabricCanvas.renderAll();
