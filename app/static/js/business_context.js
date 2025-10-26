@@ -117,6 +117,12 @@ function setupEventListeners() {
     
     // Setup free objects tools
     setupFreeObjectsTools();
+    
+    // Setup properties panel
+    setupPropertiesPanel();
+    
+    // Setup keyboard shortcuts
+    setupKeyboardShortcuts();
 }
 
 /**
@@ -150,6 +156,274 @@ function setupFreeObjectsTools() {
             createRectangleOnCanvas();
         });
     }
+}
+
+/**
+ * Setup properties panel
+ */
+function setupPropertiesPanel() {
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const closePropertiesBtn = document.getElementById('closePropertiesBtn');
+    
+    // Close properties panel
+    if (closePropertiesBtn) {
+        closePropertiesBtn.addEventListener('click', function() {
+            propertiesPanel.style.display = 'none';
+        });
+    }
+    
+    // Text properties
+    document.getElementById('fontSize')?.addEventListener('change', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeText') {
+            activeObj.set('fontSize', parseInt(this.value));
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('boldBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeText') {
+            const isBold = activeObj.fontWeight === 'bold';
+            activeObj.set('fontWeight', isBold ? 'normal' : 'bold');
+            this.classList.toggle('active', !isBold);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('italicBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeText') {
+            const isItalic = activeObj.fontStyle === 'italic';
+            activeObj.set('fontStyle', isItalic ? 'normal' : 'italic');
+            this.classList.toggle('active', !isItalic);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('underlineBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeText') {
+            activeObj.set('underline', !activeObj.underline);
+            this.classList.toggle('active', activeObj.underline);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('textColor')?.addEventListener('input', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeText') {
+            activeObj.set('fill', this.value);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    // Rectangle properties
+    document.getElementById('rectFillColor')?.addEventListener('input', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeRect') {
+            const opacity = document.getElementById('rectOpacity').value / 100;
+            activeObj.set('fill', hexToRgba(this.value, opacity));
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('rectOpacity')?.addEventListener('input', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeRect') {
+            const color = document.getElementById('rectFillColor').value;
+            const opacity = this.value / 100;
+            activeObj.set('fill', hexToRgba(color, opacity));
+            document.getElementById('rectOpacityValue').textContent = this.value + '%';
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('rectStrokeColor')?.addEventListener('input', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && activeObj.objectType === 'freeRect') {
+            activeObj.set('stroke', this.value);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    // Layer ordering
+    document.getElementById('bringToFrontBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj) {
+            fabricCanvas.bringToFront(activeObj);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    document.getElementById('sendToBackBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj) {
+            fabricCanvas.sendToBack(activeObj);
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        }
+    });
+    
+    // Delete object
+    document.getElementById('deleteObjectBtn')?.addEventListener('click', function() {
+        const activeObj = fabricCanvas.getActiveObject();
+        if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+            fabricCanvas.remove(activeObj);
+            fabricCanvas.renderAll();
+            hidePropertiesPanel();
+            scheduleAutoSave();
+        }
+    });
+}
+
+/**
+ * Show properties panel for selected object
+ */
+function showPropertiesPanel(obj) {
+    if (!obj || (obj.objectType !== 'freeText' && obj.objectType !== 'freeRect')) {
+        hidePropertiesPanel();
+        return;
+    }
+    
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const textProperties = document.getElementById('textProperties');
+    const rectangleProperties = document.getElementById('rectangleProperties');
+    
+    // Hide all property sections
+    textProperties.style.display = 'none';
+    rectangleProperties.style.display = 'none';
+    
+    // Show relevant properties
+    if (obj.objectType === 'freeText') {
+        textProperties.style.display = 'block';
+        
+        // Update controls to match object
+        document.getElementById('fontSize').value = obj.fontSize || 24;
+        document.getElementById('textColor').value = obj.fill || '#1F2937';
+        document.getElementById('boldBtn').classList.toggle('active', obj.fontWeight === 'bold');
+        document.getElementById('italicBtn').classList.toggle('active', obj.fontStyle === 'italic');
+        document.getElementById('underlineBtn').classList.toggle('active', obj.underline === true);
+    } else if (obj.objectType === 'freeRect') {
+        rectangleProperties.style.display = 'block';
+        
+        // Extract color from rgba
+        const fillColor = obj.fill || 'rgba(59, 130, 246, 0.2)';
+        const rgb = fillColor.match(/\d+/g);
+        if (rgb) {
+            const hex = '#' + [rgb[0], rgb[1], rgb[2]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+            document.getElementById('rectFillColor').value = hex;
+            const opacity = rgb[3] ? Math.round(parseFloat(rgb[3]) * 100) : 20;
+            document.getElementById('rectOpacity').value = opacity;
+            document.getElementById('rectOpacityValue').textContent = opacity + '%';
+        }
+        document.getElementById('rectStrokeColor').value = obj.stroke || '#3B82F6';
+    }
+    
+    propertiesPanel.style.display = 'flex';
+}
+
+/**
+ * Hide properties panel
+ */
+function hidePropertiesPanel() {
+    document.getElementById('propertiesPanel').style.display = 'none';
+}
+
+/**
+ * Setup keyboard shortcuts (copy, paste, delete, etc.)
+ */
+function setupKeyboardShortcuts() {
+    let copiedObject = null;
+    
+    document.addEventListener('keydown', function(e) {
+        // Don't trigger shortcuts when typing in text
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        // Copy: Ctrl+C or Cmd+C
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            const activeObj = fabricCanvas?.getActiveObject();
+            if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+                e.preventDefault();
+                copiedObject = activeObj;
+            }
+        }
+        
+        // Paste: Ctrl+V or Cmd+V
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            if (copiedObject) {
+                e.preventDefault();
+                pasteObject(copiedObject);
+            }
+        }
+        
+        // Delete: Delete or Backspace
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            const activeObj = fabricCanvas?.getActiveObject();
+            if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+                // Don't delete if we're editing text
+                if (activeObj.objectType === 'freeText' && activeObj.isEditing) {
+                    return;
+                }
+                e.preventDefault();
+                fabricCanvas.remove(activeObj);
+                fabricCanvas.renderAll();
+                hidePropertiesPanel();
+                scheduleAutoSave();
+            }
+        }
+        
+        // Bring to front: Ctrl+]
+        if ((e.ctrlKey || e.metaKey) && e.key === ']') {
+            const activeObj = fabricCanvas?.getActiveObject();
+            if (activeObj) {
+                e.preventDefault();
+                fabricCanvas.bringToFront(activeObj);
+                fabricCanvas.renderAll();
+                scheduleAutoSave();
+            }
+        }
+        
+        // Send to back: Ctrl+[
+        if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+            const activeObj = fabricCanvas?.getActiveObject();
+            if (activeObj) {
+                e.preventDefault();
+                fabricCanvas.sendToBack(activeObj);
+                fabricCanvas.renderAll();
+                scheduleAutoSave();
+            }
+        }
+    });
+}
+
+/**
+ * Paste (duplicate) an object
+ */
+function pasteObject(obj) {
+    if (!fabricCanvas || !obj) return;
+    
+    obj.clone(function(cloned) {
+        cloned.set({
+            left: cloned.left + 20,
+            top: cloned.top + 20
+        });
+        fabricCanvas.add(cloned);
+        fabricCanvas.setActiveObject(cloned);
+        fabricCanvas.renderAll();
+        scheduleAutoSave();
+    });
 }
 
 /**
@@ -584,6 +858,19 @@ function setupCanvasEvents() {
     
     fabricCanvas.on('object:removed', function() {
         scheduleAutoSave();
+    });
+    
+    // Selection events for properties panel
+    fabricCanvas.on('selection:created', function(e) {
+        showPropertiesPanel(e.selected[0]);
+    });
+    
+    fabricCanvas.on('selection:updated', function(e) {
+        showPropertiesPanel(e.selected[0]);
+    });
+    
+    fabricCanvas.on('selection:cleared', function() {
+        hidePropertiesPanel();
     });
     
     // Custom context menu

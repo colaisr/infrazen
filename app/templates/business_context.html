@@ -159,6 +159,89 @@
                 </div>
             </div>
             
+            <!-- Properties Panel -->
+            <div class="properties-panel" id="propertiesPanel" style="display: none;">
+                <div class="properties-header">
+                    <h4 id="propertiesTitle">Свойства</h4>
+                    <button class="btn btn-icon" id="closePropertiesBtn">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="properties-content">
+                    <!-- Text Properties -->
+                    <div id="textProperties" style="display: none;">
+                        <div class="property-group">
+                            <label>Размер шрифта</label>
+                            <select id="fontSize" class="form-control">
+                                <option value="12">12</option>
+                                <option value="14">14</option>
+                                <option value="16">16</option>
+                                <option value="18">18</option>
+                                <option value="24" selected>24</option>
+                                <option value="32">32</option>
+                                <option value="48">48</option>
+                                <option value="64">64</option>
+                            </select>
+                        </div>
+                        <div class="property-group">
+                            <label>Стиль</label>
+                            <div class="button-group">
+                                <button class="btn btn-icon" id="boldBtn" title="Жирный">
+                                    <i class="fa-solid fa-bold"></i>
+                                </button>
+                                <button class="btn btn-icon" id="italicBtn" title="Курсив">
+                                    <i class="fa-solid fa-italic"></i>
+                                </button>
+                                <button class="btn btn-icon" id="underlineBtn" title="Подчёркнутый">
+                                    <i class="fa-solid fa-underline"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="property-group">
+                            <label>Цвет текста</label>
+                            <input type="color" id="textColor" class="color-picker" value="#1F2937">
+                        </div>
+                    </div>
+                    
+                    <!-- Rectangle Properties -->
+                    <div id="rectangleProperties" style="display: none;">
+                        <div class="property-group">
+                            <label>Цвет заливки</label>
+                            <input type="color" id="rectFillColor" class="color-picker" value="#3B82F6">
+                        </div>
+                        <div class="property-group">
+                            <label>Прозрачность</label>
+                            <input type="range" id="rectOpacity" class="range-slider" min="0" max="100" value="20">
+                            <span id="rectOpacityValue">20%</span>
+                        </div>
+                        <div class="property-group">
+                            <label>Цвет обводки</label>
+                            <input type="color" id="rectStrokeColor" class="color-picker" value="#3B82F6">
+                        </div>
+                    </div>
+                    
+                    <!-- Common Properties for all objects -->
+                    <div id="commonProperties">
+                        <div class="property-group">
+                            <label>Слои</label>
+                            <div class="button-group">
+                                <button class="btn btn-sm" id="bringToFrontBtn">
+                                    <i class="fa-solid fa-arrow-up"></i> На передний план
+                                </button>
+                                <button class="btn btn-sm" id="sendToBackBtn">
+                                    <i class="fa-solid fa-arrow-down"></i> На задний план
+                                </button>
+                            </div>
+                        </div>
+                        <div class="property-group">
+                            <button class="btn btn-secondary btn-block" id="deleteObjectBtn">
+                                <i class="fa-solid fa-trash"></i> Удалить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Canvas Container -->
             <div class="canvas-container" id="canvasContainer">
                 <canvas id="canvas"></canvas>
