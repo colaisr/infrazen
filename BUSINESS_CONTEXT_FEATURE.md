@@ -1042,7 +1042,7 @@ PUT /api/business-context/boards/1
 
 ## 🔄 Current Status
 
-**Overall Progress: 54% (Phase 1, 2, 3 Complete + Phase 5 Partially Complete)**
+**Overall Progress: 67% (Phase 1, 2, 3, 4 Complete + Phase 5 Partially Complete)**
 
 ### Phase 1: Foundation & Board Management ✅ COMPLETED
 - [x] 35/35 tasks completed (100%)
@@ -1091,10 +1091,18 @@ PUT /api/business-context/boards/1
 - ✅ Smooth move and resize with child elements
 - ✅ Professional styling with InfraZen colors
 
-### Phase 4: Free Objects Toolbox
-- [ ] 0/28 tasks completed (0%)
-- **Status:** Pending Phase 3
-- Toolbox section already exists in UI
+### Phase 4: Free Objects Toolbox ✅ COMPLETED
+- [x] 28/28 tasks completed (100%)
+- ✅ Free Objects toolbox section implemented
+- ✅ Text objects with full editing (font size, bold, italic, underline)
+- ✅ Rectangle objects with customization (fill, opacity, stroke)
+- ✅ Properties panel (context-menu triggered)
+- ✅ Copy/paste functionality (Ctrl+C/V)
+- ✅ Layer ordering (bring to front, send to back)
+- ✅ Delete with keyboard shortcut
+- ✅ All objects persist correctly after reload
+- ✅ Smart canvas_state loading (filters out group objects)
+- ✅ Custom toObject() methods for property preservation
 
 ### Phase 5: Resources Toolbox 🔄 PARTIALLY COMPLETE
 - [x] 12/45 tasks completed (27%)
@@ -1122,9 +1130,9 @@ PUT /api/business-context/boards/1
 - ⏳ Export functionality - Pending
 - ⏳ Performance optimization - Pending
 
-**Total Progress: 115/213 tasks completed (54%)**
+**Total Progress: 143/213 tasks completed (67%)**
 
-**Last Updated:** 2025-10-26 (Phase 1, 2, 3 completed, Phase 5 partially complete)
+**Last Updated:** 2025-10-26 (Phase 1, 2, 3, 4 completed, Phase 5 partially complete)
 
 ---
 
@@ -1238,16 +1246,16 @@ PUT /api/business-context/boards/1
 
 ---
 
-**Document Version:** 1.1  
+**Document Version:** 1.2  
 **Created:** 2025-10-26  
 **Last Updated:** 2025-10-26  
-**Status:** Phase 1 & 2 Complete, 40% Overall Progress  
+**Status:** Phase 1, 2, 3, 4 Complete, 67% Overall Progress  
 **Estimated Effort:** 12-13 development days  
 **Priority:** High
 
 ---
 
-## 📝 Phase 1 & 2 Implementation Notes
+## 📝 Phase 1, 2, 3, 4 Implementation Notes
 
 ### What Was Built (2025-10-26)
 
@@ -1283,6 +1291,14 @@ PUT /api/business-context/boards/1
 - Responsive design for InfraZen sidebar
 - Professional UI matching InfraZen design system
 - All Russian localization
+- **Free Objects (Phase 4)**:
+  - Text objects with rich editing (font size, bold, italic, underline, color)
+  - Rectangle objects with full customization (fill, opacity, stroke)
+  - Properties panel (right-click context menu)
+  - Copy/paste with keyboard shortcuts (Ctrl+C/V, Cmd+C/V)
+  - Layer ordering (Ctrl+]/[, Cmd+]/[, bring to front/send to back)
+  - Smart persistence (canvas_state for free objects, database for groups)
+  - Custom toObject() overrides to preserve custom properties
 
 **UX Improvements:**
 - Empty state with friendly message (no infinite spinner)
