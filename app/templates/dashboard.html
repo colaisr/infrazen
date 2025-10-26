@@ -115,6 +115,8 @@
                             <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 2rem; height: 2rem; object-fit: contain;">
                         {% elif p.code | lower == 'beget' %}
                             <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
+                        {% elif p.code | lower == 'yandex' %}
+                            <img src="{{ url_for('static', filename='provider_logos/yc_logo.png') }}" alt="Yandex Cloud" style="width: 2rem; height: 2rem; object-fit: contain;">
                         {% else %}
                             <span class="provider-badge {{ p.code | lower }}">{{ p.code | upper }}</span>
                         {% endif %}

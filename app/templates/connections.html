@@ -95,9 +95,9 @@
         <article class="connection-card" id="provider-{{ provider.id }}" data-provider-type="{{ provider.provider_type }}">
             <div class="card-header">
                 <div class="provider-logo">
-                    {% if provider.code == 'yc' %}
+                    {% if provider.code == 'yandex' %}
                         <div class="provider-icon yandex-cloud">
-                            <i class="fa-solid fa-cloud"></i>
+                            <img src="{{ url_for('static', filename='provider_logos/yc_logo.png') }}" alt="Yandex Cloud" style="width: 2rem; height: 2rem; object-fit: contain;">
                         </div>
                     {% elif provider.code == 'selectel' %}
                         <div class="provider-icon selectel">
@@ -358,11 +358,11 @@
                             {% elif provider.provider_type == 'gcp' %}
                                 <i class="fa-brands fa-google"></i>
                             {% elif provider.provider_type == 'beget' %}
-                                <i class="fa-solid fa-server"></i>
+                                <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
                             {% elif provider.provider_type == 'selectel' %}
-                                <i class="fa-solid fa-cloud"></i>
+                                <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 2rem; height: 2rem; object-fit: contain;">
                             {% elif provider.provider_type == 'yandex' %}
-                                <i class="fa-solid fa-cloud"></i>
+                                <img src="{{ url_for('static', filename='provider_logos/yc_logo.png') }}" alt="Yandex Cloud" style="width: 2rem; height: 2rem; object-fit: contain;">
                             {% elif provider.provider_type == 'vk-cloud' %}
                                 <i class="fa-solid fa-cloud"></i>
                             {% else %}
