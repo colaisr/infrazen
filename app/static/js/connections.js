@@ -482,7 +482,8 @@ function showProviderModalForEdit(connectionData, providerType) {
     changeProvider();
     
     const waitForFields = () => {
-        const readyField = document.querySelector('input[name="api_key"], input[name="username"]');
+        // Check for any provider-specific field (input or textarea)
+        const readyField = document.querySelector('input[name="api_key"], input[name="username"], textarea[name="service_account_key"]');
         if (readyField) {
             fillEditForm(connectionData);
         } else {
