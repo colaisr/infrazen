@@ -293,7 +293,6 @@ async function openBoard(boardId) {
     try {
         const response = await fetch(`/api/business-context/boards/${boardId}`);
         const data = await response.json();
-        
         if (data.success) {
             currentBoard = data.board;
             
@@ -383,10 +382,16 @@ function initializeCanvas() {
     }
     
     // Load canvas state if exists (for free objects)
-    if (currentBoard.canvas_state) {
-        fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
-            fabricCanvas.renderAll();
-        });
+    // Skip this for now since we're loading groups from database
+    // TODO: Filter out group objects from canvas_state to only load free objects
+    if (currentBoard.canvas_state && false) {
+        try {
+            fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
+                fabricCanvas.renderAll();
+            });
+        } catch (error) {
+            console.error('Error loading canvas state:', error);
+        }
     }
     
     // Restore viewport
@@ -970,7 +975,20 @@ async function createGroupOnCanvas() {
         fabricId: fabricId,
         groupName: 'Новая группа',
         groupColor: '#3B82F6',
-        calculatedCost: 0
+        calculatedCost: 0,
+        // Make sure Fabric.js preserves our custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    fabricId: this.fabricId,
+                    groupName: this.groupName,
+                    groupColor: this.groupColor,
+                    calculatedCost: this.calculatedCost,
+                    dbId: this.dbId
+                });
+            };
+        })(fabric.Rect.prototype.toObject)
     });
     
     // Create group name text
@@ -1044,11 +1062,14 @@ async function createGroupOnCanvas() {
  * Load groups from board data and render on canvas
  */
 function loadGroupsOnCanvas(groups) {
-    if (!fabricCanvas || !groups) return;
+    if (!fabricCanvas || !groups) {
+        return;
+    }
     
     groups.forEach(group => {
-        // Create group rectangle
-        const groupRect = new fabric.Rect({
+        try {
+            // Create group rectangle
+            const groupRect = new fabric.Rect({
             left: group.position.x,
             top: group.position.y,
             width: group.size.width,
@@ -1066,7 +1087,20 @@ function loadGroupsOnCanvas(groups) {
             groupName: group.name,
             groupColor: group.color,
             calculatedCost: group.calculated_cost || 0,
-            dbId: group.id
+            dbId: group.id,
+            // Make sure Fabric.js preserves our custom properties
+            toObject: (function(toObject) {
+                return function() {
+                    return fabric.util.object.extend(toObject.call(this), {
+                        objectType: this.objectType,
+                        fabricId: this.fabricId,
+                        groupName: this.groupName,
+                        groupColor: this.groupColor,
+                        calculatedCost: this.calculatedCost,
+                        dbId: this.dbId
+                    });
+                };
+            })(fabric.Rect.prototype.toObject)
         });
         
         // Create group name text
@@ -1127,6 +1161,9 @@ function loadGroupsOnCanvas(groups) {
         groupRect.on('mousedblclick', function() {
             editGroupName(groupRect, groupText);
         });
+        } catch (error) {
+            console.error('Error loading group:', error);
+        }
     });
     
     fabricCanvas.renderAll();
