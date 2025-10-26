@@ -48,6 +48,7 @@ class Resource(BaseModel):
     last_sync = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True, index=True)
     provider_config = db.Column(db.Text)  # Provider-specific configuration as JSON
+    notes = db.Column(db.Text)  # User notes about this resource (system-wide, persists across syncs)
     
     # Relationships
     tags = db.relationship('ResourceTag', backref='resource', lazy=True, cascade='all, delete-orphan')
