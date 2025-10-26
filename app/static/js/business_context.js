@@ -20,15 +20,30 @@ document.addEventListener('DOMContentLoaded', function() {
 /**
  * Main initialization function
  */
-function initializeBusinessContext() {
+async function initializeBusinessContext() {
     setupEventListeners();
     
     // Check if we should restore a previously opened board
     const lastBoardId = localStorage.getItem('business_context_last_board');
     
     if (lastBoardId && lastBoardId !== 'list') {
-        // Try to open the last board
-        openBoard(parseInt(lastBoardId));
+        // Validate board exists before trying to open it
+        try {
+            const response = await fetch(`/api/business-context/boards/${parseInt(lastBoardId)}`);
+            const data = await response.json();
+            if (data.success) {
+                // Board exists, open it
+                openBoard(parseInt(lastBoardId));
+            } else {
+                // Board doesn't exist (e.g., after re-seed) - show list silently
+                localStorage.setItem('business_context_last_board', 'list');
+                loadBoards();
+            }
+        } catch (error) {
+            // Error fetching board - show list silently
+            localStorage.setItem('business_context_last_board', 'list');
+            loadBoards();
+        }
     } else {
         // Show board list
         loadBoards();
@@ -630,16 +645,20 @@ async function openBoard(boardId) {
             switchToCanvasView();
             loadResources();
         } else {
-            // Board not found or error - go back to list
+            // Board not found (likely after re-seed) - silently go back to list
             localStorage.setItem('business_context_last_board', 'list');
             loadBoards();
-            showFlashMessage('error', data.error || 'Failed to load board');
+            // Don't show error - board not found is expected after re-seed
         }
     } catch (error) {
         console.error('Error opening board:', error);
+        // Network error - show error only for unexpected failures
         localStorage.setItem('business_context_last_board', 'list');
         loadBoards();
-        showFlashMessage('error', 'Failed to load board');
+        // Only show error for actual network failures, not 404s
+        if (!error.message?.includes('404')) {
+            showFlashMessage('error', 'Ошибка загрузки доски');
+        }
     }
 }
 
@@ -1325,11 +1344,16 @@ async function placeResourceOnCanvas(resourceId, x, y) {
 /**
  * Create Fabric.js object for resource on canvas
  */
-function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
+function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAbsolutePosition = false) {
     // Create resource card as a simple rectangle with overlaid text
+    // If isAbsolutePosition is true, x/y are already the final card positions
+    // If false (default), x/y are click positions that need to be centered
+    const cardLeft = isAbsolutePosition ? x : (x - 60);
+    const cardTop = isAbsolutePosition ? y : (y - 40);
+    
     const resourceCard = new fabric.Rect({
-        left: x - 60,
-        top: y - 40,
+        left: cardLeft,
+        top: cardTop,
         width: 120,
         height: 80,
         fill: '#FFFFFF',
@@ -1361,8 +1385,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     
     // Resource name text
     const nameText = new fabric.Text(resourceData.name, {
-        left: x,
-        top: y - 25,
+        left: cardLeft + 60,
+        top: cardTop + 15,
         fontSize: 13,
         fontWeight: 'bold',
         fill: '#1F2937',
@@ -1385,8 +1409,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     
     // Resource type and IP text
     const metaText = new fabric.Text(`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`, {
-        left: x,
-        top: y + 0,
+        left: cardLeft + 60,
+        top: cardTop + 40,
         fontSize: 10,
         fill: '#6B7280',
         originX: 'center',
@@ -1409,8 +1433,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     
     // Info icon circle (top-left)
     const infoIconCircle = new fabric.Circle({
-        left: x - 60 + 12,
-        top: y - 40 + 4,
+        left: cardLeft + 12,
+        top: cardTop + 4,
         radius: 8,
         fill: '#FFFFFF',
         stroke: '#3B82F6',
@@ -1436,8 +1460,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     });
     
     const infoIconText = new fabric.Text('i', {
-        left: x - 60 + 12,
-        top: y - 40 + 4,
+        left: cardLeft + 12,
+        top: cardTop + 4,
         fontSize: 10,
         fontWeight: 'bold',
         fill: '#3B82F6',
@@ -1461,8 +1485,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     // Notes icon circle (top-right)
     const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
     const notesIconCircle = new fabric.Circle({
-        left: x + 60 - 12,
-        top: y - 40 + 4,
+        left: cardLeft + 120 - 12,
+        top: cardTop + 4,
         radius: 8,
         fill: hasNotes ? '#10B981' : '#FFFFFF',
         stroke: '#10B981',
@@ -1490,8 +1514,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
     });
     
     const notesIconText = new fabric.Text('n', {
-        left: x + 60 - 12,
-        top: y - 40 + 4,
+        left: cardLeft + 120 - 12,
+        top: cardTop + 4,
         fontSize: 10,
         fontWeight: 'bold',
         fill: hasNotes ? '#FFFFFF' : '#10B981',
@@ -2002,6 +2026,14 @@ async function updateBoardName(newName) {
  * Schedule auto-save
  */
 function scheduleAutoSave() {
+    // Skip autosave for demo users
+    if (window.isDemoUser) {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.textContent = 'Демо режим';
+        indicator.className = 'save-indicator demo-mode';
+        return;
+    }
+    
     const indicator = document.getElementById('saveIndicator');
     indicator.textContent = 'Изменения...';
     indicator.className = 'save-indicator saving';
@@ -2020,6 +2052,17 @@ function scheduleAutoSave() {
  */
 async function saveBoard(isAutoSave = false) {
     if (!currentBoard || !fabricCanvas) return;
+    
+    // Prevent demo users from saving
+    if (window.isDemoUser) {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.textContent = 'Демо режим';
+        indicator.className = 'save-indicator demo-mode';
+        if (!isAutoSave) {
+            showFlashMessage('info', 'В демо режиме изменения не сохраняются');
+        }
+        return;
+    }
     
     const indicator = document.getElementById('saveIndicator');
     
@@ -2431,12 +2474,14 @@ function loadResourcesOnCanvas(boardResources) {
             };
             
             // Create resource object on canvas
+            // Pass true for isAbsolutePosition since we're loading saved positions
             createResourceObject(
                 formattedResource,
                 boardResource.position.x,
                 boardResource.position.y,
                 boardResource.id,
-                boardResource.group_id
+                boardResource.group_id,
+                true  // isAbsolutePosition
             );
         } catch (error) {
             console.error('Error loading resource:', error, boardResource);

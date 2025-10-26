@@ -129,12 +129,12 @@ def google_auth():
                 'initials': user.get_initials(),
                 'picture': user.google_picture or '',
                 'role': user.role,
-                'is_admin': True,  # keep admin capabilities for demo walkthrough
+                'is_admin': user.is_admin(),
                 'permissions': {
-                    'manage_users': True,
-                    'impersonate_users': True,
-                    'view_all_data': True,
-                    'manage_providers': True,
+                    'manage_users': user.has_permission('manage_users'),
+                    'impersonate_users': user.has_permission('impersonate_users'),
+                    'view_all_data': user.has_permission('view_all_data'),
+                    'manage_providers': user.has_permission('manage_providers'),
                     'manage_resources': True
                 }
             }

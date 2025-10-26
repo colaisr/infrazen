@@ -21,7 +21,11 @@ from app.core.models.tags import ResourceTag
 from app.core.models.metrics import ResourceMetric, ResourceUsageSummary
 from app.core.models.logs import ResourceLog, ResourceComponent
 from app.core.models.costs import CostAllocation, CostTrend
+from app.core.models.business_board import BusinessBoard
+from app.core.models.board_resource import BoardResource
+from app.core.models.board_group import BoardGroup
 import random
+import uuid
 
 def seed_demo_user():
     """
@@ -78,6 +82,18 @@ def seed_demo_user():
             # Delete providers
             CloudProvider.query.filter(CloudProvider.id.in_(provider_ids)).delete(synchronize_session=False)
             db.session.commit()
+        
+        # Delete business context data
+        board_ids = [b.id for b in BusinessBoard.query.filter_by(user_id=demo_user.id).all()]
+        if board_ids:
+            BoardResource.query.filter(BoardResource.board_id.in_(board_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            BoardGroup.query.filter(BoardGroup.board_id.in_(board_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            BusinessBoard.query.filter(BusinessBoard.id.in_(board_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            print("  ✓ Deleted business context boards, groups, and resources")
+        
         # Delete user last
         db.session.delete(demo_user)
         db.session.commit()
@@ -852,6 +868,689 @@ def generate_daily_usage_data(metric_type, resource_name):
         'raw_data': raw_data
     }
 
+def seed_business_context(demo_user, providers):
+    """
+    Create business context boards for demo user
+    Demonstrates FinOps insights: unit economics, feature costs, environment ratios, optimization pipeline
+    """
+    print("\n🔄 Creating Business Context boards...")
+    
+    # Helper to find resource by name and provider
+    def find_resource(provider_id, resource_name):
+        return Resource.query.filter_by(provider_id=provider_id, resource_name=resource_name).first()
+    
+    boards_created = 0
+    groups_created = 0
+    resources_placed = 0
+    
+    # ========================================================================
+    # BOARD 1: Customer Allocation (Unit Economics)
+    # ========================================================================
+    print("  🎯 Board 1: Customer Allocation...")
+    
+    board1 = BusinessBoard(
+        user_id=demo_user.id,
+        name='Customer Allocation',
+        is_default=True,
+        viewport={'zoom': 1.0, 'pan_x': 0, 'pan_y': 0}
+    )
+    db.session.add(board1)
+    db.session.commit()
+    boards_created += 1
+    
+    # Create groups for Board 1
+    group1_1 = BoardGroup(
+        board_id=board1.id,
+        name='Customer A (Enterprise)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=100,
+        width=350,
+        height=300,
+        color='#3B82F6',  # Blue
+        calculated_cost=0.0
+    )
+    group1_2 = BoardGroup(
+        board_id=board1.id,
+        name='Customer B (SMB)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=500,
+        position_y=100,
+        width=300,
+        height=250,
+        color='#10B981',  # Green
+        calculated_cost=0.0
+    )
+    group1_3 = BoardGroup(
+        board_id=board1.id,
+        name='Customer C (Trial)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=850,
+        position_y=100,
+        width=250,
+        height=200,
+        color='#F59E0B',  # Orange
+        calculated_cost=0.0
+    )
+    group1_4 = BoardGroup(
+        board_id=board1.id,
+        name='Shared Infrastructure',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=450,
+        width=1000,
+        height=250,
+        color='#6B7280',  # Gray
+        calculated_cost=0.0
+    )
+    db.session.add_all([group1_1, group1_2, group1_3, group1_4])
+    db.session.commit()
+    groups_created += 4
+    
+    # Place resources on Board 1
+    # Customer A (dedicated high-value resources)
+    sel_a = providers['selectel_bu_a']
+    for res_name, pos_x, pos_y, notes in [
+        ('api-backend-prod-01', 150, 180, 'Выделенный API-бэкенд для Клиента A. SLA 99.9%. Критичен для корпоративного контракта.'),
+        ('db-postgres-prod-01', 280, 180, 'Выделенная база данных Клиента A. Содержит конфиденциальные корпоративные данные.'),
+        ('s3-cdn-static', 150, 280, 'Статические активы Клиента A и CDN-дистрибуция.')
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            res.notes = notes  # System-wide notes
+            br = BoardResource(
+                board_id=board1.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group1_1.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Customer B (mid-tier)
+    sel_b = providers['selectel_bu_b']
+    for res_name, pos_x, pos_y in [
+        ('web-frontend-01', 550, 180),
+        ('db-mysql-staging', 680, 180)
+    ]:
+        res = find_resource(sel_b.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board1.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group1_2.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Customer C (trial - small resources)
+    beget_dev = providers['beget_dev']
+    res = find_resource(beget_dev.id, 'dev-vps-01')
+    if res:
+        br = BoardResource(
+            board_id=board1.id,
+            resource_id=res.id,
+            position_x=900,
+            position_y=180,
+            group_id=group1_3.id
+        )
+        db.session.add(br)
+        resources_placed += 1
+    
+    # Shared infrastructure
+    for res_name, pos_x, pos_y, notes in [
+        ('lb-prod-01', 150, 520, 'Общий балансировщик нагрузки для всех клиентов. Мультитенантная архитектура.'),
+        ('k8s-worker-01', 300, 520, 'Kubernetes кластер - общие рабочие нагрузки для клиентов.'),
+        ('k8s-worker-02', 450, 520, None)
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            if notes:
+                res.notes = notes
+            br = BoardResource(
+                board_id=board1.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group1_4.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    db.session.commit()
+    
+    # ========================================================================
+    # BOARD 2: Product Features (Feature Cost Attribution)
+    # ========================================================================
+    print("  🎨 Board 2: Product Features...")
+    
+    board2 = BusinessBoard(
+        user_id=demo_user.id,
+        name='Product Features',
+        is_default=False,
+        viewport={'zoom': 1.0, 'pan_x': 0, 'pan_y': 0}
+    )
+    db.session.add(board2)
+    db.session.commit()
+    boards_created += 1
+    
+    # Create groups for Board 2
+    group2_1 = BoardGroup(
+        board_id=board2.id,
+        name='Analytics Dashboard (ML/BI)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=100,
+        width=400,
+        height=250,
+        color='#8B5CF6',  # Purple
+        calculated_cost=0.0
+    )
+    group2_2 = BoardGroup(
+        board_id=board2.id,
+        name='Mobile API',
+        fabric_id=str(uuid.uuid4()),
+        position_x=550,
+        position_y=100,
+        width=350,
+        height=250,
+        color='#3B82F6',  # Blue
+        calculated_cost=0.0
+    )
+    group2_3 = BoardGroup(
+        board_id=board2.id,
+        name='Chat & Messaging',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=400,
+        width=300,
+        height=220,
+        color='#10B981',  # Green
+        calculated_cost=0.0
+    )
+    group2_4 = BoardGroup(
+        board_id=board2.id,
+        name='Search Engine',
+        fabric_id=str(uuid.uuid4()),
+        position_x=450,
+        position_y=400,
+        width=300,
+        height=220,
+        color='#F59E0B',  # Orange
+        calculated_cost=0.0
+    )
+    db.session.add_all([group2_1, group2_2, group2_3, group2_4])
+    db.session.commit()
+    groups_created += 4
+    
+    # Place resources on Board 2
+    # Analytics feature
+    for res_name, pos_x, pos_y, notes in [
+        ('analytics-etl-01', 150, 180, 'Обслуживает BI-дашборды. Используется 5% пользователей, но генерирует 40% корпоративных сделок.'),
+        ('archive-cold-storage', 300, 180, 'Исторические данные аналитики. Требуется для compliance-отчётности.')
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            if notes:
+                res.notes = notes
+            br = BoardResource(
+                board_id=board2.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group2_1.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Mobile API
+    for res_name, pos_x, pos_y in [
+        ('api-backend-prod-01', 600, 180),
+        ('s3-cdn-static', 750, 180)
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board2.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group2_2.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Chat feature
+    beget_prod = providers['beget_prod']
+    for res_name, pos_x, pos_y in [
+        ('vps-mq-01', 150, 480),
+        ('vps-cache-01', 280, 480)
+    ]:
+        res = find_resource(beget_prod.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board2.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group2_3.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Search engine
+    for res_name, pos_x, pos_y in [
+        ('k8s-worker-01', 500, 480),
+        ('k8s-worker-02', 630, 480)
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board2.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group2_4.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    db.session.commit()
+    
+    # ========================================================================
+    # BOARD 3: Environment & Teams (Operational View)
+    # ========================================================================
+    print("  🏗️  Board 3: Environment & Teams...")
+    
+    board3 = BusinessBoard(
+        user_id=demo_user.id,
+        name='Environment & Teams',
+        is_default=False,
+        viewport={'zoom': 1.0, 'pan_x': 0, 'pan_y': 0}
+    )
+    db.session.add(board3)
+    db.session.commit()
+    boards_created += 1
+    
+    # Create groups for Board 3
+    group3_1 = BoardGroup(
+        board_id=board3.id,
+        name='Production (Team: Platform)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=100,
+        width=450,
+        height=300,
+        color='#EF4444',  # Red
+        calculated_cost=0.0
+    )
+    group3_2 = BoardGroup(
+        board_id=board3.id,
+        name='Staging (Team: QA)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=600,
+        position_y=100,
+        width=350,
+        height=250,
+        color='#F59E0B',  # Orange
+        calculated_cost=0.0
+    )
+    group3_3 = BoardGroup(
+        board_id=board3.id,
+        name='Development (Team: Engineering)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=450,
+        width=400,
+        height=250,
+        color='#10B981',  # Green
+        calculated_cost=0.0
+    )
+    group3_4 = BoardGroup(
+        board_id=board3.id,
+        name='CI/CD (Team: DevOps)',
+        fabric_id=str(uuid.uuid4()),
+        position_x=550,
+        position_y=450,
+        width=400,
+        height=250,
+        color='#8B5CF6',  # Purple
+        calculated_cost=0.0
+    )
+    db.session.add_all([group3_1, group3_2, group3_3, group3_4])
+    db.session.commit()
+    groups_created += 4
+    
+    # Place resources on Board 3
+    # Production environment
+    for res_name, pos_x, pos_y in [
+        ('api-backend-prod-01', 150, 180),
+        ('db-postgres-prod-01', 280, 180),
+        ('lb-prod-01', 410, 180),
+        ('vps-app-01', 150, 280),
+        ('vps-db-01', 280, 280)
+    ]:
+        # Try Selectel first
+        res = find_resource(sel_a.id, res_name)
+        if not res:
+            res = find_resource(beget_prod.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board3.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group3_1.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Staging environment
+    for res_name, pos_x, pos_y in [
+        ('db-mysql-staging', 650, 180),
+        ('stage-web-01', 780, 180)
+    ]:
+        res = find_resource(sel_b.id, res_name)
+        if not res:
+            res = find_resource(beget_dev.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board3.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group3_2.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Development environment
+    for res_name, pos_x, pos_y in [
+        ('dev-vps-01', 150, 530),
+        ('dev-vps-02', 280, 530),
+        ('dev-db-01', 410, 530)
+    ]:
+        res = find_resource(beget_dev.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board3.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group3_3.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # CI/CD infrastructure
+    for res_name, pos_x, pos_y, notes in [
+        ('ci-runner-spot', 600, 530, 'Простаивает 75% времени. Рассмотреть расписание автоотключения для экономии.'),
+        ('test-runner-01', 730, 530, None),
+        ('ci-dev-runner', 860, 530, None)
+    ]:
+        res = find_resource(sel_b.id, res_name)
+        if not res:
+            res = find_resource(beget_dev.id, res_name)
+        if res:
+            if notes:
+                res.notes = notes
+            br = BoardResource(
+                board_id=board3.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group3_4.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    db.session.commit()
+    
+    # ========================================================================
+    # BOARD 4: Optimization Opportunities (FinOps Action Board)
+    # ========================================================================
+    print("  🎯 Board 4: Optimization Opportunities...")
+    
+    board4 = BusinessBoard(
+        user_id=demo_user.id,
+        name='Optimization Opportunities',
+        is_default=False,
+        viewport={'zoom': 1.0, 'pan_x': 0, 'pan_y': 0}
+    )
+    db.session.add(board4)
+    db.session.commit()
+    boards_created += 1
+    
+    # Create groups for Board 4 (Kanban-style)
+    group4_1 = BoardGroup(
+        board_id=board4.id,
+        name='🔥 High Priority Savings',
+        fabric_id=str(uuid.uuid4()),
+        position_x=100,
+        position_y=100,
+        width=350,
+        height=400,
+        color='#EF4444',  # Red
+        calculated_cost=0.0
+    )
+    group4_2 = BoardGroup(
+        board_id=board4.id,
+        name='⚠️ Medium Priority',
+        fabric_id=str(uuid.uuid4()),
+        position_x=500,
+        position_y=100,
+        width=300,
+        height=400,
+        color='#F59E0B',  # Orange
+        calculated_cost=0.0
+    )
+    group4_3 = BoardGroup(
+        board_id=board4.id,
+        name='✅ Optimized',
+        fabric_id=str(uuid.uuid4()),
+        position_x=850,
+        position_y=100,
+        width=300,
+        height=400,
+        color='#10B981',  # Green
+        calculated_cost=0.0
+    )
+    db.session.add_all([group4_1, group4_2, group4_3])
+    db.session.commit()
+    groups_created += 3
+    
+    # Place resources with critical recommendations in High Priority
+    for res_name, pos_x, pos_y in [
+        ('api-backend-prod-01', 150, 180),
+        ('db-postgres-prod-01', 280, 180),
+        ('k8s-worker-01', 150, 280)
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board4.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group4_1.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Medium priority
+    for res_name, pos_x, pos_y in [
+        ('lb-prod-01', 550, 180),
+        ('s3-media-bucket', 680, 180)
+    ]:
+        res = find_resource(sel_a.id, res_name)
+        if not res:
+            res = find_resource(sel_b.id, res_name)
+        if res:
+            br = BoardResource(
+                board_id=board4.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group4_2.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    # Already optimized
+    for res_name, pos_x, pos_y, notes in [
+        ('vps-app-01', 900, 180, 'Правильный размер. Мониторинг показывает оптимальное использование CPU/RAM.'),
+        ('vps-cache-01', 1030, 180, 'Идеально подобранный Redis кэш. Оптимизация не требуется.')
+    ]:
+        res = find_resource(beget_prod.id, res_name)
+        if res:
+            if notes:
+                res.notes = notes
+            br = BoardResource(
+                board_id=board4.id,
+                resource_id=res.id,
+                position_x=pos_x,
+                position_y=pos_y,
+                group_id=group4_3.id
+            )
+            db.session.add(br)
+            resources_placed += 1
+    
+    db.session.commit()
+    
+    # Commit all resource notes
+    db.session.commit()
+    
+    # Calculate group costs for all boards
+    for board in [board1, board2, board3, board4]:
+        for group in board.groups.all():
+            total_cost = sum([
+                br.resource.daily_cost or 0.0 
+                for br in group.resources.all() 
+                if br.resource and br.resource.daily_cost
+            ])
+            group.calculated_cost = total_cost
+    
+    db.session.commit()
+    
+    # Add text descriptions to canvas for each board
+    print("  📝 Adding board descriptions...")
+    
+    board_descriptions = {
+        'Customer Allocation': {
+            'text': '💰 БИЗНЕС-ЦЕННОСТЬ: Юнит-экономика и прибыльность клиентов\n\n' +
+                    '✓ Отслеживание стоимости на клиента\n' +
+                    '✓ Валидация ценовых моделей\n' +
+                    '✓ Определение маржинальности\n' +
+                    '✓ Оптимизация высокодоходных клиентов\n\n' +
+                    'ИНСАЙТ: Клиент A стоит ₽85К/мес, но платит ₽120К = маржа 41% ✅',
+            'left': 100,
+            'top': 720
+        },
+        'Product Features': {
+            'text': '🎨 БИЗНЕС-ЦЕННОСТЬ: Распределение затрат по функциям и ROI\n\n' +
+                    '✓ Видимость затрат на уровне функций\n' +
+                    '✓ Решения "разработать или купить"\n' +
+                    '✓ Приоритизация продуктовой дорожной карты\n' +
+                    '✓ Закрытие функций с низким ROI\n\n' +
+                    'ИНСАЙТ: ML/BI стоит 62% бюджета, но обеспечивает ключевую дифференциацию',
+            'left': 100,
+            'top': 770
+        },
+        'Environment & Teams': {
+            'text': '🏗️ БИЗНЕС-ЦЕННОСТЬ: Операционное здоровье и соотношения ресурсов\n\n' +
+                    '✓ Мониторинг соотношения затрат Dev/Prod\n' +
+                    '✓ Метрики эффективности команд\n' +
+                    '✓ Контроль разрастания окружений\n' +
+                    '✓ Распределение затрат между командами\n\n' +
+                    'ИНСАЙТ: Соотношение Prod:Dev 3.6:1 (здоровое для SaaS)',
+            'left': 100,
+            'top': 750
+        },
+        'Optimization Opportunities': {
+            'text': '🎯 БИЗНЕС-ЦЕННОСТЬ: Визуальный пайплайн экономии и отслеживание действий\n\n' +
+                    '✓ Приоритизация высокоэффективной экономии\n' +
+                    '✓ Отслеживание прогресса оптимизации\n' +
+                    '✓ Измерение фактической vs прогнозной экономии\n' +
+                    '✓ Цикл непрерывного улучшения\n\n' +
+                    'ИНСАЙТ: Выявлена экономия ₽10.4К/мес на 8 ресурсах',
+            'left': 100,
+            'top': 520
+        }
+    }
+    
+    for board in [board1, board2, board3, board4]:
+        if board.name in board_descriptions:
+            desc = board_descriptions[board.name]
+            canvas_state = {
+                'objects': [
+                    {
+                        'type': 'textbox',
+                        'version': '5.3.0',
+                        'originX': 'left',
+                        'originY': 'top',
+                        'left': desc['left'],
+                        'top': desc['top'],
+                        'width': 500,
+                        'height': 200,
+                        'fill': '#1F2937',
+                        'stroke': None,
+                        'strokeWidth': 0,
+                        'strokeDashArray': None,
+                        'strokeLineCap': 'butt',
+                        'strokeDashOffset': 0,
+                        'strokeLineJoin': 'miter',
+                        'strokeUniform': False,
+                        'strokeMiterLimit': 4,
+                        'scaleX': 1,
+                        'scaleY': 1,
+                        'angle': 0,
+                        'flipX': False,
+                        'flipY': False,
+                        'opacity': 1,
+                        'shadow': None,
+                        'visible': True,
+                        'backgroundColor': '',
+                        'fillRule': 'nonzero',
+                        'paintFirst': 'fill',
+                        'globalCompositeOperation': 'source-over',
+                        'skewX': 0,
+                        'skewY': 0,
+                        'text': desc['text'],
+                        'fontSize': 13,
+                        'fontWeight': 'normal',
+                        'fontFamily': 'Inter, -apple-system, sans-serif',
+                        'fontStyle': 'normal',
+                        'lineHeight': 1.4,
+                        'underline': False,
+                        'overline': False,
+                        'linethrough': False,
+                        'textAlign': 'left',
+                        'textBackgroundColor': '',
+                        'charSpacing': 0,
+                        'minWidth': 20,
+                        'splitByGrapheme': False,
+                        'objectType': 'freeText',
+                        'selectable': True,
+                        'evented': True,
+                        'hasControls': True
+                    }
+                ],
+                'background': '#FFFFFF'
+            }
+            board.canvas_state = json.dumps(canvas_state)
+    
+    db.session.commit()
+    print(f"     Added descriptions to {len(board_descriptions)} boards")
+    
+    print(f"\n✅ Business Context seeding completed!")
+    print(f"   Boards created: {boards_created}")
+    print(f"   Groups created: {groups_created}")
+    print(f"   Resources placed: {resources_placed}")
+    print(f"   Notes added: {len([r for r in Resource.query.join(CloudProvider).filter(CloudProvider.user_id == demo_user.id).all() if r.notes])}")
+
 def main():
     """Main seeding function"""
     from app import create_app
@@ -874,8 +1573,11 @@ def main():
             # Generate usage data tags for resources
             seed_usage_data_tags(demo_user, providers)
             
+            # Create business context boards
+            seed_business_context(demo_user, providers)
+            
             print("\n" + "="*60)
-            print("🎉 COMPLETE! Demo user fully seeded with 3-month history and usage data!")
+            print("🎉 COMPLETE! Demo user fully seeded with 3-month history, usage data, and business context boards!")
             print("="*60)
             
         except Exception as e:

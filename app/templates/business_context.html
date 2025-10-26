@@ -378,6 +378,14 @@
 {% block extra_js %}
 <!-- Fabric.js for canvas manipulation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+<!-- User role detection for client-side logic -->
+<script>
+    // Expose user role for client-side logic (before main script loads)
+    window.userRole = '{{ user.role if user else 'guest' }}';
+    window.isDemoUser = window.userRole === 'demouser';
+</script>
+
 <!-- Business Context JavaScript -->
 <script src="{{ url_for('static', filename='js/business_context.js') }}?v={{ range(1000, 9999) | random }}"></script>
 {% endblock %}

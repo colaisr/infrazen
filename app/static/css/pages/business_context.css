@@ -240,6 +240,11 @@
     color: #10B981;
 }
 
+.save-indicator.demo-mode {
+    color: #8B5CF6;
+    font-weight: 600;
+}
+
 /* Zoom Controls */
 .zoom-controls {
     display: flex;

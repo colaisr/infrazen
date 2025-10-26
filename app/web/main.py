@@ -67,14 +67,16 @@ def dashboard():
                 'email': demo_user.email,
                 'name': f"{demo_user.first_name} {demo_user.last_name}",
                 'picture': '',
-                'db_id': demo_user.id
+                'db_id': demo_user.id,
+                'is_admin': demo_user.is_admin()
             }
         else:
             session['user'] = {
                 'id': 'demo-user-123',
                 'email': 'demo@infrazen.com',
                 'name': 'Demo User',
-                'picture': ''
+                'picture': '',
+                'is_admin': False
             }
 
     user = session['user']
@@ -117,14 +119,16 @@ def connections():
                 'email': demo_user.email,
                 'name': f"{demo_user.first_name} {demo_user.last_name}",
                 'picture': '',
-                'db_id': demo_user.id
+                'db_id': demo_user.id,
+                'is_admin': demo_user.is_admin()
             }
         else:
             session['user'] = {
                 'id': '106509284268867883869',
                 'email': 'demo@infrazen.com',
                 'name': 'Demo User',
-                'picture': ''
+                'picture': '',
+                'is_admin': False
             }
     
     user = session['user']
@@ -282,14 +286,16 @@ def resources():
                 'email': demo_user.email,
                 'name': f"{demo_user.first_name} {demo_user.last_name}",
                 'picture': '',
-                'db_id': demo_user.id
+                'db_id': demo_user.id,
+                'is_admin': demo_user.is_admin()
             }
         else:
             session['user'] = {
                 'id': '106509284268867883869',  # Use the actual user ID from the database
                 'email': 'real@infrazen.com',
                 'name': 'Real User',
-                'picture': ''
+                'picture': '',
+                'is_admin': False
             }
     
     user = session['user']
