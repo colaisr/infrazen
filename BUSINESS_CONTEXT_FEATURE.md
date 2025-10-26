@@ -1061,7 +1061,11 @@ PUT /api/business-context/boards/1
 - [x] 25/25 tasks completed (100%)
 - ✅ Canvas initialization with proper sizing
 - ✅ Zoom functionality (mouse wheel, +/- buttons, reset)
-- ✅ Pan functionality (space + drag, middle mouse)
+- ✅ Pan functionality (space + drag, middle mouse, 2-finger scroll)
+- ✅ **macOS Touchpad Gestures (Miro-style)**:
+  - 2-finger pinch → Zoom in/out
+  - 2-finger drag/scroll → Pan canvas
+  - Click empty canvas + drag → Pan
 - ✅ Viewport persistence (zoom level and pan position saved)
 - ✅ Auto-save system (3-second debounce)
 - ✅ Save indicator (saving/saved states)
@@ -1260,6 +1264,10 @@ PUT /api/business-context/boards/1
 **Key Features Implemented:**
 - Full board management (create, read, update, delete)
 - Canvas with grid background, zoom, pan controls
+- **macOS Touchpad Gestures (Miro-style)**:
+  - Pinch to zoom (smooth and responsive)
+  - 2-finger scroll to pan
+  - Natural gesture detection
 - Auto-save with 3-second debounce
 - Viewport persistence (zoom/pan saved per board)
 - State persistence (reopens last viewed board)
