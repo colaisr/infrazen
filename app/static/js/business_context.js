@@ -443,37 +443,75 @@ function initializeCanvas() {
  * Setup canvas event listeners
  */
 function setupCanvasEvents() {
-    // Mouse wheel zoom
+    // Mouse wheel and touchpad zoom (supports pinch gesture)
     fabricCanvas.on('mouse:wheel', function(opt) {
-        const delta = opt.e.deltaY;
+        const evt = opt.e;
+        const delta = evt.deltaY;
         let zoom = fabricCanvas.getZoom();
-        zoom *= 0.999 ** delta;
+        
+        // Check if it's a pinch gesture (ctrlKey is set on macOS trackpad pinch)
+        if (evt.ctrlKey) {
+            // Pinch zoom (touchpad) - more sensitive
+            zoom *= 0.99 ** delta;
+        } else {
+            // Regular mouse wheel zoom
+            zoom *= 0.999 ** delta;
+        }
         
         // Limit zoom
         if (zoom > 5) zoom = 5;
         if (zoom < 0.1) zoom = 0.1;
         
-        fabricCanvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        fabricCanvas.zoomToPoint({ x: evt.offsetX, y: evt.offsetY }, zoom);
         updateZoomDisplay();
         
-        opt.e.preventDefault();
-        opt.e.stopPropagation();
+        evt.preventDefault();
+        evt.stopPropagation();
         
         scheduleAutoSave();
     });
     
-    // Pan with space key or middle mouse button
+    // Miro-style panning: drag on empty space or hold space key
     let isPanning = false;
     let lastPosX, lastPosY;
+    let spacePressed = false;
+    
+    // Track space key
+    document.addEventListener('keydown', function(e) {
+        if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+            spacePressed = true;
+            if (fabricCanvas) {
+                fabricCanvas.defaultCursor = 'grab';
+            }
+        }
+    });
+    
+    document.addEventListener('keyup', function(e) {
+        if (e.code === 'Space') {
+            spacePressed = false;
+            if (fabricCanvas && !isPanning) {
+                fabricCanvas.defaultCursor = 'default';
+            }
+        }
+    });
     
     fabricCanvas.on('mouse:down', function(opt) {
         const evt = opt.e;
-        if (evt.button === 1 || (evt.button === 0 && evt.spaceKey)) {
+        const target = opt.target;
+        
+        // Start panning if: middle mouse, space key, or clicking on empty canvas
+        // On touchpad, this will be triggered by 2-finger drag
+        if (evt.button === 1 || spacePressed || (!target && evt.button === 0)) {
             isPanning = true;
             fabricCanvas.selection = false;
             lastPosX = evt.clientX;
             lastPosY = evt.clientY;
-            fabricCanvas.defaultCursor = 'grab';
+            fabricCanvas.defaultCursor = 'grabbing';
+            
+            // Don't prevent default for touchpad to allow smooth scrolling
+            if (evt.button !== 0 || spacePressed) {
+                evt.preventDefault();
+            }
         }
     });
     
@@ -495,7 +533,7 @@ function setupCanvasEvents() {
         if (isPanning) {
             isPanning = false;
             fabricCanvas.selection = true;
-            fabricCanvas.defaultCursor = 'default';
+            fabricCanvas.defaultCursor = spacePressed ? 'grab' : 'default';
         }
     });
     
