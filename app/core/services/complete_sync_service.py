@@ -158,6 +158,12 @@ class CompleteSyncService:
                         provider_ref.sync_status = 'error'
                         provider_ref.error_message = sync_result.get('error', 'Unknown error')
                         provider_ref.set_error_details(sync_result.get('errors', {}))
+                        
+                        # Set sync_snapshot_id if available (even on error)
+                        # Some providers create snapshots before failing
+                        if sync_result.get('sync_snapshot_id'):
+                            provider_ref.sync_snapshot_id = sync_result['sync_snapshot_id']
+                        
                         failed_providers += 1
                         provider_errors.append({
                             'provider': provider.connection_name,
@@ -180,7 +186,12 @@ class CompleteSyncService:
                     self.logger.error(f"Provider {provider.connection_name} sync exception: {e}")
                 
                 # Add provider reference to database
-                db.session.add(provider_ref)
+                # Only add if we have a sync_snapshot_id (required field)
+                if provider_ref.sync_snapshot_id is not None:
+                    db.session.add(provider_ref)
+                else:
+                    # If no snapshot (sync failed before creating snapshot), skip this reference
+                    self.logger.warning(f"Skipping provider_sync_reference for {provider.connection_name} - no sync_snapshot_id")
             
             # Update complete sync with results
             complete_sync.successful_providers = successful_providers

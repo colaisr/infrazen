@@ -269,11 +269,13 @@ class YandexService:
             logger.error(f"Yandex Cloud sync failed: {str(e)}", exc_info=True)
             
             # Update sync snapshot with error
+            snapshot_id = None
             if 'sync_snapshot' in locals():
                 sync_snapshot.sync_status = 'error'
                 sync_snapshot.sync_completed_at = datetime.now()
                 sync_snapshot.error_message = str(e)
                 sync_snapshot.calculate_duration()
+                snapshot_id = sync_snapshot.id
                 
                 # Update provider sync status to error
                 self.provider.sync_status = 'error'
@@ -284,7 +286,8 @@ class YandexService:
             return {
                 'success': False,
                 'error': str(e),
-                'message': 'Sync failed'
+                'message': 'Sync failed',
+                'sync_snapshot_id': snapshot_id  # Include snapshot ID even on error
             }
     
     def _process_instance_resource(self, instance: Dict, folder_id: str, 
