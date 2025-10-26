@@ -371,16 +371,24 @@ function setupKeyboardShortcuts() {
         // Delete: Delete or Backspace
         if (e.key === 'Delete' || e.key === 'Backspace') {
             const activeObj = fabricCanvas?.getActiveObject();
-            if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+            if (activeObj) {
                 // Don't delete if we're editing text
                 if (activeObj.objectType === 'freeText' && activeObj.isEditing) {
                     return;
                 }
+                
                 e.preventDefault();
-                fabricCanvas.remove(activeObj);
-                fabricCanvas.renderAll();
-                hidePropertiesPanel();
-                scheduleAutoSave();
+                
+                if (activeObj.objectType === 'group') {
+                    deleteGroup(activeObj);
+                } else if (activeObj.objectType === 'resource') {
+                    deleteResourceFromBoard(activeObj);
+                } else if (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect') {
+                    fabricCanvas.remove(activeObj);
+                    fabricCanvas.renderAll();
+                    hidePropertiesPanel();
+                    scheduleAutoSave();
+                }
             }
         }
         
@@ -918,8 +926,8 @@ function setupContextMenu() {
         const pointer = fabricCanvas.getPointer(e);
         const target = fabricCanvas.findTarget(e);
         
-        // Show menu for groups, text, and rectangles
-        if (target && (target.objectType === 'group' || target.objectType === 'freeText' || target.objectType === 'freeRect')) {
+        // Show menu for groups, text, rectangles, and resources
+        if (target && (target.objectType === 'group' || target.objectType === 'freeText' || target.objectType === 'freeRect' || target.objectType === 'resource')) {
             contextTarget = target;
             
             // Show/hide menu items based on object type
@@ -972,10 +980,26 @@ function setupContextMenu() {
                     fabricCanvas.setActiveObject(contextTarget);
                     fabricCanvas.renderAll();
                     break;
+                
+                case 'view-info':
+                    // Show resource info modal
+                    if (contextTarget.resourceId) {
+                        showResourceInfo(contextTarget.resourceId);
+                    }
+                    break;
+                
+                case 'edit-notes':
+                    // Show resource notes modal
+                    if (contextTarget.resourceId) {
+                        showResourceNotes(contextTarget.resourceId);
+                    }
+                    break;
                     
                 case 'delete':
                     if (contextTarget.objectType === 'group') {
                         deleteGroup(contextTarget);
+                    } else if (contextTarget.objectType === 'resource') {
+                        deleteResourceFromBoard(contextTarget);
                     } else if (contextTarget.objectType === 'freeText' || contextTarget.objectType === 'freeRect') {
                         fabricCanvas.remove(contextTarget);
                         fabricCanvas.renderAll();
@@ -2591,6 +2615,57 @@ async function deleteGroup(groupRect) {
     } catch (error) {
         console.error('Error deleting group:', error);
         showFlashMessage('error', 'Failed to delete group');
+    }
+}
+
+/**
+ * Delete resource from board
+ */
+async function deleteResourceFromBoard(resourceCard) {
+    if (!resourceCard.boardResourceId) return;
+    
+    if (!confirm('Удалить ресурс с доски?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/business-context/board-resources/${resourceCard.boardResourceId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Remove resource card and associated text objects from canvas
+            const objects = fabricCanvas.getObjects();
+            objects.forEach(obj => {
+                if (obj.boardResourceId === resourceCard.boardResourceId || 
+                    obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceInfoIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceNotesIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceInfoIconText' && obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === resourceCard.boardResourceId) {
+                    fabricCanvas.remove(obj);
+                }
+            });
+            
+            fabricCanvas.renderAll();
+            
+            // Reload resources to update toolbox (resource should show as available again)
+            await loadResources();
+            
+            // If resource was in a group, update group cost
+            if (resourceCard.groupId) {
+                await updateGroupCost(resourceCard.groupId);
+            }
+            
+            scheduleAutoSave();
+        } else {
+            showFlashMessage('error', data.error || 'Не удалось удалить ресурс');
+        }
+    } catch (error) {
+        console.error('Error deleting resource:', error);
+        showFlashMessage('error', 'Не удалось удалить ресурс');
     }
 }
 

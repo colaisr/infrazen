@@ -924,6 +924,81 @@ CREATE TABLE resource_states (
 - **Authentication:** Google OAuth integration with real user profiles, circular avatar display, and secure session management
 - **User Separation:** Demo users (mock data) vs Real users (database data) with conditional UI and trend displays
 
+### 7.1.5 Business Context ("Бизнес-контекст") ✅ IMPLEMENTED
+**Visual Resource Mapping & Organization**
+
+A Miro-inspired interactive canvas for mapping cloud resources to business contexts (customers, features, departments, projects), enabling visual cost allocation and resource organization.
+
+#### **Core Capabilities**
+- **Multiple Boards:** Unlimited boards per user with auto-save and last-viewed persistence
+- **Infinite Canvas:** Zoom (mouse wheel/pinch), pan (click-drag/2-finger scroll), with viewport state persistence
+- **Three Object Types:**
+  - **Groups (Business Context Frames):** Resizable containers with automatic cost calculation from contained resources
+  - **Resources:** Draggable cloud resources from sync inventory with info/notes access
+  - **Free Objects:** Text and rectangles for visual clarity and documentation
+
+#### **Technical Implementation**
+- **Frontend:** Fabric.js canvas library for object manipulation and serialization
+- **Backend:** Flask API with 15+ endpoints for CRUD operations
+- **Database:** MySQL with three new tables:
+  - `business_boards`: Board metadata, canvas state (JSON), viewport (JSON)
+  - `board_resources`: Resource placements with positions and group assignments
+  - `board_groups`: Group properties, positions, sizes, colors, calculated costs
+- **State Management:** Client-side localStorage for last board, debounced auto-save, real-time cost updates
+
+#### **User Experience Features**
+- **Board Management:** Create, rename, delete boards with "Create first board" empty state
+- **Resource Interaction:**
+  - Drag from toolbox to canvas (resources show "Placed" badge after placement)
+  - Info icon ("i", blue, top-left): Opens resource details modal
+  - Notes icon ("n", green, top-right): Opens notes editor with system-wide persistence
+  - Green fill on notes icon when notes exist
+  - Monthly cost display (₽/мес) on resource cards
+- **Group Functionality:**
+  - Right-click context menu (Edit, Delete, Properties)
+  - Auto-calculated cost badge updates when resources added/removed
+  - Custom colors and names via properties panel
+  - Drag resources in/out updates group membership and costs
+- **Free Objects Tools:**
+  - Text: Resizable with font controls (size, bold, italic), color picker
+  - Rectangle: Resizable with color picker, transparency support
+  - Layer ordering (Ctrl+]/[), Copy/paste (Ctrl+C/V), Delete (Backspace/Del)
+- **Canvas Controls:**
+  - Miro-style panning: Click-drag empty space
+  - macOS gestures: Pinch-to-zoom, 2-finger scroll to pan
+  - Zoom controls: +/- buttons, percentage display, reset
+  - Responsive sidebar: Canvas resizes smoothly on expand/collapse
+
+#### **System-Wide Notes**
+- **Persistence Model:** Notes tied to resource ID, survive syncs and board changes
+- **Database Column:** `resources.notes` (TEXT) added via Alembic migration
+- **API Endpoint:** `PUT /api/business-context/resources/<id>/notes`
+- **UI Integration:** 
+  - "n" icon in toolbox and canvas for all resources
+  - Modal with textarea for rich note editing
+  - Visual indicator (filled green circle) when notes exist
+  - Real-time icon updates when notes saved
+
+#### **Performance & Polish**
+- **Debounced Operations:** Auto-save (3s delay), canvas resize events
+- **Custom Context Menu:** Overrides browser right-click for canvas objects
+- **Keyboard Shortcuts:** Delete, Copy/Paste, Layer ordering, Save (Ctrl+S)
+- **Object Persistence:** Custom `toObject()` methods preserve all properties during JSON serialization
+- **Smart Loading:** Filters old canvas state, loads fresh data from database for groups/resources
+- **Visual Feedback:** Drag states, hover effects, loading spinners, Russian-language alerts
+
+#### **Development Status**
+- **Phase 1-5:** ✅ Complete (176/213 tasks, 83%)
+- **Remaining:** Phase 6 (Polish & Production - 37 tasks)
+- **Documentation:** Complete feature spec in `BUSINESS_CONTEXT_FEATURE.md`
+- **Code Quality:** Modular architecture, comprehensive error handling, type-safe serialization
+
+#### **Business Value**
+- **Resource Accountability:** Visual mapping reveals orphaned/unmapped resources post-sync
+- **Cost Allocation:** Automatic calculation of business unit/customer costs
+- **Documentation:** Persistent notes capture tribal knowledge about resources
+- **Flexibility:** Multiple boards support different organizational views (by customer, feature, department)
+
 ### 7.2 Cost Explorer / Analytics
 - Filterable by provider, account, service, region, tag, time period.
 - Rich tables with sorting/pagination; charts (bar/pie/line) for cost breakdowns.
