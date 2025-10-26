@@ -568,30 +568,23 @@ function setupContextMenu() {
     const contextMenu = document.getElementById('contextMenu');
     let contextTarget = null;
     
-    // Prevent default browser context menu on canvas
-    const canvasWrapper = document.querySelector('.canvas-wrapper-for-context') || fabricCanvas.wrapperEl;
-    if (canvasWrapper) {
-        canvasWrapper.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-    }
-    
-    // Show custom context menu on right-click
-    fabricCanvas.on('mouse:down', function(opt) {
-        if (opt.button === 3) { // Right click
-            const target = opt.target;
+    // Prevent default browser context menu and show custom one
+    fabricCanvas.wrapperEl.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        
+        // Get the object at mouse position
+        const pointer = fabricCanvas.getPointer(e);
+        const target = fabricCanvas.findTarget(e);
+        
+        if (target && target.objectType === 'group') {
+            contextTarget = target;
             
-            if (target && target.objectType === 'group') {
-                opt.e.preventDefault();
-                contextTarget = target;
-                
-                // Position menu at mouse location
-                contextMenu.style.left = opt.e.clientX + 'px';
-                contextMenu.style.top = opt.e.clientY + 'px';
-                contextMenu.style.display = 'block';
-            } else {
-                contextMenu.style.display = 'none';
-            }
+            // Position menu at mouse location
+            contextMenu.style.left = e.clientX + 'px';
+            contextMenu.style.top = e.clientY + 'px';
+            contextMenu.style.display = 'block';
+        } else {
+            contextMenu.style.display = 'none';
         }
     });
     
