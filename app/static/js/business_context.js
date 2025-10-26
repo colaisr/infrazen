@@ -114,6 +114,9 @@ function setupEventListeners() {
     
     // Setup group tool drag
     setupGroupTool();
+    
+    // Setup free objects tools
+    setupFreeObjectsTools();
 }
 
 /**
@@ -126,6 +129,27 @@ function setupGroupTool() {
     groupTool.addEventListener('click', function() {
         createGroupOnCanvas();
     });
+}
+
+/**
+ * Setup free objects tools (text, rectangle)
+ */
+function setupFreeObjectsTools() {
+    // Text tool
+    const textTool = document.querySelector('[data-tool="text"]');
+    if (textTool) {
+        textTool.addEventListener('click', function() {
+            createTextOnCanvas();
+        });
+    }
+    
+    // Rectangle tool
+    const rectangleTool = document.querySelector('[data-tool="rectangle"]');
+    if (rectangleTool) {
+        rectangleTool.addEventListener('click', function() {
+            createRectangleOnCanvas();
+        });
+    }
 }
 
 /**
@@ -1055,6 +1079,79 @@ async function createGroupOnCanvas() {
     // Save group to database
     await saveGroupToDatabase(groupRect);
     
+    scheduleAutoSave();
+}
+
+/**
+ * Create text object on canvas
+ */
+function createTextOnCanvas() {
+    if (!fabricCanvas || !currentBoard) return;
+    
+    // Get canvas center position
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    
+    // Create text object
+    const text = new fabric.IText('Текст', {
+        left: centerX - 50,
+        top: centerY - 20,
+        fontSize: 24,
+        fontFamily: 'Arial, sans-serif',
+        fill: '#1F2937',
+        objectType: 'freeText',
+        selectable: true,
+        editable: true
+    });
+    
+    // Add to canvas
+    fabricCanvas.add(text);
+    fabricCanvas.setActiveObject(text);
+    
+    // Enter edit mode immediately
+    text.enterEditing();
+    text.selectAll();
+    
+    fabricCanvas.renderAll();
+    scheduleAutoSave();
+}
+
+/**
+ * Create rectangle object on canvas
+ */
+function createRectangleOnCanvas() {
+    if (!fabricCanvas || !currentBoard) return;
+    
+    // Get canvas center position
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    
+    // Create rectangle object
+    const rect = new fabric.Rect({
+        left: centerX - 100,
+        top: centerY - 60,
+        width: 200,
+        height: 120,
+        fill: 'rgba(59, 130, 246, 0.2)',
+        stroke: '#3B82F6',
+        strokeWidth: 2,
+        rx: 4,
+        ry: 4,
+        objectType: 'freeRect',
+        selectable: true,
+        hasControls: true,
+        hasBorders: true
+    });
+    
+    // Add to canvas
+    fabricCanvas.add(rect);
+    fabricCanvas.setActiveObject(rect);
+    
+    fabricCanvas.renderAll();
     scheduleAutoSave();
 }
 
