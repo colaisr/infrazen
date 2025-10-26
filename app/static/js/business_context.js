@@ -1129,6 +1129,7 @@ function displayResources() {
                     <div class="resource-details">
                         <div class="resource-name">${escapeHtml(resource.name)}</div>
                         <div class="resource-meta">${resource.type} • ${resource.ip || 'No IP'}</div>
+                        ${resource.daily_cost ? `<div class="resource-cost">${(resource.daily_cost * 30).toFixed(2)} ₽/мес</div>` : ''}
                     </div>
                     ${resource.is_placed ? '<span class="resource-badge">Placed</span>' : ''}
                 </div>
@@ -1254,7 +1255,7 @@ async function placeResourceOnCanvas(resourceId, x, y) {
             displayResources();
             
             // Reload resources to update counts
-            await loadAvailableResources();
+            await loadResources();
             
             // If placed in group, update group cost
             if (groupId) {
@@ -1374,9 +1375,6 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
             top: this.top + 40
         });
         fabricCanvas.renderAll();
-        
-        // Check if moved into/out of groups
-        checkResourceGroupAssignment(this);
     });
     
     resourceCard.on('modified', function() {
@@ -1390,6 +1388,9 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
             top: this.top + 40
         });
         fabricCanvas.renderAll();
+        
+        // Check if moved into/out of groups (when drag is complete)
+        checkResourceGroupAssignment(this);
         
         // Save new position to database
         updateResourcePosition(this);
@@ -1438,7 +1439,7 @@ async function updateResourcePosition(resourceObj) {
     if (!resourceObj.boardResourceId) return;
     
     try {
-        await fetch(`/api/business-context/resources/${resourceObj.boardResourceId}`, {
+        await fetch(`/api/business-context/board-resources/${resourceObj.boardResourceId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1456,7 +1457,7 @@ async function updateResourcePosition(resourceObj) {
  */
 async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGroupId) {
     try {
-        await fetch(`/api/business-context/resources/${boardResourceId}`, {
+        const response = await fetch(`/api/business-context/board-resources/${boardResourceId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1464,9 +1465,15 @@ async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGro
             })
         });
         
+        const data = await response.json();
+        
         // Update costs for affected groups
-        if (oldGroupId) await updateGroupCost(oldGroupId);
-        if (newGroupId) await updateGroupCost(newGroupId);
+        if (oldGroupId) {
+            await updateGroupCost(oldGroupId);
+        }
+        if (newGroupId) {
+            await updateGroupCost(newGroupId);
+        }
         
     } catch (error) {
         console.error('Error updating resource group assignment:', error);
@@ -1477,23 +1484,29 @@ async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGro
  * Update group cost badge
  */
 async function updateGroupCost(groupDbId) {
+    if (!groupDbId) return; // Skip if no group
+    
     try {
         const response = await fetch(`/api/business-context/groups/${groupDbId}/cost`);
         const data = await response.json();
         
         if (data.success) {
+            const calculatedCost = data.calculated_cost || 0;
+            
             // Find group object on canvas and update cost display
             const objects = fabricCanvas.getObjects();
             for (const obj of objects) {
                 if (obj.objectType === 'group' && obj.dbId === groupDbId) {
-                    obj.calculatedCost = data.cost;
+                    obj.calculatedCost = calculatedCost;
                     
                     // Update cost badge text
                     const costBadgeText = objects.find(o => 
                         o.objectType === 'groupCost' && o.parentFabricId === obj.fabricId
                     );
+                    
                     if (costBadgeText) {
-                        const costText = data.cost > 0 ? `${data.cost.toFixed(2)} ₽/день` : '0 ₽/день';
+                        const monthlyCost = calculatedCost * 30;
+                        const costText = monthlyCost > 0 ? `${monthlyCost.toFixed(2)} ₽/мес` : '0 ₽/мес';
                         costBadgeText.set('text', costText);
                     }
                     
@@ -1537,7 +1550,7 @@ async function showResourceInfo(resourceId) {
     const content = document.getElementById('resourceInfoContent');
     
     // Show modal with loading state
-    modal.style.display = 'flex';
+    modal.classList.add('active');
     content.innerHTML = '<div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i></div>';
     
     try {
@@ -1587,11 +1600,11 @@ async function showResourceInfo(resourceId) {
             <div class="resource-info-section">
                 <h4>Стоимость</h4>
                 <div class="resource-info-grid">
-                    <div class="resource-info-label">Стоимость:</div>
-                    <div class="resource-info-value">${resource.cost ? resource.cost.toFixed(2) + ' ₽/день' : 'Не указана'}</div>
+                    <div class="resource-info-label">Ежемесячно:</div>
+                    <div class="resource-info-value">${resource.daily_cost ? (resource.daily_cost * 30).toFixed(2) + ' ₽/мес' : 'Не указана'}</div>
                     
-                    <div class="resource-info-label">Модель:</div>
-                    <div class="resource-info-value">${escapeHtml(resource.pricing_model || 'Не указана')}</div>
+                    <div class="resource-info-label">Ежедневно:</div>
+                    <div class="resource-info-value">${resource.daily_cost ? resource.daily_cost.toFixed(2) + ' ₽/день' : 'Не указана'}</div>
                 </div>
             </div>
             
@@ -1622,7 +1635,7 @@ async function showResourceInfo(resourceId) {
  * Close resource info modal
  */
 function closeResourceInfoModal() {
-    document.getElementById('resourceInfoModal').style.display = 'none';
+    document.getElementById('resourceInfoModal').classList.remove('active');
 }
 
 /**
@@ -1678,7 +1691,7 @@ async function showResourceNotes(resourceId) {
     }
     
     // Show modal
-    modal.style.display = 'flex';
+    modal.classList.add('active');
     textarea.focus();
 }
 
@@ -1686,7 +1699,7 @@ async function showResourceNotes(resourceId) {
  * Close resource notes modal
  */
 function closeResourceNotesModal() {
-    document.getElementById('resourceNotesModal').style.display = 'none';
+    document.getElementById('resourceNotesModal').classList.remove('active');
 }
 
 /**
@@ -1711,7 +1724,7 @@ async function saveResourceNotes() {
             return;
         }
         
-        const response = await fetch(`/api/business-context/resources/${boardResource.id}/notes`, {
+        const response = await fetch(`/api/business-context/board-resources/${boardResource.id}/notes`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notes: notes })
@@ -1727,7 +1740,7 @@ async function saveResourceNotes() {
             closeResourceNotesModal();
             
             // Reload resources to update "has notes" indicator
-            await loadAvailableResources();
+            await loadResources();
         } else {
             showFlashMessage('error', data.error || 'Ошибка сохранения заметок');
         }
@@ -1908,7 +1921,7 @@ async function createGroupOnCanvas() {
     });
     
     // Create cost badge text
-    const costBadge = new fabric.Text('0 ₽/день', {
+    const costBadge = new fabric.Text('0 ₽/мес', {
         left: centerX + 100,
         top: centerY - 90,
         fontSize: 14,
@@ -2111,7 +2124,8 @@ function loadGroupsOnCanvas(groups) {
         });
         
         // Create cost badge text
-        const costText = group.calculated_cost > 0 ? `${group.calculated_cost.toFixed(2)} ₽/день` : '0 ₽/день';
+        const monthlyCost = (group.calculated_cost || 0) * 30;
+        const costText = monthlyCost > 0 ? `${monthlyCost.toFixed(2)} ₽/мес` : '0 ₽/мес';
         const costBadge = new fabric.Text(costText, {
             left: group.position.x + group.size.width - 80,
             top: group.position.y + 10,
@@ -2191,9 +2205,9 @@ function loadResourcesOnCanvas(boardResources) {
             // Convert API data format to match expected format
             const formattedResource = {
                 id: resourceData.id,
-                name: resourceData.resource_name || 'Unknown',
-                type: resourceData.resource_type || 'Resource',
-                ip: resourceData.external_ip || resourceData.region || null
+                name: resourceData.name || 'Unknown',
+                type: resourceData.type || 'Resource',
+                ip: resourceData.ip || null
             };
             
             // Create resource object on canvas
