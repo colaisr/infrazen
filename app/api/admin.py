@@ -1143,15 +1143,27 @@ def reseed_demo_user():
         from app.core.models.complete_sync import CompleteSync
         complete_sync_count = CompleteSync.query.filter_by(user_id=demo_user.id).count()
         
+        # Get business context counts
+        from app.core.models.business_board import BusinessBoard
+        from app.core.models.board_group import BoardGroup
+        from app.core.models.board_resource import BoardResource
+        
+        boards_count = BusinessBoard.query.filter_by(user_id=demo_user.id).count()
+        groups_count = BoardGroup.query.join(BusinessBoard).filter(BusinessBoard.user_id == demo_user.id).count()
+        board_resources_count = BoardResource.query.join(BusinessBoard).filter(BusinessBoard.user_id == demo_user.id).count()
+        
         return jsonify({
             'success': True,
-            'message': 'Demo user successfully reseeded with 3-month historical data and usage analytics',
+            'message': 'Demo user successfully reseeded with 3-month historical data, usage analytics, and business context boards',
             'demo_user': {
                 'id': demo_user.id,
                 'email': demo_user.email,
                 'providers': provider_count,
                 'resources': resource_count,
-                'complete_syncs': complete_sync_count
+                'complete_syncs': complete_sync_count,
+                'boards': boards_count,
+                'groups': groups_count,
+                'board_resources': board_resources_count
             }
         })
         

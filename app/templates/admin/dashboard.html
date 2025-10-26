@@ -161,7 +161,16 @@ function reseedDemoUser() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('✅ Demo user successfully reseeded!\n\nEmail: ' + data.demo_user.email + '\nProviders: ' + data.demo_user.providers + '\nResources: ' + data.demo_user.resources);
+            const alertMsg = '✅ Demo user successfully reseeded!\n\n' +
+                'Email: ' + data.demo_user.email + '\n\n' +
+                'Infrastructure:\n' +
+                '  • Providers: ' + data.demo_user.providers + '\n' +
+                '  • Resources: ' + data.demo_user.resources + '\n\n' +
+                'Business Context:\n' +
+                '  • Boards: ' + (data.demo_user.boards || 0) + '\n' +
+                '  • Groups: ' + (data.demo_user.groups || 0) + '\n' +
+                '  • Placed Resources: ' + (data.demo_user.board_resources || 0);
+            alert(alertMsg);
             loadAdminStats(); // Reload stats
         } else {
             alert('❌ Error: ' + data.error);
