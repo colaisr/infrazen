@@ -2588,10 +2588,6 @@ async function updateGroupInDatabase(groupRect) {
 async function deleteGroup(groupRect) {
     if (!groupRect.dbId) return;
     
-    if (!confirm('Удалить группу?')) {
-        return;
-    }
-    
     try {
         const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
             method: 'DELETE'
@@ -2623,10 +2619,6 @@ async function deleteGroup(groupRect) {
  */
 async function deleteResourceFromBoard(resourceCard) {
     if (!resourceCard.boardResourceId) return;
-    
-    if (!confirm('Удалить ресурс с доски?')) {
-        return;
-    }
     
     try {
         const response = await fetch(`/api/business-context/board-resources/${resourceCard.boardResourceId}`, {
