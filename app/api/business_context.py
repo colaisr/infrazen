@@ -238,6 +238,8 @@ def get_available_resources():
             'provider_id': r.provider_id,
             'daily_cost': float(r.daily_cost) if r.daily_cost else 0.0,
             'currency': r.currency,
+            'notes': r.notes,
+            'has_notes': bool(r.notes),
             'is_placed': r.id in placed_resource_ids
         }
         resources_data.append(resource_dict)
@@ -474,6 +476,44 @@ def update_resource_notes(board_resource_id):
         'success': True,
         'notes': board_resource.notes,
         'has_notes': bool(board_resource.notes)
+    })
+
+
+@business_context_bp.route('/resources/<int:resource_id>/notes', methods=['PUT'])
+@validate_session
+def update_resource_system_notes(resource_id):
+    """Update system-wide resource notes (not board-specific)"""
+    # Check if demo user
+    demo_check = check_demo_user_write_access()
+    if demo_check:
+        return demo_check
+    
+    user_id = session.get('user', {}).get('db_id')
+    
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+    
+    # Get resource and verify ownership (user must own the provider)
+    resource = Resource.query.join(
+        CloudProvider, Resource.provider_id == CloudProvider.id
+    ).filter(
+        Resource.id == resource_id,
+        CloudProvider.user_id == user_id
+    ).first()
+    
+    if not resource:
+        return jsonify({'success': False, 'error': 'Resource not found'}), 404
+    
+    data = request.get_json()
+    notes = data.get('notes', '')
+    
+    resource.notes = notes if notes else None
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'notes': resource.notes,
+        'has_notes': bool(resource.notes)
     })
 
 

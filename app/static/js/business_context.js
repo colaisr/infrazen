@@ -1676,19 +1676,8 @@ async function showResourceNotes(resourceId) {
         </div>
     `;
     
-    // Load existing notes if resource is placed
-    textarea.value = '';
-    if (currentBoard && resource.is_placed) {
-        try {
-            // Find board_resource to get notes
-            const boardResource = currentBoard.resources.find(br => br.resource.id === resourceId);
-            if (boardResource && boardResource.notes) {
-                textarea.value = boardResource.notes;
-            }
-        } catch (error) {
-            console.error('Error loading notes:', error);
-        }
-    }
+    // Load existing notes from resource
+    textarea.value = resource.notes || '';
     
     // Show modal
     modal.classList.add('active');
@@ -1703,28 +1692,15 @@ function closeResourceNotesModal() {
 }
 
 /**
- * Save resource notes
+ * Save resource notes (system-wide, not board-specific)
  */
 async function saveResourceNotes() {
     const textarea = document.getElementById('resourceNotesText');
     const resourceId = parseInt(textarea.dataset.resourceId);
     const notes = textarea.value;
     
-    if (!currentBoard) {
-        showFlashMessage('error', 'Откройте доску');
-        return;
-    }
-    
     try {
-        // Find board_resource_id
-        const boardResource = currentBoard.resources.find(br => br.resource.id === resourceId);
-        
-        if (!boardResource) {
-            showFlashMessage('error', 'Ресурс не размещен на доске');
-            return;
-        }
-        
-        const response = await fetch(`/api/business-context/board-resources/${boardResource.id}/notes`, {
+        const response = await fetch(`/api/business-context/resources/${resourceId}/notes`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notes: notes })
@@ -1733,9 +1709,6 @@ async function saveResourceNotes() {
         const data = await response.json();
         
         if (data.success) {
-            // Update local data
-            boardResource.notes = notes;
-            
             // Close modal
             closeResourceNotesModal();
             
