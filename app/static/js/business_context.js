@@ -854,7 +854,14 @@ function setupCanvasEvents() {
     });
     
     // Object modified - trigger autosave
-    fabricCanvas.on('object:modified', function() {
+    fabricCanvas.on('object:modified', function(e) {
+        const obj = e.target;
+        
+        // If it's a group, update the database
+        if (obj && obj.objectType === 'group') {
+            updateGroupInDatabase(obj);
+        }
+        
         scheduleAutoSave();
     });
     
@@ -1634,6 +1641,34 @@ function changeGroupColor(groupRect) {
         // Update in database
         updateGroupInDatabase(groupRect);
         scheduleAutoSave();
+    }
+}
+
+/**
+ * Update group in database when modified
+ */
+async function updateGroupInDatabase(groupRect) {
+    if (!currentBoard || !groupRect.dbId) return;
+    
+    try {
+        const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                position_x: groupRect.left,
+                position_y: groupRect.top,
+                width: groupRect.width,
+                height: groupRect.height,
+                color: groupRect.groupColor || '#3B82F6'
+            })
+        });
+        
+        const data = await response.json();
+        if (!data.success) {
+            console.error('Failed to update group in database:', data.error);
+        }
+    } catch (error) {
+        console.error('Error updating group in database:', error);
     }
 }
 
