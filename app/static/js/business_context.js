@@ -111,6 +111,21 @@ function setupEventListeners() {
             filterResources();
         });
     }
+    
+    // Setup group tool drag
+    setupGroupTool();
+}
+
+/**
+ * Setup group tool drag functionality
+ */
+function setupGroupTool() {
+    const groupTool = document.querySelector('[data-tool="group"]');
+    if (!groupTool) return;
+    
+    groupTool.addEventListener('click', function() {
+        createGroupOnCanvas();
+    });
 }
 
 /**
@@ -362,7 +377,12 @@ function initializeCanvas() {
         height: initialHeight
     });
     
-    // Load canvas state if exists
+    // Load existing groups from board data
+    if (currentBoard.groups && currentBoard.groups.length > 0) {
+        loadGroupsOnCanvas(currentBoard.groups);
+    }
+    
+    // Load canvas state if exists (for free objects)
     if (currentBoard.canvas_state) {
         fabricCanvas.loadFromJSON(currentBoard.canvas_state, function() {
             fabricCanvas.renderAll();
@@ -807,6 +827,403 @@ async function saveBoard(isAutoSave = false) {
 }
 
 /**
+ * Create a new group on canvas
+ */
+async function createGroupOnCanvas() {
+    if (!fabricCanvas || !currentBoard) return;
+    
+    // Generate unique fabric_id
+    const fabricId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    // Get canvas center position
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    
+    // Create group rectangle
+    const groupRect = new fabric.Rect({
+        left: centerX - 150,
+        top: centerY - 100,
+        width: 300,
+        height: 200,
+        fill: 'rgba(59, 130, 246, 0.05)',
+        stroke: '#3B82F6',
+        strokeWidth: 2,
+        rx: 4,
+        ry: 4,
+        selectable: true,
+        hasControls: true,
+        hasBorders: true,
+        objectType: 'group',
+        fabricId: fabricId,
+        groupName: 'Новая группа',
+        groupColor: '#3B82F6',
+        calculatedCost: 0
+    });
+    
+    // Create group name text
+    const groupText = new fabric.Text('Новая группа', {
+        left: centerX - 140,
+        top: centerY - 90,
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: '#1F2937',
+        selectable: false,
+        evented: false,
+        objectType: 'groupText',
+        parentFabricId: fabricId
+    });
+    
+    // Create cost badge text
+    const costBadge = new fabric.Text('0 ₽/день', {
+        left: centerX + 100,
+        top: centerY - 90,
+        fontSize: 14,
+        fontWeight: '600',
+        fill: '#10B981',
+        selectable: false,
+        evented: false,
+        objectType: 'groupCost',
+        parentFabricId: fabricId
+    });
+    
+    // Add objects to canvas
+    fabricCanvas.add(groupRect);
+    fabricCanvas.add(groupText);
+    fabricCanvas.add(costBadge);
+    
+    // Make text and badge move with the group
+    groupRect.on('moving', function() {
+        updateGroupChildren(groupRect, groupText, costBadge);
+    });
+    
+    groupRect.on('scaling', function() {
+        const newWidth = groupRect.width * groupRect.scaleX;
+        const newHeight = groupRect.height * groupRect.scaleY;
+        
+        groupRect.set({
+            width: newWidth,
+            height: newHeight,
+            scaleX: 1,
+            scaleY: 1
+        });
+        
+        updateGroupChildren(groupRect, groupText, costBadge);
+    });
+    
+    groupRect.on('modified', function() {
+        updateGroupInDatabase(groupRect);
+    });
+    
+    // Double-click to edit name
+    groupRect.on('mousedblclick', function() {
+        editGroupName(groupRect, groupText);
+    });
+    
+    fabricCanvas.renderAll();
+    
+    // Save group to database
+    await saveGroupToDatabase(groupRect);
+    
+    scheduleAutoSave();
+}
+
+/**
+ * Load groups from board data and render on canvas
+ */
+function loadGroupsOnCanvas(groups) {
+    if (!fabricCanvas || !groups) return;
+    
+    groups.forEach(group => {
+        // Create group rectangle
+        const groupRect = new fabric.Rect({
+            left: group.position.x,
+            top: group.position.y,
+            width: group.size.width,
+            height: group.size.height,
+            fill: hexToRgba(group.color, 0.05),
+            stroke: group.color,
+            strokeWidth: 2,
+            rx: 4,
+            ry: 4,
+            selectable: true,
+            hasControls: true,
+            hasBorders: true,
+            objectType: 'group',
+            fabricId: group.fabric_id,
+            groupName: group.name,
+            groupColor: group.color,
+            calculatedCost: group.calculated_cost || 0,
+            dbId: group.id
+        });
+        
+        // Create group name text
+        const groupText = new fabric.Text(group.name, {
+            left: group.position.x + 10,
+            top: group.position.y + 10,
+            fontSize: 16,
+            fontWeight: 'bold',
+            fill: '#1F2937',
+            selectable: false,
+            evented: false,
+            objectType: 'groupText',
+            parentFabricId: group.fabric_id
+        });
+        
+        // Create cost badge text
+        const costText = group.calculated_cost > 0 ? `${group.calculated_cost.toFixed(2)} ₽/день` : '0 ₽/день';
+        const costBadge = new fabric.Text(costText, {
+            left: group.position.x + group.size.width - 80,
+            top: group.position.y + 10,
+            fontSize: 14,
+            fontWeight: '600',
+            fill: '#10B981',
+            selectable: false,
+            evented: false,
+            objectType: 'groupCost',
+            parentFabricId: group.fabric_id
+        });
+        
+        // Add to canvas
+        fabricCanvas.add(groupRect);
+        fabricCanvas.add(groupText);
+        fabricCanvas.add(costBadge);
+        
+        // Setup event handlers
+        groupRect.on('moving', function() {
+            updateGroupChildren(groupRect, groupText, costBadge);
+        });
+        
+        groupRect.on('scaling', function() {
+            const newWidth = groupRect.width * groupRect.scaleX;
+            const newHeight = groupRect.height * groupRect.scaleY;
+            
+            groupRect.set({
+                width: newWidth,
+                height: newHeight,
+                scaleX: 1,
+                scaleY: 1
+            });
+            
+            updateGroupChildren(groupRect, groupText, costBadge);
+        });
+        
+        groupRect.on('modified', function() {
+            updateGroupInDatabase(groupRect);
+        });
+        
+        groupRect.on('mousedblclick', function() {
+            editGroupName(groupRect, groupText);
+        });
+    });
+    
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Update group children (text and cost badge) position
+ */
+function updateGroupChildren(groupRect, groupText, costBadge) {
+    groupText.set({
+        left: groupRect.left + 10,
+        top: groupRect.top + 10
+    });
+    costBadge.set({
+        left: groupRect.left + groupRect.width - 80,
+        top: groupRect.top + 10
+    });
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Edit group name
+ */
+function editGroupName(groupRect, groupText) {
+    const currentName = groupRect.groupName || 'Новая группа';
+    const newName = prompt('Введите название группы:', currentName);
+    
+    if (newName && newName.trim()) {
+        groupRect.groupName = newName.trim();
+        groupText.set('text', newName.trim());
+        fabricCanvas.renderAll();
+        
+        // Update in database
+        updateGroupInDatabase(groupRect);
+        scheduleAutoSave();
+    }
+}
+
+/**
+ * Save group to database
+ */
+async function saveGroupToDatabase(groupRect) {
+    if (!currentBoard) return;
+    
+    try {
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/groups`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: groupRect.groupName,
+                fabric_id: groupRect.fabricId,
+                position_x: groupRect.left,
+                position_y: groupRect.top,
+                width: groupRect.width,
+                height: groupRect.height,
+                color: groupRect.groupColor || '#3B82F6'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            groupRect.dbId = data.group.id;
+        } else {
+            showFlashMessage('error', data.error || 'Failed to save group');
+        }
+    } catch (error) {
+        console.error('Error saving group:', error);
+        showFlashMessage('error', 'Failed to save group');
+    }
+}
+
+/**
+ * Update group in database
+ */
+async function updateGroupInDatabase(groupRect) {
+    if (!currentBoard || !groupRect.dbId) return;
+    
+    try {
+        const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: groupRect.groupName,
+                position_x: groupRect.left,
+                position_y: groupRect.top,
+                width: groupRect.width,
+                height: groupRect.height,
+                color: groupRect.groupColor || '#3B82F6'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            console.error('Failed to update group:', data.error);
+        }
+    } catch (error) {
+        console.error('Error updating group:', error);
+    }
+}
+
+/**
+ * Delete group
+ */
+async function deleteGroup(groupRect) {
+    if (!groupRect.dbId) return;
+    
+    if (!confirm('Удалить группу?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Remove from canvas
+            const objects = fabricCanvas.getObjects();
+            objects.forEach(obj => {
+                if (obj.fabricId === groupRect.fabricId || obj.parentFabricId === groupRect.fabricId) {
+                    fabricCanvas.remove(obj);
+                }
+            });
+            fabricCanvas.renderAll();
+            scheduleAutoSave();
+        } else {
+            showFlashMessage('error', data.error || 'Failed to delete group');
+        }
+    } catch (error) {
+        console.error('Error deleting group:', error);
+        showFlashMessage('error', 'Failed to delete group');
+    }
+}
+
+/**
+ * Check if a resource is inside a group (containment detection)
+ * This will be used when implementing resource placement in Phase 5
+ */
+function getContainingGroup(resourceX, resourceY) {
+    if (!fabricCanvas) return null;
+    
+    const groups = fabricCanvas.getObjects().filter(obj => obj.objectType === 'group');
+    
+    for (let group of groups) {
+        const left = group.left;
+        const top = group.top;
+        const right = left + group.width;
+        const bottom = top + group.height;
+        
+        if (resourceX >= left && resourceX <= right && resourceY >= top && resourceY <= bottom) {
+            return group;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Recalculate and update group cost
+ * Will be fully implemented in Phase 5 when resources can be placed
+ */
+async function recalculateGroupCost(groupId) {
+    if (!groupId) return;
+    
+    try {
+        const response = await fetch(`/api/business-context/groups/${groupId}/cost`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Find the group on canvas and update its cost badge
+            const groups = fabricCanvas.getObjects().filter(obj => obj.objectType === 'group' && obj.dbId === groupId);
+            if (groups.length > 0) {
+                const groupRect = groups[0];
+                groupRect.calculatedCost = data.calculated_cost;
+                
+                // Find and update cost badge
+                const costBadge = fabricCanvas.getObjects().find(obj => 
+                    obj.objectType === 'groupCost' && obj.parentFabricId === groupRect.fabricId
+                );
+                
+                if (costBadge) {
+                    const costText = data.calculated_cost > 0 ? 
+                        `${data.calculated_cost.toFixed(2)} ₽/день` : '0 ₽/день';
+                    costBadge.set('text', costText);
+                    fabricCanvas.renderAll();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error recalculating group cost:', error);
+    }
+}
+
+/**
+ * Utility: Convert hex color to rgba
+ */
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
  * Utility: Escape HTML
  */
 function escapeHtml(text) {
@@ -819,6 +1236,28 @@ function escapeHtml(text) {
     };
     return text.replace(/[&<>"']/g, m => map[m]);
 }
+
+/**
+ * Setup keyboard shortcuts
+ */
+document.addEventListener('keydown', function(e) {
+    if (!fabricCanvas) return;
+    
+    // Delete key - delete selected object
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeObject = fabricCanvas.getActiveObject();
+        if (activeObject && activeObject.objectType === 'group') {
+            e.preventDefault();
+            deleteGroup(activeObject);
+        }
+    }
+    
+    // Ctrl/Cmd + S - Save
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveBoard(false);
+    }
+});
 
 /**
  * Show flash message
