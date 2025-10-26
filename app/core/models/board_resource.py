@@ -57,7 +57,9 @@ class BoardResource(BaseModel):
                 'status': self.resource.status,
                 'provider_id': self.resource.provider_id,
                 'daily_cost': float(self.resource.daily_cost) if self.resource.daily_cost else 0.0,
-                'currency': self.resource.currency
+                'currency': self.resource.currency,
+                'notes': self.resource.notes,
+                'has_notes': bool(self.resource.notes)
             }
             
         return data

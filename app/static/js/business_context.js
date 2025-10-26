@@ -685,7 +685,11 @@ function initializeCanvas() {
                         obj.objectType === 'groupText' || 
                         obj.objectType === 'groupCost' ||
                         obj.objectType === 'resource' ||
-                        obj.objectType === 'resourceText') {
+                        obj.objectType === 'resourceText' ||
+                        obj.objectType === 'resourceInfoIcon' ||
+                        obj.objectType === 'resourceInfoIconText' ||
+                        obj.objectType === 'resourceNotesIcon' ||
+                        obj.objectType === 'resourceNotesIconText') {
                         objectsToRemove.push(obj);
                     }
                 });
@@ -1357,10 +1361,126 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         })(fabric.Text.prototype.toObject)
     });
     
+    // Info icon circle (top-right)
+    const infoIconCircle = new fabric.Circle({
+        left: x + 60 - 12,
+        top: y - 40 + 4,
+        radius: 8,
+        fill: '#FFFFFF',
+        stroke: '#3B82F6',
+        strokeWidth: 1,
+        selectable: false,
+        evented: true,
+        objectType: 'resourceInfoIcon',
+        parentResourceId: boardResourceId,
+        resourceId: resourceData.id,
+        hoverCursor: 'pointer',
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId,
+                    resourceId: this.resourceId
+                });
+            };
+        })(fabric.Circle.prototype.toObject)
+    });
+    
+    const infoIconText = new fabric.Text('i', {
+        left: x + 60 - 12,
+        top: y - 40 + 4,
+        fontSize: 10,
+        fontWeight: 'bold',
+        fill: '#3B82F6',
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceInfoIconText',
+        parentResourceId: boardResourceId,
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
+    });
+    
+    // Notes icon circle (top-right, below info icon)
+    const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
+    const notesIconCircle = new fabric.Circle({
+        left: x + 60 - 12,
+        top: y - 40 + 24,
+        radius: 8,
+        fill: hasNotes ? '#10B981' : '#FFFFFF',
+        stroke: '#10B981',
+        strokeWidth: 1,
+        selectable: false,
+        evented: true,
+        objectType: 'resourceNotesIcon',
+        parentResourceId: boardResourceId,
+        resourceId: resourceData.id,
+        hasNotes: hasNotes,
+        hoverCursor: 'pointer',
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId,
+                    resourceId: this.resourceId,
+                    hasNotes: this.hasNotes
+                });
+            };
+        })(fabric.Circle.prototype.toObject)
+    });
+    
+    const notesIconText = new fabric.Text('n', {
+        left: x + 60 - 12,
+        top: y - 40 + 24,
+        fontSize: 10,
+        fontWeight: 'bold',
+        fill: hasNotes ? '#FFFFFF' : '#10B981',
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceNotesIconText',
+        parentResourceId: boardResourceId,
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
+    });
+    
+    // Add click handlers to icons
+    infoIconCircle.on('mousedown', function(e) {
+        e.e.stopPropagation();
+        showResourceInfo(this.resourceId);
+    });
+    
+    notesIconCircle.on('mousedown', function(e) {
+        e.e.stopPropagation();
+        showResourceNotes(this.resourceId);
+    });
+    
     // Add to canvas
     fabricCanvas.add(resourceCard);
     fabricCanvas.add(nameText);
     fabricCanvas.add(metaText);
+    fabricCanvas.add(infoIconCircle);
+    fabricCanvas.add(infoIconText);
+    fabricCanvas.add(notesIconCircle);
+    fabricCanvas.add(notesIconText);
     fabricCanvas.renderAll();
     
     // Setup event handlers for the card
@@ -1374,6 +1494,23 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
             left: this.left + this.width / 2,
             top: this.top + 40
         });
+        // Move icons with card
+        infoIconCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + 4
+        });
+        infoIconText.set({
+            left: this.left + this.width - 12,
+            top: this.top + 4
+        });
+        notesIconCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + 24
+        });
+        notesIconText.set({
+            left: this.left + this.width - 12,
+            top: this.top + 24
+        });
         fabricCanvas.renderAll();
     });
     
@@ -1386,6 +1523,23 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId) {
         metaText.set({
             left: this.left + this.width / 2,
             top: this.top + 40
+        });
+        // Update icon positions
+        infoIconCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + 4
+        });
+        infoIconText.set({
+            left: this.left + this.width - 12,
+            top: this.top + 4
+        });
+        notesIconCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + 24
+        });
+        notesIconText.set({
+            left: this.left + this.width - 12,
+            top: this.top + 24
         });
         fabricCanvas.renderAll();
         
@@ -1730,10 +1884,31 @@ async function saveResourceNotes() {
             // Close modal
             closeResourceNotesModal();
             
-            // Reload resources to update "has notes" indicator
+            // Reload resources to update "has notes" indicator in toolbox
             await loadResources();
             
-            console.log('Resources reloaded');
+            // Update notes icon on canvas if resource is placed
+            const hasNotes = data.has_notes;
+            const objects = fabricCanvas.getObjects();
+            const notesIcon = objects.find(obj => 
+                obj.objectType === 'resourceNotesIcon' && obj.resourceId === resourceId
+            );
+            const notesIconText = objects.find(obj => 
+                obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === notesIcon?.parentResourceId
+            );
+            
+            if (notesIcon && notesIconText) {
+                notesIcon.set({
+                    fill: hasNotes ? '#10B981' : '#FFFFFF',
+                    hasNotes: hasNotes
+                });
+                notesIconText.set({
+                    fill: hasNotes ? '#FFFFFF' : '#10B981'
+                });
+                fabricCanvas.renderAll();
+            }
+            
+            console.log('Resources reloaded and canvas updated');
         } else {
             showFlashMessage('error', data.error || 'Ошибка сохранения заметок');
         }
@@ -2200,7 +2375,9 @@ function loadResourcesOnCanvas(boardResources) {
                 id: resourceData.id,
                 name: resourceData.name || 'Unknown',
                 type: resourceData.type || 'Resource',
-                ip: resourceData.ip || null
+                ip: resourceData.ip || null,
+                notes: resourceData.notes || null,
+                has_notes: resourceData.has_notes || false
             };
             
             // Create resource object on canvas
