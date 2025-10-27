@@ -574,10 +574,13 @@ function saveToUndoStack() {
     const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
     
     // Filter out grid lines - they should never be saved
-    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    const filteredObjects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
     
     const state = {
-        objects: canvasJSON,
+        objects: {
+            ...canvasJSON,
+            objects: filteredObjects
+        },
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -609,10 +612,13 @@ function undo() {
     
     // Save current state to redo stack (excluding grid lines)
     const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
-    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    const filteredObjects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
     
     const currentState = {
-        objects: canvasJSON,
+        objects: {
+            ...canvasJSON,
+            objects: filteredObjects
+        },
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -637,10 +643,13 @@ function redo() {
     
     // Save current state to undo stack (excluding grid lines)
     const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
-    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    const filteredObjects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
     
     const currentState = {
-        objects: canvasJSON,
+        objects: {
+            ...canvasJSON,
+            objects: filteredObjects
+        },
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -731,6 +740,9 @@ function restoreCanvasState(state) {
         
         // Re-enable saving after restoration is complete
         isRestoring = false;
+        
+        // Redraw grid if it was visible
+        updateGrid();
         
         // Trigger autosave
         scheduleAutoSave();
