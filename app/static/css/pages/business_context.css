@@ -289,6 +289,15 @@
     color: #1F2937;
 }
 
+#gridToggleBtn.active {
+    background-color: #3B82F6;
+    color: white;
+}
+
+#gridToggleBtn.active:hover {
+    background-color: #2563EB;
+}
+
 /* Canvas Main Area */
 .canvas-main {
     position: relative;

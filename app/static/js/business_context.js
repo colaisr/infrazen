@@ -18,6 +18,10 @@ let redoStack = [];
 let maxUndoSteps = 50;
 let isRestoring = false; // Flag to prevent saving during restoration
 
+// Grid state
+let gridVisible = false;
+let gridSize = 50; // Grid cell size in pixels
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     initializeBusinessContext();
@@ -82,6 +86,9 @@ function setupEventListeners() {
     document.getElementById('zoomInBtn')?.addEventListener('click', zoomIn);
     document.getElementById('zoomOutBtn')?.addEventListener('click', zoomOut);
     document.getElementById('zoomResetBtn')?.addEventListener('click', zoomReset);
+    
+    // Grid toggle
+    document.getElementById('gridToggleBtn')?.addEventListener('click', toggleGrid);
     
     // Undo/Redo controls
     document.getElementById('undoBtn')?.addEventListener('click', undo);
@@ -1408,6 +1415,7 @@ function setupCanvasEvents() {
             
             fabricCanvas.zoomToPoint({ x: evt.offsetX, y: evt.offsetY }, zoom);
             updateZoomDisplay();
+            updateGrid();
             scheduleAutoSave();
         } else {
             // 2-FINGER SCROLL TO PAN (macOS touchpad) or mouse wheel
@@ -1419,6 +1427,7 @@ function setupCanvasEvents() {
             vpt[4] -= deltaX;
             vpt[5] -= deltaY;
             fabricCanvas.requestRenderAll();
+            updateGrid();
             scheduleAutoSave();
         }
         
@@ -1480,6 +1489,7 @@ function setupCanvasEvents() {
             lastPosX = evt.clientX;
             lastPosY = evt.clientY;
             
+            updateGrid();
             scheduleAutoSave();
         }
     });
@@ -1489,6 +1499,7 @@ function setupCanvasEvents() {
             isPanning = false;
             fabricCanvas.selection = true;
             fabricCanvas.defaultCursor = spacePressed ? 'grab' : 'default';
+            updateGrid();
         }
     });
     
@@ -1680,6 +1691,7 @@ function zoomIn() {
     zoom = Math.min(zoom * 1.1, 5);
     fabricCanvas.setZoom(zoom);
     updateZoomDisplay();
+    updateGrid();
     scheduleAutoSave();
 }
 
@@ -1689,6 +1701,7 @@ function zoomOut() {
     zoom = Math.max(zoom * 0.9, 0.1);
     fabricCanvas.setZoom(zoom);
     updateZoomDisplay();
+    updateGrid();
     scheduleAutoSave();
 }
 
@@ -1697,6 +1710,7 @@ function zoomReset() {
     fabricCanvas.setZoom(1);
     fabricCanvas.absolutePan({ x: 0, y: 0 });
     updateZoomDisplay();
+    updateGrid();
     scheduleAutoSave();
 }
 
@@ -1704,6 +1718,103 @@ function updateZoomDisplay() {
     if (!fabricCanvas) return;
     const zoom = Math.round(fabricCanvas.getZoom() * 100);
     document.getElementById('zoomLevel').textContent = zoom + '%';
+}
+
+/**
+ * Toggle grid visibility
+ */
+function toggleGrid() {
+    gridVisible = !gridVisible;
+    
+    const gridBtn = document.getElementById('gridToggleBtn');
+    if (gridVisible) {
+        gridBtn.classList.add('active');
+        drawGrid();
+    } else {
+        gridBtn.classList.remove('active');
+        clearGrid();
+    }
+}
+
+/**
+ * Draw grid on canvas
+ */
+function drawGrid() {
+    if (!fabricCanvas || !gridVisible) return;
+    
+    // Remove existing grid lines
+    clearGrid();
+    
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    const width = fabricCanvas.width / zoom;
+    const height = fabricCanvas.height / zoom;
+    
+    // Calculate grid offset based on viewport
+    const offsetX = -vpt[4] / zoom;
+    const offsetY = -vpt[5] / zoom;
+    
+    // Adjust grid start to align with grid size
+    const startX = Math.floor(offsetX / gridSize) * gridSize;
+    const startY = Math.floor(offsetY / gridSize) * gridSize;
+    
+    const endX = offsetX + width;
+    const endY = offsetY + height;
+    
+    const gridLines = [];
+    
+    // Vertical lines
+    for (let x = startX; x <= endX; x += gridSize) {
+        const line = new fabric.Line([x, offsetY, x, offsetY + height], {
+            stroke: '#E5E7EB',
+            strokeWidth: 1 / zoom,
+            selectable: false,
+            evented: false,
+            objectType: 'gridLine'
+        });
+        gridLines.push(line);
+        fabricCanvas.add(line);
+    }
+    
+    // Horizontal lines
+    for (let y = startY; y <= endY; y += gridSize) {
+        const line = new fabric.Line([offsetX, y, offsetX + width, y], {
+            stroke: '#E5E7EB',
+            strokeWidth: 1 / zoom,
+            selectable: false,
+            evented: false,
+            objectType: 'gridLine'
+        });
+        gridLines.push(line);
+        fabricCanvas.add(line);
+    }
+    
+    // Send grid lines to back
+    gridLines.forEach(line => fabricCanvas.sendToBack(line));
+    
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Clear grid from canvas
+ */
+function clearGrid() {
+    if (!fabricCanvas) return;
+    
+    const objects = fabricCanvas.getObjects();
+    const gridLines = objects.filter(obj => obj.objectType === 'gridLine');
+    
+    gridLines.forEach(line => fabricCanvas.remove(line));
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Update grid on zoom or pan
+ */
+function updateGrid() {
+    if (gridVisible) {
+        drawGrid();
+    }
 }
 
 /**
