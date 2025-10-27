@@ -157,8 +157,23 @@ function setupGroupTool() {
     const groupTool = document.querySelector('[data-tool="group"]');
     if (!groupTool) return;
     
-    groupTool.addEventListener('click', function() {
-        createGroupOnCanvas();
+    // Click to create at default position (deprecated, but keep for compatibility)
+    groupTool.addEventListener('click', function(e) {
+        // Only trigger on direct click, not when starting drag
+        if (!e.defaultPrevented) {
+            createGroupOnCanvas();
+        }
+    });
+    
+    // Drag to create at specific position
+    groupTool.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('tool', 'group');
+        e.dataTransfer.effectAllowed = 'copy';
+        this.classList.add('dragging');
+    });
+    
+    groupTool.addEventListener('dragend', function() {
+        this.classList.remove('dragging');
     });
 }
 
@@ -169,16 +184,40 @@ function setupFreeObjectsTools() {
     // Text tool
     const textTool = document.querySelector('[data-tool="text"]');
     if (textTool) {
-        textTool.addEventListener('click', function() {
-            createTextOnCanvas();
+        textTool.addEventListener('click', function(e) {
+            if (!e.defaultPrevented) {
+                createTextOnCanvas();
+            }
+        });
+        
+        textTool.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('tool', 'text');
+            e.dataTransfer.effectAllowed = 'copy';
+            this.classList.add('dragging');
+        });
+        
+        textTool.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
         });
     }
     
     // Rectangle tool
     const rectangleTool = document.querySelector('[data-tool="rectangle"]');
     if (rectangleTool) {
-        rectangleTool.addEventListener('click', function() {
-            createRectangleOnCanvas();
+        rectangleTool.addEventListener('click', function(e) {
+            if (!e.defaultPrevented) {
+                createRectangleOnCanvas();
+            }
+        });
+        
+        rectangleTool.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('tool', 'rectangle');
+            e.dataTransfer.effectAllowed = 'copy';
+            this.classList.add('dragging');
+        });
+        
+        rectangleTool.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
         });
     }
 }
@@ -1796,18 +1835,31 @@ function setupCanvasDropZone() {
     canvasElement.addEventListener('drop', async function(e) {
         e.preventDefault();
         
-        const resourceId = e.dataTransfer.getData('text/plain');
-        if (!resourceId) return;
-        
-        // Get drop position relative to canvas
-        const rect = canvasElement.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
         // Convert screen coordinates to canvas coordinates
         const pointer = fabricCanvas.getPointer(e);
         
-        await placeResourceOnCanvas(parseInt(resourceId), pointer.x, pointer.y);
+        // Check if it's a resource
+        const resourceId = e.dataTransfer.getData('text/plain');
+        if (resourceId) {
+            await placeResourceOnCanvas(parseInt(resourceId), pointer.x, pointer.y);
+            return;
+        }
+        
+        // Check if it's a tool (group, text, rectangle)
+        const tool = e.dataTransfer.getData('tool');
+        if (tool) {
+            switch(tool) {
+                case 'group':
+                    await createGroupOnCanvas(pointer.x, pointer.y);
+                    break;
+                case 'text':
+                    createTextOnCanvas(pointer.x, pointer.y);
+                    break;
+                case 'rectangle':
+                    createRectangleOnCanvas(pointer.x, pointer.y);
+                    break;
+            }
+        }
     });
 }
 
@@ -2657,22 +2709,29 @@ async function saveBoard(isAutoSave = false) {
 /**
  * Create a new group on canvas
  */
-async function createGroupOnCanvas() {
+async function createGroupOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
     
     // Generate unique fabric_id
     const fabricId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
-    // Get canvas center position
-    const zoom = fabricCanvas.getZoom();
-    const vpt = fabricCanvas.viewportTransform;
-    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
-    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    // If no coordinates provided, use canvas center
+    let posX, posY;
+    if (x !== undefined && y !== undefined) {
+        posX = x;
+        posY = y;
+    } else {
+        // Get canvas center position
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        posX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+        posY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    }
     
     // Create group rectangle
     const groupRect = new fabric.Rect({
-        left: centerX - 150,
-        top: centerY - 100,
+        left: posX - 150,
+        top: posY - 100,
         width: 300,
         height: 200,
         fill: 'rgba(59, 130, 246, 0.05)',
@@ -2705,8 +2764,8 @@ async function createGroupOnCanvas() {
     
     // Create group name text
     const groupText = new fabric.Text('Новая группа', {
-        left: centerX - 140,
-        top: centerY - 90,
+        left: posX - 140,
+        top: posY - 90,
         fontSize: 16,
         fontWeight: 'bold',
         fill: '#1F2937',
@@ -2727,8 +2786,8 @@ async function createGroupOnCanvas() {
     
     // Create cost badge text
     const costBadge = new fabric.Text('0 ₽/мес', {
-        left: centerX + 100,
-        top: centerY - 90,
+        left: posX + 100,
+        top: posY - 90,
         fontSize: 14,
         fontWeight: '600',
         fill: '#10B981',
@@ -2791,19 +2850,26 @@ async function createGroupOnCanvas() {
 /**
  * Create text object on canvas
  */
-function createTextOnCanvas() {
+function createTextOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
     
-    // Get canvas center position
-    const zoom = fabricCanvas.getZoom();
-    const vpt = fabricCanvas.viewportTransform;
-    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
-    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    // If no coordinates provided, use canvas center
+    let posX, posY;
+    if (x !== undefined && y !== undefined) {
+        posX = x;
+        posY = y;
+    } else {
+        // Get canvas center position
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        posX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+        posY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    }
     
     // Create text object
     const text = new fabric.IText('Текст', {
-        left: centerX - 50,
-        top: centerY - 20,
+        left: posX - 50,
+        top: posY - 20,
         fontSize: 24,
         fontFamily: 'Arial, sans-serif',
         fill: '#1F2937',
@@ -2827,19 +2893,26 @@ function createTextOnCanvas() {
 /**
  * Create rectangle object on canvas
  */
-function createRectangleOnCanvas() {
+function createRectangleOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
     
-    // Get canvas center position
-    const zoom = fabricCanvas.getZoom();
-    const vpt = fabricCanvas.viewportTransform;
-    const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
-    const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    // If no coordinates provided, use canvas center
+    let posX, posY;
+    if (x !== undefined && y !== undefined) {
+        posX = x;
+        posY = y;
+    } else {
+        // Get canvas center position
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        posX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+        posY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+    }
     
     // Create rectangle object
     const rect = new fabric.Rect({
-        left: centerX - 100,
-        top: centerY - 60,
+        left: posX - 100,
+        top: posY - 60,
         width: 200,
         height: 120,
         fill: 'rgba(59, 130, 246, 0.2)',
