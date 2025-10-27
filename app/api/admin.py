@@ -1087,13 +1087,10 @@ def test_provider_credentials(provider_type):
         credentials.mark_used()
         db.session.commit()
         
-        # TODO: Implement actual credential testing based on provider type
-        # For now, just return success
-        return jsonify({
-            'success': True,
-            'message': 'Credentials test successful (placeholder)',
-            'tested_at': datetime.utcnow().isoformat()
-        })
+        # Test credentials based on provider type
+        test_result = _test_credentials_by_provider(provider_type, credentials.get_credentials())
+        
+        return jsonify(test_result)
             
     except Exception as e:
         logger.error(f"Error testing provider credentials: {str(e)}")
@@ -1101,6 +1098,153 @@ def test_provider_credentials(provider_type):
             'success': False,
             'error': f'Failed to test credentials: {str(e)}'
         })
+
+@admin_bp.route('/providers/<string:provider_type>/credentials/test-raw', methods=['POST'])
+def test_provider_credentials_raw(provider_type):
+    """Test raw credentials without saving them (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No credentials provided'})
+        
+        # Extract credentials from request
+        if provider_type == 'yandex':
+            service_account_key = data.get('service_account_key')
+            if not service_account_key:
+                return jsonify({'success': False, 'error': 'Service Account JSON is required'})
+            
+            # Parse JSON to validate format
+            try:
+                import json
+                parsed_key = json.loads(service_account_key)
+                credentials = {'service_account_key': parsed_key}
+            except json.JSONDecodeError as e:
+                return jsonify({'success': False, 'error': f'Invalid JSON format: {str(e)}'})
+        
+        elif provider_type == 'selectel':
+            api_key = data.get('api_key')
+            service_username = data.get('service_username')
+            service_password = data.get('service_password')
+            
+            if not all([api_key, service_username, service_password]):
+                return jsonify({'success': False, 'error': 'API Key, Service Username, and Service Password are required'})
+            
+            credentials = {
+                'api_key': api_key,
+                'service_username': service_username,
+                'service_password': service_password
+            }
+        
+        elif provider_type == 'beget':
+            username = data.get('username')
+            password = data.get('password')
+            
+            if not all([username, password]):
+                return jsonify({'success': False, 'error': 'Username and password are required'})
+            
+            credentials = {
+                'username': username,
+                'password': password
+            }
+        
+        else:
+            return jsonify({'success': False, 'error': f'Unsupported provider type: {provider_type}'})
+        
+        # Test credentials based on provider type
+        test_result = _test_credentials_by_provider(provider_type, credentials)
+        
+        return jsonify(test_result)
+            
+    except Exception as e:
+        logger.error(f"Error testing raw credentials: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to test credentials: {str(e)}'
+        })
+
+def _test_credentials_by_provider(provider_type: str, creds: dict) -> dict:
+    """Test credentials by provider type"""
+    try:
+        if provider_type == 'yandex':
+            from app.providers.yandex.client import YandexClient
+            
+            # Test if we can create client and fetch SKUs
+            client = YandexClient(creds)
+            result = client.list_skus(page_size=1)
+            
+            if result and 'skus' in result:
+                return {
+                    'success': True,
+                    'message': 'Успешно! Доступ к Yandex Cloud Billing API подтверждён',
+                    'tested_at': datetime.utcnow().isoformat(),
+                    'details': f'Доступ к SKU каталогу: {len(result.get("skus", []))} SKU получено'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Не удалось получить доступ к SKU каталогу. Проверьте права Service Account.'
+                }
+        
+        elif provider_type == 'selectel':
+            from app.providers.selectel.client import SelectelClient
+            
+            client = SelectelClient(creds)
+            test_result = client.test_connection()
+            
+            if test_result.get('success'):
+                return {
+                    'success': True,
+                    'message': 'Успешно! Подключение к Selectel подтверждено',
+                    'tested_at': datetime.utcnow().isoformat()
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': test_result.get('message', 'Ошибка подключения к Selectel')
+                }
+        
+        elif provider_type == 'beget':
+            from app.providers.beget.client import BegetAPIClient
+            
+            username = creds.get('username')
+            password = creds.get('password')
+            
+            if not username or not password:
+                return {
+                    'success': False,
+                    'error': 'Отсутствуют username или password'
+                }
+            
+            client = BegetAPIClient(username, password)
+            if client.authenticate():
+                return {
+                    'success': True,
+                    'message': 'Успешно! Аутентификация Beget прошла успешно',
+                    'tested_at': datetime.utcnow().isoformat()
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Неверные учетные данные Beget'
+                }
+        
+        else:
+            return {
+                'success': False,
+                'error': f'Тестирование для провайдера {provider_type} еще не реализовано'
+            }
+    
+    except Exception as e:
+        logger.error(f"Error testing {provider_type} credentials: {str(e)}")
+        return {
+            'success': False,
+            'error': f'Ошибка тестирования: {str(e)}'
+        }
 
 @admin_bp.route('/reseed-demo-user', methods=['POST'])
 def reseed_demo_user():

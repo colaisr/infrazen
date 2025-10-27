@@ -507,6 +507,9 @@ const providerCredentialFields = {
         { id: 'credentialApiKey', label: 'API Key *', type: 'text', placeholder: 'geKYksHLzAeQQLakNjyWnmTLJ_478587', required: true },
         { id: 'credentialServiceUsername', label: 'Service Username *', type: 'text', placeholder: 'InfraZen', required: true },
         { id: 'credentialServicePassword', label: 'Service Password *', type: 'password', placeholder: '••••••••', required: true }
+    ],
+    yandex: [
+        { id: 'credentialServiceAccountKey', label: 'Service Account JSON *', type: 'textarea', placeholder: '{\n  "id": "...",\n  "service_account_id": "...",\n  "private_key": "..."\n}', required: true, rows: 10 }
     ]
 };
 
@@ -633,10 +636,8 @@ function testCredentials() {
     
     showCredentialsStatus('Тестирование подключения...', 'info');
     
-    // Test connection using the same logic as user connections
-    const testEndpoint = currentProviderType === 'selectel' ? '/api/providers/selectel/test' : '/api/providers/beget/test';
-    
-    fetch(testEndpoint, {
+    // Use test-raw endpoint to test without saving
+    fetch(`/api/admin/providers/${currentProviderType}/credentials/test-raw`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -646,30 +647,16 @@ function testCredentials() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Show success message with account info
-            let message = '✅ Подключение успешно установлено!';
+            // Show success message with details
+            let message = data.message || '✅ Подключение успешно установлено!';
             
-            if (data.account_info) {
-                const account = data.account_info;
-                const accountName = account.name || account.customer_login || account.username || 'Unknown';
-                const customerId = account.customer_id || account.id || '';
-                
-                if (customerId && customerId !== accountName) {
-                    message = `✅ Подключение успешно! Аккаунт: ${accountName} (ID: ${customerId})`;
-                } else {
-                    message = `✅ Подключение успешно! Аккаунт: ${accountName}`;
-                }
+            if (data.details) {
+                message += '<br><small style="color: #666;">' + data.details + '</small>';
             }
             
             showCredentialsStatus(message, 'success');
         } else {
             let errorMessage = '❌ ' + (data.error || 'Ошибка подключения');
-            
-            // Add helpful information for authentication errors
-            if (data.error && data.error.includes('Authentication failed')) {
-                errorMessage += '<br><br><strong>Возможные причины:</strong><br>• Проверьте правильность имени пользователя и пароля<br>• Убедитесь, что API доступ включен в панели управления Beget<br>• Используйте пароль API, а не пароль от аккаунта';
-            }
-            
             showCredentialsStatus(errorMessage, 'error');
         }
     })
@@ -682,7 +669,7 @@ function testCredentials() {
 
 function showCredentialsStatus(message, type) {
     const statusDiv = document.getElementById('credentialsStatus');
-    statusDiv.innerText = message;
+    statusDiv.innerHTML = message;  // Use innerHTML to support HTML tags
     statusDiv.className = 'credentials-status ' + type;
     statusDiv.style.display = 'block';
 }
@@ -738,6 +725,16 @@ function renderCredentialFields(providerType) {
             containerDiv.appendChild(toggleBtn);
 
             wrapper.appendChild(containerDiv);
+        } else if (field.type === 'textarea') {
+            const textarea = document.createElement('textarea');
+            textarea.id = field.id;
+            textarea.className = 'form-control';
+            textarea.placeholder = field.placeholder || '';
+            textarea.rows = field.rows || 4;
+            textarea.dataset.required = field.required ? 'true' : 'false';
+            textarea.style.fontFamily = 'monospace';
+            textarea.style.fontSize = '12px';
+            wrapper.appendChild(textarea);
         } else {
             const input = document.createElement('input');
             input.type = field.type || 'text';
@@ -754,8 +751,8 @@ function renderCredentialFields(providerType) {
 
 function attachFieldListeners() {
     const container = document.getElementById('credentialsFieldsContainer');
-    container.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', checkTestButtonState);
+    container.querySelectorAll('input, textarea').forEach(element => {
+        element.addEventListener('input', checkTestButtonState);
     });
 }
 
@@ -782,6 +779,8 @@ function fieldIdToKey(fieldId) {
             return 'service_username';
         case 'credentialServicePassword':
             return 'service_password';
+        case 'credentialServiceAccountKey':
+            return 'service_account_key';
         default:
             return fieldId;
     }
@@ -797,6 +796,15 @@ function getCredentialFieldValues(providerType, showError = true) {
         values[key] = input.value.trim();
         if (field.required && !values[key]) {
             return { isValid: false, error: showError ? `Заполните поле "${field.label}"` : null };
+        }
+        
+        // Special validation for Yandex JSON
+        if (providerType === 'yandex' && key === 'service_account_key') {
+            try {
+                JSON.parse(values[key]);
+            } catch (e) {
+                return { isValid: false, error: showError ? 'Невалидный JSON. Проверьте формат Service Account Key' : null };
+            }
         }
     }
     return { isValid: true, values };

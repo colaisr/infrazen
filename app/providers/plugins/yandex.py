@@ -156,12 +156,130 @@ class YandexProviderPlugin(ProviderPlugin):
         return result
 
     def get_pricing_data(self) -> List[Dict[str, Any]]:
-        """Get pricing data for Yandex Cloud resources"""
+        """Get pricing data for Yandex Cloud resources from SKU catalog"""
         try:
-            # TODO: Implement Yandex Cloud pricing fetch when billing API is available
-            self.logger.warning("Yandex Cloud pricing fetch not yet implemented")
-            return []
+            from ..yandex.client import YandexClient
+            
+            self.logger.info("Fetching Yandex Cloud SKU pricing catalog...")
+            
+            # Create client with credentials
+            client = YandexClient(self.credentials)
+            
+            # Fetch all SKUs (paginated)
+            all_skus = []
+            page_token = None
+            page_num = 1
+            
+            while True:
+                self.logger.info(f"Fetching SKU page {page_num}...")
+                result = client.list_skus(page_size=1000, page_token=page_token)
+                
+                if not result or 'skus' not in result:
+                    break
+                
+                skus = result.get('skus', [])
+                if not skus:
+                    break
+                
+                all_skus.extend(skus)
+                self.logger.info(f"Page {page_num}: Fetched {len(skus)} SKUs (total: {len(all_skus)})")
+                
+                page_token = result.get('nextPageToken')
+                if not page_token:
+                    break
+                
+                page_num += 1
+            
+            self.logger.info(f"Fetched {len(all_skus)} total SKUs from Yandex Cloud")
+            
+            # Convert SKUs to pricing format
+            pricing_data = []
+            for sku in all_skus:
+                pricing_versions = sku.get('pricingVersions', [])
+                if not pricing_versions:
+                    continue
+                
+                # Get latest pricing
+                latest_pricing = pricing_versions[0]
+                pricing_expressions = latest_pricing.get('pricingExpressions', [])
+                if not pricing_expressions:
+                    continue
+                
+                rates_data = pricing_expressions[0]
+                rates = rates_data.get('rates', [])
+                if not rates:
+                    continue
+                
+                first_rate = rates[0]
+                unit_price = float(first_rate.get('unitPrice', 0))
+                
+                # Skip zero-price SKUs (they clutter the catalog)
+                if unit_price == 0:
+                    continue
+                
+                # Map to ProviderPrice model fields
+                pricing_data.append({
+                    'provider': 'yandex',
+                    'provider_sku': sku.get('id'),  # SKU ID
+                    'resource_type': self._categorize_sku(sku.get('name', '')),
+                    'hourly_cost': unit_price,  # Price is per hour
+                    'monthly_cost': unit_price * 730,  # Approximate hours per month
+                    'currency': first_rate.get('currency', 'RUB'),
+                    'source': 'billing_api',
+                    'extended_specs': {
+                        'sku_id': sku.get('id'),
+                        'sku_name': sku.get('name'),
+                        'service_id': sku.get('serviceId'),
+                        'pricing_unit': rates_data.get('pricingUnit', 'hour'),
+                        'pricing_type': latest_pricing.get('type', 'STREET_PRICE'),
+                        'effective_time': latest_pricing.get('effectiveTime'),
+                        'description': sku.get('description', '')
+                    }
+                })
+            
+            self.logger.info(f"Converted {len(pricing_data)} SKUs with prices > 0 to pricing format")
+            return pricing_data
+            
         except Exception as exc:
             self.logger.error("Failed to collect Yandex pricing: %s", exc, exc_info=True)
             return []
+    
+    def _categorize_sku(self, sku_name: str) -> str:
+        """Categorize SKU by name into resource type"""
+        name_lower = sku_name.lower()
+        
+        if any(kw in name_lower for kw in ['vcpu', 'cpu', 'core', 'processor']):
+            return 'compute_cpu'
+        elif any(kw in name_lower for kw in ['ram', 'memory']):
+            return 'compute_ram'
+        elif any(kw in name_lower for kw in ['disk', 'storage', 'hdd', 'ssd', 'nvme']):
+            return 'storage'
+        elif 'kubernetes' in name_lower or 'k8s' in name_lower:
+            return 'kubernetes'
+        elif 'postgresql' in name_lower or 'postgres' in name_lower:
+            return 'database_postgresql'
+        elif 'mysql' in name_lower:
+            return 'database_mysql'
+        elif 'mongodb' in name_lower or 'mongo' in name_lower:
+            return 'database_mongodb'
+        elif 'clickhouse' in name_lower:
+            return 'database_clickhouse'
+        elif 'redis' in name_lower or 'valkey' in name_lower:
+            return 'database_redis'
+        elif 'kafka' in name_lower:
+            return 'database_kafka'
+        elif 'vpc' in name_lower or 'network' in name_lower or 'subnet' in name_lower:
+            return 'networking'
+        elif 'dns' in name_lower:
+            return 'dns'
+        elif 's3' in name_lower or 'object storage' in name_lower:
+            return 's3'
+        elif 'kms' in name_lower or 'key management' in name_lower:
+            return 'kms'
+        elif 'load balancer' in name_lower or 'balancer' in name_lower:
+            return 'load_balancer'
+        elif 'container registry' in name_lower or 'registry' in name_lower:
+            return 'container_registry'
+        else:
+            return 'other'
 
