@@ -1181,3 +1181,51 @@ def reseed_demo_user():
             'success': False,
             'error': f'Failed to reseed demo user: {str(e)}'
         }), 500
+
+@admin_bp.route('/bulk-sync-all-users', methods=['POST'])
+def bulk_sync_all_users():
+    """Trigger bulk sync for all active users (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.services.bulk_sync_service import BulkSyncService
+        
+        # Get sync type from request (default: manual when triggered from admin)
+        sync_type = request.json.get('sync_type', 'manual') if request.is_json else 'manual'
+        
+        logger.info(f"Admin initiated bulk sync for all users (sync_type: {sync_type})")
+        
+        # Create bulk sync service
+        bulk_sync_service = BulkSyncService()
+        
+        # Execute bulk sync
+        result = bulk_sync_service.sync_all_users(sync_type=sync_type)
+        
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': result.get('message'),
+                'total_users': result.get('total_users'),
+                'successful_users': result.get('successful_users'),
+                'failed_users': result.get('failed_users'),
+                'skipped_users': result.get('skipped_users'),
+                'duration_seconds': result.get('duration_seconds'),
+                'user_results': result.get('user_results', [])
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error'),
+                'message': result.get('message', 'Bulk sync failed')
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error during bulk sync: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to execute bulk sync: {str(e)}'
+        }), 500
