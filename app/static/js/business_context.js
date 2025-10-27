@@ -521,7 +521,6 @@ function saveToUndoStack() {
     
     // Don't save during restoration
     if (isRestoring) {
-        console.log('⏸️ Skipping save - restoration in progress');
         return;
     }
     
@@ -535,13 +534,6 @@ function saveToUndoStack() {
         timestamp: Date.now()
     };
     
-    console.log('📝 Saving to undo stack. Stack size:', undoStack.length + 1, 'Objects:', state.objects.objects.length);
-    
-    // Log first group position for debugging
-    const firstGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
-    if (firstGroup) {
-        console.log(`  📍 Group ${firstGroup.fabricId?.slice(-8)} position: left=${firstGroup.left.toFixed(2)}, top=${firstGroup.top.toFixed(2)}`);
-    }
     
     // Add to undo stack
     undoStack.push(state);
@@ -562,18 +554,7 @@ function saveToUndoStack() {
  * Undo last action
  */
 function undo() {
-    console.log('⬅️ Undo called. Stack size:', undoStack.length);
-    
-    if (undoStack.length === 0) {
-        console.log('❌ Undo stack is empty');
-        return;
-    }
-    
-    // Log current position before undo
-    const currentGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
-    if (currentGroup) {
-        console.log(`  📍 Current Group ${currentGroup.fabricId?.slice(-8)} position BEFORE undo: left=${currentGroup.left.toFixed(2)}, top=${currentGroup.top.toFixed(2)}`);
-    }
+    if (undoStack.length === 0) return;
     
     // Save current state to redo stack
     const currentState = {
@@ -585,11 +566,9 @@ function undo() {
         timestamp: Date.now()
     };
     redoStack.push(currentState);
-    console.log('💾 Saved current state to redo stack. Current objects:', currentState.objects.objects.length);
     
     // Restore previous state
     const previousState = undoStack.pop();
-    console.log('♻️ Restoring previous state. Objects:', previousState.objects.objects.length);
     restoreCanvasState(previousState);
     
     // Update button states
@@ -625,12 +604,7 @@ function redo() {
  * Restore canvas to a saved state
  */
 function restoreCanvasState(state) {
-    if (!fabricCanvas || !state) {
-        console.log('❌ Cannot restore: fabricCanvas or state is null');
-        return;
-    }
-    
-    console.log('🔄 Restoring canvas state...');
+    if (!fabricCanvas || !state) return;
     
     // Set flag to prevent saving during restoration
     isRestoring = true;
@@ -640,26 +614,15 @@ function restoreCanvasState(state) {
     fabricCanvas.off('object:modified');
     fabricCanvas.off('object:added');
     fabricCanvas.off('object:removed');
-    console.log('🔇 Canvas event listeners removed');
     
     // Clear current canvas
     fabricCanvas.clear();
-    console.log('🗑️ Canvas cleared');
     
     // Restore objects
     fabricCanvas.loadFromJSON(state.objects, function() {
-        console.log('✅ Objects loaded from JSON. Count:', fabricCanvas.getObjects().length);
-        
-        // Log first group position after restore
-        const firstGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
-        if (firstGroup) {
-            console.log(`  📍 Restored Group ${firstGroup.fabricId?.slice(-8)} to position: left=${firstGroup.left.toFixed(2)}, top=${firstGroup.top.toFixed(2)}`);
-        }
-        
         // Restore viewport
         fabricCanvas.setZoom(state.viewport.zoom);
         fabricCanvas.viewportTransform = state.viewport.pan.slice();
-        console.log('👁️ Viewport restored. Zoom:', state.viewport.zoom);
         
         // Re-setup event handlers for all objects
         setupObjectEventHandlers();
@@ -670,7 +633,6 @@ function restoreCanvasState(state) {
         fabricCanvas.on('mouse:down', function(opt) {
             const target = opt.target;
             if (target && target.selectable) {
-                // Save state before any modification starts
                 saveToUndoStack();
             }
         });
@@ -704,18 +666,14 @@ function restoreCanvasState(state) {
             scheduleAutoSave();
         });
         
-        console.log('🔊 Canvas event listeners re-attached');
-        
         // Update zoom display
         updateZoomDisplay();
         
         // Render
         fabricCanvas.renderAll();
-        console.log('🎨 Canvas rendered');
         
         // Re-enable saving after restoration is complete
         isRestoring = false;
-        console.log('🔓 Restoration complete - saving re-enabled');
         
         // Trigger autosave
         scheduleAutoSave();
@@ -729,24 +687,14 @@ function setupObjectEventHandlers() {
     if (!fabricCanvas) return;
     
     const objects = fabricCanvas.getObjects();
-    console.log('🔧 Setting up event handlers for', objects.length, 'objects');
-    
-    let groupsFound = 0;
-    let groupsSetup = 0;
     
     objects.forEach(function(obj) {
         // Setup group event handlers
         if (obj.objectType === 'group') {
-            groupsFound++;
-            console.log('🟦 Found group:', obj.fabricId, 'Name:', obj.groupName);
-            
             const groupText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupText');
             const costBadge = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupCost');
             
-            console.log('  └─ Text:', groupText ? '✅' : '❌', 'Cost:', costBadge ? '✅' : '❌');
-            
             if (groupText && costBadge) {
-                groupsSetup++;
                 // Setup moving event
                 obj.on('moving', function() {
                     updateGroupChildren(obj, groupText, costBadge);
@@ -834,8 +782,6 @@ function setupObjectEventHandlers() {
             }
         }
     });
-    
-    console.log('✅ Event handler setup complete. Groups found:', groupsFound, 'Groups setup:', groupsSetup);
 }
 
 /**
