@@ -570,9 +570,14 @@ function saveToUndoStack() {
         return;
     }
     
-    // Get current canvas state
+    // Get current canvas state (excluding grid lines)
+    const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
+    
+    // Filter out grid lines - they should never be saved
+    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    
     const state = {
-        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        objects: canvasJSON,
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -602,9 +607,12 @@ function saveToUndoStack() {
 function undo() {
     if (undoStack.length === 0) return;
     
-    // Save current state to redo stack
+    // Save current state to redo stack (excluding grid lines)
+    const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
+    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    
     const currentState = {
-        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        objects: canvasJSON,
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -627,9 +635,12 @@ function undo() {
 function redo() {
     if (redoStack.length === 0) return;
     
-    // Save current state to undo stack
+    // Save current state to undo stack (excluding grid lines)
+    const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
+    canvasJSON.objects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    
     const currentState = {
-        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        objects: canvasJSON,
         viewport: {
             zoom: fabricCanvas.getZoom(),
             pan: fabricCanvas.viewportTransform.slice()
@@ -1763,6 +1774,9 @@ function drawGrid() {
     
     const gridLines = [];
     
+    // Temporarily set flag to prevent saving grid lines to undo
+    isRestoring = true;
+    
     // Vertical lines
     for (let x = startX; x <= endX; x += gridSize) {
         const line = new fabric.Line([x, offsetY, x, offsetY + height], {
@@ -1789,6 +1803,9 @@ function drawGrid() {
         fabricCanvas.add(line);
     }
     
+    // Re-enable saving
+    isRestoring = false;
+    
     // Send grid lines to back
     gridLines.forEach(line => fabricCanvas.sendToBack(line));
     
@@ -1801,10 +1818,17 @@ function drawGrid() {
 function clearGrid() {
     if (!fabricCanvas) return;
     
+    // Temporarily set flag to prevent saving when removing grid lines
+    isRestoring = true;
+    
     const objects = fabricCanvas.getObjects();
     const gridLines = objects.filter(obj => obj.objectType === 'gridLine');
     
     gridLines.forEach(line => fabricCanvas.remove(line));
+    
+    // Re-enable saving
+    isRestoring = false;
+    
     fabricCanvas.renderAll();
 }
 
