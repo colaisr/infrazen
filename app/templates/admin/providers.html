@@ -303,12 +303,23 @@ function syncProviderPrices(providerId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Update local data
-            provider.sync_status = 'success';
-            provider.last_price_sync = new Date().toISOString();
-            provider.sync_error = null;
-            renderProviders();
-            showSuccess(data.message);
+            if (data.background) {
+                // For background sync, show info message
+                provider.sync_status = 'in_progress';
+                renderProviders();
+                showSuccess(data.message + ' (Background sync in progress)');
+                // Refresh page after 10 seconds to check status
+                setTimeout(() => {
+                    window.location.reload();
+                }, 10000);
+            } else {
+                // Update local data for immediate sync
+                provider.sync_status = 'success';
+                provider.last_price_sync = new Date().toISOString();
+                provider.sync_error = null;
+                renderProviders();
+                showSuccess(data.message);
+            }
         } else {
             provider.sync_status = 'failed';
             provider.sync_error = data.error;

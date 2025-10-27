@@ -809,7 +809,32 @@ def sync_provider_prices(provider_id):
     try:
         provider = ProviderCatalog.query.get_or_404(provider_id)
         
-        # Import price update service
+        # For Yandex, run in background to avoid timeout
+        if provider.provider_type == 'yandex':
+            import threading
+            
+            def background_sync():
+                try:
+                    from app.core.services.price_update_service import PriceUpdateService
+                    price_update_service = PriceUpdateService()
+                    result = price_update_service.sync_provider_prices(provider.provider_type)
+                    logger.info(f"Background Yandex sync completed: {result.get('success', False)}")
+                except Exception as e:
+                    logger.error(f"Background Yandex sync failed: {e}")
+            
+            # Start background thread
+            thread = threading.Thread(target=background_sync)
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Yandex price sync started in background (estimated 10-20 minutes)',
+                'background': True,
+                'provider': provider.to_dict()
+            })
+        
+        # For other providers, run normally
         from app.core.services.price_update_service import PriceUpdateService
         price_update_service = PriceUpdateService()
         

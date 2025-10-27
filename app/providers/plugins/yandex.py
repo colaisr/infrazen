@@ -156,22 +156,24 @@ class YandexProviderPlugin(ProviderPlugin):
         return result
 
     def get_pricing_data(self) -> List[Dict[str, Any]]:
-        """Get pricing data for Yandex Cloud resources from SKU catalog"""
+        """Get complete pricing data for Yandex Cloud resources using individual SKU calls"""
         try:
             from ..yandex.client import YandexClient
+            import time
+            import requests
             
-            self.logger.info("Fetching Yandex Cloud SKU pricing catalog...")
+            self.logger.info("Starting complete Yandex Cloud pricing sync...")
             
-            # Create client with credentials
             client = YandexClient(self.credentials)
             
-            # Fetch all SKUs (paginated)
-            all_skus = []
+            # Step 1: Get all SKU IDs from list API (fast)
+            self.logger.info("Fetching SKU list...")
+            all_sku_ids = []
             page_token = None
             page_num = 1
             
             while True:
-                self.logger.info(f"Fetching SKU page {page_num}...")
+                self.logger.info(f"Fetching SKU list page {page_num}...")
                 result = client.list_skus(page_size=1000, page_token=page_token)
                 
                 if not result or 'skus' not in result:
@@ -181,8 +183,11 @@ class YandexProviderPlugin(ProviderPlugin):
                 if not skus:
                     break
                 
-                all_skus.extend(skus)
-                self.logger.info(f"Page {page_num}: Fetched {len(skus)} SKUs (total: {len(all_skus)})")
+                # Collect all SKU IDs (including zero-price ones)
+                for sku in skus:
+                    all_sku_ids.append(sku.get('id'))
+                
+                self.logger.info(f"Page {page_num}: Collected {len(skus)} SKU IDs (total: {len(all_sku_ids)})")
                 
                 page_token = result.get('nextPageToken')
                 if not page_token:
@@ -190,54 +195,140 @@ class YandexProviderPlugin(ProviderPlugin):
                 
                 page_num += 1
             
-            self.logger.info(f"Fetched {len(all_skus)} total SKUs from Yandex Cloud")
+            self.logger.info(f"Collected {len(all_sku_ids)} total SKU IDs")
             
-            # Convert SKUs to pricing format
+            # Step 2: Fetch individual SKU details (with progress tracking)
             pricing_data = []
-            for sku in all_skus:
-                pricing_versions = sku.get('pricingVersions', [])
-                if not pricing_versions:
-                    continue
-                
-                # Get latest pricing
-                latest_pricing = pricing_versions[0]
-                pricing_expressions = latest_pricing.get('pricingExpressions', [])
-                if not pricing_expressions:
-                    continue
-                
-                rates_data = pricing_expressions[0]
-                rates = rates_data.get('rates', [])
-                if not rates:
-                    continue
-                
-                first_rate = rates[0]
-                unit_price = float(first_rate.get('unitPrice', 0))
-                
-                # Skip zero-price SKUs (they clutter the catalog)
-                if unit_price == 0:
-                    continue
-                
-                # Map to ProviderPrice model fields
-                pricing_data.append({
-                    'provider': 'yandex',
-                    'provider_sku': sku.get('id'),  # SKU ID
-                    'resource_type': self._categorize_sku(sku.get('name', '')),
-                    'hourly_cost': unit_price,  # Price is per hour
-                    'monthly_cost': unit_price * 730,  # Approximate hours per month
-                    'currency': first_rate.get('currency', 'RUB'),
-                    'source': 'billing_api',
-                    'extended_specs': {
-                        'sku_id': sku.get('id'),
-                        'sku_name': sku.get('name'),
-                        'service_id': sku.get('serviceId'),
-                        'pricing_unit': rates_data.get('pricingUnit', 'hour'),
-                        'pricing_type': latest_pricing.get('type', 'STREET_PRICE'),
-                        'effective_time': latest_pricing.get('effectiveTime'),
-                        'description': sku.get('description', '')
-                    }
-                })
+            successful_fetches = 0
+            failed_fetches = 0
+            start_time = time.time()
+            timeout_seconds = 20 * 60  # 20 minutes
             
-            self.logger.info(f"Converted {len(pricing_data)} SKUs with prices > 0 to pricing format")
+            headers = client._get_headers()
+            
+            for i, sku_id in enumerate(all_sku_ids):
+                # Check timeout
+                elapsed = time.time() - start_time
+                if elapsed > timeout_seconds:
+                    self.logger.warning(f"Timeout reached after {elapsed:.1f}s. Processed {i}/{len(all_sku_ids)} SKUs")
+                    break
+                
+                try:
+                    # Fetch individual SKU details
+                    url = f'{client.billing_url}/skus/{sku_id}'
+                    response = requests.get(url, headers=headers, timeout=10)
+                    
+                    if response.status_code == 200:
+                        sku_data = response.json()
+                        
+                        # Extract pricing information
+                        pricing_versions = sku_data.get('pricingVersions', [])
+                        if not pricing_versions:
+                            continue
+                        
+                        # Get the latest pricing version (most recent effectiveTime)
+                        latest_pricing = max(pricing_versions, key=lambda x: x.get('effectiveTime', ''))
+                        
+                        # Extract rates
+                        pricing_expressions = latest_pricing.get('pricingExpressions', [])
+                        if not pricing_expressions:
+                            continue
+                        
+                        rates_data = pricing_expressions[0]
+                        rates = rates_data.get('rates', [])
+                        if not rates:
+                            continue
+                        
+                        first_rate = rates[0]
+                        unit_price = float(first_rate.get('unitPrice', 0))
+                        
+                        # Skip zero-price SKUs
+                        if unit_price == 0:
+                            continue
+                        
+                        # Parse pricing unit to determine resource specs
+                        pricing_unit = sku_data.get('pricingUnit', '')
+                        cpu_cores = None
+                        ram_gb = None
+                        storage_gb = None
+                        notes = f"Price per {pricing_unit}"
+                        
+                        if 'core*hour' in pricing_unit or 'core*month' in pricing_unit:
+                            cpu_cores = 1
+                        elif 'gbyte*hour' in pricing_unit or 'gbyte*month' in pricing_unit:
+                            ram_gb = 1
+                        elif 'gbyte' in pricing_unit and 'storage' in sku_data.get('name', '').lower():
+                            storage_gb = 1
+                        elif 'server*month' in pricing_unit:
+                            # BareMetal servers - treat as complete server
+                            cpu_cores = 1  # Will be overridden by name parsing
+                            ram_gb = 1
+                        
+                        # Parse SKU name for additional specs
+                        sku_name = sku_data.get('name', '')
+                        if 'vCPU' in sku_name or 'CPU' in sku_name:
+                            cpu_cores = 1
+                        elif 'RAM' in sku_name or 'memory' in sku_name:
+                            ram_gb = 1
+                        elif 'storage' in sku_name.lower() or 'disk' in sku_name.lower():
+                            storage_gb = 1
+                        
+                        # Calculate monthly cost based on pricing unit
+                        if 'month' in pricing_unit:
+                            monthly_cost = unit_price
+                            hourly_cost = unit_price / 730  # Approximate
+                        else:  # hour
+                            hourly_cost = unit_price
+                            monthly_cost = unit_price * 730  # Approximate
+                        
+                        pricing_data.append({
+                            'provider': 'yandex',
+                            'provider_sku': sku_id,
+                            'resource_type': self._categorize_sku(sku_name),
+                            'cpu_cores': cpu_cores,
+                            'ram_gb': ram_gb,
+                            'storage_gb': storage_gb,
+                            'hourly_cost': hourly_cost,
+                            'monthly_cost': monthly_cost,
+                            'currency': first_rate.get('currency', 'RUB'),
+                            'source': 'billing_api',
+                            'notes': notes,
+                            'extended_specs': {
+                                'sku_id': sku_id,
+                                'sku_name': sku_name,
+                                'service_id': sku_data.get('serviceId'),
+                                'pricing_unit': pricing_unit,
+                                'pricing_type': latest_pricing.get('type', 'STREET_PRICE'),
+                                'effective_time': latest_pricing.get('effectiveTime'),
+                                'description': sku_data.get('description', '')
+                            }
+                        })
+                        
+                        successful_fetches += 1
+                        
+                        # Log progress every 50 SKUs
+                        if successful_fetches % 50 == 0:
+                            elapsed = time.time() - start_time
+                            rate = successful_fetches / elapsed if elapsed > 0 else 0
+                            remaining = (len(all_sku_ids) - i) / rate if rate > 0 else 0
+                            self.logger.info(f"Progress: {successful_fetches} SKUs with prices, {i+1}/{len(all_sku_ids)} total, {rate:.1f} SKUs/sec, ~{remaining/60:.1f}min remaining")
+                    
+                    else:
+                        failed_fetches += 1
+                        if failed_fetches <= 5:  # Log first 5 failures
+                            self.logger.warning(f"Failed to fetch SKU {sku_id}: {response.status_code}")
+                    
+                    # Small delay to avoid rate limiting
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    failed_fetches += 1
+                    if failed_fetches <= 5:
+                        self.logger.warning(f"Exception fetching SKU {sku_id}: {e}")
+            
+            elapsed = time.time() - start_time
+            self.logger.info(f"Complete pricing sync finished: {successful_fetches} SKUs with prices, {failed_fetches} failures, {elapsed:.1f}s elapsed")
+            
             return pricing_data
             
         except Exception as exc:

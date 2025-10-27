@@ -299,3 +299,6 @@ If you need to change email credentials:
 **Beget Control Panel:** https://beget.com/ru/panel
 **Email Settings:** Mail → Mailboxes → registration@infrazen.ru
 
+
+
+
