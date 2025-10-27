@@ -64,6 +64,10 @@ class YandexClient:
         self.resource_manager_url = "https://resource-manager.api.cloud.yandex.net/resource-manager/v1"
         self.monitoring_url = "https://monitoring.api.cloud.yandex.net/monitoring/v2"
         
+        # Managed Services APIs
+        self.kubernetes_url = "https://mks.api.cloud.yandex.net/managed-kubernetes/v1"
+        self.mdb_url = "https://mdb.api.cloud.yandex.net"
+        
         self._iam_token = None
         self._iam_token_expires_at = None
         self._discovered_folders = []
@@ -775,6 +779,46 @@ class YandexClient:
             logger.error(f"Failed to get resource costs: {e}")
             return {}
     
+    def list_skus(self, page_size: int = 1000, page_token: str = None, 
+                  currency: str = 'RUB', billing_account_id: str = None) -> Dict[str, Any]:
+        """
+        List SKUs (pricing catalog) from Yandex Cloud Billing API
+        
+        Args:
+            page_size: Number of SKUs per page (max 1000)
+            page_token: Token for pagination (from previous response)
+            currency: Currency code (default: RUB)
+            billing_account_id: Billing account ID (optional)
+        
+        Returns:
+            Dict with 'skus' list and optional 'nextPageToken'
+        """
+        try:
+            headers = self._get_headers()
+            url = f'{self.billing_url}/skus'
+            
+            params = {
+                'pageSize': min(page_size, 1000)  # Max 1000
+            }
+            
+            if page_token:
+                params['pageToken'] = page_token
+            
+            if currency:
+                params['currency'] = currency
+            
+            if billing_account_id:
+                params['billingAccountId'] = billing_account_id
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            return response.json()
+        
+        except Exception as e:
+            logger.error(f"Failed to list SKUs: {e}")
+            return {}
+    
     def get_instance_cpu_statistics(self, instance_id: str, folder_id: str = None, days: int = 30) -> Dict[str, Any]:
         """
         Get CPU usage statistics for a compute instance
@@ -930,5 +974,381 @@ class YandexClient:
                 'min_cpu_usage': 0,
                 'error': str(e),
                 'no_data': True
+            }
+    
+    # ============================================================================
+    # MANAGED SERVICES APIs
+    # ============================================================================
+    
+    def list_kubernetes_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed Kubernetes clusters in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of Kubernetes cluster dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.kubernetes_url}/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} Kubernetes clusters in folder {folder_id}")
+            
+            # Enrich each cluster with additional details
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'kubernetes-cluster'
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list Kubernetes clusters: {e}")
+            return []
+    
+    def get_kubernetes_cluster(self, cluster_id: str) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific Kubernetes cluster
+        
+        Args:
+            cluster_id: Cluster ID
+        
+        Returns:
+            Cluster details dictionary
+        """
+        try:
+            headers = self._get_headers()
+            url = f'{self.kubernetes_url}/clusters/{cluster_id}'
+            
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            cluster = response.json()
+            cluster['resource_type'] = 'kubernetes-cluster'
+            return cluster
+        
+        except Exception as e:
+            logger.error(f"Failed to get Kubernetes cluster {cluster_id}: {e}")
+            return {}
+    
+    def list_kubernetes_node_groups(self, cluster_id: str) -> List[Dict[str, Any]]:
+        """
+        List node groups for a Kubernetes cluster
+        
+        Args:
+            cluster_id: Cluster ID
+        
+        Returns:
+            List of node group dictionaries
+        """
+        try:
+            headers = self._get_headers()
+            url = f'{self.kubernetes_url}/clusters/{cluster_id}/nodeGroups'
+            
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            node_groups = data.get('nodeGroups', [])
+            
+            logger.info(f"Found {len(node_groups)} node groups for cluster {cluster_id}")
+            return node_groups
+        
+        except Exception as e:
+            logger.error(f"Failed to list node groups for cluster {cluster_id}: {e}")
+            return []
+    
+    def list_postgresql_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed PostgreSQL clusters in a folder with host details
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of PostgreSQL cluster dictionaries with hosts enriched
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-postgresql/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} PostgreSQL clusters in folder {folder_id}")
+            
+            # Enrich each cluster with hosts
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'postgresql-cluster'
+                
+                # Fetch hosts for this cluster
+                try:
+                    hosts_url = f'{self.mdb_url}/managed-postgresql/v1/clusters/{cluster["id"]}/hosts'
+                    hosts_response = requests.get(hosts_url, headers=headers, timeout=30)
+                    if hosts_response.status_code == 200:
+                        hosts_data = hosts_response.json()
+                        cluster['hosts'] = hosts_data.get('hosts', [])
+                except Exception as hosts_error:
+                    logger.error(f"Failed to get hosts for PostgreSQL cluster {cluster['id']}: {hosts_error}")
+                    cluster['hosts'] = []
+                
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list PostgreSQL clusters: {e}")
+            return []
+    
+    def list_mysql_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed MySQL clusters in a folder with host details
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of MySQL cluster dictionaries with hosts enriched
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-mysql/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} MySQL clusters in folder {folder_id}")
+            
+            # Enrich each cluster with hosts
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'mysql-cluster'
+                
+                # Fetch hosts for this cluster
+                try:
+                    hosts_url = f'{self.mdb_url}/managed-mysql/v1/clusters/{cluster["id"]}/hosts'
+                    hosts_response = requests.get(hosts_url, headers=headers, timeout=30)
+                    if hosts_response.status_code == 200:
+                        hosts_data = hosts_response.json()
+                        cluster['hosts'] = hosts_data.get('hosts', [])
+                except Exception as hosts_error:
+                    logger.error(f"Failed to get hosts for MySQL cluster {cluster['id']}: {hosts_error}")
+                    cluster['hosts'] = []
+                
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list MySQL clusters: {e}")
+            return []
+    
+    def list_mongodb_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed MongoDB clusters in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of MongoDB cluster dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-mongodb/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} MongoDB clusters in folder {folder_id}")
+            
+            # Enrich each cluster with additional details
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'mongodb-cluster'
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list MongoDB clusters: {e}")
+            return []
+    
+    def list_clickhouse_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed ClickHouse clusters in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of ClickHouse cluster dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-clickhouse/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} ClickHouse clusters in folder {folder_id}")
+            
+            # Enrich each cluster with additional details
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'clickhouse-cluster'
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list ClickHouse clusters: {e}")
+            return []
+    
+    def list_redis_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed Redis clusters in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of Redis cluster dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-redis/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} Redis clusters in folder {folder_id}")
+            
+            # Enrich each cluster with additional details
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'redis-cluster'
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list Redis clusters: {e}")
+            return []
+    
+    def get_all_managed_services(self, folder_id: str = None) -> Dict[str, Any]:
+        """
+        Get all managed services from a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            Dict containing all managed service types
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            services = {
+                'kubernetes_clusters': self.list_kubernetes_clusters(folder_id),
+                'postgresql_clusters': self.list_postgresql_clusters(folder_id),
+                'mysql_clusters': self.list_mysql_clusters(folder_id),
+                'mongodb_clusters': self.list_mongodb_clusters(folder_id),
+                'clickhouse_clusters': self.list_clickhouse_clusters(folder_id),
+                'redis_clusters': self.list_redis_clusters(folder_id)
+            }
+            
+            # Calculate totals
+            total_clusters = sum(len(clusters) for clusters in services.values())
+            logger.info(f"Found {total_clusters} managed service clusters in folder {folder_id}")
+            
+            return services
+        
+        except Exception as e:
+            logger.error(f"Error getting managed services from folder {folder_id}: {e}")
+            return {
+                'kubernetes_clusters': [],
+                'postgresql_clusters': [],
+                'mysql_clusters': [],
+                'mongodb_clusters': [],
+                'clickhouse_clusters': [],
+                'redis_clusters': [],
+                'error': str(e)
             }
 

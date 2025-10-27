@@ -26,9 +26,14 @@
         </select>
         <select id="resource_type" class="input">
             <option value="">Все типы</option>
+            <option value="SERVER">Server</option>
             <option value="VM">VM</option>
-            <option value="Диск">Диск</option>
-            <option value="Хранилище">Хранилище</option>
+            <option value="VOLUME">Volume</option>
+            <option value="DISK">Disk</option>
+            <option value="KUBERNETES-CLUSTER">Kubernetes Cluster</option>
+            <option value="POSTGRESQL-CLUSTER">PostgreSQL Cluster</option>
+            <option value="MYSQL-CLUSTER">MySQL Cluster</option>
+            <option value="DATABASE">Database</option>
         </select>
         <select id="status" class="input">
             <option value="">Все статусы</option>
@@ -120,12 +125,16 @@
                 <div class="resource-card" data-resource-id="{{ resource.id }}">
             <div class="resource-header">
                 <div class="resource-icon">
-                    {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' %}
+                    {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' or resource.resource_type == 'server' %}
                         <i class="fa-solid fa-server"></i>
                     {% elif resource.resource_type == 'disk' or resource.resource_type == 'volume' %}
                         <i class="fa-solid fa-hdd"></i>
                     {% elif resource.resource_type == 'database' %}
                         <i class="fa-solid fa-database"></i>
+                    {% elif resource.resource_type == 'kubernetes-cluster' %}
+                        <i class="fa-brands fa-docker" style="color: #326CE5;"></i>
+                    {% elif 'postgresql' in resource.resource_type or 'mysql' in resource.resource_type or 'mongodb' in resource.resource_type or 'clickhouse' in resource.resource_type or 'redis' in resource.resource_type %}
+                        <i class="fa-solid fa-database" style="color: #336791;"></i>
                     {% elif resource.resource_type == 'domain' %}
                         <i class="fa-solid fa-globe"></i>
                     {% elif resource.resource_type == 'email' %}
@@ -359,6 +368,122 @@
                                         <div class="spec-content">
                                             <span class="spec-value">{{ config.get('targets') or config.get('target_count') }}</span>
                                             <span class="spec-label">Targets</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- Kubernetes Cluster Specifications -->
+                                {% elif resource.resource_type == 'kubernetes-cluster' %}
+                                    {% if config.get('master_version') or config.get('version') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-tag"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('master_version') or config.get('version') }}</span>
+                                            <span class="spec-label">Version</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_nodes') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-server"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_nodes') }}</span>
+                                            <span class="spec-label">Nodes</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_vcpus') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-microchip"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_vcpus') }}</span>
+                                            <span class="spec-label">Total vCPU</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_ram_gb') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-memory"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_ram_gb')|round(1) }} GB</span>
+                                            <span class="spec-label">Total RAM</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_storage_gb') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-hdd"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_storage_gb')|round(1) }} GB</span>
+                                            <span class="spec-label">Total Storage</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                
+                                <!-- PostgreSQL/MySQL/MongoDB/ClickHouse/Redis Cluster Specifications -->
+                                {% elif 'postgresql' in resource.resource_type or 'mysql' in resource.resource_type or 'mongodb' in resource.resource_type or 'clickhouse' in resource.resource_type or 'redis' in resource.resource_type %}
+                                    {% if config.get('version') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-tag"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('version') }}</span>
+                                            <span class="spec-label">Version</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_hosts') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-server"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_hosts') }}</span>
+                                            <span class="spec-label">Hosts</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_vcpus') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-microchip"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_vcpus') }}</span>
+                                            <span class="spec-label">Total vCPU</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_ram_gb') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-memory"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_ram_gb')|round(1) }} GB</span>
+                                            <span class="spec-label">Total RAM</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('total_storage_gb') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-hdd"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value">{{ config.get('total_storage_gb')|round(1) }} GB</span>
+                                            <span class="spec-label">Total Storage</span>
                                         </div>
                                     </div>
                                     {% endif %}

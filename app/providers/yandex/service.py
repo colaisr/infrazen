@@ -70,16 +70,14 @@ class YandexService:
     
     def sync_resources(self) -> Dict[str, Any]:
         """
-        Sync resources from Yandex Cloud
+        Sync resources from Yandex Cloud with proper managed services support
         
-        This method follows a resource-discovery approach since Yandex Cloud's
-        billing API requires special permissions and may not be immediately available.
-        
-        Process:
+        This method now properly identifies and groups managed services:
         1. Discover all clouds and folders
-        2. List all resources in each folder
-        3. Create/update resources in database
-        4. Calculate estimated costs based on resource types
+        2. Query managed services (Kubernetes, PostgreSQL, etc.)
+        3. Query compute resources and filter out managed service nodes
+        4. Create/update resources in database with proper grouping
+        5. Calculate estimated costs based on resource types
         
         Returns:
             Dict containing sync results
@@ -88,7 +86,7 @@ class YandexService:
             # Create sync snapshot entry
             sync_snapshot = SyncSnapshot(
                 provider_id=self.provider.id,
-                sync_type='resource_discovery',
+                sync_type='managed_services',
                 sync_status='running',
                 sync_started_at=datetime.now()
             )
@@ -106,6 +104,7 @@ class YandexService:
             synced_resources = []
             total_instances = 0
             total_disks = 0
+            total_managed_clusters = 0
             total_cost = 0.0
             
             logger.info(f"PHASE 2: Processing {len(all_resources['folders'])} folders")
@@ -121,28 +120,103 @@ class YandexService:
                 
                 logger.info(f"Processing folder: {folder_name} ({folder_id})")
                 
-                # Process instances (VMs)
-                instances = resources.get('instances', [])
-                disks = resources.get('disks', [])  # Get disks list for size lookup
+                # PHASE 2A: Query managed services first
+                logger.info(f"  Querying managed services...")
+                managed_services = self.client.get_all_managed_services(folder_id)
                 
+                # Process Kubernetes clusters
+                k8s_clusters = managed_services.get('kubernetes_clusters', [])
+                for cluster in k8s_clusters:
+                    cluster_resource = self._process_kubernetes_cluster(
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id
+                    )
+                    if cluster_resource:
+                        synced_resources.append(cluster_resource)
+                        total_managed_clusters += 1
+                        total_cost += cluster_resource.daily_cost or 0.0
+                
+                # Process PostgreSQL clusters
+                postgres_clusters = managed_services.get('postgresql_clusters', [])
+                for cluster in postgres_clusters:
+                    cluster_resource = self._process_postgresql_cluster(
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id
+                    )
+                    if cluster_resource:
+                        synced_resources.append(cluster_resource)
+                        total_managed_clusters += 1
+                        total_cost += cluster_resource.daily_cost or 0.0
+                
+                # Process MySQL clusters
+                mysql_clusters = managed_services.get('mysql_clusters', [])
+                for cluster in mysql_clusters:
+                    cluster_resource = self._process_mysql_cluster(
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id
+                    )
+                    if cluster_resource:
+                        synced_resources.append(cluster_resource)
+                        total_managed_clusters += 1
+                        total_cost += cluster_resource.daily_cost or 0.0
+                
+                # Process other managed services
+                for service_type in ['mongodb_clusters', 'clickhouse_clusters', 'redis_clusters']:
+                    clusters = managed_services.get(service_type, [])
+                    for cluster in clusters:
+                        cluster_resource = self._process_managed_cluster(
+                            cluster, service_type.replace('_clusters', ''), 
+                            folder_id, folder_name, cloud_id, sync_snapshot.id
+                        )
+                        if cluster_resource:
+                            synced_resources.append(cluster_resource)
+                            total_managed_clusters += 1
+                            total_cost += cluster_resource.daily_cost or 0.0
+                
+                # PHASE 2B: Process compute resources, filtering out managed service nodes
+                logger.info(f"  Processing compute resources (filtering managed service nodes)...")
+                instances = resources.get('instances', [])
+                disks = resources.get('disks', [])
+                
+                # Get cluster IDs to filter out managed service VMs
+                k8s_cluster_ids = {cluster['id'] for cluster in k8s_clusters}
+                
+                standalone_instances = []
                 for instance in instances:
+                    # Check if this VM belongs to a managed service
+                    labels = instance.get('labels', {})
+                    cluster_id = labels.get('managed-kubernetes-cluster-id')
+                    
+                    if cluster_id and cluster_id in k8s_cluster_ids:
+                        # This is a Kubernetes node - skip it (it's part of the cluster)
+                        logger.debug(f"    Skipping K8s node: {instance.get('name')} (belongs to cluster {cluster_id})")
+                        continue
+                    else:
+                        # This is a standalone VM
+                        standalone_instances.append(instance)
+                
+                # Process standalone VMs
+                for instance in standalone_instances:
                     vm_resource = self._process_instance_resource(
                         instance,
                         folder_id,
                         folder_name,
                         cloud_id,
                         sync_snapshot.id,
-                        disks  # Pass disks list for boot disk size lookup
+                        disks
                     )
                     if vm_resource:
                         synced_resources.append(vm_resource)
                         total_instances += 1
                         total_cost += vm_resource.daily_cost or 0.0
                 
-                # Process standalone disks (not attached to VMs)
+                # Process standalone disks (not attached to VMs or managed services)
                 for disk in disks:
-                    # Skip if disk is attached to an instance (will be unified with VM)
+                    # Skip if disk is attached to an instance
                     if disk.get('instanceIds'):
+                        continue
+                    
+                    # Skip if disk is part of a managed service (check by name patterns)
+                    disk_name = disk.get('name', '')
+                    if any(pattern in disk_name.lower() for pattern in ['k8s-csi', 'postgres', 'mysql', 'mongodb', 'clickhouse', 'redis']):
+                        logger.debug(f"    Skipping managed service disk: {disk_name}")
                         continue
                     
                     disk_resource = self._process_disk_resource(
@@ -166,30 +240,29 @@ class YandexService:
             
             # Store metadata
             sync_config = {
-                'sync_method': 'resource_discovery',
+                'sync_method': 'managed_services',
                 'clouds_discovered': len(all_resources['clouds']),
                 'folders_discovered': len(all_resources['folders']),
                 'total_instances': total_instances,
                 'total_disks': total_disks,
+                'total_managed_clusters': total_managed_clusters,
                 'total_estimated_daily_cost': round(total_cost, 2)
             }
             sync_snapshot.sync_config = json.dumps(sync_config)
             
             # PHASE 3: Collect performance statistics (CPU usage) - OPTIONAL
-            # Controlled by provider metadata setting (like Selectel)
             provider_metadata = json.loads(self.provider.provider_metadata) if self.provider.provider_metadata else {}
-            collect_stats = provider_metadata.get('collect_performance_stats', True)  # Default: True for Yandex
+            collect_stats = provider_metadata.get('collect_performance_stats', True)
             
-            logger.info(f"PHASE 3: Performance statistics {'ENABLED' if collect_stats else 'DISABLED (set in provider settings)'}")
+            logger.info(f"PHASE 3: Performance statistics {'ENABLED' if collect_stats else 'DISABLED'}")
             
             vm_resources = [r for r in synced_resources if r.resource_type == 'server']
             
             if vm_resources and collect_stats:
-                logger.info(f"Collecting CPU statistics for {len(vm_resources)} VMs...")
+                logger.info(f"Collecting CPU statistics for {len(vm_resources)} standalone VMs...")
                 
                 for vm_resource in vm_resources:
                     try:
-                        # Get CPU statistics (30-day history)
                         cpu_stats = self.client.get_instance_cpu_statistics(
                             instance_id=vm_resource.resource_id,
                             folder_id=folder_id,
@@ -197,13 +270,11 @@ class YandexService:
                         )
                         
                         if cpu_stats and not cpu_stats.get('no_data'):
-                            # Store CPU stats as resource tags (Beget/Selectel pattern)
                             vm_resource.add_tag('cpu_avg_usage', str(cpu_stats.get('avg_cpu_usage', 0)))
                             vm_resource.add_tag('cpu_max_usage', str(cpu_stats.get('max_cpu_usage', 0)))
                             vm_resource.add_tag('cpu_min_usage', str(cpu_stats.get('min_cpu_usage', 0)))
                             vm_resource.add_tag('cpu_performance_tier', cpu_stats.get('performance_tier', 'unknown'))
                             
-                            # Store daily aggregated data for chart (same format as Selectel)
                             if cpu_stats.get('daily_aggregated'):
                                 daily_data = cpu_stats['daily_aggregated']
                                 raw_data = {
@@ -212,35 +283,12 @@ class YandexService:
                                 }
                                 vm_resource.add_tag('cpu_raw_data', json.dumps(raw_data))
                             
-                            # Also add to provider_config for UI display
-                            if vm_resource.provider_config:
-                                config = json.loads(vm_resource.provider_config)
-                                config['usage_statistics'] = {
-                                    'cpu': {
-                                        'avg_usage': cpu_stats.get('avg_cpu_usage', 0),
-                                        'max_usage': cpu_stats.get('max_cpu_usage', 0),
-                                        'min_usage': cpu_stats.get('min_cpu_usage', 0),
-                                        'trend': cpu_stats.get('trend', 0),
-                                        'performance_tier': cpu_stats.get('performance_tier', 'unknown')
-                                    },
-                                    'memory': {
-                                        'note': 'Memory metrics require Yandex Unified Agent'
-                                    },
-                                    'disk': {
-                                        'note': 'Disk usage metrics require Yandex Unified Agent'
-                                    }
-                                }
-                                vm_resource.provider_config = json.dumps(config)
-                                vm_resource.last_sync = datetime.now()
-                                db.session.add(vm_resource)
-                            
                             logger.info(f"   ✅ {vm_resource.resource_name}: CPU avg={cpu_stats.get('avg_cpu_usage')}%")
                         else:
                             logger.warning(f"   ⚠️  {vm_resource.resource_name}: No CPU data available")
                     
                     except Exception as stats_error:
                         logger.error(f"   ❌ Error getting CPU stats for {vm_resource.resource_name}: {stats_error}")
-                        # Continue with other VMs even if one fails
                 
                 db.session.commit()
                 logger.info(f"Performance statistics collection completed")
@@ -252,17 +300,18 @@ class YandexService:
             
             db.session.commit()
             
-            logger.info(f"Sync completed: {len(synced_resources)} resources, estimated {total_cost:.2f} ₽/day")
+            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks), estimated {total_cost:.2f} ₽/day")
             
             return {
                 'success': True,
                 'resources_synced': len(synced_resources),
+                'total_managed_clusters': total_managed_clusters,
                 'total_instances': total_instances,
                 'total_disks': total_disks,
                 'estimated_daily_cost': round(total_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'cpu_stats_collected': collect_stats and len(vm_resources) > 0,
-                'message': f'Successfully synced {len(synced_resources)} resources (estimated cost: {total_cost:.2f} ₽/day)'
+                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks) - estimated cost: {total_cost:.2f} ₽/day'
             }
             
         except Exception as e:
@@ -287,7 +336,7 @@ class YandexService:
                 'success': False,
                 'error': str(e),
                 'message': 'Sync failed',
-                'sync_snapshot_id': snapshot_id  # Include snapshot ID even on error
+                'sync_snapshot_id': snapshot_id
             }
     
     def _process_instance_resource(self, instance: Dict, folder_id: str, 
@@ -773,4 +822,517 @@ class YandexService:
                 'last_sync': None,
                 'error': str(e)
             }
+    
+    # ============================================================================
+    # MANAGED SERVICES PROCESSING METHODS
+    # ============================================================================
+    
+    def _process_kubernetes_cluster(self, cluster: Dict, folder_id: str, 
+                                   folder_name: str, cloud_id: str,
+                                   sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process Kubernetes cluster resource
+        
+        Args:
+            cluster: Cluster data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            cluster_id = cluster['id']
+            cluster_name = cluster.get('name', cluster_id)
+            
+            # Extract cluster specifications
+            master = cluster.get('master', {})
+            master_version = master.get('version', 'unknown')
+            master_zone = master.get('zonalMaster', {}).get('zoneId', 'unknown')
+            
+            # Get node groups to calculate total resources
+            node_groups = self.client.list_kubernetes_node_groups(cluster_id)
+            
+            total_nodes = 0
+            total_vcpus = 0
+            total_ram_gb = 0
+            total_storage_gb = 0
+            
+            for node_group in node_groups:
+                scale_policy = node_group.get('scalePolicy', {})
+                fixed_scale = scale_policy.get('fixedScale', {})
+                auto_scale = scale_policy.get('autoScale', {})
+                
+                # Get node count (API returns strings, convert to int)
+                if fixed_scale:
+                    node_count = int(fixed_scale.get('size', 0))
+                elif auto_scale:
+                    node_count = int(auto_scale.get('maxSize', 0))
+                else:
+                    node_count = 0
+                
+                total_nodes += node_count
+                
+                # Get node specifications
+                node_template = node_group.get('nodeTemplate', {})
+                resources_spec = node_template.get('resourcesSpec', {})  # Fixed: resourcesSpec not resources
+                vcpus = int(resources_spec.get('cores', 0))
+                ram_bytes = int(resources_spec.get('memory', 0))
+                ram_gb = ram_bytes / (1024**3)
+                
+                total_vcpus += vcpus * node_count
+                total_ram_gb += ram_gb * node_count
+                
+                # Get actual boot disk size from node template
+                boot_disk_spec = node_template.get('bootDiskSpec', {})
+                disk_size_bytes = int(boot_disk_spec.get('diskSize', 107374182400))  # Default 100GB in bytes
+                disk_size_gb = disk_size_bytes / (1024**3)
+                
+                total_storage_gb += disk_size_gb * node_count
+            
+            # Estimate daily cost
+            estimated_daily_cost = self._estimate_kubernetes_cluster_cost(
+                total_vcpus, total_ram_gb, total_storage_gb, master_zone
+            )
+            
+            # Create resource metadata
+            metadata = {
+                'cluster': cluster,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'master_version': master_version,
+                'master_zone': master_zone,
+                'total_nodes': total_nodes,
+                'total_vcpus': total_vcpus,
+                'total_ram_gb': total_ram_gb,
+                'total_storage_gb': total_storage_gb,
+                'node_groups': node_groups,
+                'created_at': cluster.get('createdAt'),
+                'estimated_cost': True
+            }
+            
+            resource = self._create_resource(
+                resource_type='kubernetes-cluster',
+                resource_id=cluster_id,
+                name=cluster_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=master_zone,
+                service_name='Managed Kubernetes'
+            )
+            
+            if resource:
+                resource.daily_cost = estimated_daily_cost
+                resource.effective_cost = estimated_daily_cost
+                resource.original_cost = estimated_daily_cost * 30
+                resource.currency = 'RUB'
+                resource.add_tag('folder_id', folder_id)
+                resource.add_tag('folder_name', folder_name)
+                resource.add_tag('cloud_id', cloud_id)
+                resource.add_tag('cost_source', 'estimated')
+                resource.add_tag('master_version', master_version)
+                resource.add_tag('total_nodes', str(total_nodes))
+                resource.add_tag('total_vcpus', str(total_vcpus))
+                resource.add_tag('total_ram_gb', str(round(total_ram_gb, 2)))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing Kubernetes cluster {cluster.get('id')}: {e}")
+            return None
+    
+    def _process_postgresql_cluster(self, cluster: Dict, folder_id: str, 
+                                  folder_name: str, cloud_id: str,
+                                  sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process PostgreSQL cluster resource
+        
+        Args:
+            cluster: Cluster data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            cluster_id = cluster['id']
+            cluster_name = cluster.get('name', cluster_id)
+            
+            # Extract version from config key (e.g., "postgresqlConfig_14" -> "14")
+            config = cluster.get('config', {})
+            version = 'unknown'
+            for key in config.keys():
+                if 'postgresqlConfig_' in key:
+                    version = key.split('_')[1]
+                    break
+            
+            # Get host specifications
+            hosts = cluster.get('hosts', [])
+            total_vcpus = 0
+            total_ram_gb = 0
+            total_storage_gb = 0
+            
+            for host in hosts:
+                resources = host.get('resources', {})
+                
+                # Parse resourcePresetId (e.g., "c3-c2-m4" = class3-2vCPU-4GB)
+                preset_id = resources.get('resourcePresetId', '')
+                if preset_id and '-' in preset_id:
+                    parts = preset_id.split('-')
+                    # Skip first "c" (class), find second "c" (vCPUs)
+                    c_parts = [p for p in parts if p.startswith('c') and len(p) > 1 and p[1:].isdigit()]
+                    vcpus_part = c_parts[1] if len(c_parts) > 1 else (c_parts[0] if c_parts else 'c2')
+                    vcpus = int(vcpus_part[1:]) if len(vcpus_part) > 1 else 2
+                    # Extract RAM from "m4" = 4 GB
+                    ram_part = next((p for p in parts if p.startswith('m') and p[1:].isdigit()), 'm4')
+                    ram_gb = int(ram_part[1:]) if len(ram_part) > 1 else 4
+                else:
+                    vcpus = 2
+                    ram_gb = 4
+                
+                # Parse disk size (in bytes)
+                disk_size_bytes = int(resources.get('diskSize', 0))
+                disk_size_gb = disk_size_bytes / (1024**3)
+                
+                total_vcpus += vcpus
+                total_ram_gb += ram_gb
+                total_storage_gb += disk_size_gb
+            
+            # Estimate daily cost
+            estimated_daily_cost = self._estimate_database_cluster_cost(
+                total_vcpus, total_ram_gb, total_storage_gb, 'postgresql'
+            )
+            
+            # Create resource metadata
+            metadata = {
+                'cluster': cluster,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'version': version,
+                'total_hosts': len(hosts),
+                'total_vcpus': total_vcpus,
+                'total_ram_gb': total_ram_gb,
+                'total_storage_gb': total_storage_gb,
+                'created_at': cluster.get('createdAt'),
+                'estimated_cost': True
+            }
+            
+            resource = self._create_resource(
+                resource_type='postgresql-cluster',
+                resource_id=cluster_id,
+                name=cluster_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=hosts[0].get('zoneId', 'unknown') if hosts else 'unknown',
+                service_name='Managed PostgreSQL'
+            )
+            
+            if resource:
+                resource.daily_cost = estimated_daily_cost
+                resource.effective_cost = estimated_daily_cost
+                resource.original_cost = estimated_daily_cost * 30
+                resource.currency = 'RUB'
+                resource.add_tag('folder_id', folder_id)
+                resource.add_tag('folder_name', folder_name)
+                resource.add_tag('cloud_id', cloud_id)
+                resource.add_tag('cost_source', 'estimated')
+                resource.add_tag('version', version)
+                resource.add_tag('total_hosts', str(len(hosts)))
+                resource.add_tag('total_vcpus', str(total_vcpus))
+                resource.add_tag('total_ram_gb', str(round(total_ram_gb, 2)))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing PostgreSQL cluster {cluster.get('id')}: {e}")
+            return None
+    
+    def _process_mysql_cluster(self, cluster: Dict, folder_id: str, 
+                              folder_name: str, cloud_id: str,
+                              sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process MySQL cluster resource
+        
+        Args:
+            cluster: Cluster data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            cluster_id = cluster['id']
+            cluster_name = cluster.get('name', cluster_id)
+            
+            # Extract version from config key (e.g., "mysqlConfig_8_0" -> "8.0")
+            config = cluster.get('config', {})
+            version = 'unknown'
+            for key in config.keys():
+                if 'mysqlConfig_' in key:
+                    version = key.replace('mysqlConfig_', '').replace('_', '.')
+                    break
+            
+            # Get host specifications
+            hosts = cluster.get('hosts', [])
+            total_vcpus = 0
+            total_ram_gb = 0
+            total_storage_gb = 0
+            
+            for host in hosts:
+                resources = host.get('resources', {})
+                
+                # Parse resourcePresetId (e.g., "c3-c2-m4" = class3-2vCPU-4GB)
+                preset_id = resources.get('resourcePresetId', '')
+                if preset_id and '-' in preset_id:
+                    parts = preset_id.split('-')
+                    # Skip first "c" (class), find second "c" (vCPUs)
+                    c_parts = [p for p in parts if p.startswith('c') and len(p) > 1 and p[1:].isdigit()]
+                    vcpus_part = c_parts[1] if len(c_parts) > 1 else (c_parts[0] if c_parts else 'c2')
+                    vcpus = int(vcpus_part[1:]) if len(vcpus_part) > 1 else 2
+                    # Extract RAM from "m4" = 4 GB
+                    ram_part = next((p for p in parts if p.startswith('m') and p[1:].isdigit()), 'm4')
+                    ram_gb = int(ram_part[1:]) if len(ram_part) > 1 else 4
+                else:
+                    vcpus = 2
+                    ram_gb = 4
+                
+                # Parse disk size (in bytes)
+                disk_size_bytes = int(resources.get('diskSize', 0))
+                disk_size_gb = disk_size_bytes / (1024**3)
+                
+                total_vcpus += vcpus
+                total_ram_gb += ram_gb
+                total_storage_gb += disk_size_gb
+            
+            # Estimate daily cost
+            estimated_daily_cost = self._estimate_database_cluster_cost(
+                total_vcpus, total_ram_gb, total_storage_gb, 'mysql'
+            )
+            
+            # Create resource metadata
+            metadata = {
+                'cluster': cluster,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'version': version,
+                'total_hosts': len(hosts),
+                'total_vcpus': total_vcpus,
+                'total_ram_gb': total_ram_gb,
+                'total_storage_gb': total_storage_gb,
+                'created_at': cluster.get('createdAt'),
+                'estimated_cost': True
+            }
+            
+            resource = self._create_resource(
+                resource_type='mysql-cluster',
+                resource_id=cluster_id,
+                name=cluster_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=hosts[0].get('zoneId', 'unknown') if hosts else 'unknown',
+                service_name='Managed MySQL'
+            )
+            
+            if resource:
+                resource.daily_cost = estimated_daily_cost
+                resource.effective_cost = estimated_daily_cost
+                resource.original_cost = estimated_daily_cost * 30
+                resource.currency = 'RUB'
+                resource.add_tag('folder_id', folder_id)
+                resource.add_tag('folder_name', folder_name)
+                resource.add_tag('cloud_id', cloud_id)
+                resource.add_tag('cost_source', 'estimated')
+                resource.add_tag('version', version)
+                resource.add_tag('total_hosts', str(len(hosts)))
+                resource.add_tag('total_vcpus', str(total_vcpus))
+                resource.add_tag('total_ram_gb', str(round(total_ram_gb, 2)))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing MySQL cluster {cluster.get('id')}: {e}")
+            return None
+    
+    def _process_managed_cluster(self, cluster: Dict, service_type: str,
+                                folder_id: str, folder_name: str, cloud_id: str,
+                                sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process generic managed cluster resource (MongoDB, ClickHouse, Redis)
+        
+        Args:
+            cluster: Cluster data from API
+            service_type: Type of service (mongodb, clickhouse, redis)
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            cluster_id = cluster['id']
+            cluster_name = cluster.get('name', cluster_id)
+            
+            # Extract cluster specifications
+            config = cluster.get('config', {})
+            version = 'unknown'
+            
+            # Get version from config based on service type
+            if service_type == 'mongodb':
+                mongodb_config = config.get('mongodbConfig', {})
+                version = mongodb_config.get('version', 'unknown')
+            elif service_type == 'clickhouse':
+                clickhouse_config = config.get('clickhouseConfig', {})
+                version = clickhouse_config.get('version', 'unknown')
+            elif service_type == 'redis':
+                redis_config = config.get('redisConfig', {})
+                version = redis_config.get('version', 'unknown')
+            
+            # Get host specifications
+            hosts = cluster.get('hosts', [])
+            total_vcpus = 0
+            total_ram_gb = 0
+            total_storage_gb = 0
+            
+            for host in hosts:
+                resources = host.get('resources', {})
+                vcpus = int(resources.get('resourcePresetId', '0').split('-')[-1]) if '-' in resources.get('resourcePresetId', '') else 2
+                ram_bytes = int(resources.get('diskSize', 0)) * (1024**3)
+                ram_gb = ram_bytes / (1024**3)
+                disk_size_gb = int(resources.get('diskSize', 0))
+                
+                total_vcpus += vcpus
+                total_ram_gb += ram_gb
+                total_storage_gb += disk_size_gb
+            
+            # Estimate daily cost
+            estimated_daily_cost = self._estimate_database_cluster_cost(
+                total_vcpus, total_ram_gb, total_storage_gb, service_type
+            )
+            
+            # Create resource metadata
+            metadata = {
+                'cluster': cluster,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'version': version,
+                'total_hosts': len(hosts),
+                'total_vcpus': total_vcpus,
+                'total_ram_gb': total_ram_gb,
+                'total_storage_gb': total_storage_gb,
+                'created_at': cluster.get('createdAt'),
+                'estimated_cost': True
+            }
+            
+            resource = self._create_resource(
+                resource_type=f'{service_type}-cluster',
+                resource_id=cluster_id,
+                name=cluster_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=hosts[0].get('zoneId', 'unknown') if hosts else 'unknown',
+                service_name=f'Managed {service_type.title()}'
+            )
+            
+            if resource:
+                resource.daily_cost = estimated_daily_cost
+                resource.effective_cost = estimated_daily_cost
+                resource.original_cost = estimated_daily_cost * 30
+                resource.currency = 'RUB'
+                resource.add_tag('folder_id', folder_id)
+                resource.add_tag('folder_name', folder_name)
+                resource.add_tag('cloud_id', cloud_id)
+                resource.add_tag('cost_source', 'estimated')
+                resource.add_tag('version', version)
+                resource.add_tag('total_hosts', str(len(hosts)))
+                resource.add_tag('total_vcpus', str(total_vcpus))
+                resource.add_tag('total_ram_gb', str(round(total_ram_gb, 2)))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing {service_type} cluster {cluster.get('id')}: {e}")
+            return None
+    
+    def _estimate_kubernetes_cluster_cost(self, total_vcpus: int, total_ram_gb: float, 
+                                         total_storage_gb: float, zone_id: str) -> float:
+        """
+        Estimate daily cost for a Kubernetes cluster
+        
+        Args:
+            total_vcpus: Total vCPUs across all nodes
+            total_ram_gb: Total RAM in GB across all nodes
+            total_storage_gb: Total storage in GB across all nodes
+            zone_id: Zone ID
+        
+        Returns:
+            Estimated daily cost in RUB
+        """
+        # Kubernetes cluster pricing includes:
+        # - Master node cost (fixed)
+        # - Worker node costs (based on resources)
+        # - Storage costs
+        
+        master_cost_per_hour = 50.0  # ₽ per hour for master
+        cpu_cost_per_hour = 1.50  # ₽ per vCPU per hour
+        ram_cost_per_gb_per_hour = 0.40  # ₽ per GB per hour
+        storage_cost_per_gb_per_hour = 0.0025  # ₽ per GB per hour
+        
+        hourly_cost = (
+            master_cost_per_hour +
+            total_vcpus * cpu_cost_per_hour +
+            total_ram_gb * ram_cost_per_gb_per_hour +
+            total_storage_gb * storage_cost_per_gb_per_hour
+        )
+        
+        daily_cost = hourly_cost * 24
+        return round(daily_cost, 2)
+    
+    def _estimate_database_cluster_cost(self, total_vcpus: int, total_ram_gb: float, 
+                                       total_storage_gb: float, db_type: str) -> float:
+        """
+        Estimate daily cost for a database cluster
+        
+        Args:
+            total_vcpus: Total vCPUs across all hosts
+            total_ram_gb: Total RAM in GB across all hosts
+            total_storage_gb: Total storage in GB across all hosts
+            db_type: Database type (postgresql, mysql, mongodb, etc.)
+        
+        Returns:
+            Estimated daily cost in RUB
+        """
+        # Database cluster pricing includes:
+        # - Compute costs (vCPU + RAM)
+        # - Storage costs
+        # - Managed service overhead
+        
+        cpu_cost_per_hour = 1.50  # ₽ per vCPU per hour
+        ram_cost_per_gb_per_hour = 0.40  # ₽ per GB per hour
+        storage_cost_per_gb_per_hour = 0.0025  # ₽ per GB per hour
+        
+        # Managed service overhead (20% markup)
+        overhead_multiplier = 1.2
+        
+        hourly_cost = (
+            total_vcpus * cpu_cost_per_hour +
+            total_ram_gb * ram_cost_per_gb_per_hour +
+            total_storage_gb * storage_cost_per_gb_per_hour
+        ) * overhead_multiplier
+        
+        daily_cost = hourly_cost * 24
+        return round(daily_cost, 2)
 
