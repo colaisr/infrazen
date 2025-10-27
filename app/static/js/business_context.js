@@ -12,6 +12,12 @@ let allResources = [];
 let currentFilter = 'all';
 let autoSaveTimer = null;
 
+// Undo/Redo state
+let undoStack = [];
+let redoStack = [];
+let maxUndoSteps = 50;
+let isRestoring = false; // Flag to prevent saving during restoration
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     initializeBusinessContext();
@@ -76,6 +82,10 @@ function setupEventListeners() {
     document.getElementById('zoomInBtn')?.addEventListener('click', zoomIn);
     document.getElementById('zoomOutBtn')?.addEventListener('click', zoomOut);
     document.getElementById('zoomResetBtn')?.addEventListener('click', zoomReset);
+    
+    // Undo/Redo controls
+    document.getElementById('undoBtn')?.addEventListener('click', undo);
+    document.getElementById('redoBtn')?.addEventListener('click', redo);
     
     // Toolbox toggle
     document.getElementById('toggleToolboxBtn')?.addEventListener('click', toggleToolbox);
@@ -488,7 +498,360 @@ function setupKeyboardShortcuts() {
             e.preventDefault();
             zoomReset();
         }
+        
+        // Undo: Ctrl+Z
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+        }
+        
+        // Redo: Ctrl+Shift+Z or Ctrl+Y
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+            e.preventDefault();
+            redo();
+        }
     });
+}
+
+/**
+ * Save current canvas state to undo stack
+ */
+function saveToUndoStack() {
+    if (!fabricCanvas) return;
+    
+    // Don't save during restoration
+    if (isRestoring) {
+        console.log('⏸️ Skipping save - restoration in progress');
+        return;
+    }
+    
+    // Get current canvas state
+    const state = {
+        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        viewport: {
+            zoom: fabricCanvas.getZoom(),
+            pan: fabricCanvas.viewportTransform.slice()
+        },
+        timestamp: Date.now()
+    };
+    
+    console.log('📝 Saving to undo stack. Stack size:', undoStack.length + 1, 'Objects:', state.objects.objects.length);
+    
+    // Log first group position for debugging
+    const firstGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
+    if (firstGroup) {
+        console.log(`  📍 Group ${firstGroup.fabricId?.slice(-8)} position: left=${firstGroup.left.toFixed(2)}, top=${firstGroup.top.toFixed(2)}`);
+    }
+    
+    // Add to undo stack
+    undoStack.push(state);
+    
+    // Limit stack size
+    if (undoStack.length > maxUndoSteps) {
+        undoStack.shift();
+    }
+    
+    // Clear redo stack when new action is performed
+    redoStack = [];
+    
+    // Update button states
+    updateUndoRedoButtons();
+}
+
+/**
+ * Undo last action
+ */
+function undo() {
+    console.log('⬅️ Undo called. Stack size:', undoStack.length);
+    
+    if (undoStack.length === 0) {
+        console.log('❌ Undo stack is empty');
+        return;
+    }
+    
+    // Log current position before undo
+    const currentGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
+    if (currentGroup) {
+        console.log(`  📍 Current Group ${currentGroup.fabricId?.slice(-8)} position BEFORE undo: left=${currentGroup.left.toFixed(2)}, top=${currentGroup.top.toFixed(2)}`);
+    }
+    
+    // Save current state to redo stack
+    const currentState = {
+        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        viewport: {
+            zoom: fabricCanvas.getZoom(),
+            pan: fabricCanvas.viewportTransform.slice()
+        },
+        timestamp: Date.now()
+    };
+    redoStack.push(currentState);
+    console.log('💾 Saved current state to redo stack. Current objects:', currentState.objects.objects.length);
+    
+    // Restore previous state
+    const previousState = undoStack.pop();
+    console.log('♻️ Restoring previous state. Objects:', previousState.objects.objects.length);
+    restoreCanvasState(previousState);
+    
+    // Update button states
+    updateUndoRedoButtons();
+}
+
+/**
+ * Redo last undone action
+ */
+function redo() {
+    if (redoStack.length === 0) return;
+    
+    // Save current state to undo stack
+    const currentState = {
+        objects: fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']),
+        viewport: {
+            zoom: fabricCanvas.getZoom(),
+            pan: fabricCanvas.viewportTransform.slice()
+        },
+        timestamp: Date.now()
+    };
+    undoStack.push(currentState);
+    
+    // Restore next state
+    const nextState = redoStack.pop();
+    restoreCanvasState(nextState);
+    
+    // Update button states
+    updateUndoRedoButtons();
+}
+
+/**
+ * Restore canvas to a saved state
+ */
+function restoreCanvasState(state) {
+    if (!fabricCanvas || !state) {
+        console.log('❌ Cannot restore: fabricCanvas or state is null');
+        return;
+    }
+    
+    console.log('🔄 Restoring canvas state...');
+    
+    // Set flag to prevent saving during restoration
+    isRestoring = true;
+    
+    // Temporarily remove canvas event listeners to prevent pollution
+    fabricCanvas.off('mouse:down');
+    fabricCanvas.off('object:modified');
+    fabricCanvas.off('object:added');
+    fabricCanvas.off('object:removed');
+    console.log('🔇 Canvas event listeners removed');
+    
+    // Clear current canvas
+    fabricCanvas.clear();
+    console.log('🗑️ Canvas cleared');
+    
+    // Restore objects
+    fabricCanvas.loadFromJSON(state.objects, function() {
+        console.log('✅ Objects loaded from JSON. Count:', fabricCanvas.getObjects().length);
+        
+        // Log first group position after restore
+        const firstGroup = fabricCanvas.getObjects().find(obj => obj.objectType === 'group');
+        if (firstGroup) {
+            console.log(`  📍 Restored Group ${firstGroup.fabricId?.slice(-8)} to position: left=${firstGroup.left.toFixed(2)}, top=${firstGroup.top.toFixed(2)}`);
+        }
+        
+        // Restore viewport
+        fabricCanvas.setZoom(state.viewport.zoom);
+        fabricCanvas.viewportTransform = state.viewport.pan.slice();
+        console.log('👁️ Viewport restored. Zoom:', state.viewport.zoom);
+        
+        // Re-setup event handlers for all objects
+        setupObjectEventHandlers();
+        
+        // Re-attach canvas event listeners
+        
+        // Mouse down on object - save state BEFORE modification
+        fabricCanvas.on('mouse:down', function(opt) {
+            const target = opt.target;
+            if (target && target.selectable) {
+                // Save state before any modification starts
+                saveToUndoStack();
+            }
+        });
+        
+        fabricCanvas.on('object:modified', function(e) {
+            const obj = e.target;
+            
+            // If it's an ActiveSelection (multiple objects), update each group in database
+            if (obj.type === 'activeSelection') {
+                obj.forEachObject(function(selectedObj) {
+                    if (selectedObj.objectType === 'group') {
+                        updateGroupInDatabase(selectedObj);
+                    }
+                });
+            }
+            // If it's a single group, update the database
+            else if (obj && obj.objectType === 'group') {
+                updateGroupInDatabase(obj);
+            }
+            
+            scheduleAutoSave();
+        });
+        
+        fabricCanvas.on('object:added', function() {
+            saveToUndoStack();
+            scheduleAutoSave();
+        });
+        
+        fabricCanvas.on('object:removed', function() {
+            saveToUndoStack();
+            scheduleAutoSave();
+        });
+        
+        console.log('🔊 Canvas event listeners re-attached');
+        
+        // Update zoom display
+        updateZoomDisplay();
+        
+        // Render
+        fabricCanvas.renderAll();
+        console.log('🎨 Canvas rendered');
+        
+        // Re-enable saving after restoration is complete
+        isRestoring = false;
+        console.log('🔓 Restoration complete - saving re-enabled');
+        
+        // Trigger autosave
+        scheduleAutoSave();
+    });
+}
+
+/**
+ * Setup event handlers for all objects on canvas
+ */
+function setupObjectEventHandlers() {
+    if (!fabricCanvas) return;
+    
+    const objects = fabricCanvas.getObjects();
+    console.log('🔧 Setting up event handlers for', objects.length, 'objects');
+    
+    let groupsFound = 0;
+    let groupsSetup = 0;
+    
+    objects.forEach(function(obj) {
+        // Setup group event handlers
+        if (obj.objectType === 'group') {
+            groupsFound++;
+            console.log('🟦 Found group:', obj.fabricId, 'Name:', obj.groupName);
+            
+            const groupText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupText');
+            const costBadge = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupCost');
+            
+            console.log('  └─ Text:', groupText ? '✅' : '❌', 'Cost:', costBadge ? '✅' : '❌');
+            
+            if (groupText && costBadge) {
+                groupsSetup++;
+                // Setup moving event
+                obj.on('moving', function() {
+                    updateGroupChildren(obj, groupText, costBadge);
+                });
+                
+                // Setup scaling event
+                obj.on('scaling', function() {
+                    const newWidth = obj.width * obj.scaleX;
+                    const newHeight = obj.height * obj.scaleY;
+                    
+                    obj.set({
+                        width: newWidth,
+                        height: newHeight,
+                        scaleX: 1,
+                        scaleY: 1
+                    });
+                    
+                    updateGroupChildren(obj, groupText, costBadge);
+                });
+                
+                // Setup modified event
+                obj.on('modified', function() {
+                    updateGroupInDatabase(obj);
+                });
+                
+                // Setup double-click event
+                obj.on('mousedblclick', function() {
+                    editGroupName(obj, groupText);
+                });
+            }
+        }
+        
+        // Setup resource event handlers
+        if (obj.objectType === 'resource') {
+            const nameText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceName');
+            const metaText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceMeta');
+            const infoIconCircle = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceInfoIcon');
+            const infoIconText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceInfoText');
+            const notesIconCircle = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceNotesIcon');
+            const notesIconText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceNotesText');
+            
+            if (nameText && metaText) {
+                // Setup moving event for resource
+                obj.on('moving', function() {
+                    // Update text positions
+                    nameText.set({
+                        left: this.left + this.width / 2,
+                        top: this.top + 15
+                    });
+                    metaText.set({
+                        left: this.left + this.width / 2,
+                        top: this.top + 40
+                    });
+                    
+                    // Update icon positions
+                    if (infoIconCircle && infoIconText) {
+                        infoIconCircle.set({
+                            left: this.left + 12,
+                            top: this.top + 4
+                        });
+                        infoIconText.set({
+                            left: this.left + 12,
+                            top: this.top + 4
+                        });
+                    }
+                    if (notesIconCircle && notesIconText) {
+                        notesIconCircle.set({
+                            left: this.left + this.width - 12,
+                            top: this.top + 4
+                        });
+                        notesIconText.set({
+                            left: this.left + this.width - 12,
+                            top: this.top + 4
+                        });
+                    }
+                    
+                    fabricCanvas.renderAll();
+                    
+                    // Check if moved into/out of groups
+                    checkResourceGroupAssignment(this);
+                    
+                    // Save new position to database
+                    updateResourcePosition(this);
+                });
+            }
+        }
+    });
+    
+    console.log('✅ Event handler setup complete. Groups found:', groupsFound, 'Groups setup:', groupsSetup);
+}
+
+/**
+ * Update undo/redo button states
+ */
+function updateUndoRedoButtons() {
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    
+    if (undoBtn) {
+        undoBtn.disabled = undoStack.length === 0;
+    }
+    
+    if (redoBtn) {
+        redoBtn.disabled = redoStack.length === 0;
+    }
 }
 
 /**
@@ -890,6 +1253,9 @@ function switchToCanvasView() {
         if (!fabricCanvas) {
             initializeCanvas();
         }
+        
+        // Initialize undo/redo buttons
+        updateUndoRedoButtons();
     }, 50);
 }
 
@@ -1141,7 +1507,16 @@ function setupCanvasEvents() {
         }
     });
     
-    // Object modified - trigger autosave
+    // Mouse down on object - save state BEFORE modification
+    fabricCanvas.on('mouse:down', function(opt) {
+        const target = opt.target;
+        if (target && target.selectable) {
+            // Save state before any modification starts
+            saveToUndoStack();
+        }
+    });
+    
+    // Object modified - update database and trigger autosave
     fabricCanvas.on('object:modified', function(e) {
         const obj = e.target;
         
@@ -1162,10 +1537,12 @@ function setupCanvasEvents() {
     });
     
     fabricCanvas.on('object:added', function() {
+        saveToUndoStack();
         scheduleAutoSave();
     });
     
     fabricCanvas.on('object:removed', function() {
+        saveToUndoStack();
         scheduleAutoSave();
     });
     
