@@ -1120,7 +1120,7 @@ def reseed_demo_user():
         import sys
         import os
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'scripts'))
-        from seed_demo_user import seed_demo_user, seed_historical_complete_syncs, seed_usage_data_tags
+        from seed_demo_user import seed_demo_user, seed_historical_complete_syncs, seed_usage_data_tags, seed_business_context
         
         # Call the comprehensive seeding function (base data + historical data)
         demo_user, providers_dict = seed_demo_user()
@@ -1130,6 +1130,12 @@ def reseed_demo_user():
         
         # Generate usage data tags for all server resources
         seed_usage_data_tags(demo_user, providers_dict)
+        
+        # Create business context boards
+        try:
+            seed_business_context(demo_user, providers_dict)
+        except Exception as bc_error:
+            logger.warning(f"Business Context seeding failed: {bc_error}", exc_info=True)
 
         # Compute fresh counts for response
         provider_count = CloudProvider.query.filter_by(user_id=demo_user.id).count()
