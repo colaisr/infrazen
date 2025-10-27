@@ -2256,7 +2256,7 @@ function scheduleAutoSave() {
     }
     
     const indicator = document.getElementById('saveIndicator');
-    indicator.textContent = 'Изменения...';
+    indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
     indicator.className = 'save-indicator saving';
     
     if (autoSaveTimer) {
