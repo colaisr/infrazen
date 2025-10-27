@@ -369,7 +369,8 @@ function setupKeyboardShortcuts() {
         // Copy: Ctrl+C or Cmd+C
         if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
             const activeObj = fabricCanvas?.getActiveObject();
-            if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+            // Allow copying groups and free objects (not resources - they're tied to DB)
+            if (activeObj && (activeObj.objectType === 'group' || activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
                 e.preventDefault();
                 copiedObject = activeObj;
             }
@@ -428,6 +429,65 @@ function setupKeyboardShortcuts() {
                 scheduleAutoSave();
             }
         }
+        
+        // Deselect: Esc key
+        if (e.key === 'Escape') {
+            if (fabricCanvas) {
+                fabricCanvas.discardActiveObject();
+                fabricCanvas.renderAll();
+                hidePropertiesPanel();
+            }
+        }
+        
+        // Select All: Ctrl+A
+        if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            if (fabricCanvas) {
+                e.preventDefault();
+                const allObjects = fabricCanvas.getObjects().filter(obj => 
+                    obj.selectable && 
+                    (obj.objectType === 'group' || obj.objectType === 'resource' || 
+                     obj.objectType === 'freeText' || obj.objectType === 'freeRect')
+                );
+                
+                // Also include group children (labels and cost badges) in the selection
+                const groupFabricIds = allObjects
+                    .filter(obj => obj.objectType === 'group')
+                    .map(obj => obj.fabricId);
+                
+                const groupChildren = fabricCanvas.getObjects().filter(obj => 
+                    groupFabricIds.includes(obj.parentFabricId) &&
+                    (obj.objectType === 'groupText' || obj.objectType === 'groupCost')
+                );
+                
+                const completeSelection = [...allObjects, ...groupChildren];
+                
+                if (completeSelection.length > 0) {
+                    const selection = new fabric.ActiveSelection(completeSelection, {
+                        canvas: fabricCanvas
+                    });
+                    fabricCanvas.setActiveObject(selection);
+                    fabricCanvas.renderAll();
+                }
+            }
+        }
+        
+        // Zoom In: Ctrl+= or Ctrl++
+        if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+            e.preventDefault();
+            zoomIn();
+        }
+        
+        // Zoom Out: Ctrl+-
+        if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+            e.preventDefault();
+            zoomOut();
+        }
+        
+        // Reset Zoom: Ctrl+0
+        if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+            e.preventDefault();
+            zoomReset();
+        }
     });
 }
 
@@ -437,6 +497,13 @@ function setupKeyboardShortcuts() {
 function pasteObject(obj) {
     if (!fabricCanvas || !obj) return;
     
+    // Handle groups separately (they need DB creation)
+    if (obj.objectType === 'group') {
+        pasteGroup(obj);
+        return;
+    }
+    
+    // Handle free objects (text, rectangles)
     obj.clone(function(cloned) {
         cloned.set({
             left: cloned.left + 20,
@@ -469,6 +536,152 @@ function pasteObject(obj) {
         fabricCanvas.renderAll();
         scheduleAutoSave();
     });
+}
+
+/**
+ * Paste a group (clone with DB creation)
+ */
+async function pasteGroup(originalGroup) {
+    if (!fabricCanvas || !currentBoard) return;
+    
+    const newFabricId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const newLeft = originalGroup.left + 30;
+    const newTop = originalGroup.top + 30;
+    
+    try {
+        // Create group in database
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/groups`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: originalGroup.groupName + ' (Copy)',
+                fabric_id: newFabricId,
+                position_x: newLeft,
+                position_y: newTop,
+                width: originalGroup.width,
+                height: originalGroup.height,
+                color: originalGroup.groupColor || '#3B82F6',
+                calculated_cost: 0
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Clone the group rectangle
+            originalGroup.clone(function(clonedRect) {
+                clonedRect.set({
+                    left: newLeft,
+                    top: newTop,
+                    fabricId: newFabricId,
+                    groupName: originalGroup.groupName + ' (Copy)',
+                    groupColor: originalGroup.groupColor || '#3B82F6',
+                    calculatedCost: 0,
+                    dbId: data.group.id,
+                    objectType: 'group'
+                });
+                
+                // Preserve toObject method
+                clonedRect.toObject = (function(toObject) {
+                    return function() {
+                        return fabric.util.object.extend(toObject.call(this), {
+                            objectType: this.objectType,
+                            fabricId: this.fabricId,
+                            groupName: this.groupName,
+                            groupColor: this.groupColor,
+                            calculatedCost: this.calculatedCost,
+                            dbId: this.dbId
+                        });
+                    };
+                })(fabric.Rect.prototype.toObject);
+                
+                fabricCanvas.add(clonedRect);
+                
+                // Add group label
+                const groupText = new fabric.Text(clonedRect.groupName, {
+                    left: clonedRect.left + 10,
+                    top: clonedRect.top + 10,
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                    fill: clonedRect.groupColor,
+                    selectable: false,
+                    evented: false,
+                    objectType: 'groupText',
+                    parentFabricId: newFabricId,
+                    toObject: (function(toObject) {
+                        return function() {
+                            return fabric.util.object.extend(toObject.call(this), {
+                                objectType: this.objectType,
+                                parentFabricId: this.parentFabricId
+                            });
+                        };
+                    })(fabric.Text.prototype.toObject)
+                });
+                
+                fabricCanvas.add(groupText);
+                
+                // Add cost badge
+                const costText = '0 ₽/мес';
+                const costBadge = new fabric.Text(costText, {
+                    left: clonedRect.left + clonedRect.width - 80,
+                    top: clonedRect.top + 10,
+                    fontSize: 13,
+                    fontWeight: '600',
+                    fill: '#10B981',
+                    selectable: false,
+                    evented: false,
+                    objectType: 'groupCost',
+                    parentFabricId: newFabricId,
+                    toObject: (function(toObject) {
+                        return function() {
+                            return fabric.util.object.extend(toObject.call(this), {
+                                objectType: this.objectType,
+                                parentFabricId: this.parentFabricId
+                            });
+                        };
+                    })(fabric.Text.prototype.toObject)
+                });
+                
+                fabricCanvas.add(costBadge);
+                
+                // Setup event handlers to keep label/cost in sync
+                clonedRect.on('moving', function() {
+                    updateGroupChildren(clonedRect, groupText, costBadge);
+                });
+                
+                clonedRect.on('scaling', function() {
+                    const newWidth = clonedRect.width * clonedRect.scaleX;
+                    const newHeight = clonedRect.height * clonedRect.scaleY;
+                    
+                    clonedRect.set({
+                        width: newWidth,
+                        height: newHeight,
+                        scaleX: 1,
+                        scaleY: 1
+                    });
+                    
+                    updateGroupChildren(clonedRect, groupText, costBadge);
+                });
+                
+                clonedRect.on('modified', function() {
+                    updateGroupInDatabase(clonedRect);
+                });
+                
+                clonedRect.on('mousedblclick', function() {
+                    editGroupName(clonedRect, groupText);
+                });
+                
+                fabricCanvas.setActiveObject(clonedRect);
+                fabricCanvas.renderAll();
+                scheduleAutoSave();
+            });
+        } else {
+            showFlashMessage('error', data.error || 'Failed to copy group');
+        }
+    } catch (error) {
+        console.error('Error copying group:', error);
+        showFlashMessage('error', 'Failed to copy group');
+    }
 }
 
 /**
@@ -932,8 +1145,16 @@ function setupCanvasEvents() {
     fabricCanvas.on('object:modified', function(e) {
         const obj = e.target;
         
-        // If it's a group, update the database
-        if (obj && obj.objectType === 'group') {
+        // If it's an ActiveSelection (multiple objects), update each group in database
+        if (obj.type === 'activeSelection') {
+            obj.forEachObject(function(selectedObj) {
+                if (selectedObj.objectType === 'group') {
+                    updateGroupInDatabase(selectedObj);
+                }
+            });
+        }
+        // If it's a single group, update the database
+        else if (obj && obj.objectType === 'group') {
             updateGroupInDatabase(obj);
         }
         
@@ -2554,6 +2775,22 @@ function changeGroupColor(groupRect) {
         // Update in database
         updateGroupInDatabase(groupRect);
         scheduleAutoSave();
+    }
+}
+
+/**
+ * Update group children by fabric ID (used when group is part of ActiveSelection)
+ */
+function updateGroupChildrenByFabricId(fabricId) {
+    if (!fabricCanvas || !fabricId) return;
+    
+    const objects = fabricCanvas.getObjects();
+    const groupRect = objects.find(obj => obj.fabricId === fabricId && obj.objectType === 'group');
+    const groupText = objects.find(obj => obj.parentFabricId === fabricId && obj.objectType === 'groupText');
+    const costBadge = objects.find(obj => obj.parentFabricId === fabricId && obj.objectType === 'groupCost');
+    
+    if (groupRect && groupText && costBadge) {
+        updateGroupChildren(groupRect, groupText, costBadge);
     }
 }
 
