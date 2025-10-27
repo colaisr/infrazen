@@ -82,7 +82,7 @@ function setupEventListeners() {
     document.getElementById('closeToolboxBtn')?.addEventListener('click', toggleToolbox);
     
     // Save board button
-    document.getElementById('saveBoardBtn')?.addEventListener('click', saveBoard);
+    // Manual save button removed - autosave only
     
     // Board name editing
     const boardNameEl = document.getElementById('currentBoardName');
@@ -2826,11 +2826,7 @@ document.addEventListener('keydown', function(e) {
         }
     }
     
-    // Ctrl/Cmd + S - Save
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        saveBoard(false);
-    }
+    // Manual save (Ctrl+S) removed - autosave only
 });
 
 /**
