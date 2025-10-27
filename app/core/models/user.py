@@ -36,6 +36,9 @@ class User(BaseModel):
     # Account status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    email_confirmed = db.Column(db.Boolean, default=False, nullable=False)  # Email confirmation status
+    email_confirmation_token = db.Column(db.String(255), nullable=True)  # Token for email confirmation
+    email_confirmation_sent_at = db.Column(db.DateTime, nullable=True)  # When confirmation email was sent
     last_login = db.Column(db.DateTime)
     login_count = db.Column(db.Integer, default=0)
     
@@ -67,6 +70,7 @@ class User(BaseModel):
             'can_modify_data': self.can_modify_data(),
             'is_active': self.is_active,
             'is_verified': self.is_verified,
+            'email_confirmed': self.email_confirmed,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'login_count': self.login_count,
             'timezone': self.timezone,
@@ -156,6 +160,28 @@ class User(BaseModel):
         self.login_count += 1
         db.session.commit()
     
+    def generate_email_confirmation_token(self):
+        """Generate a unique token for email confirmation"""
+        import secrets
+        from datetime import datetime
+        self.email_confirmation_token = secrets.token_urlsafe(32)
+        self.email_confirmation_sent_at = datetime.now()
+        db.session.commit()
+        return self.email_confirmation_token
+    
+    def confirm_email(self, token):
+        """Confirm email using token"""
+        if self.email_confirmation_token == token:
+            self.email_confirmed = True
+            self.email_confirmation_token = None  # Clear token after use
+            db.session.commit()
+            return True
+        return False
+    
+    def is_email_confirmed(self):
+        """Check if user's email is confirmed"""
+        return self.email_confirmed or self.google_verified_email
+    
     @classmethod
     def find_by_google_id(cls, google_id):
         """Find user by Google ID"""
@@ -184,15 +210,17 @@ class User(BaseModel):
     @classmethod
     def create_from_google(cls, google_data):
         """Create user from Google OAuth data"""
+        email_verified = google_data.get('email_verified', False)
         user = cls(
             google_id=google_data.get('sub'),
             email=google_data.get('email'),
             first_name=google_data.get('given_name', ''),
             last_name=google_data.get('family_name', ''),
             google_picture=google_data.get('picture', ''),
-            google_verified_email=google_data.get('email_verified', False),
+            google_verified_email=email_verified,
             google_locale=google_data.get('locale', ''),
-            is_verified=google_data.get('email_verified', False),
+            is_verified=email_verified,
+            email_confirmed=email_verified,  # Auto-confirm email for Google OAuth users
             role='user'  # Default role for new users
         )
         

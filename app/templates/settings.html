@@ -24,7 +24,17 @@
             <div class="info-grid">
                 <div class="info-item">
                     <label>Email</label>
-                    <div class="info-value" id="userEmail">{{ user.email }}</div>
+                    <div class="info-value">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span id="userEmail">{{ user.email }}</span>
+                            <span class="email-status-badge" id="emailStatusBadge">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Checking...
+                            </span>
+                            <button id="sendConfirmationBtn" class="btn-send-confirmation" style="display: none;" onclick="sendConfirmationEmail()">
+                                <i class="fa-solid fa-envelope"></i> Send Confirmation Email
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="info-item">
                     <label>Name</label>

@@ -37,6 +37,15 @@ class Config:
     
     # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+    
+    # Email Configuration (Beget SMTP)
+    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.beget.com')
+    MAIL_PORT = int(os.getenv('MAIL_PORT', 465))
+    MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'True') == 'True'
+    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'False') == 'True'
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', os.getenv('MAIL_USERNAME'))
 
     # Recommendations feature flags
     RECOMMENDATIONS_ENABLED = os.environ.get('RECOMMENDATIONS_ENABLED', 'true').lower() == 'true'

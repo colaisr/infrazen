@@ -8,9 +8,12 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 import os
 import time
+import logging
 from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -395,6 +398,8 @@ def user_details():
                 'company': user.company,
                 'role': user.role,
                 'is_active': user.is_active,
+                'email_confirmed': user.email_confirmed,
+                'is_email_confirmed': user.is_email_confirmed(),  # Combined check (native or Google)
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'last_login': user.last_login.isoformat() if user.last_login else None,
                 'login_count': user.login_count,
@@ -461,6 +466,23 @@ def handle_register():
         db.session.add(user)
         db.session.commit()
         
+        # Generate confirmation token and send email
+        token = user.generate_email_confirmation_token()
+        confirmation_link = f"{request.url_root}api/auth/verify-email?token={token}"
+        
+        # Send confirmation email asynchronously (don't block registration if email fails)
+        try:
+            from app.core.services.email_service import EmailService
+            username = f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0]
+            EmailService.send_registration_confirmation(
+                to_email=user.email,
+                username=username,
+                confirmation_link=confirmation_link
+            )
+        except Exception as e:
+            logger.error(f"Failed to send confirmation email: {str(e)}")
+            # Don't fail registration if email sending fails
+        
         # Automatically log the user in after successful registration
         session['user'] = {
             'id': str(user.id),
@@ -477,7 +499,7 @@ def handle_register():
         
         return jsonify({
             'success': True, 
-            'message': 'Регистрация прошла успешно! Вы автоматически вошли в систему.',
+            'message': 'Регистрация прошла успешно! Проверьте email для подтверждения.',
             'redirect': '/dashboard'
         })
         
@@ -550,9 +572,10 @@ def link_google_account():
             if not user.last_name and idinfo.get('family_name'):
                 user.last_name = idinfo.get('family_name')
             
-            # Update is_verified based on Google verification
+            # Update is_verified and email_confirmed based on Google verification
             if idinfo.get('email_verified'):
                 user.is_verified = True
+                user.email_confirmed = True  # Auto-confirm email for Google OAuth
             
             db.session.commit()
             
@@ -575,6 +598,97 @@ def link_google_account():
     except Exception as e:
         print(f"Error linking Google account: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/send-confirmation-email', methods=['POST'])
+@validate_session
+def send_confirmation_email():
+    """Send email confirmation to current user"""
+    try:
+        # Get user from database
+        user_data = session.get('user')
+        user = User.find_by_id(user_data.get('db_id'))
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        # Check if email is already confirmed
+        if user.is_email_confirmed():
+            return jsonify({'success': False, 'error': 'Email is already confirmed'})
+        
+        # Generate confirmation token
+        token = user.generate_email_confirmation_token()
+        
+        # Create confirmation link
+        confirmation_link = f"{request.url_root}api/auth/verify-email?token={token}"
+        
+        # Send confirmation email
+        from app.core.services.email_service import EmailService
+        
+        username = f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0]
+        success = EmailService.send_email_confirmation(
+            to_email=user.email,
+            username=username,
+            confirmation_link=confirmation_link
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Confirmation email sent! Please check your inbox.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to send confirmation email. Please try again later.'
+            })
+        
+    except Exception as e:
+        logger.error(f"Error sending confirmation email: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/verify-email')
+def verify_email():
+    """Verify email using token from confirmation link"""
+    try:
+        token = request.args.get('token')
+        
+        if not token:
+            return render_template('email_verification_result.html', 
+                                 success=False, 
+                                 message='Неверная ссылка подтверждения')
+        
+        # Find user with this token
+        user = User.query.filter_by(email_confirmation_token=token).first()
+        
+        if not user:
+            return render_template('email_verification_result.html',
+                                 success=False,
+                                 message='Неверная или устаревшая ссылка подтверждения')
+        
+        # Check if token is still valid (24 hours)
+        from datetime import datetime, timedelta
+        if user.email_confirmation_sent_at:
+            token_age = datetime.now() - user.email_confirmation_sent_at
+            if token_age > timedelta(hours=24):
+                return render_template('email_verification_result.html',
+                                     success=False,
+                                     message='Срок действия ссылки истек. Пожалуйста, запросите новую.')
+        
+        # Confirm email
+        if user.confirm_email(token):
+            return render_template('email_verification_result.html',
+                                 success=True,
+                                 message='Ваш email успешно подтвержден!')
+        else:
+            return render_template('email_verification_result.html',
+                                 success=False,
+                                 message='Не удалось подтвердить email. Попробуйте снова.')
+        
+    except Exception as e:
+        logger.error(f"Error verifying email: {str(e)}")
+        return render_template('email_verification_result.html',
+                             success=False,
+                             message='Произошла ошибка при подтверждении')
 
 @auth_bp.route('/logout')
 def logout():

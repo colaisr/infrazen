@@ -63,6 +63,23 @@ function updateAccountInfo(user) {
             month: 'long',
             day: 'numeric'
         });
+    
+    // Update email confirmation badge
+    const emailBadge = document.getElementById('emailStatusBadge');
+    const sendBtn = document.getElementById('sendConfirmationBtn');
+    const isEmailConfirmed = user.is_email_confirmed;
+    
+    if (isEmailConfirmed) {
+        emailBadge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verified';
+        emailBadge.style.color = '#10b981';
+        emailBadge.style.fontWeight = '500';
+        sendBtn.style.display = 'none';
+    } else {
+        emailBadge.innerHTML = '<i class="fa-solid fa-exclamation-circle"></i> Not Verified';
+        emailBadge.style.color = '#f59e0b';
+        emailBadge.style.fontWeight = '500';
+        sendBtn.style.display = 'inline-block';
+    }
 }
 
 function updateLoginMethods(user) {
@@ -462,6 +479,45 @@ document.addEventListener('DOMContentLoaded', function() {
     loadUserDetails();
 });
 
+// ============================================================================
+// Email Confirmation
+// ============================================================================
+
+function sendConfirmationEmail() {
+    const btn = document.getElementById('sendConfirmationBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    
+    fetch('/api/auth/send-confirmation-email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(data.message || 'Confirmation email sent! Please check your inbox.', 'success');
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Email Sent';
+            // Keep button disabled for 60 seconds to prevent spam
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-envelope"></i> Send Confirmation Email';
+            }, 60000);
+        } else {
+            showMessage(data.error || 'Failed to send confirmation email', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-envelope"></i> Send Confirmation Email';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Failed to send confirmation email', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-envelope"></i> Send Confirmation Email';
+    });
+}
+
 // Make functions globally available for onclick handlers
 window.handleGoogleConnect = handleGoogleConnect;
 window.handleGoogleConnectResponse = handleGoogleConnectResponse;
@@ -470,4 +526,5 @@ window.setPassword = setPassword;
 window.changePassword = changePassword;
 window.checkPasswordStrength = checkPasswordStrength;
 window.checkPasswordMatch = checkPasswordMatch;
+window.sendConfirmationEmail = sendConfirmationEmail;
 
