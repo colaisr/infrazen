@@ -199,11 +199,14 @@ def set_default_board(board_id):
 @business_context_bp.route('/available-resources', methods=['GET'])
 @validate_session
 def get_available_resources():
-    """Get all user resources with placement status"""
+    """Get all user resources with placement status for a specific board"""
     user_id = session.get('user', {}).get('db_id')
     
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+    
+    # Get board_id from query parameter (optional for backward compatibility)
+    board_id = request.args.get('board_id', type=int)
     
     # Get all user's resources via their providers
     resources = Resource.query.join(
@@ -213,16 +216,22 @@ def get_available_resources():
         Resource.is_active == True
     ).all()
     
-    # Get user's boards
-    board_ids = [b.id for b in BusinessBoard.query.filter_by(user_id=user_id).all()]
-    
-    # Get placed resource IDs
+    # Get placed resource IDs for the specific board (or all boards if no board_id)
     placed_resource_ids = set()
-    if board_ids:
+    if board_id:
+        # Check placement only for the specific board
         placed_resources = BoardResource.query.filter(
-            BoardResource.board_id.in_(board_ids)
+            BoardResource.board_id == board_id
         ).all()
         placed_resource_ids = {br.resource_id for br in placed_resources}
+    else:
+        # Legacy behavior: check all boards
+        board_ids = [b.id for b in BusinessBoard.query.filter_by(user_id=user_id).all()]
+        if board_ids:
+            placed_resources = BoardResource.query.filter(
+                BoardResource.board_id.in_(board_ids)
+            ).all()
+            placed_resource_ids = {br.resource_id for br in placed_resources}
     
     # Build response with placement status
     resources_data = []

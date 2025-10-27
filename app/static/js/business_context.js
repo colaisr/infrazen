@@ -1876,7 +1876,12 @@ function toggleToolbox() {
  */
 async function loadResources() {
     try {
-        const response = await fetch('/api/business-context/available-resources');
+        // Pass current board ID to get board-specific placement status
+        const url = currentBoard 
+            ? `/api/business-context/available-resources?board_id=${currentBoard.id}`
+            : '/api/business-context/available-resources';
+        
+        const response = await fetch(url);
         const data = await response.json();
         
         if (data.success) {
