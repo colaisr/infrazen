@@ -111,6 +111,7 @@ class YandexService:
             total_reserved_ips = 0
             total_load_balancers = 0
             total_registries = 0
+            total_dns_zones = 0
             total_managed_clusters = 0
             total_cost = 0.0
             
@@ -338,6 +339,23 @@ class YandexService:
                         synced_resources.append(registry_resource)
                         total_registries += 1
                         total_cost += registry_resource.daily_cost or 0.0
+                
+                # PHASE 2H: Process DNS zones
+                logger.info(f"  Processing DNS zones...")
+                dns_zones = self.client.list_dns_zones(folder_id)
+                total_dns_zones = 0
+                for zone in dns_zones:
+                    dns_resource = self._process_dns_zone_resource(
+                        zone,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if dns_resource:
+                        synced_resources.append(dns_resource)
+                        total_dns_zones += 1
+                        total_cost += dns_resource.daily_cost or 0.0
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
@@ -358,6 +376,7 @@ class YandexService:
                 'total_reserved_ips': total_reserved_ips,
                 'total_load_balancers': total_load_balancers,
                 'total_registries': total_registries,
+                'total_dns_zones': total_dns_zones,
                 'total_managed_clusters': total_managed_clusters,
                 'total_estimated_daily_cost': round(total_cost, 2)
             }
@@ -413,7 +432,7 @@ class YandexService:
             
             db.session.commit()
             
-            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries), estimated {total_cost:.2f} ₽/day")
+            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries, {total_dns_zones} DNS zones), estimated {total_cost:.2f} ₽/day")
             
             return {
                 'success': True,
@@ -426,10 +445,11 @@ class YandexService:
                 'total_reserved_ips': total_reserved_ips,
                 'total_load_balancers': total_load_balancers,
                 'total_registries': total_registries,
+                'total_dns_zones': total_dns_zones,
                 'estimated_daily_cost': round(total_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'cpu_stats_collected': collect_stats and len(vm_resources) > 0,
-                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries) - estimated cost: {total_cost:.2f} ₽/day'
+                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries, {total_dns_zones} DNS zones) - estimated cost: {total_cost:.2f} ₽/day'
             }
             
         except Exception as e:
@@ -1198,6 +1218,84 @@ class YandexService:
             
         except Exception as e:
             logger.error(f"Error processing container registry {registry.get('id', 'unknown')}: {str(e)}")
+            return None
+    
+    def _process_dns_zone_resource(self, zone: Dict, folder_id: str, 
+                                   folder_name: str, cloud_id: str,
+                                   sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process DNS zone resource
+        
+        DNS zones are charged per zone + per query.
+        From HAR analysis: 13.47₽/day total (mostly zone hosting)
+        
+        Args:
+            zone: DNS zone data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            zone_id = zone['id']
+            zone_name = zone.get('zone', zone.get('name', zone_id))
+            
+            # DNS zone status
+            # DNS zones don't have explicit status in API response
+            status = 'RUNNING'
+            
+            # DNS pricing from HAR analysis:
+            # Total: 13.47₽/day for yc-it
+            # Breakdown:
+            #   - Zone hosting: 11.66₽ (dns.zones.v1)
+            #   - Queries: 1.81₽ (dns.requests.public.*)
+            # 
+            # Average per zone: 13.47₽ if 1 zone, split if multiple
+            # For simplicity, use 11.66₽ per zone (zone hosting only)
+            # Query costs are variable and small
+            daily_cost = 11.66
+            
+            metadata = {
+                'dns_zone': zone,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'zone_name': zone_name,
+                'created_at': zone.get('createdAt'),
+                'cost_source': 'har_analysis',
+                'note': 'Zone hosting cost only (queries are variable)'
+            }
+            
+            resource = self._create_resource(
+                resource_type='dns_zone',
+                resource_id=zone_id,
+                name=f"DNS: {zone_name}",
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Cloud DNS'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = status
+                resource.add_tag('zone_name', zone_name)
+                resource.add_tag('cost_source', 'har_analysis')
+                resource.add_tag('pricing_per_day', '11.66')
+                resource.add_tag('note', 'Query costs not included (variable)')
+                
+                logger.debug(f"    DNS Zone: {zone_name} = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing DNS zone {zone.get('id', 'unknown')}: {str(e)}")
             return None
     
     def _create_resource(self, resource_type: str, resource_id: str, 

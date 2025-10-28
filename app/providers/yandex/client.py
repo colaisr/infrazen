@@ -778,7 +778,44 @@ class YandexClient:
             return enriched_registries
         
         except Exception as e:
-            logger.warning(f"Failed to list gateways: {e}")
+            logger.warning(f"Failed to list container registries: {e}")
+            return []
+    
+    def list_dns_zones(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all DNS zones in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of DNS zone dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            # DNS API endpoint
+            dns_url = 'https://dns.api.cloud.yandex.net/dns/v1'
+            url = f'{dns_url}/zones'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            zones = data.get('dnsZones', [])
+            
+            logger.info(f"Found {len(zones)} DNS zones in folder {folder_id}")
+            
+            return zones
+        
+        except Exception as e:
+            logger.warning(f"Failed to list DNS zones: {e}")
             return []
     
     def _get_service_account_folder(self) -> Optional[str]:
