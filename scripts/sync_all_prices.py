@@ -107,8 +107,7 @@ def run_dry_run(provider_type=None):
     print_header("Price Sync - Dry Run", '=')
     
     query = ProviderCatalog.query.filter_by(
-        is_enabled=True,
-        has_pricing_api=True
+        is_enabled=True
     )
     
     if provider_type:
@@ -120,7 +119,7 @@ def run_dry_run(provider_type=None):
         if provider_type:
             print(f"No enabled provider found for type: {provider_type}")
         else:
-            print("No enabled providers with pricing API found.")
+            print("No enabled providers found.")
         return
     
     print(f"\nFound {len(providers)} provider(s) for price synchronization:\n")
@@ -149,10 +148,9 @@ def run_price_sync(provider_type=None, verbose=False, quiet=False):
             print_header("Price Sync - All Providers", '=')
         print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Get providers
+    # Get providers (only check if enabled, not has_pricing_api)
     query = ProviderCatalog.query.filter_by(
-        is_enabled=True,
-        has_pricing_api=True
+        is_enabled=True
     )
     
     if provider_type:
@@ -164,7 +162,7 @@ def run_price_sync(provider_type=None, verbose=False, quiet=False):
         if provider_type:
             print(f"❌ No enabled provider found for type: {provider_type}")
         else:
-            print("❌ No enabled providers with pricing API found")
+            print("❌ No enabled providers found")
         sys.exit(2)
     
     # Create service

@@ -1413,16 +1413,15 @@ def sync_all_prices():
         
         logger.info("Admin initiated price sync for all providers")
         
-        # Get all enabled providers with pricing API
+        # Get all enabled providers
         providers = ProviderCatalog.query.filter_by(
-            is_enabled=True,
-            has_pricing_api=True
+            is_enabled=True
         ).all()
         
         if not providers:
             return jsonify({
                 'success': True,
-                'message': 'No providers with pricing API enabled',
+                'message': 'No providers enabled',
                 'total_providers': 0,
                 'successful_providers': 0,
                 'failed_providers': 0,
