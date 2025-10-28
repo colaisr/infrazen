@@ -68,6 +68,17 @@ class YandexPricing:
         'public_ip_active': 0.2592,    # Active public IP (attached to VM) - NOT FREE!
     }
     
+    # Managed PostgreSQL pricing (₽/day)
+    # Source: HAR file analysis of actual billing data (Oct 27, 2024)
+    # Note: Managed services have overhead costs (backups, monitoring, management)
+    # that make them more expensive than raw Compute VMs
+    POSTGRESQL_PRICING = {
+        'cpu_per_day': 42.25,     # Per vCPU per day (100% fraction)
+        'ram_per_gb_day': 11.41,  # Per GB RAM per day
+        'storage_hdd_per_gb_day': 0.1152,  # network-hdd storage per GB per day
+        'storage_ssd_per_gb_day': 0.43,    # network-ssd storage per GB per day (estimated)
+    }
+    
     @classmethod
     def calculate_vm_cost(cls, vcpus: int, ram_gb: float, storage_gb: float = 0,
                           platform_id: str = 'standard-v3', 
@@ -170,11 +181,13 @@ class YandexPricing:
     @classmethod
     def calculate_cluster_cost(cls, total_vcpus: int, total_ram_gb: float,
                                total_storage_gb: float, cluster_type: str = 'kubernetes',
-                               platform_id: str = 'standard-v3') -> Dict[str, float]:
+                               platform_id: str = 'standard-v3', 
+                               disk_type: str = 'network-hdd') -> Dict[str, float]:
         """
         Calculate cluster cost (Kubernetes, databases)
         
-        For managed services, uses platform pricing + storage
+        For PostgreSQL, uses HAR-derived pricing for accuracy.
+        For other services, uses platform pricing + storage.
         
         Args:
             total_vcpus: Total vCPUs across all nodes/hosts
@@ -182,11 +195,40 @@ class YandexPricing:
             total_storage_gb: Total storage in GB
             cluster_type: Type of cluster (kubernetes, postgresql, mysql, etc.)
             platform_id: Platform ID
+            disk_type: Disk type (network-hdd, network-ssd)
             
         Returns:
             Dict with hourly, daily, and monthly costs
         """
         try:
+            # PostgreSQL has special pricing from HAR analysis
+            if cluster_type == 'postgresql':
+                cpu_cost_daily = total_vcpus * cls.POSTGRESQL_PRICING['cpu_per_day']
+                ram_cost_daily = total_ram_gb * cls.POSTGRESQL_PRICING['ram_per_gb_day']
+                
+                # Choose storage pricing based on disk type
+                if 'ssd' in disk_type.lower():
+                    storage_cost_daily = total_storage_gb * cls.POSTGRESQL_PRICING['storage_ssd_per_gb_day']
+                else:  # HDD
+                    storage_cost_daily = total_storage_gb * cls.POSTGRESQL_PRICING['storage_hdd_per_gb_day']
+                
+                total_daily = cpu_cost_daily + ram_cost_daily + storage_cost_daily
+                total_hourly = total_daily / 24
+                total_monthly = total_daily * 30
+                
+                return {
+                    'hourly_cost': round(total_hourly, 4),
+                    'daily_cost': round(total_daily, 2),
+                    'monthly_cost': round(total_monthly, 2),
+                    'breakdown': {
+                        'cpu': round(cpu_cost_daily, 2),
+                        'ram': round(ram_cost_daily, 2),
+                        'storage': round(storage_cost_daily, 2),
+                    },
+                    'accuracy': 'har_based'
+                }
+            
+            # For other cluster types, use generic compute pricing
             platform = cls.PLATFORM_PRICING.get(platform_id, cls.PLATFORM_PRICING['standard-v3'])
             
             # Use 100% vCPU for managed services

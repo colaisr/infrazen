@@ -1311,6 +1311,7 @@ class YandexService:
             total_vcpus = 0
             total_ram_gb = 0
             total_storage_gb = 0
+            disk_type = 'network-hdd'  # Default
             
             for host in hosts:
                 resources = host.get('resources', {})
@@ -1330,17 +1331,18 @@ class YandexService:
                     vcpus = 2
                     ram_gb = 4
                 
-                # Parse disk size (in bytes)
+                # Parse disk size (in bytes) and type
                 disk_size_bytes = int(resources.get('diskSize', 0))
                 disk_size_gb = disk_size_bytes / (1024**3)
+                disk_type = resources.get('diskTypeId', 'network-hdd')
                 
                 total_vcpus += vcpus
                 total_ram_gb += ram_gb
                 total_storage_gb += disk_size_gb
             
-            # Estimate daily cost
+            # Estimate daily cost with disk type
             estimated_daily_cost = self._estimate_database_cluster_cost(
-                total_vcpus, total_ram_gb, total_storage_gb, 'postgresql'
+                total_vcpus, total_ram_gb, total_storage_gb, 'postgresql', disk_type
             )
             
             # Create resource metadata
@@ -1622,9 +1624,12 @@ class YandexService:
         return master_daily_cost
     
     def _estimate_database_cluster_cost(self, total_vcpus: int, total_ram_gb: float, 
-                                       total_storage_gb: float, db_type: str) -> float:
+                                       total_storage_gb: float, db_type: str, disk_type: str = 'network-hdd') -> float:
         """
-        Calculate database cluster cost using SKU-based pricing
+        Calculate database cluster cost using SKU-based or HAR-based pricing
+        
+        For PostgreSQL, uses HAR-derived pricing for maximum accuracy.
+        For other databases, uses SKU-based pricing with fallback to documented pricing.
         """
         # Try SKU-based pricing first
         sku_cost = YandexSKUPricing.calculate_cluster_cost(
@@ -1638,13 +1643,14 @@ class YandexService:
         if sku_cost and sku_cost.get('accuracy') == 'sku_based':
             return sku_cost['daily_cost']
         
-        # Fallback to documented pricing
+        # Fallback to documented pricing (with HAR-based pricing for PostgreSQL)
         cost_data = YandexPricing.calculate_cluster_cost(
             total_vcpus=total_vcpus,
             total_ram_gb=total_ram_gb,
             total_storage_gb=total_storage_gb,
             cluster_type=db_type,
-            platform_id='standard-v3'
+            platform_id='standard-v3',
+            disk_type=disk_type
         )
         
         return cost_data['daily_cost']
