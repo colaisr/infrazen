@@ -42,8 +42,8 @@ instance/
 .env.development.local
 .env.test.local
 .env.production.local
-config.env
-config.env.*
+config.env.local
+config.env.bak*
 .ssh/
 
 # IDE
