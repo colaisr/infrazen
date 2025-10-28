@@ -1400,6 +1400,231 @@ def bulk_sync_all_users():
         }), 500
 
 
+@admin_bp.route('/users/<int:user_id>/snapshots', methods=['GET'])
+def get_user_snapshots(user_id):
+    """Get all sync snapshots for a user, grouped by complete syncs (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.models.sync import SyncSnapshot
+        from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
+        
+        # Get target user
+        user = User.find_by_id(user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'})
+        
+        # Get all complete syncs for this user
+        complete_syncs = CompleteSync.query.filter_by(user_id=user_id).order_by(
+            CompleteSync.sync_started_at.desc()
+        ).all()
+        
+        # Get all provider connections for this user
+        providers = CloudProvider.query.filter_by(user_id=user_id).all()
+        provider_ids = [p.id for p in providers]
+        
+        # Get all individual snapshots for user's providers
+        all_snapshots = SyncSnapshot.query.filter(
+            SyncSnapshot.provider_id.in_(provider_ids)
+        ).order_by(SyncSnapshot.sync_started_at.desc()).all()
+        
+        # Create a mapping of snapshot_id to whether it's part of a complete sync
+        snapshot_in_complete_sync = set()
+        for cs in complete_syncs:
+            for ref in cs.provider_syncs:
+                snapshot_in_complete_sync.add(ref.sync_snapshot_id)
+        
+        # Build response data
+        response_data = {
+            'complete_syncs': [],
+            'individual_snapshots': []
+        }
+        
+        # Process complete syncs with their provider snapshots
+        for cs in complete_syncs:
+            provider_snapshots = []
+            for ref in cs.provider_syncs:
+                snapshot = SyncSnapshot.query.get(ref.sync_snapshot_id)
+                if snapshot:
+                    provider = CloudProvider.query.get(snapshot.provider_id)
+                    provider_snapshots.append({
+                        'id': snapshot.id,
+                        'provider_name': provider.connection_name if provider else 'Unknown',
+                        'provider_type': provider.provider_type if provider else 'unknown',
+                        'sync_type': snapshot.sync_type,
+                        'sync_status': snapshot.sync_status,
+                        'sync_started_at': snapshot.sync_started_at.isoformat() if snapshot.sync_started_at else None,
+                        'sync_completed_at': snapshot.sync_completed_at.isoformat() if snapshot.sync_completed_at else None,
+                        'sync_duration_seconds': snapshot.sync_duration_seconds,
+                        'total_resources_found': snapshot.total_resources_found,
+                        'resources_created': snapshot.resources_created,
+                        'resources_updated': snapshot.resources_updated,
+                        'resources_deleted': snapshot.resources_deleted,
+                        'total_monthly_cost': snapshot.total_monthly_cost,
+                        'error_message': snapshot.error_message
+                    })
+            
+            response_data['complete_syncs'].append({
+                'id': cs.id,
+                'sync_type': cs.sync_type,
+                'sync_status': cs.sync_status,
+                'sync_started_at': cs.sync_started_at.isoformat() if cs.sync_started_at else None,
+                'sync_completed_at': cs.sync_completed_at.isoformat() if cs.sync_completed_at else None,
+                'sync_duration_seconds': cs.sync_duration_seconds,
+                'total_providers_synced': cs.total_providers_synced,
+                'successful_providers': cs.successful_providers,
+                'failed_providers': cs.failed_providers,
+                'total_resources_found': cs.total_resources_found,
+                'total_monthly_cost': cs.total_monthly_cost,
+                'error_message': cs.error_message,
+                'provider_snapshots': provider_snapshots
+            })
+        
+        # Process individual snapshots (not part of complete sync)
+        for snapshot in all_snapshots:
+            if snapshot.id not in snapshot_in_complete_sync:
+                provider = CloudProvider.query.get(snapshot.provider_id)
+                response_data['individual_snapshots'].append({
+                    'id': snapshot.id,
+                    'provider_name': provider.connection_name if provider else 'Unknown',
+                    'provider_type': provider.provider_type if provider else 'unknown',
+                    'sync_type': snapshot.sync_type,
+                    'sync_status': snapshot.sync_status,
+                    'sync_started_at': snapshot.sync_started_at.isoformat() if snapshot.sync_started_at else None,
+                    'sync_completed_at': snapshot.sync_completed_at.isoformat() if snapshot.sync_completed_at else None,
+                    'sync_duration_seconds': snapshot.sync_duration_seconds,
+                    'total_resources_found': snapshot.total_resources_found,
+                    'resources_created': snapshot.resources_created,
+                    'resources_updated': snapshot.resources_updated,
+                    'resources_deleted': snapshot.resources_deleted,
+                    'total_monthly_cost': snapshot.total_monthly_cost,
+                    'error_message': snapshot.error_message
+                })
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0]
+            },
+            'data': response_data,
+            'total_complete_syncs': len(response_data['complete_syncs']),
+            'total_individual_snapshots': len(response_data['individual_snapshots'])
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching user snapshots: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to fetch snapshots: {str(e)}'
+        })
+
+@admin_bp.route('/snapshots/<int:snapshot_id>', methods=['DELETE'])
+def delete_snapshot(snapshot_id):
+    """Delete an individual sync snapshot (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.models.sync import SyncSnapshot
+        
+        snapshot = SyncSnapshot.query.get(snapshot_id)
+        if not snapshot:
+            return jsonify({'success': False, 'error': 'Snapshot not found'})
+        
+        # Check if snapshot is part of a complete sync
+        from app.core.models.complete_sync import ProviderSyncReference
+        ref = ProviderSyncReference.query.filter_by(sync_snapshot_id=snapshot_id).first()
+        
+        if ref:
+            return jsonify({
+                'success': False, 
+                'error': 'Cannot delete snapshot that is part of a main sync. Delete the main sync instead.'
+            })
+        
+        # Delete the snapshot (ResourceStates will cascade automatically)
+        db.session.delete(snapshot)
+        db.session.commit()
+        
+        logger.info(f"Admin deleted snapshot {snapshot_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Snapshot deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting snapshot {snapshot_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete snapshot: {str(e)}'
+        })
+
+@admin_bp.route('/complete-syncs/<int:complete_sync_id>', methods=['DELETE'])
+def delete_complete_sync(complete_sync_id):
+    """Delete a complete sync and all related snapshots (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.models.sync import SyncSnapshot, ResourceState
+        from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
+        
+        complete_sync = CompleteSync.query.get(complete_sync_id)
+        if not complete_sync:
+            return jsonify({'success': False, 'error': 'Complete sync not found'})
+        
+        # Get all provider sync references to find snapshot IDs
+        snapshot_ids = []
+        for ref in complete_sync.provider_syncs:
+            snapshot_ids.append(ref.sync_snapshot_id)
+        
+        # Step 1: Delete all ResourceStates related to these snapshots
+        if snapshot_ids:
+            deleted_states = ResourceState.query.filter(
+                ResourceState.sync_snapshot_id.in_(snapshot_ids)
+            ).delete(synchronize_session=False)
+            logger.info(f"Deleted {deleted_states} resource states")
+        
+        # Step 2: Delete the complete sync (this will cascade delete ProviderSyncReferences)
+        db.session.delete(complete_sync)
+        
+        # Step 3: Delete all the individual snapshots
+        if snapshot_ids:
+            deleted_snapshots = SyncSnapshot.query.filter(
+                SyncSnapshot.id.in_(snapshot_ids)
+            ).delete(synchronize_session=False)
+            logger.info(f"Deleted {deleted_snapshots} snapshots")
+        
+        db.session.commit()
+        
+        logger.info(f"Admin deleted complete sync {complete_sync_id} and {len(snapshot_ids)} related snapshots")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Complete sync and {len(snapshot_ids)} related snapshots deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting complete sync {complete_sync_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to delete complete sync: {str(e)}'
+        })
+
 @admin_bp.route('/sync-all-prices', methods=['POST'])
 def sync_all_prices():
     """Sync prices for all enabled providers with pricing API (admin only)"""
