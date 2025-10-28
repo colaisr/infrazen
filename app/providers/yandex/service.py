@@ -106,6 +106,9 @@ class YandexService:
             synced_resources = []
             total_instances = 0
             total_disks = 0
+            total_snapshots = 0
+            total_images = 0
+            total_reserved_ips = 0
             total_managed_clusters = 0
             total_cost = 0.0
             
@@ -237,6 +240,57 @@ class YandexService:
                         synced_resources.append(disk_resource)
                         total_disks += 1
                         total_cost += disk_resource.daily_cost or 0.0
+                
+                # PHASE 2C: Process snapshots
+                logger.info(f"  Processing snapshots...")
+                snapshots = self.client.list_snapshots(folder_id)
+                total_snapshots = 0
+                for snapshot in snapshots:
+                    snapshot_resource = self._process_snapshot_resource(
+                        snapshot,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if snapshot_resource:
+                        synced_resources.append(snapshot_resource)
+                        total_snapshots += 1
+                        total_cost += snapshot_resource.daily_cost or 0.0
+                
+                # PHASE 2D: Process custom images
+                logger.info(f"  Processing custom images...")
+                images = self.client.list_images(folder_id)
+                total_images = 0
+                for image in images:
+                    image_resource = self._process_image_resource(
+                        image,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if image_resource:
+                        synced_resources.append(image_resource)
+                        total_images += 1
+                        total_cost += image_resource.daily_cost or 0.0
+                
+                # PHASE 2E: Process reserved (unused) public IPs
+                logger.info(f"  Processing reserved IPs...")
+                addresses = self.client.list_addresses(folder_id)
+                total_reserved_ips = 0
+                for address in addresses:
+                    reserved_ip_resource = self._process_reserved_ip_resource(
+                        address,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if reserved_ip_resource:
+                        synced_resources.append(reserved_ip_resource)
+                        total_reserved_ips += 1
+                        total_cost += reserved_ip_resource.daily_cost or 0.0
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
@@ -252,6 +306,9 @@ class YandexService:
                 'folders_discovered': len(all_resources['folders']),
                 'total_instances': total_instances,
                 'total_disks': total_disks,
+                'total_snapshots': total_snapshots,
+                'total_images': total_images,
+                'total_reserved_ips': total_reserved_ips,
                 'total_managed_clusters': total_managed_clusters,
                 'total_estimated_daily_cost': round(total_cost, 2)
             }
@@ -307,7 +364,7 @@ class YandexService:
             
             db.session.commit()
             
-            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks), estimated {total_cost:.2f} ₽/day")
+            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs), estimated {total_cost:.2f} ₽/day")
             
             return {
                 'success': True,
@@ -315,10 +372,13 @@ class YandexService:
                 'total_managed_clusters': total_managed_clusters,
                 'total_instances': total_instances,
                 'total_disks': total_disks,
+                'total_snapshots': total_snapshots,
+                'total_images': total_images,
+                'total_reserved_ips': total_reserved_ips,
                 'estimated_daily_cost': round(total_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'cpu_stats_collected': collect_stats and len(vm_resources) > 0,
-                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks) - estimated cost: {total_cost:.2f} ₽/day'
+                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs) - estimated cost: {total_cost:.2f} ₽/day'
             }
             
         except Exception as e:
@@ -679,6 +739,237 @@ class YandexService:
         )
         
         return cost_data['daily_cost']
+    
+    def _process_snapshot_resource(self, snapshot: Dict, folder_id: str, 
+                                   folder_name: str, cloud_id: str,
+                                   sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process snapshot resource
+        
+        Snapshots are storage-based resources charged per GB per day.
+        From HAR analysis: 0.1123₽/GB/day (478.98₽ for 4,264 GB)
+        
+        Args:
+            snapshot: Snapshot data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            snapshot_id = snapshot['id']
+            snapshot_name = snapshot.get('name', snapshot_id)
+            
+            # Extract snapshot specifications
+            size_bytes = int(snapshot.get('storageSize', 0))
+            size_gb = size_bytes / (1024**3)
+            status_raw = snapshot.get('status', 'UNKNOWN')
+            source_disk_id = snapshot.get('sourceDiskId', '')
+            
+            # Map snapshot statuses
+            status_map = {
+                'READY': 'RUNNING',
+                'CREATING': 'CREATING',
+                'ERROR': 'ERROR',
+                'DELETING': 'DELETING'
+            }
+            status = status_map.get(status_raw, status_raw)
+            
+            # Snapshot pricing: 0.1123₽/GB/day (from HAR analysis)
+            # This matches documented pricing of ~0.0047₽/GB/hour
+            daily_cost = size_gb * 0.1123
+            
+            metadata = {
+                'snapshot': snapshot,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'size_gb': round(size_gb, 2),
+                'source_disk_id': source_disk_id,
+                'created_at': snapshot.get('createdAt'),
+                'cost_source': 'har_analysis'
+            }
+            
+            resource = self._create_resource(
+                resource_type='snapshot',
+                resource_id=snapshot_id,
+                name=snapshot_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Compute Cloud'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = status
+                resource.add_tag('source_disk_id', source_disk_id)
+                resource.add_tag('cost_source', 'har_analysis')
+                resource.add_tag('pricing_per_gb_day', '0.1123')
+                
+                logger.debug(f"    Snapshot: {snapshot_name} ({size_gb:.1f} GB) = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing snapshot {snapshot.get('id', 'unknown')}: {str(e)}")
+            return None
+    
+    def _process_image_resource(self, image: Dict, folder_id: str, 
+                                folder_name: str, cloud_id: str,
+                                sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process custom image resource
+        
+        Custom images are storage-based resources charged per GB per day.
+        From HAR analysis: 0.1382₽/GB/day (126.02₽ for 912 GB)
+        
+        Args:
+            image: Image data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            image_id = image['id']
+            image_name = image.get('name', image_id)
+            
+            # Extract image specifications
+            size_bytes = int(image.get('storageSize', 0))
+            size_gb = size_bytes / (1024**3)
+            status_raw = image.get('status', 'UNKNOWN')
+            
+            # Map image statuses
+            status_map = {
+                'READY': 'RUNNING',
+                'CREATING': 'CREATING',
+                'ERROR': 'ERROR',
+                'DELETING': 'DELETING'
+            }
+            status = status_map.get(status_raw, status_raw)
+            
+            # Image pricing: 0.1382₽/GB/day (from HAR analysis)
+            # This matches documented pricing of ~0.0058₽/GB/hour
+            daily_cost = size_gb * 0.1382
+            
+            metadata = {
+                'image': image,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'size_gb': round(size_gb, 2),
+                'created_at': image.get('createdAt'),
+                'cost_source': 'har_analysis'
+            }
+            
+            resource = self._create_resource(
+                resource_type='image',
+                resource_id=image_id,
+                name=image_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Compute Cloud'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = status
+                resource.add_tag('cost_source', 'har_analysis')
+                resource.add_tag('pricing_per_gb_day', '0.1382')
+                
+                logger.debug(f"    Image: {image_name} ({size_gb:.1f} GB) = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing image {image.get('id', 'unknown')}: {str(e)}")
+            return None
+    
+    def _process_reserved_ip_resource(self, address: Dict, folder_id: str, 
+                                     folder_name: str, cloud_id: str,
+                                     sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process reserved but unused public IP address
+        
+        Reserved IPs that are not attached to any resource still cost money.
+        From HAR analysis: 4.61₽/day per unused IP (40.18₽ for ~9 IPs)
+        
+        Args:
+            address: Address data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            address_id = address['id']
+            address_value = address.get('address', address_id)
+            
+            # Only process unused (reserved) addresses
+            is_used = address.get('used', True)
+            if is_used:
+                return None  # Skip active IPs (they're counted in VM costs)
+            
+            # Reserved IP pricing: 0.1920₽/hour = 4.608₽/day
+            daily_cost = 4.608
+            
+            metadata = {
+                'address': address,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'ip_address': address_value,
+                'is_used': is_used,
+                'reserved': address.get('reserved', False),
+                'created_at': address.get('createdAt'),
+                'cost_source': 'documented'
+            }
+            
+            resource = self._create_resource(
+                resource_type='reserved_ip',
+                resource_id=address_id,
+                name=f"Reserved IP: {address_value}",
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Virtual Private Cloud'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = 'RUNNING'
+                resource.add_tag('ip_address', address_value)
+                resource.add_tag('is_reserved', 'true')
+                resource.add_tag('cost_source', 'documented')
+                resource.add_tag('pricing_per_day', '4.608')
+                
+                logger.debug(f"    Reserved IP: {address_value} = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing reserved IP {address.get('id', 'unknown')}: {str(e)}")
+            return None
     
     def _create_resource(self, resource_type: str, resource_id: str, 
                         name: str, metadata: Dict[str, Any], 

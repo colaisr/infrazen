@@ -477,6 +477,84 @@ class YandexClient:
         except Exception as e:
             raise Exception(f"Failed to list disks: {str(e)}")
     
+    def list_snapshots(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all disk snapshots in a folder
+        
+        Snapshots cost money to store (compute.snapshot SKU)
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of snapshot dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folders = self.list_folders()
+                if folders:
+                    folder_id = folders[0]['id']
+                else:
+                    raise Exception("No folders found and no folder_id provided")
+            
+            headers = self._get_headers()
+            url = f'{self.compute_url}/snapshots'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            snapshots = data.get('snapshots', [])
+            
+            logger.info(f"Found {len(snapshots)} snapshots in folder {folder_id}")
+            
+            return snapshots
+        
+        except Exception as e:
+            logger.warning(f"Failed to list snapshots: {e}")
+            return []
+    
+    def list_images(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all custom images in a folder
+        
+        Custom images cost money to store (compute.image SKU)
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of image dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folders = self.list_folders()
+                if folders:
+                    folder_id = folders[0]['id']
+                else:
+                    raise Exception("No folders found and no folder_id provided")
+            
+            headers = self._get_headers()
+            url = f'{self.compute_url}/images'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            images = data.get('images', [])
+            
+            logger.info(f"Found {len(images)} custom images in folder {folder_id}")
+            
+            return images
+        
+        except Exception as e:
+            logger.warning(f"Failed to list images: {e}")
+            return []
+    
     def list_networks(self, folder_id: str = None) -> List[Dict[str, Any]]:
         """
         List all networks in a folder
