@@ -6,13 +6,12 @@ from datetime import timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
-# Priority: config.env.local (production) > config.env (development)
-# config.env.local is git-ignored and maintained via SSH on production
-# config.env is git-tracked with safe development defaults
-if os.path.exists('config.env.local'):
-    load_dotenv('config.env.local')  # Production
+# Priority: config.prod.env (production) > config.dev.env (development)
+# Both files are git-ignored and maintained separately
+if os.path.exists('config.prod.env'):
+    load_dotenv('config.prod.env')  # Production
 else:
-    load_dotenv('config.env')  # Development
+    load_dotenv('config.dev.env')  # Development
 
 class Config:
     """Base configuration"""

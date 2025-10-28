@@ -38,12 +38,11 @@ instance/
 
 # Environment variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-config.env.local
-config.env.bak*
+.env.*
+config.dev.env
+config.prod.env
+config.*.env
+*.bak
 .ssh/
 
 # IDE

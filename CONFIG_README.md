@@ -1,169 +1,199 @@
 # Configuration Management
 
-## Overview
+## Clear and Simple Config System
 
-InfraZen uses a simple, clean two-file configuration approach:
+InfraZen uses **two config files**, both git-ignored:
 
-- **`config.env`** - Development configuration (Git tracked)
-- **`config.env.local`** - Production configuration (Git ignored, SSH managed)
+| File | Environment | Location | Git Tracked |
+|------|-------------|----------|-------------|
+| `config.dev.env` | **Development** (your Mac) | `/Users/.../InfraZen/` | ❌ No |
+| `config.prod.env` | **Production** (server) | `/opt/infrazen/` | ❌ No |
+| `config.example.env` | **Template** (copy this) | Both | ✅ Yes |
 
 ## How It Works
 
-The application automatically loads the correct config:
-
 ```python
-if os.path.exists('config.env.local'):
-    load_dotenv('config.env.local')  # Production
+# app/config.py automatically loads:
+if os.path.exists('config.prod.env'):
+    load_dotenv('config.prod.env')  # Production
 else:
-    load_dotenv('config.env')  # Development
+    load_dotenv('config.dev.env')  # Development
 ```
 
-**Priority:** `config.env.local` > `config.env`
+**Simple rule:** 
+- Has `config.prod.env`? → Production mode
+- No `config.prod.env`? → Development mode (uses `config.dev.env`)
 
-## Development Setup
+## Setup Instructions
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/colaisr/infrazen.git
-   cd infrazen
-   ```
+### Local Development Setup
 
-2. **Use the default `config.env`**
-   - Already tracked in Git
-   - Contains safe development defaults
-   - Uses local MySQL: `localhost:3306/infrazen_dev`
+```bash
+# 1. Clone repo
+git clone https://github.com/colaisr/infrazen.git
+cd infrazen
 
-3. **Optional: Override locally**
-   ```bash
-   cp config.env config.env.local
-   # Edit config.env.local with your local settings
-   ```
+# 2. Copy template
+cp config.example.env config.dev.env
 
-## Production Setup
+# 3. Edit with your local settings
+nano config.dev.env
 
-1. **SSH into production server**
-   ```bash
-   ssh infrazen-prod
-   cd /opt/infrazen
-   ```
-
-2. **Create `config.env.local` with production credentials**
-   ```bash
-   sudo nano config.env.local
-   ```
-
-3. **Add production settings:**
-   ```bash
-   # InfraZen Production Configuration
-   
-   FLASK_ENV=production
-   SECRET_KEY=<generate-secure-key>
-   
-   # Production Database
-   DATABASE_URL=mysql+pymysql://user:password@10.19.0.1:3306/infrazen_prod?charset=utf8mb4
-   
-   # Google OAuth
-   GOOGLE_CLIENT_ID=<your-prod-client-id>.apps.googleusercontent.com
-   
-   # Email (Beget SMTP)
-   MAIL_SERVER=smtp.beget.com
-   MAIL_PORT=465
-   MAIL_USE_SSL=True
-   MAIL_USE_TLS=False
-   MAIL_USERNAME=registration@infrazen.ru
-   MAIL_PASSWORD=<your-mail-password>
-   MAIL_DEFAULT_SENDER=registration@infrazen.ru
-   
-   # Logging
-   LOG_LEVEL=INFO
-   ```
-
-4. **Restart the application**
-   ```bash
-   sudo systemctl restart infrazen
-   ```
-
-## File Structure
-
-```
-infrazen/
-├── config.env              # Development (Git tracked)
-├── config.env.local        # Production (Git ignored)
-├── CONFIG_README.md        # This file
-└── .gitignore             # Ignores config.env.local
+# Set:
+# - DATABASE_URL=mysql+pymysql://infrazen_user:infrazen_password@localhost:3306/infrazen_dev
+# - FLASK_ENV=development
 ```
 
-## Security
+### Production Setup
 
-- ✅ `config.env` - Safe to commit (no secrets)
-- ❌ `config.env.local` - **NEVER commit** (contains secrets)
-- ✅ Git automatically ignores `config.env.local`
+```bash
+# 1. SSH to server
+ssh infrazen-prod
+cd /opt/infrazen
 
-## Scripts and Cron Jobs
+# 2. Copy template
+cp config.example.env config.prod.env
 
-All scripts (`bulk_sync_all_users.py`, `sync_all_prices.py`) automatically use the correct config:
+# 3. Edit with production settings
+sudo nano config.prod.env
 
-- **Development:** Uses `config.env` (local MySQL)
-- **Production:** Uses `config.env.local` (production MySQL)
+# Set:
+# - DATABASE_URL=mysql+pymysql://infrazen_prod:PASSWORD@jufiedeycadeth.beget.app:3306/infrazen_prod
+# - FLASK_ENV=production
+# - SECRET_KEY=<generate-secure-key>
+# - MAIL credentials for registration@infrazen.ru
+```
 
-No code changes needed between environments!
+## Production Database
 
-## Common Issues
+**Host:** `jufiedeycadeth.beget.app:3306`  
+**Access from:** `217.26.28.90` (production server IP)  
+**User:** `infrazen_prod`  
+**Database:** `infrazen_prod`
 
-### "Can't connect to database"
+## File Contents
 
-**Development:**
-- Ensure MySQL is running locally
-- Check credentials in `config.env`
+### config.dev.env (Local)
+```bash
+FLASK_ENV=development
+DATABASE_URL=mysql+pymysql://infrazen_user:infrazen_password@localhost:3306/infrazen_dev?charset=utf8mb4
+GOOGLE_CLIENT_ID=your-dev-client-id
+# ... other dev settings
+```
 
-**Production:**
-- Ensure `config.env.local` exists
-- Verify DATABASE_URL points to correct server
-- Check MySQL server is accessible
-
-### "Script works locally but not on production"
-
-1. Verify `config.env.local` exists on production
-2. Check DATABASE_URL in `config.env.local`
-3. Test connectivity: `mysql -h 10.19.0.1 -u user -p`
-
-## Migration from Old Config
-
-If you have old config files (`config.env.example`, `config.env.prod`):
-
-1. **On production:** Rename to `config.env.local`
-   ```bash
-   sudo mv /opt/infrazen/config.env.prod /opt/infrazen/config.env.local
-   ```
-
-2. **Remove old files from git:**
-   ```bash
-   git rm config.env.example config.env.prod config.env.dev
-   ```
+### config.prod.env (Production)
+```bash
+FLASK_ENV=production
+DATABASE_URL=mysql+pymysql://infrazen_prod:Kok5489103!@jufiedeycadeth.beget.app:3306/infrazen_prod?charset=utf8mb4
+GOOGLE_CLIENT_ID=421154810757-i7ssn34msfpqlf0s5fkfrucun5sgut4d.apps.googleusercontent.com
+SECRET_KEY=infrazen-finops-secret-key-2025
+MAIL_USERNAME=registration@infrazen.ru
+# ... other prod settings
+```
 
 ## Systemd Service
 
-The systemd service loads environment from the config file:
+The production systemd service loads `config.prod.env`:
 
 ```ini
 [Service]
-EnvironmentFile=/opt/infrazen/config.env
+EnvironmentFile=/opt/infrazen/config.prod.env
 ```
 
-**Note:** This should be updated to check for `config.env.local` first, but since our app code handles the priority, it works either way.
+## Deploy Script
 
-## Best Practices
+The `/opt/infrazen/deploy` script should:
 
-1. ✅ Keep `config.env` with safe defaults
-2. ✅ Create `config.env.local` on production only
-3. ✅ Never commit `config.env.local`
-4. ✅ Backup `config.env.local` separately (not in Git)
-5. ✅ Use strong passwords and keys in production
+1. Pull latest code from Git
+2. **NOT touch config.prod.env** (it's not in Git)
+3. Restart the service
 
-## Quick Reference
+```bash
+#!/bin/bash
+cd /opt/infrazen
+git pull
+sudo systemctl restart infrazen
+echo "✅ Deployed successfully"
+```
 
-| File | Environment | Git Tracked | Contains Secrets |
-|------|-------------|-------------|------------------|
-| `config.env` | Development | ✅ Yes | ❌ No |
-| `config.env.local` | Production | ❌ No | ✅ Yes |
+## Scripts (bulk_sync, price_sync)
 
+All scripts automatically use the correct config:
+
+- **Local:** Uses `config.dev.env` → local MySQL
+- **Production:** Uses `config.prod.env` → Beget MySQL
+
+No changes needed between environments!
+
+## Security
+
+- ❌ **Never commit** `config.dev.env` or `config.prod.env`
+- ✅ **Always commit** `config.example.env` (template only)
+- ✅ Git automatically ignores both dev and prod configs
+- 🔒 Production secrets stay only on server
+
+## Migration from Old System
+
+If you have old files:
+
+**On local Mac:**
+```bash
+mv config.env config.dev.env
+# OR copy from example:
+cp config.example.env config.dev.env
+nano config.dev.env
+```
+
+**On production:**
+```bash
+ssh infrazen-prod
+cd /opt/infrazen
+sudo mv config.env.local config.prod.env
+# OR if you have config.env with prod settings:
+sudo mv config.env config.prod.env
+```
+
+## What's in Git vs What's Not
+
+**In Git (safe templates):**
+- ✅ `config.example.env` - Template to copy
+- ✅ `CONFIG_README.md` - This documentation
+
+**NOT in Git (real secrets):**
+- ❌ `config.dev.env` - Your local dev config
+- ❌ `config.prod.env` - Production config with real passwords
+
+## Troubleshooting
+
+### "App can't connect to database"
+
+**Check which config is loaded:**
+```python
+python -c "
+import os
+if os.path.exists('config.prod.env'):
+    print('Using: config.prod.env (PRODUCTION)')
+else:
+    print('Using: config.dev.env (DEVELOPMENT)')
+"
+```
+
+### "Config file not found"
+
+Create the appropriate file:
+```bash
+# Local:
+cp config.example.env config.dev.env
+
+# Production:
+sudo cp config.example.env config.prod.env
+sudo nano config.prod.env  # Add real credentials
+```
+
+## Summary
+
+✅ **Clear naming:** `dev` = local, `prod` = server  
+✅ **No mix:** Production ONLY uses `config.prod.env`  
+✅ **All excluded from Git:** Both configs are git-ignored  
+✅ **Deploy script safe:** Git pull won't overwrite configs  
+✅ **Scripts work:** Auto-detect environment, no changes needed
