@@ -109,29 +109,15 @@ class PricingService:
         region = price_data_list[0].get("region")
 
         try:
-            # Remove previous snapshot for this provider (optionally scoped by resource type/region)
-            # We must delete dependent price_history rows first to satisfy FK constraints
-            price_ids_subq = db.session.query(ProviderPrice.id).filter(ProviderPrice.provider == provider)
-            if resource_type:
-                price_ids_subq = price_ids_subq.filter(ProviderPrice.resource_type == resource_type)
-            if region:
-                price_ids_subq = price_ids_subq.filter(ProviderPrice.region == region)
-
-            # Delete history records referencing the target prices
-            history_deleted = db.session.query(PriceHistory).filter(PriceHistory.price_id.in_(price_ids_subq)).delete(synchronize_session=False)
-
-            # Now delete the prices themselves
-            deleted = db.session.query(ProviderPrice).filter(ProviderPrice.id.in_(price_ids_subq.subquery())).delete(synchronize_session=False)
-            if deleted:
-                logger.info(
-                    "Removed %d price records and %d history rows for provider=%s resource_type=%s region=%s",
-                    deleted,
-                    history_deleted,
-                    provider,
-                    resource_type,
-                    region,
-                )
-
+            # Don't delete existing prices - just update/insert
+            # This avoids:
+            # 1. Foreign key violations (recommendations reference prices)
+            # 2. MySQL connection timeouts during long DELETE operations
+            # 3. Loss of price history data
+            # The save_price_data method will update existing records automatically
+            
+            logger.info(f"Upserting {len(price_data_list)} price records for provider={provider}")
+            
             for price_data in price_data_list:
                 record = PricingService.save_price_data(price_data)
                 saved_records.append(record)
