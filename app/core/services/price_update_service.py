@@ -83,8 +83,23 @@ class PriceUpdateService:
                 
                 logger.info(f"Retrieved {len(pricing_data)} pricing records from {provider_type}")
                 
-                # Save pricing data
-                saved_records = self.pricing_service.bulk_save_price_data(pricing_data)
+                # Save pricing data in batches to avoid MySQL connection timeouts
+                batch_size = 100
+                saved_records = []
+                
+                for i in range(0, len(pricing_data), batch_size):
+                    batch = pricing_data[i:i + batch_size]
+                    batch_num = (i // batch_size) + 1
+                    total_batches = (len(pricing_data) + batch_size - 1) // batch_size
+                    
+                    logger.info(f"Saving batch {batch_num}/{total_batches} ({len(batch)} records)")
+                    batch_saved = self.pricing_service.bulk_save_price_data(batch)
+                    saved_records.extend(batch_saved)
+                    
+                    # Commit after each batch to keep connection alive
+                    from app.core.database import db
+                    db.session.commit()
+                    logger.info(f"Batch {batch_num}/{total_batches} committed ({len(saved_records)}/{len(pricing_data)} total)")
                 
                 # Update sync status to success
                 self.pricing_service.update_provider_sync_status(provider_type, 'success')
