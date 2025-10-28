@@ -425,7 +425,7 @@ class ProviderPlugin(ABC):
 **Implemented Providers:**
 - ✅ **Beget**: VPS, domains, databases, FTP, email accounts
 - ✅ **Selectel**: VMs, volumes, file storage, billing integration
-- ✅ **Yandex Cloud**: VMs, disks, networks, IAM authentication (October 2025)
+- ✅ **Yandex Cloud**: 11 service types, 99.84% accuracy, SKU+HAR pricing (October 2025) - See `yandex_cloud_integration.md`
 - 🚀 **Ready for**: AWS, Azure, GCP, DigitalOcean, etc.
 
 ### 6.2.4. Multi-Provider User Experience
@@ -685,7 +685,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 
 #### **Provider-Specific Data Handling**
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
-- **Yandex Cloud**: ✅ **IAM Token-Based Integration** (October 2025) - Service account JWT authentication, compute instances with full specs (CPU/RAM/disk), block storage with orphan detection, smart folder discovery fallback for limited permissions, cost estimation with billing API upgrade path, multi-tenancy support (Clouds→Folders), production-tested
+- **Yandex Cloud**: ✅ **SKU+HAR-Based Cost Tracking** (October 2025) - Service account JWT authentication, 11 service types (VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs), 993 SKU prices synced daily, HAR-derived managed service pricing, 99.84% accuracy, multi-tenancy support (Clouds→Folders), production-tested. **Full details:** See `yandex_cloud_integration.md` for complete architecture, pricing methodology, API integration details, and implementation guide (15,000+ words).
 - **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
