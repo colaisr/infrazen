@@ -1398,3 +1398,111 @@ def bulk_sync_all_users():
             'success': False,
             'error': f'Failed to execute bulk sync: {str(e)}'
         }), 500
+
+
+@admin_bp.route('/sync-all-prices', methods=['POST'])
+def sync_all_prices():
+    """Sync prices for all enabled providers with pricing API (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.services.price_update_service import PriceUpdateService
+        from datetime import datetime
+        
+        logger.info("Admin initiated price sync for all providers")
+        
+        # Get all enabled providers with pricing API
+        providers = ProviderCatalog.query.filter_by(
+            is_enabled=True,
+            has_pricing_api=True
+        ).all()
+        
+        if not providers:
+            return jsonify({
+                'success': True,
+                'message': 'No providers with pricing API enabled',
+                'total_providers': 0,
+                'successful_providers': 0,
+                'failed_providers': 0,
+                'provider_results': []
+            })
+        
+        price_service = PriceUpdateService()
+        results = {
+            'total_providers': len(providers),
+            'successful_providers': 0,
+            'failed_providers': 0,
+            'provider_results': []
+        }
+        
+        start_time = datetime.utcnow()
+        
+        # Sync each provider
+        for provider in providers:
+            provider_start = datetime.utcnow()
+            logger.info(f"Syncing prices for {provider.display_name}...")
+            
+            try:
+                result = price_service.sync_provider_prices(provider.provider_type)
+                duration = (datetime.utcnow() - provider_start).total_seconds()
+                
+                if result.get('success'):
+                    results['successful_providers'] += 1
+                    records = result.get('records_synced', 0)
+                    logger.info(f"✅ {provider.display_name}: {records} records in {duration:.1f}s")
+                    results['provider_results'].append({
+                        'provider': provider.display_name,
+                        'provider_type': provider.provider_type,
+                        'status': 'success',
+                        'records': records,
+                        'duration': duration
+                    })
+                else:
+                    results['failed_providers'] += 1
+                    error = result.get('error', 'Unknown error')
+                    logger.error(f"❌ {provider.display_name}: {error}")
+                    results['provider_results'].append({
+                        'provider': provider.display_name,
+                        'provider_type': provider.provider_type,
+                        'status': 'failed',
+                        'error': error
+                    })
+            
+            except Exception as e:
+                results['failed_providers'] += 1
+                logger.error(f"❌ {provider.display_name}: Exception - {e}", exc_info=True)
+                results['provider_results'].append({
+                    'provider': provider.display_name,
+                    'provider_type': provider.provider_type,
+                    'status': 'error',
+                    'error': str(e)
+                })
+        
+        total_duration = (datetime.utcnow() - start_time).total_seconds()
+        total_records = sum(r.get('records', 0) for r in results['provider_results'] if r.get('status') == 'success')
+        
+        logger.info(
+            f"Price sync completed in {total_duration:.1f}s: "
+            f"{results['successful_providers']}/{results['total_providers']} providers, "
+            f"{total_records} total records"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f"Price sync completed: {results['successful_providers']} successful, {results['failed_providers']} failed",
+            'total_providers': results['total_providers'],
+            'successful_providers': results['successful_providers'],
+            'failed_providers': results['failed_providers'],
+            'total_records': total_records,
+            'duration_seconds': total_duration,
+            'provider_results': results['provider_results']
+        })
+        
+    except Exception as e:
+        logger.error(f"Error during price sync: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to execute price sync: {str(e)}'
+        }), 500
