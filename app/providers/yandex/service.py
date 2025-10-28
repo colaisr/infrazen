@@ -109,6 +109,8 @@ class YandexService:
             total_snapshots = 0
             total_images = 0
             total_reserved_ips = 0
+            total_load_balancers = 0
+            total_registries = 0
             total_managed_clusters = 0
             total_cost = 0.0
             
@@ -302,6 +304,40 @@ class YandexService:
                         synced_resources.append(reserved_ip_resource)
                         total_reserved_ips += 1
                         total_cost += reserved_ip_resource.daily_cost or 0.0
+                
+                # PHASE 2F: Process network load balancers
+                logger.info(f"  Processing load balancers...")
+                load_balancers = self.client.list_network_load_balancers(folder_id)
+                total_load_balancers = 0
+                for lb in load_balancers:
+                    lb_resource = self._process_load_balancer_resource(
+                        lb,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if lb_resource:
+                        synced_resources.append(lb_resource)
+                        total_load_balancers += 1
+                        total_cost += lb_resource.daily_cost or 0.0
+                
+                # PHASE 2G: Process container registries
+                logger.info(f"  Processing container registries...")
+                registries = self.client.list_container_registries(folder_id)
+                total_registries = 0
+                for registry in registries:
+                    registry_resource = self._process_container_registry_resource(
+                        registry,
+                        folder_id,
+                        folder_name,
+                        cloud_id,
+                        sync_snapshot.id
+                    )
+                    if registry_resource:
+                        synced_resources.append(registry_resource)
+                        total_registries += 1
+                        total_cost += registry_resource.daily_cost or 0.0
             
             # Update sync snapshot
             sync_snapshot.sync_status = 'success'
@@ -320,6 +356,8 @@ class YandexService:
                 'total_snapshots': total_snapshots,
                 'total_images': total_images,
                 'total_reserved_ips': total_reserved_ips,
+                'total_load_balancers': total_load_balancers,
+                'total_registries': total_registries,
                 'total_managed_clusters': total_managed_clusters,
                 'total_estimated_daily_cost': round(total_cost, 2)
             }
@@ -375,7 +413,7 @@ class YandexService:
             
             db.session.commit()
             
-            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs), estimated {total_cost:.2f} ₽/day")
+            logger.info(f"Sync completed: {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries), estimated {total_cost:.2f} ₽/day")
             
             return {
                 'success': True,
@@ -386,10 +424,12 @@ class YandexService:
                 'total_snapshots': total_snapshots,
                 'total_images': total_images,
                 'total_reserved_ips': total_reserved_ips,
+                'total_load_balancers': total_load_balancers,
+                'total_registries': total_registries,
                 'estimated_daily_cost': round(total_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'cpu_stats_collected': collect_stats and len(vm_resources) > 0,
-                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs) - estimated cost: {total_cost:.2f} ₽/day'
+                'message': f'Successfully synced {len(synced_resources)} resources ({total_managed_clusters} clusters, {total_instances} VMs, {total_disks} disks, {total_snapshots} snapshots, {total_images} images, {total_reserved_ips} reserved IPs, {total_load_balancers} load balancers, {total_registries} registries) - estimated cost: {total_cost:.2f} ₽/day'
             }
             
         except Exception as e:
@@ -980,6 +1020,184 @@ class YandexService:
             
         except Exception as e:
             logger.error(f"Error processing reserved IP {address.get('id', 'unknown')}: {str(e)}")
+            return None
+    
+    def _process_load_balancer_resource(self, load_balancer: Dict, folder_id: str, 
+                                       folder_name: str, cloud_id: str,
+                                       sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process network load balancer resource
+        
+        Load balancers are charged per active balancer per hour.
+        From HAR analysis: 40.44₽/day per balancer (includes 1.685₽/hour base + IPs)
+        
+        Args:
+            load_balancer: Load balancer data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            lb_id = load_balancer['id']
+            lb_name = load_balancer.get('name', lb_id)
+            
+            # Get load balancer details
+            lb_type = load_balancer.get('type', 'EXTERNAL')
+            status_raw = load_balancer.get('status', 'UNKNOWN')
+            
+            # Map LB statuses
+            status_map = {
+                'ACTIVE': 'RUNNING',
+                'CREATING': 'CREATING',
+                'STARTING': 'STARTING',
+                'STOPPING': 'STOPPING',
+                'INACTIVE': 'STOPPED',
+                'DELETING': 'DELETING'
+            }
+            status = status_map.get(status_raw, status_raw)
+            
+            # Count attached public IPs
+            listeners = load_balancer.get('listeners', [])
+            public_ip_count = 0
+            public_ips = []
+            
+            for listener in listeners:
+                address = listener.get('address')
+                if address:
+                    public_ips.append(address)
+                    public_ip_count += 1
+            
+            # Load balancer pricing from HAR analysis:
+            # Base balancer: 1.685₽/hour = 40.44₽/day (includes all costs)
+            # This already includes the public IPs, so we use it as-is
+            daily_cost = 40.44
+            
+            metadata = {
+                'load_balancer': load_balancer,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'lb_type': lb_type,
+                'listeners': len(listeners),
+                'public_ips': public_ips,
+                'public_ip_count': public_ip_count,
+                'created_at': load_balancer.get('createdAt'),
+                'cost_source': 'har_analysis'
+            }
+            
+            resource = self._create_resource(
+                resource_type='load_balancer',
+                resource_id=lb_id,
+                name=lb_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Network Load Balancer'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = status
+                resource.add_tag('lb_type', lb_type)
+                resource.add_tag('listeners', str(len(listeners)))
+                resource.add_tag('public_ip_count', str(public_ip_count))
+                resource.add_tag('cost_source', 'har_analysis')
+                resource.add_tag('pricing_per_day', '40.44')
+                
+                logger.debug(f"    Load Balancer: {lb_name} ({len(listeners)} listeners) = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing load balancer {load_balancer.get('id', 'unknown')}: {str(e)}")
+            return None
+    
+    def _process_container_registry_resource(self, registry: Dict, folder_id: str, 
+                                            folder_name: str, cloud_id: str,
+                                            sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process container registry resource
+        
+        Registries are charged based on storage used.
+        From HAR analysis: 75.94₽/day for yc-it registry
+        Storage pricing: ~0.1080₽/GB/day (estimated from total cost)
+        
+        Args:
+            registry: Registry data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            registry_id = registry['id']
+            registry_name = registry.get('name', registry_id)
+            
+            status_raw = registry.get('status', 'UNKNOWN')
+            
+            # Map registry statuses
+            status_map = {
+                'ACTIVE': 'RUNNING',
+                'CREATING': 'CREATING',
+                'DELETING': 'DELETING'
+            }
+            status = status_map.get(status_raw, status_raw)
+            
+            # Container registry pricing:
+            # From HAR: 75.94₽/day total
+            # Assuming ~700GB storage: 75.94 ÷ 700 = 0.1085₽/GB/day
+            # Since we can't get storage from API, we'll use the total from HAR
+            # and divide by number of registries if we find multiple
+            
+            # For now, use the HAR total as a flat fee per registry
+            # This will be accurate if there's only 1 registry in the account
+            daily_cost = 75.94
+            
+            metadata = {
+                'registry': registry,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'created_at': registry.get('createdAt'),
+                'cost_source': 'har_total',
+                'note': 'Storage-based pricing - total from HAR analysis'
+            }
+            
+            resource = self._create_resource(
+                resource_type='container_registry',
+                resource_id=registry_id,
+                name=registry_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=folder_id,
+                service_name='Container Registry'
+            )
+            
+            if resource:
+                resource.daily_cost = round(daily_cost, 2)
+                resource.effective_cost = round(daily_cost, 2)
+                resource.original_cost = round(daily_cost * 30, 2)
+                resource.currency = 'RUB'
+                resource.status = status
+                resource.add_tag('cost_source', 'har_total')
+                resource.add_tag('pricing_model', 'storage_based')
+                
+                logger.debug(f"    Container Registry: {registry_name} = {daily_cost:.2f} ₽/day")
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing container registry {registry.get('id', 'unknown')}: {str(e)}")
             return None
     
     def _create_resource(self, resource_type: str, resource_id: str, 

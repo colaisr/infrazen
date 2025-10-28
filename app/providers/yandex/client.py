@@ -694,6 +694,90 @@ class YandexClient:
             return gateways
         
         except Exception as e:
+            logger.warning(f"Failed to list NAT gateways: {e}")
+            return []
+    
+    def list_network_load_balancers(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all network load balancers in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of load balancer dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            # Load Balancer API endpoint
+            lb_url = 'https://load-balancer.api.cloud.yandex.net/load-balancer/v1'
+            url = f'{lb_url}/networkLoadBalancers'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            load_balancers = data.get('networkLoadBalancers', [])
+            
+            logger.info(f"Found {len(load_balancers)} network load balancers in folder {folder_id}")
+            
+            return load_balancers
+        
+        except Exception as e:
+            logger.warning(f"Failed to list load balancers: {e}")
+            return []
+    
+    def list_container_registries(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all container registries in a folder
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of registry dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            # Container Registry API endpoint
+            cr_url = 'https://container-registry.api.cloud.yandex.net/container-registry/v1'
+            url = f'{cr_url}/registries'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            registries = data.get('registries', [])
+            
+            logger.info(f"Found {len(registries)} container registries in folder {folder_id}")
+            
+            # For each registry, try to get storage statistics
+            enriched_registries = []
+            for registry in registries:
+                registry['folder_id'] = folder_id
+                
+                # Note: Storage size might not be in registry response
+                # We'll need to derive from billing or use a default estimate
+                # For now, we'll use the registry as-is
+                enriched_registries.append(registry)
+            
+            return enriched_registries
+        
+        except Exception as e:
             logger.warning(f"Failed to list gateways: {e}")
             return []
     
