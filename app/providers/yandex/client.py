@@ -1330,6 +1330,60 @@ class YandexClient:
             logger.error(f"Failed to list MySQL clusters: {e}")
             return []
     
+    def list_kafka_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all managed Kafka clusters in a folder with host details
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of Kafka cluster dictionaries with hosts enriched
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                folder_id = self._get_service_account_folder()
+                if not folder_id:
+                    raise Exception("No folder_id available")
+            
+            headers = self._get_headers()
+            url = f'{self.mdb_url}/managed-kafka/v1/clusters'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            clusters = data.get('clusters', [])
+            
+            logger.info(f"Found {len(clusters)} Kafka clusters in folder {folder_id}")
+            
+            # Enrich each cluster with hosts
+            enriched_clusters = []
+            for cluster in clusters:
+                cluster['folder_id'] = folder_id
+                cluster['resource_type'] = 'kafka-cluster'
+                
+                # Fetch hosts for this cluster
+                try:
+                    hosts_url = f'{self.mdb_url}/managed-kafka/v1/clusters/{cluster["id"]}/hosts'
+                    hosts_response = requests.get(hosts_url, headers=headers, timeout=30)
+                    if hosts_response.status_code == 200:
+                        hosts_data = hosts_response.json()
+                        cluster['hosts'] = hosts_data.get('hosts', [])
+                except Exception as hosts_error:
+                    logger.error(f"Failed to get hosts for Kafka cluster {cluster['id']}: {hosts_error}")
+                    cluster['hosts'] = []
+                
+                enriched_clusters.append(cluster)
+            
+            return enriched_clusters
+        
+        except Exception as e:
+            logger.error(f"Failed to list Kafka clusters: {e}")
+            return []
+    
     def list_mongodb_clusters(self, folder_id: str = None) -> List[Dict[str, Any]]:
         """
         List all managed MongoDB clusters in a folder
@@ -1477,6 +1531,7 @@ class YandexClient:
                 'kubernetes_clusters': self.list_kubernetes_clusters(folder_id),
                 'postgresql_clusters': self.list_postgresql_clusters(folder_id),
                 'mysql_clusters': self.list_mysql_clusters(folder_id),
+                'kafka_clusters': self.list_kafka_clusters(folder_id),
                 'mongodb_clusters': self.list_mongodb_clusters(folder_id),
                 'clickhouse_clusters': self.list_clickhouse_clusters(folder_id),
                 'redis_clusters': self.list_redis_clusters(folder_id)
@@ -1494,6 +1549,7 @@ class YandexClient:
                 'kubernetes_clusters': [],
                 'postgresql_clusters': [],
                 'mysql_clusters': [],
+                'kafka_clusters': [],
                 'mongodb_clusters': [],
                 'clickhouse_clusters': [],
                 'redis_clusters': [],

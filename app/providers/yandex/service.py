@@ -162,6 +162,17 @@ class YandexService:
                         total_managed_clusters += 1
                         total_cost += cluster_resource.daily_cost or 0.0
                 
+                # Process Kafka clusters
+                kafka_clusters = managed_services.get('kafka_clusters', [])
+                for cluster in kafka_clusters:
+                    cluster_resource = self._process_kafka_cluster(
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id
+                    )
+                    if cluster_resource:
+                        synced_resources.append(cluster_resource)
+                        total_managed_clusters += 1
+                        total_cost += cluster_resource.daily_cost or 0.0
+                
                 # Process other managed services
                 for service_type in ['mongodb_clusters', 'clickhouse_clusters', 'redis_clusters']:
                     clusters = managed_services.get(service_type, [])
@@ -1498,6 +1509,126 @@ class YandexService:
             
         except Exception as e:
             logger.error(f"Error processing MySQL cluster {cluster.get('id')}: {e}")
+            return None
+    
+    def _process_kafka_cluster(self, cluster: Dict, folder_id: str, 
+                              folder_name: str, cloud_id: str,
+                              sync_snapshot_id: int) -> Optional[Resource]:
+        """
+        Process Kafka cluster resource
+        
+        Args:
+            cluster: Cluster data from API
+            folder_id: Folder ID
+            folder_name: Folder name
+            cloud_id: Cloud ID
+            sync_snapshot_id: Sync snapshot ID
+        
+        Returns:
+            Resource instance or None
+        """
+        try:
+            cluster_id = cluster['id']
+            cluster_name = cluster.get('name', cluster_id)
+            
+            # Extract version from config
+            config = cluster.get('config', {})
+            version = config.get('version', 'unknown')
+            
+            # Get host specifications
+            hosts = cluster.get('hosts', [])
+            total_vcpus = 0
+            total_ram_gb = 0
+            total_storage_gb = 0
+            disk_type = 'network-hdd'  # Default
+            has_public_ip = False
+            
+            for host in hosts:
+                resources = host.get('resources', {})
+                
+                # Parse resourcePresetId (e.g., "c3-c2-m4" = class3-2vCPU-4GB)
+                preset_id = resources.get('resourcePresetId', '')
+                if preset_id and '-' in preset_id:
+                    parts = preset_id.split('-')
+                    # Skip first "c" (class), find second "c" (vCPUs)
+                    c_parts = [p for p in parts if p.startswith('c') and len(p) > 1 and p[1:].isdigit()]
+                    vcpus_part = c_parts[1] if len(c_parts) > 1 else (c_parts[0] if c_parts else 'c2')
+                    vcpus = int(vcpus_part[1:]) if len(vcpus_part) > 1 else 2
+                    # Extract RAM from "m4" = 4 GB
+                    ram_part = next((p for p in parts if p.startswith('m') and p[1:].isdigit()), 'm4')
+                    ram_gb = int(ram_part[1:]) if len(ram_part) > 1 else 4
+                else:
+                    vcpus = 2
+                    ram_gb = 4
+                
+                # Parse disk size (in bytes) and type
+                disk_size_bytes = int(resources.get('diskSize', 0))
+                disk_size_gb = disk_size_bytes / (1024**3)
+                disk_type = resources.get('diskTypeId', 'network-hdd')
+                
+                total_vcpus += vcpus
+                total_ram_gb += ram_gb
+                total_storage_gb += disk_size_gb
+                
+                # Check for public IP assignment
+                if host.get('assignPublicIp', False):
+                    has_public_ip = True
+            
+            # Estimate daily cost with disk type
+            estimated_daily_cost = self._estimate_database_cluster_cost(
+                total_vcpus, total_ram_gb, total_storage_gb, 'kafka', disk_type
+            )
+            
+            # Add public IP cost if cluster has one
+            if has_public_ip:
+                from app.providers.yandex.pricing import YandexPricing
+                estimated_daily_cost += YandexPricing.KAFKA_PRICING['public_ip_per_day']
+            
+            # Create resource metadata
+            metadata = {
+                'cluster': cluster,
+                'folder_id': folder_id,
+                'folder_name': folder_name,
+                'cloud_id': cloud_id,
+                'version': version,
+                'total_hosts': len(hosts),
+                'total_vcpus': total_vcpus,
+                'total_ram_gb': total_ram_gb,
+                'total_storage_gb': total_storage_gb,
+                'has_public_ip': has_public_ip,
+                'created_at': cluster.get('createdAt'),
+                'estimated_cost': True
+            }
+            
+            resource = self._create_resource(
+                resource_type='kafka-cluster',
+                resource_id=cluster_id,
+                name=cluster_name,
+                metadata=metadata,
+                sync_snapshot_id=sync_snapshot_id,
+                region=hosts[0].get('zoneId', 'unknown') if hosts else 'unknown',
+                service_name='Managed Kafka'
+            )
+            
+            if resource:
+                resource.daily_cost = estimated_daily_cost
+                resource.effective_cost = estimated_daily_cost
+                resource.original_cost = estimated_daily_cost * 30
+                resource.currency = 'RUB'
+                resource.add_tag('folder_id', folder_id)
+                resource.add_tag('folder_name', folder_name)
+                resource.add_tag('cloud_id', cloud_id)
+                resource.add_tag('cost_source', 'har_based')
+                resource.add_tag('version', version)
+                resource.add_tag('total_hosts', str(len(hosts)))
+                resource.add_tag('total_vcpus', str(total_vcpus))
+                resource.add_tag('total_ram_gb', str(round(total_ram_gb, 2)))
+                resource.add_tag('has_public_ip', str(has_public_ip))
+            
+            return resource
+            
+        except Exception as e:
+            logger.error(f"Error processing Kafka cluster {cluster.get('id')}: {e}")
             return None
     
     def _process_managed_cluster(self, cluster: Dict, service_type: str,

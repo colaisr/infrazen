@@ -79,6 +79,18 @@ class YandexPricing:
         'storage_ssd_per_gb_day': 0.43,    # network-ssd storage per GB per day (estimated)
     }
     
+    # Managed Kafka pricing (₽/day)
+    # Source: HAR file analysis of actual billing data (Oct 27, 2024)
+    # Cluster: 2 vCPUs, 4GB RAM, 100GB HDD, 1 public IP = 198.14₽/day
+    # Breakdown: CPU 87.09₽, RAM 93.31₽, HDD 11.52₽, Public IP 6.22₽
+    KAFKA_PRICING = {
+        'cpu_per_day': 43.545,    # 87.09 ÷ 2 vCPUs = Per vCPU per day (100% fraction)
+        'ram_per_gb_day': 23.3275, # 93.31 ÷ 4 GB = Per GB RAM per day (2x PostgreSQL!)
+        'storage_hdd_per_gb_day': 0.1152,  # 11.52 ÷ 100 GB = Per GB HDD storage per day
+        'storage_ssd_per_gb_day': 0.43,    # network-ssd storage per GB per day (estimated)
+        'public_ip_per_day': 6.22,  # Public IP for Kafka cluster
+    }
+    
     @classmethod
     def calculate_vm_cost(cls, vcpus: int, ram_gb: float, storage_gb: float = 0,
                           platform_id: str = 'standard-v3', 
@@ -212,6 +224,35 @@ class YandexPricing:
                 else:  # HDD
                     storage_cost_daily = total_storage_gb * cls.POSTGRESQL_PRICING['storage_hdd_per_gb_day']
                 
+                total_daily = cpu_cost_daily + ram_cost_daily + storage_cost_daily
+                total_hourly = total_daily / 24
+                total_monthly = total_daily * 30
+                
+                return {
+                    'hourly_cost': round(total_hourly, 4),
+                    'daily_cost': round(total_daily, 2),
+                    'monthly_cost': round(total_monthly, 2),
+                    'breakdown': {
+                        'cpu': round(cpu_cost_daily, 2),
+                        'ram': round(ram_cost_daily, 2),
+                        'storage': round(storage_cost_daily, 2),
+                    },
+                    'accuracy': 'har_based'
+                }
+            
+            # Kafka has special pricing from HAR analysis
+            if cluster_type == 'kafka':
+                cpu_cost_daily = total_vcpus * cls.KAFKA_PRICING['cpu_per_day']
+                ram_cost_daily = total_ram_gb * cls.KAFKA_PRICING['ram_per_gb_day']
+                
+                # Choose storage pricing based on disk type
+                if 'ssd' in disk_type.lower():
+                    storage_cost_daily = total_storage_gb * cls.KAFKA_PRICING['storage_ssd_per_gb_day']
+                else:  # HDD
+                    storage_cost_daily = total_storage_gb * cls.KAFKA_PRICING['storage_hdd_per_gb_day']
+                
+                # Note: Public IP cost is per cluster, not per host
+                # We'll add it in the service processing layer based on actual config
                 total_daily = cpu_cost_daily + ram_cost_daily + storage_cost_daily
                 total_hourly = total_daily / 24
                 total_monthly = total_daily * 30
