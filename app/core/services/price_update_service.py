@@ -83,6 +83,19 @@ class PriceUpdateService:
                 
                 logger.info(f"Retrieved {len(pricing_data)} pricing records from {provider_type}")
                 
+                # Ensure database connection is alive before saving
+                # (Important for Yandex which takes 6+ minutes to fetch data)
+                from app.core.database import db
+                try:
+                    db.session.execute(db.text('SELECT 1'))
+                    logger.info("Database connection verified before save")
+                except Exception as conn_error:
+                    logger.warning(f"Database connection stale, reconnecting: {conn_error}")
+                    db.session.rollback()
+                    db.engine.dispose()  # Force reconnect
+                    db.session.execute(db.text('SELECT 1'))
+                    logger.info("Database reconnected successfully")
+                
                 # Save pricing data in batches to avoid MySQL connection timeouts
                 batch_size = 100
                 saved_records = []
@@ -97,7 +110,6 @@ class PriceUpdateService:
                     saved_records.extend(batch_saved)
                     
                     # Commit after each batch to keep connection alive
-                    from app.core.database import db
                     db.session.commit()
                     logger.info(f"Batch {batch_num}/{total_batches} committed ({len(saved_records)}/{len(pricing_data)} total)")
                 
