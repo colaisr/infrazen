@@ -17,6 +17,9 @@ log() {
 cd "$APP_DIR"
 
 log "Pulling latest from Git (branch: $BRANCH)"
+# Discard local changes to log files (they're regenerated anyway)
+git checkout -- server.log.* 2>/dev/null || true
+
 git fetch --all --prune
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
