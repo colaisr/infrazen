@@ -1,0 +1,234 @@
+"""
+Yandex Cloud Pricing Calculator
+Based on official Yandex Cloud pricing documentation
+https://yandex.cloud/en/docs/compute/pricing
+"""
+import logging
+from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class YandexPricing:
+    """
+    Yandex Cloud pricing calculator using documented rates
+    
+    Pricing is based on official Yandex Cloud documentation.
+    Rates are platform-specific and updated as of October 2025.
+    """
+    
+    # Compute pricing (₽/hour) for different platforms
+    # Source: https://yandex.cloud/en/docs/compute/pricing#prices-instance-resources
+    PLATFORM_PRICING = {
+        'standard-v3': {  # Intel Ice Lake / AMD EPYC
+            'cpu_100': 1.1200,  # 100% vCPU
+            'cpu_50': 0.5600,   # 50% vCPU
+            'cpu_20': 0.3360,   # 20% vCPU
+            'cpu_5': 0.1680,    # 5% vCPU
+            'ram_gb': 0.3000,   # Per GB RAM
+        },
+        'standard-v2': {  # Intel Cascade Lake
+            'cpu_100': 1.0800,
+            'cpu_50': 0.5400,
+            'cpu_20': 0.3240,
+            'cpu_5': 0.1620,
+            'ram_gb': 0.2900,
+        },
+        'standard-v1': {  # Intel Broadwell
+            'cpu_100': 0.9600,
+            'cpu_50': 0.4800,
+            'cpu_20': 0.2880,
+            'cpu_5': 0.1440,
+            'ram_gb': 0.2560,
+        },
+        'highfreq-v3': {  # High frequency Intel Ice Lake
+            'cpu_100': 1.3440,
+            'ram_gb': 0.3600,
+        },
+        'gpu-standard-v3': {  # GPU instances
+            'cpu_100': 1.1200,
+            'ram_gb': 0.3000,
+        },
+    }
+    
+    # Storage pricing (₽/GB/month)
+    # Source: https://yandex.cloud/en/docs/compute/pricing#prices-storage
+    STORAGE_PRICING = {
+        'network-hdd': 2.2400,      # Standard HDD
+        'network-ssd': 9.1104,      # Fast SSD
+        'network-ssd-nonreplicated': 7.6800,  # Non-replicated SSD
+        'network-ssd-io-m3': 12.2976,  # Ultra-fast SSD
+    }
+    
+    # Public IP pricing (₽/hour)
+    # Source: https://yandex.cloud/en/docs/vpc/pricing
+    # SKU: dn229q5mnmp58t58tfel (network.public_fips)
+    VPC_PRICING = {
+        'public_ip_inactive': 0.1920,  # Inactive public IP (reserved but unused)
+        'public_ip_active': 0.2592,    # Active public IP (attached to VM) - NOT FREE!
+    }
+    
+    @classmethod
+    def calculate_vm_cost(cls, vcpus: int, ram_gb: float, storage_gb: float = 0,
+                          platform_id: str = 'standard-v3', 
+                          core_fraction: int = 100,
+                          disk_type: str = 'network-ssd',
+                          has_public_ip: bool = False) -> Dict[str, float]:
+        """
+        Calculate VM cost based on official Yandex pricing
+        
+        Args:
+            vcpus: Number of vCPUs
+            ram_gb: RAM in GB
+            storage_gb: Boot disk size in GB (if attached)
+            platform_id: Platform ID (standard-v3, standard-v2, etc.)
+            core_fraction: CPU fraction (5, 20, 50, 100)
+            disk_type: Disk type (network-hdd, network-ssd, etc.)
+            has_public_ip: Whether VM has public IP
+            
+        Returns:
+            Dict with hourly, daily, and monthly costs
+        """
+        try:
+            # Get platform pricing
+            platform = cls.PLATFORM_PRICING.get(platform_id, cls.PLATFORM_PRICING['standard-v3'])
+            
+            # Get CPU price based on core fraction
+            cpu_key = f'cpu_{core_fraction}'
+            cpu_hourly_rate = platform.get(cpu_key, platform.get('cpu_100', 1.12))
+            ram_hourly_rate = platform.get('ram_gb', 0.30)
+            
+            # Calculate compute cost
+            cpu_cost_hourly = vcpus * cpu_hourly_rate
+            ram_cost_hourly = ram_gb * ram_hourly_rate
+            
+            # Calculate storage cost (convert monthly to hourly)
+            storage_hourly_rate = cls.STORAGE_PRICING.get(disk_type, 9.1104) / 730  # 730 hours/month
+            storage_cost_hourly = storage_gb * storage_hourly_rate
+            
+            # VPC cost (public IP)
+            vpc_cost_hourly = cls.VPC_PRICING['public_ip_active'] if has_public_ip else 0
+            
+            # Total
+            total_hourly = cpu_cost_hourly + ram_cost_hourly + storage_cost_hourly + vpc_cost_hourly
+            total_daily = total_hourly * 24
+            total_monthly = total_hourly * 730  # Yandex uses 730 hours/month
+            
+            return {
+                'hourly_cost': round(total_hourly, 4),
+                'daily_cost': round(total_daily, 2),
+                'monthly_cost': round(total_monthly, 2),
+                'breakdown': {
+                    'cpu': round(cpu_cost_hourly * 730, 2),
+                    'ram': round(ram_cost_hourly * 730, 2),
+                    'storage': round(storage_cost_hourly * 730, 2),
+                    'vpc': round(vpc_cost_hourly * 730, 2)
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Error calculating VM cost: {e}")
+            return {
+                'hourly_cost': 0,
+                'daily_cost': 0,
+                'monthly_cost': 0,
+                'breakdown': {}
+            }
+    
+    @classmethod
+    def calculate_disk_cost(cls, size_gb: float, disk_type: str = 'network-ssd') -> Dict[str, float]:
+        """
+        Calculate standalone disk cost
+        
+        Args:
+            size_gb: Disk size in GB
+            disk_type: Disk type (network-hdd, network-ssd, etc.)
+            
+        Returns:
+            Dict with hourly, daily, and monthly costs
+        """
+        try:
+            monthly_rate = cls.STORAGE_PRICING.get(disk_type, 9.1104)
+            monthly_cost = size_gb * monthly_rate
+            hourly_cost = monthly_cost / 730
+            daily_cost = hourly_cost * 24
+            
+            return {
+                'hourly_cost': round(hourly_cost, 4),
+                'daily_cost': round(daily_cost, 2),
+                'monthly_cost': round(monthly_cost, 2)
+            }
+        
+        except Exception as e:
+            logger.error(f"Error calculating disk cost: {e}")
+            return {
+                'hourly_cost': 0,
+                'daily_cost': 0,
+                'monthly_cost': 0
+            }
+    
+    @classmethod
+    def calculate_cluster_cost(cls, total_vcpus: int, total_ram_gb: float,
+                               total_storage_gb: float, cluster_type: str = 'kubernetes',
+                               platform_id: str = 'standard-v3') -> Dict[str, float]:
+        """
+        Calculate cluster cost (Kubernetes, databases)
+        
+        For managed services, uses platform pricing + storage
+        
+        Args:
+            total_vcpus: Total vCPUs across all nodes/hosts
+            total_ram_gb: Total RAM in GB
+            total_storage_gb: Total storage in GB
+            cluster_type: Type of cluster (kubernetes, postgresql, mysql, etc.)
+            platform_id: Platform ID
+            
+        Returns:
+            Dict with hourly, daily, and monthly costs
+        """
+        try:
+            platform = cls.PLATFORM_PRICING.get(platform_id, cls.PLATFORM_PRICING['standard-v3'])
+            
+            # Use 100% vCPU for managed services
+            cpu_hourly_rate = platform.get('cpu_100', 1.12)
+            ram_hourly_rate = platform.get('ram_gb', 0.30)
+            
+            cpu_cost_hourly = total_vcpus * cpu_hourly_rate
+            ram_cost_hourly = total_ram_gb * ram_hourly_rate
+            
+            # Storage for managed services typically uses network-ssd or better
+            storage_rate = cls.STORAGE_PRICING.get('network-ssd', 9.1104)
+            storage_monthly = total_storage_gb * storage_rate
+            storage_hourly = storage_monthly / 730
+            
+            # Kubernetes has additional master node cost
+            master_cost_hourly = 0
+            if cluster_type == 'kubernetes':
+                # Zonal master: free, Regional master: ~3500 ₽/month = ~4.79 ₽/hour
+                master_cost_hourly = 4.79  # Assume regional master
+            
+            total_hourly = cpu_cost_hourly + ram_cost_hourly + storage_hourly + master_cost_hourly
+            total_daily = total_hourly * 24
+            total_monthly = total_hourly * 730
+            
+            return {
+                'hourly_cost': round(total_hourly, 4),
+                'daily_cost': round(total_daily, 2),
+                'monthly_cost': round(total_monthly, 2),
+                'breakdown': {
+                    'cpu': round(cpu_cost_hourly * 730, 2),
+                    'ram': round(ram_cost_hourly * 730, 2),
+                    'storage': round(storage_monthly, 2),
+                    'master': round(master_cost_hourly * 730, 2) if cluster_type == 'kubernetes' else 0
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Error calculating cluster cost: {e}")
+            return {
+                'hourly_cost': 0,
+                'daily_cost': 0,
+                'monthly_cost': 0,
+                'breakdown': {}
+            }
+

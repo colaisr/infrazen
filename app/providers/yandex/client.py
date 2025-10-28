@@ -549,6 +549,76 @@ class YandexClient:
         except Exception as e:
             raise Exception(f"Failed to list subnets: {str(e)}")
     
+    def list_addresses(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all reserved public IP addresses in a folder
+        
+        Reserved IPs that are not attached to VMs cost money.
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of address dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                return []
+            
+            headers = self._get_headers()
+            url = f'{self.vpc_url}/addresses'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            addresses = data.get('addresses', [])
+            
+            logger.info(f"Found {len(addresses)} reserved addresses in folder {folder_id}")
+            
+            return addresses
+        
+        except Exception as e:
+            logger.warning(f"Failed to list addresses: {e}")
+            return []
+    
+    def list_gateways(self, folder_id: str = None) -> List[Dict[str, Any]]:
+        """
+        List all NAT gateways in a folder
+        
+        NAT gateways provide internet access for VMs without public IPs.
+        
+        Args:
+            folder_id: Folder ID (uses self.folder_id if not provided)
+        
+        Returns:
+            List of gateway dictionaries
+        """
+        try:
+            folder_id = folder_id or self.folder_id
+            if not folder_id:
+                return []
+            
+            headers = self._get_headers()
+            url = f'{self.vpc_url}/gateways'
+            params = {'folderId': folder_id}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            gateways = data.get('gateways', [])
+            
+            logger.info(f"Found {len(gateways)} NAT gateways in folder {folder_id}")
+            
+            return gateways
+        
+        except Exception as e:
+            logger.warning(f"Failed to list gateways: {e}")
+            return []
+    
     def _get_service_account_folder(self) -> Optional[str]:
         """
         Get the folder ID that the service account belongs to
