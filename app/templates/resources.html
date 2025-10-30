@@ -121,7 +121,7 @@
                     </div>
                 </div>
                 <div class="provider-right">
-                    <div class="provider-daily-cost">{{ resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost')|round(2) }} ₽/день</div>
+                    <div class="provider-daily-cost">{{ "{:,.2f}".format((resources_by_provider.get(provider.id, [])|sum(attribute='daily_cost') * 30)|round(2)) }} ₽/месяц</div>
                     <div class="provider-resource-count">{{ resources_by_provider.get(provider.id, [])|length }} ресурсов</div>
                     <i class="fa-solid fa-chevron-down provider-chevron" id="provider-chevron-{{ provider.id }}"></i>
                 </div>
