@@ -259,6 +259,51 @@
                                 </div>
                                 {% endif %}
                                 
+                                {# Yandex-specific account info display #}
+                                {% if provider.code == 'yandex' %}
+                                    {% if account.organization %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Организация:</span>
+                                        <span class="detail-value">{{ account.organization.name }}</span>
+                                    </div>
+                                    {% if account.organization.legal_name and account.organization.legal_name != 'N/A' %}
+                                    <div class="detail-item" style="padding-left: 1rem;">
+                                        <span class="detail-value" style="font-size: 0.85rem; color: var(--text-secondary);">
+                                            {{ account.organization.legal_name }}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                    {% endif %}
+                                    
+                                    {% if account.folder %}
+                                    <div class="detail-item" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb;">
+                                        <span class="detail-label">Folder:</span>
+                                        <span class="detail-value">{{ account.folder.name }} 
+                                            {% if account.folder.status == 'ACTIVE' %}(активен)
+                                            {% else %}({{ account.folder.status|lower }}){% endif %}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if account.service_account %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Сервис-аккаунт:</span>
+                                        <span class="detail-value">{{ account.service_account.name }}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <div class="detail-item" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #e5e7eb;">
+                                        <span class="detail-label">Ресурсов:</span>
+                                        <span class="detail-value">{{ provider.last_snapshot_resources or 0 }}</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <a href="https://console.cloud.yandex.ru/billing" target="_blank" style="color: var(--primary-blue); text-decoration: none; font-size: 0.85rem;">
+                                            <i class="fa-solid fa-external-link-alt"></i> Баланс и расходы →
+                                        </a>
+                                    </div>
+                                {% endif %}
+                                
                                 {# Selectel-specific account info display #}
                                 {% if provider.code == 'selectel' %}
                                     {% if account.account_id or account.account_name %}

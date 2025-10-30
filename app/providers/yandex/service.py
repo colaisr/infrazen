@@ -425,6 +425,60 @@ class YandexService:
                 db.session.commit()
                 logger.info(f"Performance statistics collection completed")
             
+            # Update provider metadata with organization and folder info
+            try:
+                existing_metadata = json.loads(self.provider.provider_metadata) if self.provider.provider_metadata else {}
+                
+                # Get organization info
+                import requests
+                iam_token = self.client._get_iam_token()
+                headers = {'Authorization': f'Bearer {iam_token}'}
+                
+                org_url = 'https://organization-manager.api.cloud.yandex.net/organization-manager/v1/organizations'
+                org_response = requests.get(org_url, headers=headers, timeout=10)
+                organizations = org_response.json().get('organizations', []) if org_response.status_code == 200 else []
+                
+                # Get folder info (use folder_id from first resource)
+                folder_info = {}
+                if synced_resources:
+                    first_resource_config = synced_resources[0].get_provider_config()
+                    folder_id = first_resource_config.get('folder_id')
+                    
+                    if folder_id:
+                        folder_url = f'https://resource-manager.api.cloud.yandex.net/resource-manager/v1/folders/{folder_id}'
+                        folder_response = requests.get(folder_url, headers=headers, timeout=10)
+                        if folder_response.status_code == 200:
+                            folder_info = folder_response.json()
+                
+                # Get current service account info
+                sa_info = self.credentials.get('service_account_key', {})
+                
+                # Build account info
+                enhanced_account_info = {
+                    'organization': {
+                        'name': organizations[0].get('title') if organizations else 'N/A',
+                        'legal_name': organizations[0].get('description') if organizations else 'N/A',
+                        'id': organizations[0].get('id') if organizations else 'N/A'
+                    } if organizations else {},
+                    'folder': {
+                        'name': folder_info.get('name', 'N/A'),
+                        'cloud_id': folder_info.get('cloudId', 'N/A'),
+                        'status': folder_info.get('status', 'N/A')
+                    } if folder_info else {},
+                    'service_account': {
+                        'name': 'infrazen',  # Can extract from SA key if needed
+                        'id': sa_info.get('service_account_id', 'N/A')
+                    }
+                }
+                
+                # Merge with existing metadata
+                existing_metadata['account_info'] = enhanced_account_info
+                existing_metadata['last_account_update'] = datetime.now().isoformat()
+                
+                self.provider.provider_metadata = json.dumps(existing_metadata)
+            except Exception as meta_error:
+                logger.warning(f"Failed to update Yandex account metadata: {meta_error}")
+            
             # Update provider
             self.provider.last_sync = datetime.now()
             self.provider.sync_status = 'success'
