@@ -131,16 +131,16 @@ function updateProviderCardAfterSync(providerId, syncData, isPartialSync) {
         }
     }
     
-    // Update cost if available
-    if (syncData.total_daily_cost !== undefined) {
+    // Update cost if available (monthly is primary, daily is secondary)
+    if (syncData.total_monthly_cost !== undefined) {
         const costPrimary = providerCard.querySelector('.cost-primary .cost-amount');
         if (costPrimary) {
-            costPrimary.textContent = `${syncData.total_daily_cost.toFixed(1)} ₽`;
+            costPrimary.textContent = `${syncData.total_monthly_cost.toFixed(1)} ₽`;
         }
         
         const costSecondary = providerCard.querySelector('.cost-amount-secondary');
-        if (costSecondary && syncData.total_monthly_cost) {
-            costSecondary.textContent = `${(syncData.total_daily_cost * 30).toFixed(1)} ₽`;
+        if (costSecondary && syncData.total_daily_cost) {
+            costSecondary.textContent = `${syncData.total_daily_cost.toFixed(1)} ₽`;
         }
     }
     

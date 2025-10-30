@@ -396,12 +396,12 @@
                 <!-- Provider Cost Display -->
                 <div class="provider-cost">
                     <div class="cost-primary">
-                        <div class="cost-amount">{{ "%.1f"|format(provider.total_daily_cost or 0) }} ₽</div>
-                        <div class="cost-period">в день</div>
+                        <div class="cost-amount">{{ "%.1f"|format(provider.total_monthly_cost or 0) }} ₽</div>
+                        <div class="cost-period">в месяц</div>
                     </div>
                     <div class="cost-secondary">
-                        <div class="cost-amount-secondary">{{ "%.1f"|format(provider.total_monthly_cost or 0) }} ₽</div>
-                        <div class="cost-period-secondary">в месяц</div>
+                        <div class="cost-amount-secondary">{{ "%.1f"|format(provider.total_daily_cost or 0) }} ₽</div>
+                        <div class="cost-period-secondary">в день</div>
                         <div class="resource-count">{{ provider.last_snapshot_resources or 0 }} ресурсов</div>
                     </div>
                 </div>
