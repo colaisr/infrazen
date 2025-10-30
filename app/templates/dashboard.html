@@ -25,9 +25,9 @@
             </div>
             <div class="kpi-value">
                 {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
-                    {{ "%.0f"|format(last_complete_sync.total_monthly_cost or 0) }} ₽
+                    {{ "{:,.0f}".format((last_complete_sync.total_monthly_cost or 0)) }} ₽/мес
                 {% else %}
-                    {{ overview.kpis.total_expenses_rub | default(0) }} ₽
+                    {{ "{:,.0f}".format(overview.kpis.total_expenses_rub | default(0)) }} ₽/мес
                 {% endif %}
             </div>
             <div class="kpi-secondary">
@@ -58,7 +58,7 @@
                 </div>
                 <div class="kpi-icon icon-savings"><i class="fa-solid fa-piggy-bank"></i></div>
             </div>
-            <div class="kpi-value">{{ "%.0f"|format(overview.kpis.potential_savings_rub | default(0)) }} ₽</div>
+            <div class="kpi-value">{{ "{:,.0f}".format(overview.kpis.potential_savings_rub | default(0)) }} ₽/мес</div>
             <div class="kpi-secondary">
                 <span class="kpi-secondary-text">{{ overview.kpis.savings_percentage | default(0) }}% от общих расходов</span>
             </div>
@@ -128,18 +128,18 @@
                     {% if p.status == 'connected' %}Подключен{% else %}Отключен{% endif %}
                 </div>
                 <div class="provider-info">
-                    <div class="provider-date">
-                        <i class="fa-solid fa-calendar-plus"></i>
-                        <span>Добавлен: {{ p.added_at }}</span>
-                    </div>
                     <div class="provider-sync {% if p.sync_error %}sync-warning{% endif %}">
                         {% if p.sync_error %}
                             <i class="fa-solid fa-exclamation-triangle"></i>
                             <span>⚠️ Частичная: {{ p.last_sync or 'Никогда' }}</span>
                         {% else %}
                             <i class="fa-solid fa-arrows-rotate"></i>
-                            <span>Синхронизация: {{ p.last_sync or 'Никогда' }}</span>
+                            <span>{{ p.last_sync or 'Никогда' }}</span>
                         {% endif %}
+                    </div>
+                    <div class="provider-cost">
+                        <i class="fa-solid fa-ruble-sign"></i>
+                        <span>{{ "{:,.0f}".format(p.monthly_cost or 0) }} ₽/мес</span>
                     </div>
                     {% if p.sync_error %}
                     <div class="provider-sync-error">

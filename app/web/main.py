@@ -555,7 +555,30 @@ def get_real_user_overview(user_id):
     
     # Format providers for dashboard display
     formatted_providers = []
+    from app.core.models.sync import SyncSnapshot
     for provider in providers:
+        # Find latest successful snapshot to get the most accurate monthly cost
+        latest_snapshot = SyncSnapshot.query.filter_by(
+            provider_id=provider.id,
+            sync_status='success'
+        ).order_by(SyncSnapshot.created_at.desc()).first()
+
+        monthly_cost = 0.0
+        if latest_snapshot:
+            # In snapshots, cost is stored as validated daily cost; convert to monthly
+            if latest_snapshot.total_monthly_cost and latest_snapshot.total_monthly_cost > 0:
+                monthly_cost = float(latest_snapshot.total_monthly_cost) * 30.0
+            else:
+                # Fallback: sum resource daily costs and convert to monthly
+                provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                monthly_cost = sum((r.daily_cost or 0) * 30 for r in provider_resources)
+        elif provider.provider_metadata:
+            try:
+                metadata = json.loads(provider.provider_metadata)
+                monthly_cost = float(metadata.get('total_monthly_cost', 0) or 0)
+            except Exception:
+                monthly_cost = 0.0
+
         formatted_providers.append({
             'id': provider.id,
             'code': provider.provider_type,
@@ -563,7 +586,8 @@ def get_real_user_overview(user_id):
             'status': 'connected' if provider.is_active else 'disconnected',
             'added_at': provider.created_at.strftime('%d.%m.%Y') if provider.created_at else 'Неизвестно',
             'last_sync': provider.last_sync.strftime('%d.%m.%Y %H:%M') if provider.last_sync else 'Никогда',
-            'sync_error': provider.sync_error  # Add sync_error for partial sync warnings
+            'sync_error': provider.sync_error,  # Add sync_error for partial sync warnings
+            'monthly_cost': monthly_cost
         })
     
     # Calculate savings percentage
