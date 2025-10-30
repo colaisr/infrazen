@@ -198,15 +198,11 @@
             <div class="summary-metrics">
                 <div>
                     <div class="summary-label">ПРОШЛЫЙ МЕСЯЦ</div>
-                    <div class="summary-value">₽{{ "%.0f"|format(expense_dynamics.last_month_cost) }}</div>
+                    <div class="summary-value">₽{{ "{:,.0f}".format(expense_dynamics.last_month_cost) }}</div>
                 </div>
                 <div>
                     <div class="summary-label">ТЕКУЩИЙ МЕСЯЦ</div>
-                    <div class="summary-value text-success">₽{{ "%.0f"|format(expense_dynamics.current_month_cost) }}</div>
-                </div>
-                <div>
-                    <div class="summary-label">ЭКОНОМИЯ</div>
-                    <div class="summary-value text-primary-blue">₽{{ "%.0f"|format(expense_dynamics.savings) }}</div>
+                    <div class="summary-value text-success">₽{{ "{:,.0f}".format(expense_dynamics.current_month_cost) }}</div>
                 </div>
             </div>
         </article>
