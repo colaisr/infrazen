@@ -258,6 +258,63 @@
                                     <span class="detail-value">{{ account.server_info.name }}</span>
                                 </div>
                                 {% endif %}
+                                
+                                {# Selectel-specific account info display #}
+                                {% if provider.code == 'selectel' %}
+                                    {% if account.account_id or account.account_name %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Аккаунт:</span>
+                                        <span class="detail-value">{{ account.account_name or account.account_id }} 
+                                            {% if account.enabled and not account.locked %}(активен)
+                                            {% elif account.locked %}(заблокирован)
+                                            {% else %}(неактивен){% endif %}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if account.service_user %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Сервисный пользователь:</span>
+                                        <span class="detail-value">{{ account.service_user.name }}</span>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if account.projects and account.projects.total_count > 0 %}
+                                    <div class="detail-item">
+                                        <span class="detail-label">Проекты:</span>
+                                        <span class="detail-value">{{ account.projects.total_count }} активных</span>
+                                    </div>
+                                    {% for project in account.projects.projects %}
+                                    <div class="detail-item" style="padding-left: 1rem;">
+                                        <span class="detail-value" style="font-size: 0.85rem;">
+                                            • {{ project.name }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                    {% endif %}
+                                    
+                                    <div class="detail-item" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;">
+                                        <span class="detail-label">Billing:</span>
+                                        <span class="detail-value">{{ provider.total_daily_cost|round(1) }} ₽/день</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <span class="detail-label">Прогноз месяц:</span>
+                                        <span class="detail-value">{{ (provider.total_daily_cost * 30)|round(1) }} ₽/месяц</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <span class="detail-label">Ресурсов:</span>
+                                        <span class="detail-value">{{ provider.last_snapshot_resources or 0 }}</span>
+                                    </div>
+                                    
+                                    <div class="detail-item">
+                                        <a href="https://my.selectel.ru/vpc/cost?groupType=project" target="_blank" style="color: var(--primary-blue); text-decoration: none; font-size: 0.85rem;">
+                                            <i class="fa-solid fa-external-link-alt"></i> Баланс и расходы →
+                                        </a>
+                                    </div>
+                                {% endif %}
+                                
                                 </div>
                             </div>
                         {% endif %}

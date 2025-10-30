@@ -364,6 +364,48 @@ class SelectelService:
             })
             sync_snapshot.sync_config = json.dumps(sync_config)
             
+            # Update provider metadata with enhanced account info
+            try:
+                existing_metadata = json.loads(self.provider.provider_metadata) if self.provider.provider_metadata else {}
+                
+                # Get additional account data
+                account_info = self.client.get_account_info()
+                projects = self.client.get_projects()
+                users = self.client.get_users()
+                
+                # Get capabilities for restrictions
+                capabilities_response = self.client.session.get(f"{self.client.base_url}/capabilities", timeout=30)
+                capabilities = capabilities_response.json().get('capabilities', {})
+                restrictions = capabilities.get('restrictions', {})
+                regions = capabilities.get('regions', [])
+                
+                # Build enhanced account info (focused on useful FinOps data)
+                enhanced_account_info = {
+                    'account_id': account_info.get('account', {}).get('name', self.provider.account_id),
+                    'account_name': account_info.get('account', {}).get('name', self.provider.account_id),
+                    'account_status': 'active' if account_info.get('account', {}).get('enabled') and not account_info.get('account', {}).get('locked') else 'locked',
+                    'enabled': account_info.get('account', {}).get('enabled', True),
+                    'locked': account_info.get('account', {}).get('locked', False),
+                    'service_user': {
+                        'name': users[0].get('name') if users else 'N/A',
+                        'id': users[0].get('id') if users else 'N/A',
+                        'enabled': users[0].get('enabled') if users else True
+                    },
+                    'projects': {
+                        'total_count': len(projects),
+                        'enabled_count': sum(1 for p in projects if p.get('enabled')),
+                        'projects': [{'name': p.get('name'), 'url': p.get('url'), 'enabled': p.get('enabled')} for p in projects]
+                    }
+                }
+                
+                # Merge with existing metadata
+                existing_metadata['account_info'] = enhanced_account_info
+                existing_metadata['last_account_update'] = datetime.now().isoformat()
+                
+                self.provider.provider_metadata = json.dumps(existing_metadata)
+            except Exception as meta_error:
+                logger.warning(f"Failed to update enhanced account metadata: {meta_error}")
+            
             # Update provider - sync fully successful
             self.provider.last_sync = datetime.now()
             self.provider.sync_status = 'success'
