@@ -93,16 +93,16 @@ body {
                 </div>
                 <div class="analytics-kpi-value">
                     {% if latest_complete_sync %}
-                        {{ "%.2f"|format(latest_complete_sync.total_daily_cost) }} ₽/день
+                        {{ "{:,.2f}".format(latest_complete_sync.total_monthly_cost) }} ₽/месяц
                     {% else %}
-                        0.00 ₽/день
+                        0.00 ₽/месяц
                     {% endif %}
                 </div>
                 <div class="analytics-kpi-subtitle">
                     {% if latest_complete_sync %}
-                        {{ "%.2f"|format(latest_complete_sync.total_monthly_cost) }} ₽/месяц
+                        {{ "{:,.2f}".format(latest_complete_sync.total_daily_cost) }} ₽/день
                     {% else %}
-                        0.00 ₽/месяц
+                        0.00 ₽/день
                     {% endif %}
                 </div>
             </div>
