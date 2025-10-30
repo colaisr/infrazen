@@ -246,6 +246,12 @@ if 'postgres' in disk_name or 'mysql' in disk_name:
 # Kubernetes clusters:
 # - Master node only (228₽/day from HAR)
 # - Workers are VMs (billed separately under Compute)
+# - CSI volumes: Automatically aggregated into cluster cost (NEW!)
+#   - Detected by labels['cluster-name'] matching cluster ID
+#   - Or by 'k8s-csi-' prefix in volume name
+#   - Includes both auto-generated and named PVCs (grafana, victoriametrics, etc.)
+#   - Hidden from standalone volume list (is_active=False)
+#   - Total cluster cost = master + CSI volumes
 
 # PostgreSQL/MySQL/Kafka clusters:
 # - Sum all hosts (vCPUs, RAM, storage)
@@ -285,15 +291,35 @@ KNOWN_SKUS = {
 
 #### Kubernetes Clusters:
 ```python
-def _estimate_kubernetes_cluster_cost(...):
-    # Master node only (from HAR observation):
+def _process_kubernetes_cluster(cluster, folder_id, ..., disks):
+    # Master node cost (from HAR observation):
     master_daily_cost = 228.0  # Regional master
     
-    # Workers are VMs (billed separately)
-    return master_daily_cost
+    # Find and sum CSI volumes for this cluster (NEW!)
+    csi_volumes_cost = 0.0
+    for disk in disks:
+        labels = disk.get('labels', {})
+        disk_cluster_id = labels.get('cluster-name')
+        
+        if disk_cluster_id == cluster_id:
+            # This CSI volume belongs to this cluster
+            volume_cost = self._estimate_disk_cost(size_gb, disk_type)
+            csi_volumes_cost += volume_cost
+    
+    # Total cluster cost = master + CSI storage
+    total_cluster_cost = master_daily_cost + csi_volumes_cost
+    
+    # Deactivate old standalone CSI volume resources
+    # (they're now aggregated into cluster, not shown separately)
+    
+    return total_cluster_cost
 ```
 
-**Important:** K8s workers are NOT included here - they're counted as regular VMs.
+**Important:** 
+- K8s workers are NOT included - they're counted as regular VMs
+- **NEW:** CSI volumes are NOW aggregated into cluster cost
+- CSI volumes are hidden from standalone volume list (is_active=False)
+- Users see complete cluster cost (master + storage) in one resource
 
 #### PostgreSQL Clusters:
 ```python
@@ -584,8 +610,8 @@ Accuracy:     99.84% ✅
 | Virtual Machines | 17 | 3,423₽ | 99%+ | SKU-based |
 | Snapshots | 10 | 479₽ | 100% | HAR-based |
 | PostgreSQL | 2 | 329₽ | 99.99% | HAR-based |
+| Kubernetes | 1 | **264₽** | 99.99% | HAR-based (includes CSI) |
 | Disks | 5 | 229₽ | 99%+ | SKU-based |
-| Kubernetes | 1 | 228₽ | 99.99% | HAR-based |
 | **DNS Zones** | **17** | **198₽** | **100%** | **HAR-based** |
 | Kafka | 1 | 198₽ | 100% | HAR-based |
 | Images | 4 | 126₽ | 100% | HAR-based |
@@ -594,6 +620,8 @@ Accuracy:     99.84% ✅
 | Reserved IPs | 3 | 14₽ | 100% | Documented |
 
 **Total: 63 resources, 5,411₽/day, 99.84% accuracy**
+
+**Note:** Kubernetes cost (264₽) now includes master (228₽) + 9 CSI volumes (36₽). CSI volumes are no longer shown as separate standalone resources.
 
 ### 5.3 Implementation Journey
 
@@ -612,7 +640,7 @@ Accuracy:     99.84% ✅
 
 ## 6. Major Technical Discoveries
 
-### 6.1 Kubernetes Billing Split
+### 6.1 Kubernetes Billing Split & CSI Volume Aggregation
 
 **Discovery:** Yandex bills Kubernetes across TWO services:
 
@@ -627,10 +655,45 @@ Compute Cloud Bill:
 └── K8s CSI volumes: Billed as standalone disks
 ```
 
+**InfraZen Implementation (October 30, 2025):**
+
+We aggregate CSI volumes into the cluster cost for better UX:
+
+```
+User sees:
+└── Kubernetes Cluster "itlkube": 264₽/day
+    ├── Master: 228₽/day
+    └── CSI Storage (9 volumes): 36₽/day
+    
+Worker VMs shown separately (tagged with cluster ID)
+
+Yandex bills:
+├── Managed Kubernetes: 228₽ (master only)
+├── Compute Cloud: VMs cost (workers)
+└── Block Storage: 36₽ (CSI volumes)
+
+InfraZen aggregates: 228₽ + 36₽ = 264₽ total cluster cost
+```
+
+**CSI Volume Detection:**
+```python
+# Primary: Check cluster-name label
+labels = disk.get('labels', {})
+cluster_id = labels.get('cluster-name')
+
+# Secondary: Check k8s-csi- prefix
+disk_name = disk.get('name', '')
+is_csi = disk_name.startswith('k8s-csi-')
+
+# Includes both auto-generated (k8s-csi-xxx) and named PVCs (grafana, victoriametrics)
+```
+
 **Implementation Impact:**
 - Process K8s worker VMs as 'server' type
 - Tag with `kubernetes_cluster_id` for identification
-- Don't filter them out!
+- **NEW:** Aggregate CSI volumes into cluster cost
+- **NEW:** Hide CSI volumes from standalone volume list (is_active=False)
+- **NEW:** Display cost breakdown on resource card showing master + storage
 
 ### 6.2 Snapshot Cost Accumulation
 
@@ -1185,6 +1248,8 @@ if cluster_type == 'new_service':
 - **SKUs:** 993 prices in database
 - **Sync Time:** ~20 seconds (resource sync)
 - **Price Sync:** ~6 minutes (SKU sync)
+- **K8s CSI Volumes:** Automatically aggregated into cluster cost (Oct 2025)
+- **UI Enhancement:** 2-column responsive specs layout for all devices
 
 ### 15.3 Commands
 

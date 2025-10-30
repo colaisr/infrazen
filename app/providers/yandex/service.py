@@ -132,11 +132,14 @@ class YandexService:
                 logger.info(f"  Querying managed services...")
                 managed_services = self.client.get_all_managed_services(folder_id)
                 
-                # Process Kubernetes clusters
+                # Get compute resources early (needed for K8s CSI volume detection)
+                folder_disks = self.client.list_disks(folder_id)
+                
+                # Process Kubernetes clusters (pass disks for CSI volume aggregation)
                 k8s_clusters = managed_services.get('kubernetes_clusters', [])
                 for cluster in k8s_clusters:
                     cluster_resource = self._process_kubernetes_cluster(
-                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id, folder_disks
                     )
                     if cluster_resource:
                         synced_resources.append(cluster_resource)
@@ -191,8 +194,8 @@ class YandexService:
                 
                 # PHASE 2B: Process compute resources, filtering out managed service nodes
                 logger.info(f"  Processing compute resources (filtering managed service nodes)...")
-                instances = resources.get('instances', [])
-                disks = resources.get('disks', [])
+                instances = self.client.list_instances(folder_id)
+                disks = folder_disks  # Use disks fetched earlier for K8s CSI volume detection
                 
                 # Get cluster IDs for tagging (but DON'T filter out K8s worker VMs!)
                 # According to Yandex billing:
@@ -230,15 +233,22 @@ class YandexService:
                         total_cost += vm_resource.daily_cost or 0.0
                 
                 # Process standalone disks (not attached to VMs)
-                # Note: K8s CSI disks are billed under Compute Cloud, so we include them
-                # Only skip database service disks (postgres, mysql, etc.) as they're in cluster costs
+                # Note: Skip K8s CSI volumes (already aggregated into cluster cost)
+                # Also skip database service disks (postgres, mysql, etc.) as they're in cluster costs
                 for disk in disks:
                     # Skip if disk is attached to an instance
                     if disk.get('instanceIds'):
                         continue
                     
-                    # Skip only database service disks (NOT k8s-csi)
                     disk_name = disk.get('name', '')
+                    labels = disk.get('labels', {})
+                    
+                    # Skip K8s CSI volumes (already counted in cluster cost)
+                    if labels.get('cluster-name') or disk_name.startswith('k8s-csi-'):
+                        logger.debug(f"    Skipping K8s CSI volume: {disk_name} (included in cluster cost)")
+                        continue
+                    
+                    # Skip database service disks
                     if any(pattern in disk_name.lower() for pattern in ['postgres', 'mysql', 'mongodb', 'clickhouse', 'redis']):
                         logger.debug(f"    Skipping database service disk: {disk_name}")
                         continue
@@ -1543,8 +1553,8 @@ class YandexService:
     # ============================================================================
     
     def _process_kubernetes_cluster(self, cluster: Dict, folder_id: str, 
-                                   folder_name: str, cloud_id: str,
-                                   sync_snapshot_id: int) -> Optional[Resource]:
+                                  folder_name: str, cloud_id: str,
+                                  sync_snapshot_id: int, disks: List[Dict] = None) -> Optional[Resource]:
         """
         Process Kubernetes cluster resource
         
@@ -1607,10 +1617,62 @@ class YandexService:
                 
                 total_storage_gb += disk_size_gb * node_count
             
-            # Estimate daily cost
-            estimated_daily_cost = self._estimate_kubernetes_cluster_cost(
+            # Estimate master cost (master node only, workers are billed as VMs)
+            master_daily_cost = self._estimate_kubernetes_cluster_cost(
                 total_vcpus, total_ram_gb, total_storage_gb, master_zone
             )
+            
+            # Find and sum CSI volumes for this cluster
+            csi_volumes_cost = 0.0
+            csi_volumes_count = 0
+            csi_volumes_list = []
+            
+            if disks:
+                for disk in disks:
+                    labels = disk.get('labels', {})
+                    disk_name = disk.get('name', '')
+                    disk_cluster_id = labels.get('cluster-name')
+                    
+                    # Check if this disk belongs to this K8s cluster
+                    if disk_cluster_id == cluster_id:
+                        # Calculate disk cost
+                        size_bytes = int(disk.get('size', 0))
+                        size_gb = size_bytes / (1024**3)
+                        disk_type = disk.get('typeId', 'network-hdd')
+                        volume_cost = self._estimate_disk_cost(size_gb, disk_type)
+                        
+                        csi_volumes_cost += volume_cost
+                        csi_volumes_count += 1
+                        csi_volumes_list.append({
+                            'name': disk_name,
+                            'size_gb': round(size_gb, 2),
+                            'type': disk_type,
+                            'cost': round(volume_cost, 2)
+                        })
+                        
+                        logger.info(f"  Found CSI volume '{disk_name}' for cluster '{cluster_name}': {volume_cost:.2f}₽/day")
+            
+            # Total cluster cost = master + storage
+            estimated_daily_cost = master_daily_cost + csi_volumes_cost
+            
+            logger.info(f"  K8s cluster '{cluster_name}' total cost: {estimated_daily_cost:.2f}₽/day (master: {master_daily_cost:.2f}₽, storage: {csi_volumes_cost:.2f}₽)")
+            
+            # Mark CSI volumes as inactive (they're now part of cluster, not standalone)
+            # This prevents them from showing up as separate resources in the UI
+            from app.core.models.resource import Resource
+            if csi_volumes_list:
+                for csi_vol in csi_volumes_list:
+                    vol_name = csi_vol['name']
+                    # Find and deactivate old volume resource if it exists
+                    old_volume = Resource.query.filter_by(
+                        provider_id=self.provider.id,
+                        resource_name=vol_name,
+                        resource_type='volume',
+                        is_active=True
+                    ).first()
+                    if old_volume:
+                        old_volume.is_active = False
+                        logger.debug(f"  Deactivated standalone volume resource '{vol_name}' (now part of cluster)")
             
             # Create resource metadata
             metadata = {
@@ -1626,7 +1688,16 @@ class YandexService:
                 'total_storage_gb': total_storage_gb,
                 'node_groups': node_groups,
                 'created_at': cluster.get('createdAt'),
-                'estimated_cost': True
+                'estimated_cost': True,
+                # Cost breakdown
+                'cost_breakdown': {
+                    'master': round(master_daily_cost, 2),
+                    'storage': round(csi_volumes_cost, 2),
+                    'total': round(estimated_daily_cost, 2)
+                },
+                'csi_volumes': csi_volumes_list,
+                'csi_volumes_count': csi_volumes_count,
+                'note': f'Total cost includes master ({master_daily_cost:.2f}₽) and {csi_volumes_count} CSI volume(s) ({csi_volumes_cost:.2f}₽). Worker VMs are billed separately under Compute Cloud.'
             }
             
             resource = self._create_resource(
