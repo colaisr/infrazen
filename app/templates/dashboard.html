@@ -215,7 +215,8 @@
                 </div>
                 <a class="icon-button" href="#"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
             </div>
-            <div class="usage-list">
+            <div class="usage-list usage-under-construction">
+                <div class="under-construction-overlay"><span>Under Construction</span></div>
                 <div class="usage-item">
                     <div class="usage-top">
                         <span>Процессоры (CPU)</span>
@@ -283,22 +284,12 @@
                 <button class="icon-button"><i class="fa-solid fa-arrows-rotate"></i></button>
             </div>
         </div>
-        {% if overview.recommendations %}
-        <div class="recommendations-list">
-            {% for r in overview.recommendations %}
-            <div class="recommendation-item">
-                <div class="rec-title">{{ r.title }}</div>
-                <div class="rec-meta">{{ r.provider }} • Экономия: {{ r.estimated_savings_rub }} ₽ • Доверие: {{ (r.confidence * 100)|round(0) }}%</div>
+        <div id="dashboard-recs" class="recommendations-list" data-initial-savings="{{ "{:,.0f}".format(overview.kpis.potential_savings_rub | default(0)) }}">
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                <div class="empty-state-title">Загрузка рекомендаций…</div>
             </div>
-            {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><i class="fa-solid fa-lightbulb"></i></div>
-            <div class="empty-state-title">Рекомендации не найдены</div>
-            <div class="empty-state-text">Все ваши ресурсы оптимально настроены</div>
-        </div>
-        {% endif %}
     </section>
 
     <section class="dashboard-section">
@@ -308,50 +299,28 @@
                 <p class="section-meta">Поиск и фильтрация по провайдерам</p>
             </div>
             <div class="section-actions">
-                <span class="section-meta">0 из 0 ресурсов</span>
-                <button class="icon-button"><i class="fa-solid fa-filter"></i></button>
+                <span class="section-meta" id="resource-count">0 из 0 ресурсов</span>
+                <a href="/resources" class="icon-button" title="Открыть все ресурсы"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
             </div>
         </div>
         <div class="filter-row">
-            <input class="form-control" type="text" placeholder="Поиск ресурсов...">
-            <select class="form-control">
-                <option>Все провайдеры</option>
+            <input id="dashboard-resource-search" class="form-control" type="text" placeholder="Поиск ресурсов...">
+            <select id="dashboard-resource-provider" class="form-control">
+                <option value="">Все провайдеры</option>
             </select>
-            <select class="form-control">
-                <option>Все типы</option>
+            <select id="dashboard-resource-type" class="form-control">
+                <option value="">Все типы</option>
             </select>
-            <select class="form-control">
-                <option>Все статусы</option>
+            <select id="dashboard-resource-status" class="form-control">
+                <option value="">Все статусы</option>
             </select>
         </div>
-        {% if overview.resources %}
-        <div class="resource-table">
-            <div class="resource-table-header">
-                <span>Ресурс</span>
-                <span>Провайдер</span>
-                <span>Тип</span>
-                <span>Регион</span>
-                <span>Статус</span>
-                <span>Месячная стоимость</span>
+        <div id="dashboard-resources-table" class="resource-table-container">
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
+                <div class="empty-state-title">Загрузка ресурсов…</div>
             </div>
-            {% for res in overview.resources %}
-            <div class="resource-row">
-                <span>{{ res.name }}</span>
-                <span>{{ res.provider }}</span>
-                <span>{{ res.type }}</span>
-                <span>{{ res.region }}</span>
-                <span>{{ res.status }}</span>
-                <span>{{ res.monthly_cost_rub | default(0) }} ₽</span>
-            </div>
-            {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><i class="fa-solid fa-server"></i></div>
-            <div class="empty-state-title">Нет ресурсов</div>
-            <div class="empty-state-text">Подключите облачных провайдеров для отображения ресурсов</div>
-        </div>
-        {% endif %}
     </section>
 </div>
 
@@ -360,3 +329,4 @@
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}
+

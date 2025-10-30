@@ -88,58 +88,79 @@ class AnalyticsService:
         return trends
     
     def get_service_analysis(self) -> Dict[str, Any]:
-        """Get service-level cost breakdown"""
-        # Get latest complete sync
-        latest_sync = CompleteSync.query.filter_by(user_id=self.user_id)\
-            .order_by(desc(CompleteSync.sync_completed_at)).first()
-        
+        """Get service-level cost breakdown from the last successful complete sync only.
+
+        This aggregates costs using `ResourceState` rows tied to the provider
+        snapshots that participated in the latest `CompleteSync` for this user.
+        """
+        # Get latest successful complete sync for the user
+        latest_sync = (
+            CompleteSync.query
+            .filter_by(user_id=self.user_id, sync_status='success')
+            .order_by(desc(CompleteSync.sync_completed_at))
+            .first()
+        )
+
         if not latest_sync:
-            return {'services': [], 'total_cost': 0}
-        
-        # Get resources from latest sync
-        # We'll use active resources as proxy for latest sync data
-        resources = Resource.query.filter_by(is_active=True).all()
-        
-        service_breakdown = {}
-        total_cost = 0
-        
-        for resource in resources:
-            service = resource.service_name or 'Unknown Service'
-            daily_cost = resource.daily_cost or 0
-            
-            if service not in service_breakdown:
-                service_breakdown[service] = {
-                    'cost': 0,
+            return {'services': [], 'total_cost': 0, 'total_resources': 0}
+
+        # Collect snapshot IDs that were part of this complete sync
+        from app.core.models.complete_sync import ProviderSyncReference
+        from app.core.models.sync import ResourceState
+
+        snapshot_ids = [ref.sync_snapshot_id for ref in latest_sync.provider_syncs or [] if ref.sync_status == 'success']
+
+        if not snapshot_ids:
+            return {'services': [], 'total_cost': 0, 'total_resources': 0}
+
+        # Aggregate ResourceState by service_name for the snapshots
+        service_breakdown: Dict[str, Dict[str, Any]] = {}
+        total_cost: float = 0.0
+        total_resources: int = 0
+
+        states_query = ResourceState.query.filter(ResourceState.sync_snapshot_id.in_(snapshot_ids))
+
+        for state in states_query.all():
+            service_name = state.service_name or 'Unknown Service'
+            # effective_cost on state reflects the cost detected during that sync
+            cost = float(state.effective_cost or 0.0)
+
+            if service_name not in service_breakdown:
+                service_breakdown[service_name] = {
+                    'cost': 0.0,
                     'count': 0,
                     'resources': []
                 }
-            
-            service_breakdown[service]['cost'] += daily_cost
-            service_breakdown[service]['count'] += 1
-            service_breakdown[service]['resources'].append({
-                'name': resource.resource_name,
-                'cost': daily_cost,
-                'type': resource.resource_type
+
+            entry = service_breakdown[service_name]
+            entry['cost'] += cost
+            entry['count'] += 1
+            entry['resources'].append({
+                'name': state.resource_name,
+                'cost': cost,
+                'type': state.resource_type
             })
-            total_cost += daily_cost
-        
+
+            total_cost += cost
+            total_resources += 1
+
         # Convert to list and sort by cost
         services = []
-        for service, data in service_breakdown.items():
+        for name, data in service_breakdown.items():
             services.append({
-                'name': service,
+                'name': name,
                 'cost': data['cost'],
                 'count': data['count'],
                 'percentage': (data['cost'] / total_cost * 100) if total_cost > 0 else 0,
                 'resources': data['resources']
             })
-        
+
         services.sort(key=lambda x: x['cost'], reverse=True)
-        
+
         return {
             'services': services,
             'total_cost': total_cost,
-            'total_resources': len(resources)
+            'total_resources': total_resources
         }
     
     def get_provider_breakdown(self) -> Dict[str, Any]:
