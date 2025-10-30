@@ -135,12 +135,12 @@ function updateProviderCardAfterSync(providerId, syncData, isPartialSync) {
     if (syncData.total_monthly_cost !== undefined) {
         const costPrimary = providerCard.querySelector('.cost-primary .cost-amount');
         if (costPrimary) {
-            costPrimary.textContent = `${syncData.total_monthly_cost.toFixed(1)} ₽`;
+            costPrimary.textContent = `${syncData.total_monthly_cost.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ₽`;
         }
         
         const costSecondary = providerCard.querySelector('.cost-amount-secondary');
         if (costSecondary && syncData.total_daily_cost) {
-            costSecondary.textContent = `${syncData.total_daily_cost.toFixed(1)} ₽`;
+            costSecondary.textContent = `${syncData.total_daily_cost.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ₽`;
         }
     }
     
