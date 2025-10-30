@@ -244,24 +244,12 @@
     cursor: not-allowed;
 }
 
-.sync-btn.loading {
-    position: relative;
-    color: transparent;
-}
-
-.sync-btn.loading::after {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    border: 2px solid transparent;
-    border-top: 2px solid currentColor;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-}
+/*
+   Loading state for sync button is handled via JS by injecting a spinning
+   icon into the button's innerHTML. The previous CSS-based pseudo-element
+   spinner caused a duplicate spinner to appear. These rules are intentionally
+   removed to avoid the second spinner overlay.
+*/
 
 @keyframes spin {
     0% { transform: translate(-50%, -50%) rotate(0deg); }
