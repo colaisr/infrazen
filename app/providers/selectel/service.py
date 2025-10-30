@@ -91,18 +91,36 @@ class SelectelService:
             db.session.add(sync_snapshot)
             db.session.commit()
             
-            # PHASE 0: Validate OpenStack authentication (critical for VM/volume details)
+            # PHASE 0: Validate OpenStack authentication (CRITICAL - no fallback)
             logger.info("PHASE 0: Validating OpenStack authentication")
-            openstack_auth_ok = False
             try:
                 iam_token = self.client._get_iam_token()
-                if iam_token:
-                    openstack_auth_ok = True
-                    logger.info("✅ OpenStack authentication successful")
+                if not iam_token:
+                    raise Exception("IAM token generation returned None")
+                logger.info("✅ OpenStack authentication successful")
             except Exception as auth_error:
                 logger.error(f"❌ OpenStack authentication FAILED: {auth_error}")
-                logger.warning("⚠️  Sync will continue with billing data only - VMs will lack CPU/RAM/IP details")
-                logger.warning("⚠️  Fix: Check service user credentials and permissions in Selectel admin panel")
+                logger.error("❌ Sync aborted - OpenStack authentication is required")
+                
+                # Update sync snapshot with error
+                sync_snapshot.sync_status = 'error'
+                sync_snapshot.sync_completed_at = datetime.now()
+                sync_snapshot.error_message = f"OpenStack authentication failed: {str(auth_error)}"
+                sync_snapshot.calculate_duration()
+                
+                # Update provider sync status to error
+                self.provider.sync_status = 'error'
+                self.provider.sync_error = f"OpenStack authentication failed: {str(auth_error)}. Check service user credentials."
+                
+                db.session.commit()
+                
+                # Return error immediately - no degraded mode
+                return {
+                    'success': False,
+                    'error': f'OpenStack authentication failed: {str(auth_error)}',
+                    'message': 'Sync aborted: OpenStack authentication is required. Please update service user credentials in connection settings.',
+                    'sync_snapshot_id': sync_snapshot.id
+                }
             
             # PHASE 1: Get all billed resources (2h window for current active resources only)
             logger.info("PHASE 1: Fetching billing data (2h window - current active resources only)")
@@ -230,15 +248,20 @@ class SelectelService:
                 resources_by_type['volume'] = {}
             resources_by_type['volume'].update(orphaned_volumes_from_deleted_vms)
             
-            # PHASE 4: Process volumes (unify with VMs where possible)
-            logger.info("PHASE 4: Processing volumes")
+            # PHASE 4: Pre-fetch all volumes from OpenStack (OPTIMIZATION: batch fetch)
+            logger.info("PHASE 4: Pre-fetching volumes from OpenStack for faster processing")
+            volume_cache = self._prefetch_all_volumes(resources_by_type.get('volume', {}))
+            
+            # PHASE 4.5: Process volumes (unify with VMs where possible, using pre-fetched data)
+            logger.info("PHASE 4.5: Processing volumes")
             if 'volume' in resources_by_type:
                 for resource_id, billing_data in resources_by_type['volume'].items():
                     volume_result = self._process_volume_resource(
                         resource_id,
                         billing_data,
                         unified_vms,
-                        sync_snapshot.id
+                        sync_snapshot.id,
+                        volume_cache=volume_cache
                     )
                     if volume_result:
                         if not volume_result.get('unified_into_vm'):
@@ -329,7 +352,6 @@ class SelectelService:
             sync_config = json.loads(sync_snapshot.sync_config) if sync_snapshot.sync_config else {}
             sync_config.update({
                 'sync_method': 'billing_first',
-                'openstack_auth_ok': openstack_auth_ok,
                 'orphan_volumes': len(orphan_volumes),
                 'zombie_resources': len(zombie_resources),
                 'unified_vms': len(unified_vms),
@@ -341,18 +363,10 @@ class SelectelService:
             })
             sync_snapshot.sync_config = json.dumps(sync_config)
             
-            # Update provider - set status based on OpenStack auth
+            # Update provider - sync fully successful
             self.provider.last_sync = datetime.now()
-            
-            if not openstack_auth_ok:
-                # OpenStack auth failed - sync succeeded but with degraded data
-                self.provider.sync_status = 'success'  # Still success (billing worked)
-                self.provider.sync_error = 'OpenStack authentication failed - VMs have limited details. Check service user credentials.'
-                logger.warning("⚠️  Sync completed with WARNINGS - OpenStack enrichment unavailable")
-            else:
-                # Full success
-                self.provider.sync_status = 'success'
-                self.provider.sync_error = None
+            self.provider.sync_status = 'success'
+            self.provider.sync_error = None
             
             db.session.commit()
             
@@ -361,14 +375,8 @@ class SelectelService:
             logger.info(f"  - Zombies: {len(zombie_resources)} ({zombie_cost:.2f} ₽/day)")
             logger.info(f"  - Orphan volumes: {len(orphan_volumes)} ({orphan_cost:.2f} ₽/day)")
             
-            if not openstack_auth_ok:
-                logger.error("❌ CRITICAL: OpenStack authentication failed - VMs are missing CPU/RAM/IP details")
-                logger.error("❌ ACTION REQUIRED: Update service user credentials in connection settings")
-            
-            # Build success message with prominent warning if OpenStack auth failed
+            # Build success message
             base_message = f'Successfully synced {len(synced_resources)} resources ({total_cost:.2f} ₽/day)'
-            if not openstack_auth_ok:
-                base_message = f'⚠️ PARTIAL SYNC: {len(synced_resources)} resources found but OpenStack auth FAILED - VMs lack CPU/RAM/IP details. Update service user credentials!'
             
             return {
                 'success': True,
@@ -380,7 +388,6 @@ class SelectelService:
                 'orphan_daily_cost': round(orphan_cost, 2),
                 'sync_snapshot_id': sync_snapshot.id,
                 'service_types': list(resources_by_type.keys()),
-                'openstack_auth_ok': openstack_auth_ok,
                 'message': base_message
             }
             
@@ -706,7 +713,8 @@ class SelectelService:
     
     def _process_volume_resource(self, resource_id: str, billing_data: Dict,
                                  unified_vms: Dict[str, Resource],
-                                 sync_snapshot_id: int) -> Optional[Dict]:
+                                 sync_snapshot_id: int,
+                                 volume_cache: Dict[str, Dict] = None) -> Optional[Dict]:
         """
         Process volume - try to unify with VM or create standalone
         
@@ -732,12 +740,21 @@ class SelectelService:
                 if billing_region_raw[-1].isalpha() and billing_region_raw[-2].isdigit():
                     billing_region = billing_region_raw[:-1]
             
-            # Try to get volume details from OpenStack (using billing location hint)
-            volume_details = self._fetch_volume_from_openstack(
-                resource_id,
-                billing_project_id=billing_project_id,
-                billing_region=billing_region
-            )
+            # Try to get volume details from OpenStack
+            # First check the pre-fetched cache, then try direct fetch if not in cache
+            volume_details = None
+            if volume_cache and resource_id in volume_cache:
+                volume_details = volume_cache[resource_id]
+                logger.debug(f"Volume {resource_id} found in pre-fetched cache")
+            elif billing_project_id and billing_region:
+                # Fallback to direct fetch if not in cache (shouldn't happen often)
+                volume_details = self._fetch_volume_from_openstack_safe(
+                    resource_id,
+                    billing_project_id=billing_project_id,
+                    billing_region=billing_region
+                )
+            else:
+                logger.debug(f"No billing location hint for volume {resource_id}, creating from billing data only")
             
             if volume_details:
                 # Volume exists in OpenStack
@@ -858,21 +875,16 @@ class SelectelService:
                 
                 # Extract volume size and creation timestamp from billing data if available
                 # For volumes, the size is typically in the metrics under volume_gigabytes_universal
-                volume_size_gb = None
-                created_at = None
-                if 'metrics' in billing_data:
-                    # Look for volume size in metrics
+                volume_size_gb = billing_data.get('size_gb')  # Try to get from billing_data directly first
+                created_at = self._extract_provision_date_from_billing(resource_id)
+                
+                # If size not in billing_data, try to extract from metrics
+                if not volume_size_gb and 'metrics' in billing_data:
+                    # Look for volume size in metrics (it's the value, not quantity)
                     for metric_id, metric_value in billing_data['metrics'].items():
                         if 'volume_gigabytes' in metric_id:
-                            # For zombie volumes, we need to make a direct billing API call to get the size
-                            # since the processed billing data doesn't include the raw metric.quantity
-                            size_and_timestamp = self._get_volume_details_from_billing_api(resource_id)
-                            if size_and_timestamp:
-                                volume_size_gb = size_and_timestamp.get('size_gb')
-                                created_at = size_and_timestamp.get('created_at')
-                            else:
-                                # Fallback to just getting the provision date
-                                created_at = self._extract_provision_date_from_billing(resource_id)
+                            # The metric value is the size in GB
+                            volume_size_gb = metric_value if isinstance(metric_value, (int, float)) else None
                             break
                 
                 # Extract region from billing data
@@ -1216,61 +1228,81 @@ class SelectelService:
             logger.error(f"Error fetching server {server_id}: {e}")
             return None
     
-    def _fetch_volume_from_openstack(self, volume_id: str, billing_project_id: str = None, billing_region: str = None) -> Optional[Dict]:
+    def _prefetch_all_volumes(self, volume_billing_data: Dict[str, Dict]) -> Dict[str, Dict]:
         """
-        Fetch volume details from OpenStack APIs
+        Pre-fetch all volumes from OpenStack in batch for faster processing
         
-        Uses project_id and region from billing API if available to avoid brute-force search
-        Falls back to multi-project/region search if billing info not provided
+        Args:
+            volume_billing_data: Dict of volume_id -> billing_data
+            
+        Returns:
+            Dict mapping volume_id -> volume_details (from OpenStack)
+        """
+        volume_cache = {}
+        
+        if not volume_billing_data:
+            return volume_cache
+        
+        # Group volumes by (project_id, region) to minimize API calls
+        volumes_by_location = {}
+        for volume_id, billing_data in volume_billing_data.items():
+            project_id = billing_data.get('project_id')
+            region_raw = billing_data.get('region', 'unknown')
+            
+            # Convert billing zone to region (ru-7b -> ru-7)
+            region = region_raw
+            if region_raw and len(region_raw) > 2:
+                if region_raw[-1].isalpha() and region_raw[-2].isdigit():
+                    region = region_raw[:-1]
+            
+            if project_id and region:
+                location_key = f"{project_id}:{region}"
+                if location_key not in volumes_by_location:
+                    volumes_by_location[location_key] = {'project_id': project_id, 'region': region, 'volume_ids': []}
+                volumes_by_location[location_key]['volume_ids'].append(volume_id)
+        
+        # Fetch volumes for each unique location
+        for location_key, location_data in volumes_by_location.items():
+            project_id = location_data['project_id']
+            region = location_data['region']
+            volume_ids = location_data['volume_ids']
+            
+            logger.debug(f"Fetching {len(volume_ids)} volumes from project {project_id} region {region}")
+            try:
+                volumes = self.client.get_openstack_volumes(project_id, region=region)
+                for volume in volumes:
+                    if volume['id'] in volume_ids:
+                        volume_cache[volume['id']] = volume
+                logger.debug(f"Cached {len([v for v in volume_ids if v in volume_cache])} volumes from this location")
+            except Exception as e:
+                logger.debug(f"Failed to fetch volumes from {region} project {project_id}: {e}")
+        
+        logger.info(f"Pre-fetched {len(volume_cache)} volumes from OpenStack")
+        return volume_cache
+    
+    def _fetch_volume_from_openstack_safe(self, volume_id: str, billing_project_id: str = None, billing_region: str = None) -> Optional[Dict]:
+        """
+        Fetch volume details from OpenStack APIs - ONLY tries billing-provided location
+        
+        NO brute-force search to avoid hanging on 400 errors
+        Returns None if not found at billing location (caller creates from billing data)
         """
         try:
-            # OPTIMIZATION: If we have project/region from billing, try that first
-            if billing_project_id and billing_region:
-                logger.debug(f"Trying volume {volume_id} in billing-provided project {billing_project_id} region {billing_region}")
-                try:
-                    volumes = self.client.get_openstack_volumes(billing_project_id, region=billing_region)
-                    for volume in volumes:
-                        if volume['id'] == volume_id:
-                            logger.info(f"✅ Found volume {volume_id} using billing-provided location")
-                            return volume
-                except Exception as e:
-                    logger.warning(f"Volume {volume_id} not found at billing location: {e}")
-            
-            # FALLBACK: Brute-force search across all projects/regions
-            logger.debug(f"Falling back to brute-force search for volume {volume_id}")
-            
-            # Ensure regions are discovered
-            if not self.client.regions:
-                try:
-                    self.client.get_available_regions()
-                except Exception as e:
-                    logger.warning(f"Failed to discover regions: {e}")
-            
-            # Get all projects from billing
-            projects = self.client.get_all_projects_from_billing()
-            if not projects:
-                logger.warning("No projects discovered from billing")
+            if not billing_project_id or not billing_region:
+                logger.debug(f"No billing location hint for volume {volume_id}")
                 return None
             
-            # Use discovered regions, fallback to known regions
-            regions_to_try = list(self.client.regions.keys()) if self.client.regions else ['ru-3', 'ru-7', 'ru-8']
+            logger.debug(f"Trying volume {volume_id} in billing-provided project {billing_project_id} region {billing_region}")
+            try:
+                volumes = self.client.get_openstack_volumes(billing_project_id, region=billing_region)
+                for volume in volumes:
+                    if volume['id'] == volume_id:
+                        logger.info(f"✅ Found volume {volume_id} using billing-provided location")
+                        return volume
+                logger.debug(f"Volume {volume_id} not found in {billing_region} project {billing_project_id} (may be deleted)")
+            except Exception as e:
+                logger.debug(f"Volume {volume_id} not found at billing location: {e}")
             
-            for project in projects:
-                project_id = project.get('id')
-                project_name = project.get('name', 'Unknown')
-                
-                for region in regions_to_try:
-                    try:
-                        volumes = self.client.get_openstack_volumes(project_id, region=region)
-                        for volume in volumes:
-                            if volume['id'] == volume_id:
-                                logger.info(f"Found volume {volume_id} in project '{project_name}' region {region}")
-                                return volume
-                    except Exception as e:
-                        logger.debug(f"Volume {volume_id} not in project '{project_name}' region {region}: {e}")
-                        continue
-            
-            logger.warning(f"Volume {volume_id} not found in any project/region combination")
             return None
             
         except Exception as e:

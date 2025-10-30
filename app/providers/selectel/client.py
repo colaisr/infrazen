@@ -439,7 +439,12 @@ class SelectelClient:
             List of volume dictionaries
         """
         try:
-            headers = self._get_openstack_headers()
+            # Use project-scoped headers if project_id is provided
+            if project_id:
+                headers = self._get_project_scoped_headers(project_id)
+            else:
+                headers = self._get_openstack_headers()
+            
             headers['Openstack-Api-Version'] = 'volume latest'
             
             # Determine which base URL to use
