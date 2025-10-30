@@ -176,18 +176,29 @@ def connections():
                 total_monthly_cost = sum((resource.daily_cost or 0) * 30 for resource in provider_resources)
             
             providers.append({
-                'id': provider.id,
-                'name': provider.connection_name,
-                'type': provider.provider_type,
+                'id': f"{provider.provider_type}-{provider.id}",
+                'code': provider.provider_type,
+                'name': provider.provider_type.title(),
+                'provider_type': provider.provider_type,
+                'connection_name': provider.connection_name,
                 'status': 'connected' if provider.is_active else 'disconnected',
                 'last_sync': provider.last_sync,
                 'sync_status': provider.sync_status,
-                'resource_count': resource_count,
-                'last_snapshot_resources': last_snapshot_resources,
-                'total_daily_cost': total_daily_cost,
-                'total_monthly_cost': total_monthly_cost,
+                'sync_error': provider.sync_error,
                 'auto_sync': provider.auto_sync,
-                'sync_interval': provider.sync_interval
+                'added_at': provider.created_at.strftime('%d.%m.%Y в %H:%M') if provider.created_at else '01.01.2024 в 00:00',
+                'provider_metadata': provider.provider_metadata,
+                'total_daily_cost': round(total_daily_cost, 2),
+                'total_monthly_cost': round(total_monthly_cost, 2),
+                'last_snapshot_resources': last_snapshot_resources,
+                'resource_count': resource_count,
+                'sync_interval': provider.sync_interval,
+                'details': {
+                    'connection_name': provider.connection_name,
+                    'account_id': provider.account_id,
+                    'resource_count': resource_count,
+                    'last_sync': provider.last_sync.isoformat() if provider.last_sync else None
+                }
             })
     else:
         # Real user: show only real database connections using unified models

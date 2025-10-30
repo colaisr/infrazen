@@ -328,14 +328,10 @@ function startCompleteSync(button) {
             
             showFlashMessage(message, 'success');
             
-            // Reset button state
+            // Reload page after 2 seconds to show updated data
             setTimeout(() => {
-                button.innerHTML = originalText;
-                button.disabled = false;
-            }, 3000);
-            
-            // TODO: Update all provider cards dynamically instead of reload
-            // For now, just show the success message - user can manually refresh if needed
+                location.reload();
+            }, 2000);
         } else {
             showFlashMessage('❌ Ошибка полной синхронизации: ' + (data.error || data.message), 'error');
             button.innerHTML = originalText;
