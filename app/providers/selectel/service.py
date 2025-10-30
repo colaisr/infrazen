@@ -155,7 +155,7 @@ class SelectelService:
                 sync_snapshot.sync_duration_seconds = int((sync_snapshot.sync_completed_at - sync_snapshot.sync_started_at).total_seconds())
                 sync_snapshot.total_resources_found = 0
                 sync_snapshot.resources_deleted = deactivated_count
-                sync_snapshot.total_monthly_cost = 0.0
+                sync_snapshot.total_monthly_cost = 0.0  # No resources, no cost
                 
                 sync_config = {
                     'sync_method': 'billing_first',
@@ -346,6 +346,7 @@ class SelectelService:
             sync_snapshot.sync_completed_at = datetime.now()
             sync_snapshot.resources_created = len(synced_resources)
             sync_snapshot.total_resources_found = len(synced_resources)
+            sync_snapshot.total_monthly_cost = total_cost  # Store daily cost (field naming is confusing but consistent with other providers)
             sync_snapshot.calculate_duration()
             
             # Store metadata about special cases
