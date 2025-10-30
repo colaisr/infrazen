@@ -10,12 +10,12 @@ providers_bp = Blueprint('providers', __name__)
 
 @providers_bp.route('/', methods=['GET'])
 def list_providers():
-    """List all providers, excluding demo user providers by default"""
+    """List all providers, excluding demo user providers and soft-deleted providers by default"""
     # Check if we should include demo user data
     include_demo = request.args.get('include_demo', 'false').lower() == 'true'
     
-    # Get all providers
-    query = CloudProvider.query
+    # Get all providers (excluding soft-deleted)
+    query = CloudProvider.query.filter_by(is_deleted=False)
     
     # Exclude demo user providers unless explicitly requested
     if not include_demo:

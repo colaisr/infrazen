@@ -27,7 +27,7 @@ class BoardResource(BaseModel):
     notes = db.Column(db.Text, nullable=True)
     
     # Relationships
-    resource = db.relationship('Resource', backref=db.backref('board_placements', lazy='dynamic'))
+    resource = db.relationship('Resource', backref=db.backref('board_placements', lazy='dynamic', cascade='all, delete-orphan'))
     group = db.relationship('BoardGroup', backref=db.backref('resources', lazy='dynamic'))
     
     def to_dict(self, include_resource=False):

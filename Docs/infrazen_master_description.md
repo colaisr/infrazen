@@ -97,8 +97,9 @@ User Request → Nginx → Gunicorn → Flask Route →
 ### **Current Implementation Status**
 ✅ **Production-ready** multi-cloud FinOps platform with:
 - **Authentication**: Google OAuth integration with role-based access control (user/admin/super_admin)
-- **Provider Support**: Beget and Selectel integrations with billing-first sync
+- **Provider Support**: Beget, Selectel, and Yandex Cloud integrations with billing-first sync
 - **Resource Tracking**: Real-time resource inventory with cost analysis and fresh snapshots per sync
+- **Data Management**: Soft delete implementation for provider connections preserving historical FinOps data
 - **Demo System**: Database-backed demo user with 4 providers, ~45 resources, 20 recommendations
 - **Admin Panel**: Complete user management, provider catalog, unrecognized resources tracking
 - **Security**: HTTPS, SSH key auth, environment secrets, database connection pooling
@@ -883,6 +884,48 @@ CREATE TABLE resource_states (
 - Selectel API integration
 - AWS/Azure/GCP API clients
 - Unified resource normalization across all providers
+
+## 6.9. Soft Delete Implementation for Provider Connections
+
+### 6.9.1. Overview
+InfraZen implements **soft delete** for cloud provider connections to preserve historical financial data while allowing users to remove unwanted connections from their active view. This design aligns with FinOps best practices where historical cost data is invaluable for trend analysis, forecasting, and compliance.
+
+### 6.9.2. Key Features
+- ✅ **Historical Data Preservation**: All sync snapshots, resources, and cost data remain in database
+- ✅ **UI Cleanup**: Deleted providers disappear from connections page and dashboards
+- ✅ **Sync Exclusion**: Soft-deleted providers automatically excluded from synchronization
+- ✅ **Name Reusability**: Users can create new connections with same name as deleted ones
+- ✅ **Audit Trail**: Deletion timestamp and status tracked for compliance
+
+### 6.9.3. Technical Implementation
+**Database Fields:**
+- `is_deleted` (BOOLEAN, indexed) - Soft delete flag
+- `deleted_at` (DATETIME) - Deletion timestamp
+
+**Unique Constraint:**
+```sql
+UNIQUE (user_id, connection_name, is_deleted)
+```
+Allows: Active connection `(user_id, 'aws-prod', 0)` and deleted `(user_id, 'aws-prod', 1)` to coexist
+
+**Query Filtering:**
+All provider queries automatically filter `is_deleted=False` to exclude soft-deleted connections from:
+- Dashboard and analytics
+- Sync operations
+- Cost calculations
+- Resource listings
+
+### 6.9.4. User Experience
+1. **Delete**: Click delete → Connection removed from UI, data preserved in DB
+2. **Re-create**: Create new connection with same name → Independent from deleted one
+3. **Analytics**: Historical data from deleted providers available for reporting
+
+### 6.9.5. Documentation
+See detailed technical documentation: `SOFT_DELETE_IMPLEMENTATION.md`
+
+**Migrations:**
+- `b2d7e551d226` - Add is_deleted fields
+- `4ada00ea0a53` - Update unique constraint
 
 ## 7. Navigation & Module Breakdown
 ```

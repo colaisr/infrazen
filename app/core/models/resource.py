@@ -59,6 +59,8 @@ class Resource(BaseModel):
     cost_allocations = db.relationship('CostAllocation', backref='resource', lazy=True, cascade='all, delete-orphan')
     cost_trends = db.relationship('CostTrend', backref='resource', lazy=True, cascade='all, delete-orphan')
     recommendations = db.relationship('OptimizationRecommendation', backref='resource', lazy=True, cascade='all, delete-orphan')
+    price_comparison_recommendations = db.relationship('PriceComparisonRecommendation', backref='current_resource', foreign_keys='PriceComparisonRecommendation.current_resource_id', lazy=True, cascade='all, delete-orphan')
+    # Note: board_placements backref is defined in BoardResource model
     
     # Constraints
     __table_args__ = (

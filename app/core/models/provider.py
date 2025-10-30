@@ -23,6 +23,8 @@ class CloudProvider(BaseModel):
     
     # Status and metadata
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False, index=True)  # Soft delete flag
+    deleted_at = db.Column(db.DateTime)  # When the provider was soft-deleted
     last_sync = db.Column(db.DateTime)
     sync_status = db.Column(db.String(20), default='pending')  # pending, syncing, success, error
     sync_error = db.Column(db.Text)  # Last sync error message
@@ -34,12 +36,18 @@ class CloudProvider(BaseModel):
     # Provider-specific metadata
     provider_metadata = db.Column(db.Text)  # JSON-encoded provider-specific data
     
-    # Relationships
+    # Relationships with cascade delete to prevent orphaned records
     resources = db.relationship('Resource', backref='provider', lazy=True, cascade='all, delete-orphan')
+    sync_snapshots = db.relationship('SyncSnapshot', backref='cloud_provider', lazy=True, cascade='all, delete-orphan')
+    provider_sync_references = db.relationship('ProviderSyncReference', backref='cloud_provider', lazy=True, cascade='all, delete-orphan')
+    recommendations = db.relationship('OptimizationRecommendation', backref='cloud_provider', foreign_keys='OptimizationRecommendation.provider_id', lazy=True, cascade='all, delete-orphan')
+    # Note: unrecognized_resources backref is defined in UnrecognizedResource model
     
     # Constraints
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'connection_name', name='unique_user_connection'),
+        # Unique constraint includes is_deleted to allow reusing connection names after soft delete
+        # Example: user can have 'yc-private' with is_deleted=False and 'yc-private' with is_deleted=True
+        db.UniqueConstraint('user_id', 'connection_name', 'is_deleted', name='unique_user_active_connection'),
         # Removed the constraint that prevents multiple connections with same provider/account
         # This allows multiple Beget connections with different names but same account
     )
@@ -65,6 +73,8 @@ class CloudProvider(BaseModel):
             'account_id': self.account_id,
             'api_endpoint': self.api_endpoint,
             'is_active': self.is_active,
+            'is_deleted': self.is_deleted,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
             'last_sync': self.last_sync.isoformat() if self.last_sync else None,
             'sync_status': self.sync_status,
             'sync_error': self.sync_error,

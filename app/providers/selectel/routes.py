@@ -356,7 +356,7 @@ def update_connection(provider_id):
 
 @selectel_bp.route('/<int:provider_id>/delete', methods=['DELETE'])
 def delete_connection(provider_id):
-    """Delete a Selectel cloud provider connection."""
+    """Soft delete Selectel connection - preserves historical data"""
     try:
         # Check if user is authenticated
         if 'user' not in session:
@@ -368,18 +368,23 @@ def delete_connection(provider_id):
         if demo_check:
             return demo_check
         
+        from datetime import datetime
         user_id = session['user']['id']
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
-            provider_type='selectel'
+            provider_type='selectel',
+            is_deleted=False
         ).first()
         
         if not provider:
             return jsonify({'success': False, 'message': 'Provider not found'}), 404
         
-        db.session.delete(provider)
+        # Soft delete: mark as deleted instead of removing from database
+        provider.is_deleted = True
+        provider.deleted_at = datetime.utcnow()
+        provider.is_active = False  # Also deactivate
         db.session.commit()
         
         return jsonify({'success': True, 'message': 'Connection deleted successfully'}), 200

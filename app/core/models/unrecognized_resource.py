@@ -37,7 +37,7 @@ class UnrecognizedResource(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    provider = db.relationship('CloudProvider', backref='unrecognized_resources')
+    provider = db.relationship('CloudProvider', backref=db.backref('unrecognized_resources', cascade='all, delete-orphan'))
     user = db.relationship('User', foreign_keys=[user_id], backref='discovered_unrecognized_resources')
     resolver = db.relationship('User', foreign_keys=[resolved_by], backref='resolved_unrecognized_resources')
     sync_snapshot = db.relationship('SyncSnapshot', backref='unrecognized_resources')

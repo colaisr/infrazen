@@ -418,6 +418,24 @@ class SyncOrchestrator:
 
             db.session.add(sync_snapshot)
 
+            # Update provider metadata with account billing info (if available)
+            if sync_data and 'account_billing' in sync_data and sync_data['account_billing']:
+                try:
+                    # Get existing metadata or create new
+                    existing_metadata = json.loads(provider.provider_metadata) if provider.provider_metadata else {}
+                    
+                    # Update account_info with billing data
+                    account_info = existing_metadata.get('account_info', {})
+                    account_info.update(sync_data['account_billing'])
+                    existing_metadata['account_info'] = account_info
+                    existing_metadata['last_sync'] = datetime.now().isoformat()
+                    
+                    # Update provider metadata
+                    provider.provider_metadata = json.dumps(existing_metadata)
+                    self.logger.info(f"Updated provider metadata with account billing info: balance={sync_data['account_billing'].get('balance')} {sync_data['account_billing'].get('currency')}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to update provider metadata with billing info: {e}")
+
             # Ensure sync snapshot is marked as completed
             if sync_snapshot.sync_status == 'running':
                 if resource_processing_errors:

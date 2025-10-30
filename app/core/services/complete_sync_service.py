@@ -86,7 +86,7 @@ class CompleteSyncService:
     
     def get_user_providers(self) -> List[CloudProvider]:
         """
-        Get all auto-sync enabled providers for the user
+        Get all auto-sync enabled providers for the user (excluding soft-deleted)
         
         Returns:
             List of CloudProvider instances
@@ -94,7 +94,8 @@ class CompleteSyncService:
         return CloudProvider.query.filter_by(
             user_id=self.user_id,
             auto_sync=True,
-            is_active=True
+            is_active=True,
+            is_deleted=False  # Exclude soft-deleted providers from sync
         ).order_by('created_at').all()
     
     def _execute_sequential_sync(self, complete_sync: CompleteSync, providers: List[CloudProvider]) -> Dict[str, any]:

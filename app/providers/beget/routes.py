@@ -209,6 +209,8 @@ def sync_connection(provider_id):
         sync_result = sync_orchestrator.sync_provider(provider_id, sync_type='manual')
         
         if sync_result['success']:
+            # total_cost from sync_result is daily cost
+            daily_cost = float(sync_result.get('total_cost', 0))
             return jsonify({
                 'success': True,
                 'message': sync_result['message'],
@@ -216,8 +218,9 @@ def sync_connection(provider_id):
                 'status': 'success',
                 'resources_synced': sync_result['resources_synced'],
                 'total_resources': sync_result['resources_synced'],
-                'total_daily_cost': sync_result.get('total_cost', 0),
-                'total_cost': sync_result.get('total_cost', 0),
+                'total_daily_cost': daily_cost,
+                'total_monthly_cost': daily_cost * 30,  # Calculate monthly from daily
+                'total_cost': daily_cost,
                 'openstack_auth_ok': True,  # Beget doesn't use OpenStack
                 'errors': sync_result['errors']
             })
@@ -230,7 +233,7 @@ def sync_connection(provider_id):
 
 @beget_bp.route('/<int:provider_id>/delete', methods=['DELETE'])
 def delete_connection(provider_id):
-    """Delete Beget connection"""
+    """Soft delete Beget connection - preserves historical data"""
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
@@ -241,16 +244,21 @@ def delete_connection(provider_id):
         if demo_check:
             return demo_check
         
+        from datetime import datetime
         user_id = session['user']['id']
-        provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
+        provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget', is_deleted=False).first()
         
         if not provider:
             return jsonify({'success': False, 'error': 'Connection not found'}), 404
         
-        db.session.delete(provider)
+        # Soft delete: mark as deleted instead of removing from database
+        provider.is_deleted = True
+        provider.deleted_at = datetime.utcnow()
+        provider.is_active = False  # Also deactivate
+        
         db.session.commit()
         
-        return jsonify({'success': True, 'message': 'Connection deleted successfully'})
+        return jsonify({'success': True, 'message': 'Connection removed successfully'})
         
     except Exception as e:
         db.session.rollback()

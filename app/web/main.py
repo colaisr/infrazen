@@ -136,8 +136,8 @@ def connections():
     
     if is_demo_user:
         # Demo user: show real database data (seeded data)
-        # Get real providers from database
-        all_providers = CloudProvider.query.all()
+        # Get real providers from database (exclude soft-deleted)
+        all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
         user_id_int = int(float(user['id']))
         cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
         
@@ -192,8 +192,8 @@ def connections():
     else:
         # Real user: show only real database connections using unified models
         
-        # Get real providers from database
-        all_providers = CloudProvider.query.all()
+        # Get real providers from database (exclude soft-deleted)
+        all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
         user_id_int = int(float(user['id']))
         cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
         
@@ -395,8 +395,8 @@ def analytics():
     else:
         active_resources_count = 0
     
-    # Get user's providers for individual charts
-    providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True).all()
+    # Get user's providers for individual charts (exclude soft-deleted)
+    providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True, is_deleted=False).all()
     
     return render_template('analytics.html', 
                         user=user,
@@ -492,8 +492,8 @@ def settings():
 def get_real_user_overview(user_id):
     """Get overview data for a real user from database using unified models"""
     
-    # Get user's unified cloud providers
-    providers = CloudProvider.query.filter_by(user_id=user_id).all()
+    # Get user's unified cloud providers (exclude soft-deleted)
+    providers = CloudProvider.query.filter_by(user_id=user_id, is_deleted=False).all()
     
     # Calculate totals
     total_connections = len(providers)
@@ -614,8 +614,8 @@ def get_real_user_resources(user_id):
     """Get resources for a real user from database - show resources from latest snapshot for each provider"""
     from app.core.models.sync import SyncSnapshot, ResourceState
     
-    # Get all providers and filter by user_id in Python to avoid floating point precision issues
-    all_providers = CloudProvider.query.all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues (exclude soft-deleted)
+    all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
     # Convert scientific notation to integer string for comparison
     user_id_int = int(float(user_id))
     providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
@@ -701,8 +701,8 @@ def get_real_user_resources(user_id):
 def get_real_user_providers(user_id):
     """Get providers for a real user from database using unified models"""
     
-    # Get all providers and filter by user_id in Python to avoid floating point precision issues
-    all_providers = CloudProvider.query.all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues (exclude soft-deleted)
+    all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
     # Convert scientific notation to integer string for comparison
     user_id_int = int(float(user_id))
     providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
@@ -727,8 +727,8 @@ def get_latest_snapshot_metadata(user_id):
     from app.core.models.sync import SyncSnapshot
     import json
     
-    # Get all providers and filter by user_id in Python to avoid floating point precision issues
-    all_providers = CloudProvider.query.all()
+    # Get all providers and filter by user_id in Python to avoid floating point precision issues (exclude soft-deleted)
+    all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
     # Convert scientific notation to integer string for comparison
     user_id_int = int(float(user_id))
     providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]

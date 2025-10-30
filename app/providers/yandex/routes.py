@@ -211,9 +211,10 @@ def update_yandex_connection(provider_id):
 
 @yandex_bp.route('/<int:provider_id>/delete', methods=['DELETE'])
 def delete_yandex_connection(provider_id):
-    """Delete Yandex Cloud connection"""
+    """Soft delete Yandex Cloud connection - preserves historical data"""
     try:
-        provider = CloudProvider.query.get(provider_id)
+        from datetime import datetime
+        provider = CloudProvider.query.filter_by(id=provider_id, is_deleted=False).first()
         
         if not provider:
             return jsonify({
@@ -223,18 +224,22 @@ def delete_yandex_connection(provider_id):
         
         connection_name = provider.connection_name
         
-        db.session.delete(provider)
+        # Soft delete: mark as deleted instead of removing from database
+        provider.is_deleted = True
+        provider.deleted_at = datetime.utcnow()
+        provider.is_active = False  # Also deactivate
+        
         db.session.commit()
         
-        logger.info(f"Deleted Yandex Cloud connection: {connection_name} (ID: {provider_id})")
+        logger.info(f"Soft deleted Yandex Cloud connection: {connection_name} (ID: {provider_id})")
         
         return jsonify({
             'success': True,
-            'message': 'Connection deleted successfully'
+            'message': 'Connection removed successfully'
         })
     
     except Exception as e:
-        logger.error(f"Error deleting Yandex connection: {e}")
+        logger.error(f"Error soft deleting Yandex connection: {e}")
         db.session.rollback()
         return jsonify({
             'success': False,
@@ -294,6 +299,12 @@ def sync_yandex_provider(provider_id):
         
         service = YandexService(provider)
         result = service.sync_resources()
+        
+        # Ensure cost fields match what the JavaScript expects
+        if result.get('success'):
+            daily_cost = float(result.get('estimated_daily_cost', 0))
+            result['total_daily_cost'] = daily_cost
+            result['total_monthly_cost'] = daily_cost * 30
         
         return jsonify(result)
     except Exception as e:
