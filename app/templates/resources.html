@@ -504,11 +504,42 @@
                                         <span style="font-size: 0.9rem; font-weight: 600; color: #1F2937;">{{ (cost_bd.get('master', 0) * 30)|round(1) }}₽/мес</span>
                                     </div>
                                     {% if cost_bd.get('storage', 0) > 0 %}
-                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: white; border-radius: 0.375rem; border: 1px solid #E5E7EB;">
-                                        <span style="font-size: 0.85rem; color: #6B7280;">
-                                            <i class="fa-solid fa-hdd" style="width: 1.2rem; margin-right: 0.5rem; color: #8B5CF6;"></i>CSI Volumes ({{ config.get('csi_volumes_count', 0) }}шт)
-                                        </span>
-                                        <span style="font-size: 0.9rem; font-weight: 600; color: #1F2937;">{{ (cost_bd.get('storage', 0) * 30)|round(1) }}₽/мес</span>
+                                    <!-- CSI Volumes - Collapsible -->
+                                    <div style="border-radius: 0.375rem; border: 1px solid #E5E7EB; overflow: hidden;">
+                                        <!-- CSI Header (clickable) -->
+                                        <div onclick="toggleCSIVolumes('{{ resource.id }}')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: white; cursor: pointer; transition: background-color 0.2s;">
+                                            <span style="font-size: 0.85rem; color: #6B7280; display: flex; align-items: center; gap: 0.5rem;">
+                                                <i class="fa-solid fa-hdd" style="width: 1.2rem; color: #8B5CF6;"></i>
+                                                <span>CSI Volumes ({{ config.get('csi_volumes_count', 0) }}шт)</span>
+                                            </span>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span style="font-size: 0.9rem; font-weight: 600; color: #1F2937;">{{ (cost_bd.get('storage', 0) * 30)|round(1) }}₽/мес</span>
+                                                <i class="fa-solid fa-chevron-down" id="csi-chevron-{{ resource.id }}" style="font-size: 0.75rem; color: #9CA3AF; transition: transform 0.2s;"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- CSI Volumes List (collapsible content) -->
+                                        <div id="csi-volumes-{{ resource.id }}" style="display: none; border-top: 1px solid #E5E7EB; background: #F9FAFB;">
+                                            {% if config.get('csi_volumes') %}
+                                            <div style="padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                                {% for volume in config.get('csi_volumes') %}
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: white; border-radius: 0.25rem; border: 1px solid #E5E7EB;">
+                                                    <div style="display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0;">
+                                                        <span style="font-size: 0.8rem; font-weight: 600; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ volume.name }}">
+                                                            {{ volume.name }}
+                                                        </span>
+                                                        <span style="font-size: 0.7rem; color: #6B7280;">
+                                                            {{ volume.size_gb }}GB • {{ volume.type }}
+                                                        </span>
+                                                    </div>
+                                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1F2937; white-space: nowrap; margin-left: 0.5rem;">
+                                                        {{ (volume.cost * 30)|round(1) }}₽/мес
+                                                    </span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                     {% endif %}
                                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-radius: 0.375rem; border: 1.5px solid #3B82F6; margin-top: 0.25rem;">
