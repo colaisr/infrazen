@@ -393,16 +393,22 @@ def update_board_resource(board_resource_id):
     db.session.commit()
     
     # Update group costs if group changed
-    if old_group_id != board_resource.group_id:
-        if old_group_id:
-            old_group = BoardGroup.query.get(old_group_id)
-            if old_group:
-                old_group.calculate_cost()
-        
-        if board_resource.group_id:
-            new_group = BoardGroup.query.get(board_resource.group_id)
-            if new_group:
-                new_group.calculate_cost()
+    try:
+        if old_group_id != board_resource.group_id:
+            if old_group_id:
+                old_group = BoardGroup.query.get(old_group_id)
+                if old_group:
+                    old_group.calculate_cost()
+            
+            if board_resource.group_id:
+                new_group = BoardGroup.query.get(board_resource.group_id)
+                if new_group:
+                    new_group.calculate_cost()
+    except Exception as e:
+        print(f"❌ Error calculating group cost: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't fail the whole request if cost calc fails
     
     return jsonify({
         'success': True,
