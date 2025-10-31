@@ -2164,72 +2164,11 @@ function handleResourceContextAction(action, resourceId) {
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.context-menu')) {
         hideResourceContextMenu();
-        hideCanvasResourceContextMenu();
     }
 });
 
 // Hide context menu on scroll
-document.addEventListener('scroll', function() {
-    hideResourceContextMenu();
-    hideCanvasResourceContextMenu();
-}, true);
-
-/**
- * Show canvas resource context menu (for resources already on canvas)
- */
-function showCanvasResourceContextMenu(e, resourceId, boardResourceId) {
-    const contextMenu = document.getElementById('canvasResourceContextMenu');
-    if (!contextMenu) return;
-    
-    // Position the menu
-    contextMenu.style.left = e.pageX + 'px';
-    contextMenu.style.top = e.pageY + 'px';
-    contextMenu.style.display = 'block';
-    
-    // Store IDs for action handlers
-    contextMenu.dataset.resourceId = resourceId;
-    contextMenu.dataset.boardResourceId = boardResourceId;
-    
-    // Remove existing event listeners by cloning
-    const newMenu = contextMenu.cloneNode(true);
-    contextMenu.parentNode.replaceChild(newMenu, contextMenu);
-    
-    // Add event listeners to menu items
-    newMenu.querySelectorAll('.context-menu-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const action = this.dataset.action;
-            handleCanvasResourceContextAction(action, resourceId, boardResourceId);
-            hideCanvasResourceContextMenu();
-        });
-    });
-}
-
-/**
- * Hide canvas resource context menu
- */
-function hideCanvasResourceContextMenu() {
-    const contextMenu = document.getElementById('canvasResourceContextMenu');
-    if (contextMenu) {
-        contextMenu.style.display = 'none';
-    }
-}
-
-/**
- * Handle canvas resource context menu actions
- */
-function handleCanvasResourceContextAction(action, resourceId, boardResourceId) {
-    switch (action) {
-        case 'info':
-            // Show resource info modal with resource ID
-            showResourceInfo(resourceId);
-            break;
-            
-        case 'notes':
-            // Show notes editor for resource
-            showResourceNotes(resourceId);
-            break;
-    }
-}
+document.addEventListener('scroll', hideResourceContextMenu, true);
 
 /**
  * Setup canvas drop zone for resources
@@ -2653,14 +2592,6 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         
         // Save new position to database
         updateResourcePosition(this);
-    });
-    
-    // Add right-click context menu for canvas resource
-    resourceCard.on('mousedown', function(opt) {
-        if (opt.button === 3) { // Right-click
-            opt.e.preventDefault();
-            showCanvasResourceContextMenu(opt.e, this.resourceId, this.boardResourceId);
-        }
     });
 }
 
