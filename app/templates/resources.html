@@ -497,12 +497,53 @@
                                 </div>
                                 <div class="usage-content" id="cost-breakdown-{{ resource.id }}" style="display: none;">
                                 <div style="display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.5rem;">
+                                    <!-- Master Node -->
                                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: white; border-radius: 0.375rem; border: 1px solid #E5E7EB;">
                                         <span style="font-size: 0.85rem; color: #6B7280;">
                                             <i class="fa-solid fa-server" style="width: 1.2rem; margin-right: 0.5rem; color: #3B82F6;"></i>Мастер-нода
                                         </span>
                                         <span style="font-size: 0.9rem; font-weight: 600; color: #1F2937;">{{ (cost_bd.get('master', 0) * 30)|round(1) }}₽/мес</span>
                                     </div>
+                                    
+                                    {% if cost_bd.get('workers', 0) > 0 %}
+                                    <!-- Worker VMs - Collapsible -->
+                                    <div style="border-radius: 0.375rem; border: 1px solid #E5E7EB; overflow: hidden;">
+                                        <!-- Worker VMs Header (clickable) -->
+                                        <div onclick="toggleWorkerVMs('{{ resource.id }}')" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: white; cursor: pointer; transition: background-color 0.2s;">
+                                            <span style="font-size: 0.85rem; color: #6B7280; display: flex; align-items: center; gap: 0.5rem;">
+                                                <i class="fa-solid fa-server-alt" style="width: 1.2rem; color: #10B981;"></i>
+                                                <span>Worker Nodes ({{ config.get('worker_vms_count', 0) }}шт)</span>
+                                            </span>
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                <span style="font-size: 0.9rem; font-weight: 600; color: #1F2937;">{{ (cost_bd.get('workers', 0) * 30)|round(1) }}₽/мес</span>
+                                                <i class="fa-solid fa-chevron-down" id="worker-chevron-{{ resource.id }}" style="font-size: 0.75rem; color: #9CA3AF; transition: transform 0.2s;"></i>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Worker VMs List (collapsible content) -->
+                                        <div id="worker-vms-{{ resource.id }}" style="display: none; border-top: 1px solid #E5E7EB; background: #F9FAFB;">
+                                            {% if config.get('worker_vms') %}
+                                            <div style="padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                                {% for vm in config.get('worker_vms') %}
+                                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: white; border-radius: 0.25rem; border: 1px solid #E5E7EB;">
+                                                    <div style="display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0;">
+                                                        <span style="font-size: 0.8rem; font-weight: 600; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ vm.name }}">
+                                                            {{ vm.name }}
+                                                        </span>
+                                                        <span style="font-size: 0.7rem; color: #6B7280;">
+                                                            {{ vm.vcpu }} vCPU • {{ vm.ram_gb }}GB RAM • {{ vm.disk_gb }}GB {{ vm.disk_type }}
+                                                        </span>
+                                                    </div>
+                                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1F2937; white-space: nowrap; margin-left: 0.5rem;">
+                                                        {{ (vm.cost * 30)|round(1) }}₽/мес
+                                                    </span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                     {% if cost_bd.get('storage', 0) > 0 %}
                                     <!-- CSI Volumes - Collapsible -->
                                     <div style="border-radius: 0.375rem; border: 1px solid #E5E7EB; overflow: hidden;">

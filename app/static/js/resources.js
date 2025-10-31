@@ -62,6 +62,19 @@ function toggleCSIVolumes(resourceId) {
     }
 }
 
+function toggleWorkerVMs(resourceId) {
+    const content = document.getElementById(`worker-vms-${resourceId}`);
+    const chevron = document.getElementById(`worker-chevron-${resourceId}`);
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
 // ============================================================================
 // Chart Initialization
 // ============================================================================
@@ -362,5 +375,6 @@ window.toggleProviderSection = toggleProviderSection;
 window.toggleUsageSection = toggleUsageSection;
 window.toggleCostBreakdown = toggleCostBreakdown;
 window.toggleCSIVolumes = toggleCSIVolumes;
+window.toggleWorkerVMs = toggleWorkerVMs;
 window.exportResourcesToCSV = exportResourcesToCSV;
 

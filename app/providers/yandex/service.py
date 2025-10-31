@@ -132,14 +132,16 @@ class YandexService:
                 logger.info(f"  Querying managed services...")
                 managed_services = self.client.get_all_managed_services(folder_id)
                 
-                # Get compute resources early (needed for K8s CSI volume detection)
+                # Get compute resources early (needed for K8s CSI volume and worker VM detection)
                 folder_disks = self.client.list_disks(folder_id)
+                folder_instances = self.client.list_instances(folder_id)
+                logger.info(f"  Found {len(folder_disks)} disks and {len(folder_instances)} instances in folder")
                 
-                # Process Kubernetes clusters (pass disks for CSI volume aggregation)
+                # Process Kubernetes clusters (pass disks for CSI volume aggregation and instances for worker VM aggregation)
                 k8s_clusters = managed_services.get('kubernetes_clusters', [])
                 for cluster in k8s_clusters:
                     cluster_resource = self._process_kubernetes_cluster(
-                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id, folder_disks
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id, folder_disks, folder_instances
                     )
                     if cluster_resource:
                         synced_resources.append(cluster_resource)
@@ -194,7 +196,7 @@ class YandexService:
                 
                 # PHASE 2B: Process compute resources, filtering out managed service nodes
                 logger.info(f"  Processing compute resources (filtering managed service nodes)...")
-                instances = self.client.list_instances(folder_id)
+                instances = folder_instances  # Use instances fetched earlier
                 disks = folder_disks  # Use disks fetched earlier for K8s CSI volume detection
                 
                 # Get cluster IDs for tagging (but DON'T filter out K8s worker VMs!)
@@ -1554,7 +1556,8 @@ class YandexService:
     
     def _process_kubernetes_cluster(self, cluster: Dict, folder_id: str, 
                                   folder_name: str, cloud_id: str,
-                                  sync_snapshot_id: int, disks: List[Dict] = None) -> Optional[Resource]:
+                                  sync_snapshot_id: int, disks: List[Dict] = None,
+                                  instances: List[Dict] = None) -> Optional[Resource]:
         """
         Process Kubernetes cluster resource
         
@@ -1564,6 +1567,8 @@ class YandexService:
             folder_name: Folder name
             cloud_id: Cloud ID
             sync_snapshot_id: Sync snapshot ID
+            disks: List of disks for CSI volume aggregation
+            instances: List of VMs for worker node aggregation
         
         Returns:
             Resource instance or None
@@ -1652,10 +1657,64 @@ class YandexService:
                         
                         logger.info(f"  Found CSI volume '{disk_name}' for cluster '{cluster_name}': {volume_cost:.2f}₽/day")
             
-            # Total cluster cost = master + storage
-            estimated_daily_cost = master_daily_cost + csi_volumes_cost
+            # Find and sum worker node VMs for this cluster
+            worker_vms_cost = 0.0
+            worker_vms_count = 0
+            worker_vms_list = []
             
-            logger.info(f"  K8s cluster '{cluster_name}' total cost: {estimated_daily_cost:.2f}₽/day (master: {master_daily_cost:.2f}₽, storage: {csi_volumes_cost:.2f}₽)")
+            if instances:
+                for instance in instances:
+                    labels = instance.get('labels', {})
+                    instance_cluster_id = labels.get('managed-kubernetes-cluster-id')
+                    
+                    # Check if this VM is a worker node for this K8s cluster
+                    if instance_cluster_id == cluster_id:
+                        instance_name = instance.get('name', instance.get('id', 'unknown'))
+                        
+                        # Calculate VM cost (estimate from resources)
+                        resources = instance.get('resources', {})
+                        cores = int(resources.get('cores', 0))
+                        memory_bytes = int(resources.get('memory', 0))
+                        memory_gb = memory_bytes / (1024**3)
+                        
+                        # Get boot disk info
+                        boot_disk = instance.get('bootDisk', {})
+                        disk_id = boot_disk.get('diskId')
+                        boot_disk_size_gb = 0
+                        boot_disk_type = 'network-hdd'
+                        
+                        # Find boot disk in disks list
+                        if disk_id and disks:
+                            for disk in disks:
+                                if disk.get('id') == disk_id:
+                                    boot_disk_size_gb = int(disk.get('size', 0)) / (1024**3)
+                                    boot_disk_type = disk.get('typeId', 'network-hdd')
+                                    break
+                        
+                        # Estimate VM cost
+                        zone_id = instance.get('zoneId', 'ru-central1-a')
+                        vm_cost = self._estimate_instance_cost(cores, memory_gb, boot_disk_size_gb, boot_disk_type, zone_id)
+                        
+                        worker_vms_cost += vm_cost
+                        worker_vms_count += 1
+                        worker_vms_list.append({
+                            'name': instance_name,
+                            'id': instance.get('id'),
+                            'vcpu': cores,
+                            'ram_gb': round(memory_gb, 1),
+                            'disk_gb': round(boot_disk_size_gb, 1),
+                            'disk_type': boot_disk_type,
+                            'zone': zone_id,
+                            'status': instance.get('status', 'unknown'),
+                            'cost': round(vm_cost, 2)
+                        })
+                        
+                        logger.info(f"  Found worker VM '{instance_name}' for cluster '{cluster_name}': {vm_cost:.2f}₽/day")
+            
+            # Total cluster cost = master + storage + worker VMs
+            estimated_daily_cost = master_daily_cost + csi_volumes_cost + worker_vms_cost
+            
+            logger.info(f"  K8s cluster '{cluster_name}' total cost: {estimated_daily_cost:.2f}₽/day (master: {master_daily_cost:.2f}₽, storage: {csi_volumes_cost:.2f}₽, workers: {worker_vms_cost:.2f}₽)")
             
             # Mark CSI volumes as inactive (they're now part of cluster, not standalone)
             # This prevents them from showing up as separate resources in the UI
@@ -1673,6 +1732,21 @@ class YandexService:
                     if old_volume:
                         old_volume.is_active = False
                         logger.debug(f"  Deactivated standalone volume resource '{vol_name}' (now part of cluster)")
+            
+            # Mark worker VMs as inactive (they're now part of cluster, not standalone)
+            if worker_vms_list:
+                for worker_vm in worker_vms_list:
+                    vm_id = worker_vm['id']
+                    # Find and deactivate old VM resource if it exists
+                    old_vm = Resource.query.filter_by(
+                        provider_id=self.provider.id,
+                        resource_id=vm_id,
+                        resource_type='server',
+                        is_active=True
+                    ).first()
+                    if old_vm:
+                        old_vm.is_active = False
+                        logger.debug(f"  Deactivated standalone VM resource '{worker_vm['name']}' (now part of cluster)")
             
             # Create resource metadata
             metadata = {
@@ -1692,12 +1766,15 @@ class YandexService:
                 # Cost breakdown
                 'cost_breakdown': {
                     'master': round(master_daily_cost, 2),
+                    'workers': round(worker_vms_cost, 2),
                     'storage': round(csi_volumes_cost, 2),
                     'total': round(estimated_daily_cost, 2)
                 },
                 'csi_volumes': csi_volumes_list,
                 'csi_volumes_count': csi_volumes_count,
-                'note': f'Total cost includes master ({master_daily_cost:.2f}₽) and {csi_volumes_count} CSI volume(s) ({csi_volumes_cost:.2f}₽). Worker VMs are billed separately under Compute Cloud.'
+                'worker_vms': worker_vms_list,
+                'worker_vms_count': worker_vms_count,
+                'note': f'Total cost includes master ({master_daily_cost:.2f}₽), {worker_vms_count} worker VM(s) ({worker_vms_cost:.2f}₽), and {csi_volumes_count} CSI volume(s) ({csi_volumes_cost:.2f}₽). All components are aggregated for complete cluster cost tracking.'
             }
             
             resource = self._create_resource(
