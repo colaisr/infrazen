@@ -1,7 +1,7 @@
 """remove_unique_constraint_board_resources
 
 Revision ID: f7b8c9d2e1a3
-Revises: 4ada00ea0a53
+Revises: e7f9b4c3a182
 Create Date: 2025-10-31 23:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'f7b8c9d2e1a3'
-down_revision: Union[str, Sequence[str], None] = '4ada00ea0a53'
+down_revision: Union[str, Sequence[str], None] = None  # Can be applied independently
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
