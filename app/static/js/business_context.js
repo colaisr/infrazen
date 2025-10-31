@@ -704,6 +704,12 @@ function restoreCanvasState(state) {
         fabricCanvas.setZoom(state.viewport.zoom);
         fabricCanvas.viewportTransform = state.viewport.pan.slice();
         
+        // Update object coordinates after viewport restore for hit detection
+        fabricCanvas.forEachObject(function(obj) {
+            obj.setCoords();
+        });
+        fabricCanvas.renderAll(); // Ensure hit detection works after viewport restore
+        
         // Re-setup event handlers for all objects
         setupObjectEventHandlers();
         
@@ -1434,6 +1440,12 @@ function initializeCanvas() {
         const viewport = currentBoard.viewport;
         fabricCanvas.setZoom(viewport.zoom || 1.0);
         fabricCanvas.absolutePan({ x: viewport.pan_x || 0, y: viewport.pan_y || 0 });
+        
+        // Update object coordinates after viewport restore for hit detection
+        fabricCanvas.forEachObject(function(obj) {
+            obj.setCoords();
+        });
+        fabricCanvas.renderAll(); // Ensure hit detection works after viewport restore
         updateZoomDisplay();
     }
     
@@ -1523,6 +1535,21 @@ function setupCanvasEvents() {
         evt.stopPropagation();
     });
     
+    // Debounced handler to update coordinates after wheel panning stops
+    let wheelPanTimeout;
+    const canvasElement = fabricCanvas.wrapperEl;
+    canvasElement.addEventListener('wheel', function() {
+        clearTimeout(wheelPanTimeout);
+        wheelPanTimeout = setTimeout(function() {
+            // Update object coordinates after wheel panning stops
+            fabricCanvas.forEachObject(function(obj) {
+                obj.setCoords();
+            });
+            fabricCanvas.renderAll();
+            console.log('📐 Wheel pan ended - updated object coordinates for hit detection');
+        }, 150); // Wait 150ms after last wheel event
+    });
+    
     // Miro-style panning: drag on empty space or hold space key
     let isPanning = false;
     let lastPosX, lastPosY;
@@ -1550,6 +1577,21 @@ function setupCanvasEvents() {
     fabricCanvas.on('mouse:down', function(opt) {
         const evt = opt.e;
         const target = opt.target;
+        
+        console.log('🖱️ CANVAS CLICK:', {
+            hasTarget: !!target,
+            targetType: target ? target.type : null,
+            objectType: target ? target.objectType : null,
+            targetId: target ? (target.fabricId || target.id) : null,
+            selectable: target ? target.selectable : null,
+            evented: target ? target.evented : null,
+            button: evt.button,
+            clientX: evt.clientX,
+            clientY: evt.clientY,
+            pointer: fabricCanvas.getPointer(evt),
+            zoom: fabricCanvas.getZoom(),
+            vpt: fabricCanvas.viewportTransform
+        });
         
         // Start panning if: middle mouse, space key, or clicking on empty canvas
         // On touchpad, this will be triggered by 2-finger drag
@@ -1587,6 +1629,16 @@ function setupCanvasEvents() {
             isPanning = false;
             fabricCanvas.selection = true;
             fabricCanvas.defaultCursor = spacePressed ? 'grab' : 'default';
+            
+            // Update all object coordinates after panning to fix hit detection
+            // This is required because viewportTransform changes affect hit detection
+            fabricCanvas.forEachObject(function(obj) {
+                obj.setCoords();
+            });
+            
+            // Force re-render after panning to refresh hit detection
+            fabricCanvas.renderAll();
+            console.log('📐 Pan ended - updated object coordinates and re-rendered canvas for hit detection');
             updateGrid();
         }
     });
@@ -1595,9 +1647,54 @@ function setupCanvasEvents() {
     fabricCanvas.on('mouse:down', function(opt) {
         const target = opt.target;
         if (target && target.selectable) {
+            console.log('💾 Saving state before modification - target:', {
+                type: target.type,
+                objectType: target.objectType,
+                id: target.fabricId || target.id
+            });
             // Save state before any modification starts
             saveToUndoStack();
         }
+    });
+    
+    // Selection created - object was selected
+    fabricCanvas.on('selection:created', function(opt) {
+        console.log('✅ SELECTION CREATED:', {
+            selected: opt.selected ? opt.selected.map(o => ({
+                type: o.type,
+                objectType: o.objectType,
+                id: o.fabricId || o.id,
+                selectable: o.selectable
+            })) : null,
+            targetType: opt.target ? opt.target.type : null
+        });
+    });
+    
+    // Selection updated - different object was selected
+    fabricCanvas.on('selection:updated', function(opt) {
+        console.log('🔄 SELECTION UPDATED:', {
+            selected: opt.selected ? opt.selected.map(o => ({
+                type: o.type,
+                objectType: o.objectType,
+                id: o.fabricId || o.id
+            })) : null,
+            deselected: opt.deselected ? opt.deselected.map(o => ({
+                type: o.type,
+                objectType: o.objectType,
+                id: o.fabricId || o.id
+            })) : null
+        });
+    });
+    
+    // Selection cleared - object was deselected
+    fabricCanvas.on('selection:cleared', function(opt) {
+        console.log('❌ SELECTION CLEARED:', {
+            deselected: opt.deselected ? opt.deselected.map(o => ({
+                type: o.type,
+                objectType: o.objectType,
+                id: o.fabricId || o.id
+            })) : null
+        });
     });
     
     // Object modified - update database and trigger autosave
@@ -1620,7 +1717,16 @@ function setupCanvasEvents() {
         scheduleAutoSave();
     });
     
-    fabricCanvas.on('object:added', function() {
+    fabricCanvas.on('object:added', function(opt) {
+        const obj = opt.target;
+        console.log('➕ OBJECT ADDED:', {
+            type: obj ? obj.type : null,
+            objectType: obj ? obj.objectType : null,
+            id: obj ? (obj.fabricId || obj.id) : null,
+            selectable: obj ? obj.selectable : null,
+            evented: obj ? obj.evented : null,
+            visible: obj ? obj.visible : null
+        });
         saveToUndoStack();
         scheduleAutoSave();
     });
@@ -1774,7 +1880,13 @@ function zoomIn() {
     if (!fabricCanvas) return;
     let zoom = fabricCanvas.getZoom();
     zoom = Math.min(zoom * 1.1, 5);
+    console.log('🔍 ZOOM IN:', { from: fabricCanvas.getZoom(), to: zoom });
     fabricCanvas.setZoom(zoom);
+    // Update object coordinates after zoom for hit detection
+    fabricCanvas.forEachObject(function(obj) {
+        obj.setCoords();
+    });
+    fabricCanvas.renderAll();
     updateZoomDisplay();
     updateGrid();
     scheduleAutoSave();
@@ -1784,7 +1896,13 @@ function zoomOut() {
     if (!fabricCanvas) return;
     let zoom = fabricCanvas.getZoom();
     zoom = Math.max(zoom * 0.9, 0.1);
+    console.log('🔍 ZOOM OUT:', { from: fabricCanvas.getZoom(), to: zoom });
     fabricCanvas.setZoom(zoom);
+    // Update object coordinates after zoom for hit detection
+    fabricCanvas.forEachObject(function(obj) {
+        obj.setCoords();
+    });
+    fabricCanvas.renderAll();
     updateZoomDisplay();
     updateGrid();
     scheduleAutoSave();
@@ -1792,8 +1910,14 @@ function zoomOut() {
 
 function zoomReset() {
     if (!fabricCanvas) return;
+    console.log('🔍 ZOOM RESET:', { from: fabricCanvas.getZoom(), to: 1 });
     fabricCanvas.setZoom(1);
     fabricCanvas.absolutePan({ x: 0, y: 0 });
+    // Update object coordinates after zoom/pan reset for hit detection
+    fabricCanvas.forEachObject(function(obj) {
+        obj.setCoords();
+    });
+    fabricCanvas.renderAll();
     updateZoomDisplay();
     updateGrid();
     scheduleAutoSave();
