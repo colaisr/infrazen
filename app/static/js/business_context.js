@@ -2423,10 +2423,9 @@ async function placeResourceOnCanvas(resourceId, x, y) {
             // Reload resources to update toolbox (shows placed badge, updates counts)
             await loadResources();
             
-            // If placed in group, update group cost
-            if (groupId) {
-                await updateGroupCost(groupId);
-            }
+            // Update costs for ALL groups containing this resource
+            // This ensures cost splitting is recalculated if clones exist in multiple groups
+            await updateCostsForAllGroupsWithResource(resourceId);
             
             // Re-enable automatic saves
             isCreatingObjects = false;
@@ -4321,6 +4320,32 @@ function updateCloneBadges(resourceId) {
 }
 
 /**
+ * Update costs for all groups containing clones of a specific resource
+ */
+async function updateCostsForAllGroupsWithResource(resourceId) {
+    if (!resourceId) return;
+    
+    const objects = fabricCanvas.getObjects();
+    const resourceInstances = objects.filter(obj => 
+        obj.objectType === 'resource' && obj.resourceId === resourceId
+    );
+    
+    // Get unique group IDs that contain this resource
+    const groupIds = new Set();
+    resourceInstances.forEach(resource => {
+        if (resource.groupId) {
+            groupIds.add(resource.groupId);
+        }
+    });
+    
+    // Update cost for each group
+    console.log(`💰 Updating costs for ${groupIds.size} groups containing resource ${resourceId}`);
+    for (const groupId of groupIds) {
+        await updateGroupCost(groupId);
+    }
+}
+
+/**
  * Clone resource on canvas
  */
 async function cloneResource(resourceCard) {
@@ -4381,10 +4406,9 @@ async function cloneResource(resourceCard) {
             // Update clone badges for all instances of this resource
             updateCloneBadges(resourceCard.resourceId);
             
-            // Update group cost if placed in a group
-            if (groupId) {
-                await updateGroupCost(groupId);
-            }
+            // Update costs for ALL groups containing this resource (not just the new one)
+            // This ensures cost splitting is recalculated across all groups
+            await updateCostsForAllGroupsWithResource(resourceCard.resourceId);
             
             // Reload resources to update toolbox
             await loadResources();
