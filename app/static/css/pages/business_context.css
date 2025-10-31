@@ -391,8 +391,8 @@
 .toolbox-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: 1.25rem;
+    padding: 0.875rem;
     background: #ffffff;
     border: 1px solid #E5E7EB;
     border-radius: 6px;
@@ -411,15 +411,15 @@
 }
 
 .tool-icon {
-    width: 32px;
-    height: 32px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #3B82F6;
     color: white;
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 1.5rem;
 }
 
 .tool-name {
@@ -502,8 +502,8 @@
 .resource-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
+    gap: 1.25rem;
+    padding: 0.875rem;
     background: #ffffff;
     border: 1px solid #E5E7EB;
     border-radius: 4px;
@@ -537,15 +537,15 @@
 }
 
 .resource-icon {
-    width: 36px;
-    height: 36px;
+    width: 54px;
+    height: 54px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #3B82F6;
     color: white;
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 1.5rem;
     position: relative;
     flex-shrink: 0;
 }
@@ -553,14 +553,14 @@
 .resource-info-icon,
 .resource-notes-icon {
     position: absolute;
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     background: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     color: #1F2937;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -568,15 +568,15 @@
 }
 
 .resource-info-icon {
-    top: -4px;
-    left: -4px;
-    border: 1px solid #3B82F6;
+    top: -6px;
+    left: -6px;
+    border: 2px solid #3B82F6;
 }
 
 .resource-notes-icon {
-    top: -4px;
-    right: -4px;
-    border: 1px solid #10B981;
+    top: -6px;
+    right: -6px;
+    border: 2px solid #10B981;
 }
 
 .resource-notes-icon.has-notes {
@@ -652,6 +652,48 @@
         linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px);
     background-size: 20px 20px;
     background-color: #FFFFFF;
+}
+
+/* ============================================================================
+   CONTEXT MENU
+   ============================================================================ */
+
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    z-index: 10000;
+    min-width: 180px;
+    padding: 0.5rem 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    color: #1F2937;
+    font-size: 0.875rem;
+}
+
+.context-menu-item:hover {
+    background: #F3F4F6;
+}
+
+.context-menu-item i {
+    width: 16px;
+    text-align: center;
+    color: #6B7280;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: #E5E7EB;
+    margin: 0.5rem 0;
 }
 
 /* ============================================================================

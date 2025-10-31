@@ -2029,8 +2029,97 @@ function setupResourceDragListeners() {
         item.addEventListener('dragend', function(e) {
             this.classList.remove('dragging');
         });
+        
+        // Add right-click context menu
+        item.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            const resourceId = parseInt(this.dataset.resourceId);
+            showResourceContextMenu(e, resourceId);
+        });
     });
 }
+
+/**
+ * Show resource context menu
+ */
+function showResourceContextMenu(e, resourceId) {
+    const contextMenu = document.getElementById('resourceContextMenu');
+    if (!contextMenu) return;
+    
+    // Position the menu
+    contextMenu.style.left = e.pageX + 'px';
+    contextMenu.style.top = e.pageY + 'px';
+    contextMenu.style.display = 'block';
+    
+    // Store resource ID for action handlers
+    contextMenu.dataset.resourceId = resourceId;
+    
+    // Remove existing event listeners by cloning
+    const newMenu = contextMenu.cloneNode(true);
+    contextMenu.parentNode.replaceChild(newMenu, contextMenu);
+    
+    // Add event listeners to menu items
+    newMenu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const action = this.dataset.action;
+            handleResourceContextAction(action, resourceId);
+            hideResourceContextMenu();
+        });
+    });
+}
+
+/**
+ * Hide resource context menu
+ */
+function hideResourceContextMenu() {
+    const contextMenu = document.getElementById('resourceContextMenu');
+    if (contextMenu) {
+        contextMenu.style.display = 'none';
+    }
+}
+
+/**
+ * Handle resource context menu actions
+ */
+function handleResourceContextAction(action, resourceId) {
+    switch (action) {
+        case 'info':
+            // Show resource info modal with resource ID
+            showResourceInfo(resourceId);
+            break;
+            
+        case 'notes':
+            // Show notes editor for resource
+            showResourceNotes(resourceId);
+            break;
+            
+        case 'place':
+            // Place resource in center of visible canvas area
+            if (!currentBoard) {
+                showFlashMessage('error', 'Откройте доску');
+                return;
+            }
+            
+            // Get center of visible canvas area
+            const vpt = fabricCanvas.viewportTransform;
+            const zoom = fabricCanvas.getZoom();
+            const centerX = (fabricCanvas.width / 2 - vpt[4]) / zoom;
+            const centerY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
+            
+            placeResourceOnCanvas(resourceId, centerX, centerY);
+            break;
+    }
+}
+
+// Hide context menu when clicking elsewhere
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.context-menu')) {
+        hideResourceContextMenu();
+    }
+});
+
+// Hide context menu on scroll
+document.addEventListener('scroll', hideResourceContextMenu, true);
 
 /**
  * Setup canvas drop zone for resources
