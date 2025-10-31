@@ -1043,8 +1043,26 @@ async function pasteGroup(originalGroup) {
                 
                 fabricCanvas.add(costBadge);
                 
+                // Store initial position for collision detection
+                clonedRect.lastValidLeft = clonedRect.left;
+                clonedRect.lastValidTop = clonedRect.top;
+                clonedRect.lastValidWidth = clonedRect.width;
+                clonedRect.lastValidHeight = clonedRect.height;
+                
                 // Setup event handlers to keep label/cost in sync
                 clonedRect.on('moving', function() {
+                    // Check for intersection with other groups
+                    if (checkGroupIntersection(this, this)) {
+                        // Revert to last valid position
+                        this.set({
+                            left: this.lastValidLeft,
+                            top: this.lastValidTop
+                        });
+                    } else {
+                        // Store current position as valid
+                        this.lastValidLeft = this.left;
+                        this.lastValidTop = this.top;
+                    }
                     updateGroupChildren(clonedRect, groupText, costBadge);
                 });
                 
@@ -1052,12 +1070,31 @@ async function pasteGroup(originalGroup) {
                     const newWidth = clonedRect.width * clonedRect.scaleX;
                     const newHeight = clonedRect.height * clonedRect.scaleY;
                     
-                    clonedRect.set({
+                    // Temporarily apply new size to check for intersection
+                    const oldWidth = this.width;
+                    const oldHeight = this.height;
+                    
+                    this.set({
                         width: newWidth,
                         height: newHeight,
                         scaleX: 1,
                         scaleY: 1
                     });
+                    
+                    // Check for intersection
+                    if (checkGroupIntersection(this, this)) {
+                        // Revert to last valid size
+                        this.set({
+                            width: this.lastValidWidth,
+                            height: this.lastValidHeight,
+                            scaleX: 1,
+                            scaleY: 1
+                        });
+                    } else {
+                        // Store current size as valid
+                        this.lastValidWidth = this.width;
+                        this.lastValidHeight = this.height;
+                    }
                     
                     updateGroupChildren(clonedRect, groupText, costBadge);
                 });
@@ -2904,6 +2941,46 @@ async function saveBoard(isAutoSave = false) {
 }
 
 /**
+ * Check if a group intersects with any other groups on the canvas
+ */
+function checkGroupIntersection(group, excludeGroup = null) {
+    const groupBounds = {
+        left: group.left,
+        top: group.top,
+        right: group.left + group.width,
+        bottom: group.top + group.height
+    };
+    
+    // Get all groups on canvas
+    const allGroups = fabricCanvas.getObjects().filter(obj => 
+        obj.objectType === 'group' && obj !== excludeGroup
+    );
+    
+    for (const otherGroup of allGroups) {
+        const otherBounds = {
+            left: otherGroup.left,
+            top: otherGroup.top,
+            right: otherGroup.left + otherGroup.width,
+            bottom: otherGroup.top + otherGroup.height
+        };
+        
+        // Check for intersection
+        const intersects = !(
+            groupBounds.right < otherBounds.left ||
+            groupBounds.left > otherBounds.right ||
+            groupBounds.bottom < otherBounds.top ||
+            groupBounds.top > otherBounds.bottom
+        );
+        
+        if (intersects) {
+            return true; // Intersection found
+        }
+    }
+    
+    return false; // No intersection
+}
+
+/**
  * Create a new group on canvas
  */
 async function createGroupOnCanvas(x, y) {
@@ -3019,8 +3096,26 @@ async function createGroupOnCanvas(x, y) {
     // Hide rotation control handle
     groupRect.setControlVisible('mtr', false);
     
+    // Store initial position for collision detection
+    groupRect.lastValidLeft = groupRect.left;
+    groupRect.lastValidTop = groupRect.top;
+    groupRect.lastValidWidth = groupRect.width;
+    groupRect.lastValidHeight = groupRect.height;
+    
     // Make text and badge move with the group
     groupRect.on('moving', function() {
+        // Check for intersection with other groups
+        if (checkGroupIntersection(this, this)) {
+            // Revert to last valid position
+            this.set({
+                left: this.lastValidLeft,
+                top: this.lastValidTop
+            });
+        } else {
+            // Store current position as valid
+            this.lastValidLeft = this.left;
+            this.lastValidTop = this.top;
+        }
         updateGroupChildren(groupRect, groupText, costBadge);
     });
     
@@ -3028,12 +3123,31 @@ async function createGroupOnCanvas(x, y) {
         const newWidth = groupRect.width * groupRect.scaleX;
         const newHeight = groupRect.height * groupRect.scaleY;
         
-        groupRect.set({
+        // Temporarily apply new size to check for intersection
+        const oldWidth = this.width;
+        const oldHeight = this.height;
+        
+        this.set({
             width: newWidth,
             height: newHeight,
             scaleX: 1,
             scaleY: 1
         });
+        
+        // Check for intersection
+        if (checkGroupIntersection(this, this)) {
+            // Revert to last valid size
+            this.set({
+                width: this.lastValidWidth,
+                height: this.lastValidHeight,
+                scaleX: 1,
+                scaleY: 1
+            });
+        } else {
+            // Store current size as valid
+            this.lastValidWidth = this.width;
+            this.lastValidHeight = this.height;
+        }
         
         updateGroupChildren(groupRect, groupText, costBadge);
     });
@@ -3278,8 +3392,26 @@ function loadGroupsOnCanvas(groups) {
         // Hide rotation control handle
         groupRect.setControlVisible('mtr', false);
         
+        // Store initial position for collision detection
+        groupRect.lastValidLeft = groupRect.left;
+        groupRect.lastValidTop = groupRect.top;
+        groupRect.lastValidWidth = groupRect.width;
+        groupRect.lastValidHeight = groupRect.height;
+        
         // Setup event handlers
         groupRect.on('moving', function() {
+            // Check for intersection with other groups
+            if (checkGroupIntersection(this, this)) {
+                // Revert to last valid position
+                this.set({
+                    left: this.lastValidLeft,
+                    top: this.lastValidTop
+                });
+            } else {
+                // Store current position as valid
+                this.lastValidLeft = this.left;
+                this.lastValidTop = this.top;
+            }
             updateGroupChildren(groupRect, groupText, costBadge);
         });
         
@@ -3287,12 +3419,31 @@ function loadGroupsOnCanvas(groups) {
             const newWidth = groupRect.width * groupRect.scaleX;
             const newHeight = groupRect.height * groupRect.scaleY;
             
-            groupRect.set({
+            // Temporarily apply new size to check for intersection
+            const oldWidth = this.width;
+            const oldHeight = this.height;
+            
+            this.set({
                 width: newWidth,
                 height: newHeight,
                 scaleX: 1,
                 scaleY: 1
             });
+            
+            // Check for intersection
+            if (checkGroupIntersection(this, this)) {
+                // Revert to last valid size
+                this.set({
+                    width: this.lastValidWidth,
+                    height: this.lastValidHeight,
+                    scaleX: 1,
+                    scaleY: 1
+                });
+            } else {
+                // Store current size as valid
+                this.lastValidWidth = this.width;
+                this.lastValidHeight = this.height;
+            }
             
             updateGroupChildren(groupRect, groupText, costBadge);
         });
