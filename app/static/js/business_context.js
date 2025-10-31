@@ -1756,6 +1756,13 @@ function setupContextMenu() {
                         showResourceNotes(contextTarget.resourceId);
                     }
                     break;
+                
+                case 'clone':
+                    // Clone resource
+                    if (contextTarget.objectType === 'resource') {
+                        cloneResource(contextTarget);
+                    }
+                    break;
                     
                 case 'delete':
                     if (contextTarget.objectType === 'group') {
@@ -2163,6 +2170,7 @@ function hideResourceContextMenu() {
 
 /**
  * Show resource on canvas - bring it into view and select it
+ * If resource is already centered and selected, cycle to next clone
  */
 function showResourceOnCanvas(resourceId) {
     if (!fabricCanvas || !currentBoard) {
@@ -2170,15 +2178,52 @@ function showResourceOnCanvas(resourceId) {
         return;
     }
     
-    // Find the resource on canvas by resourceId
+    // Find all instances (clones) of this resource on canvas
     const objects = fabricCanvas.getObjects();
-    const resourceObj = objects.find(obj => 
+    const resourceInstances = objects.filter(obj => 
         obj.objectType === 'resource' && obj.resourceId === resourceId
     );
     
-    if (!resourceObj) {
+    if (resourceInstances.length === 0) {
         showFlashMessage('error', 'Ресурс не найден на доске');
         return;
+    }
+    
+    // Check if currently selected object is one of these instances and is already centered
+    const activeObj = fabricCanvas.getActiveObject();
+    let targetResource = null;
+    
+    if (activeObj && activeObj.resourceId === resourceId && resourceInstances.length > 1) {
+        // Find current instance index
+        const currentIndex = resourceInstances.findIndex(obj => obj === activeObj);
+        
+        // Check if current resource is centered (within 50px of screen center)
+        const canvasElement = fabricCanvas.wrapperEl;
+        const canvasWidth = canvasElement.offsetWidth;
+        const canvasHeight = canvasElement.offsetHeight;
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        
+        const screenX = activeObj.left * zoom + vpt[4];
+        const screenY = activeObj.top * zoom + vpt[5];
+        const screenCenterX = canvasWidth / 2;
+        const screenCenterY = canvasHeight / 2;
+        
+        const isCentered = (
+            Math.abs(screenX - screenCenterX) < 50 &&
+            Math.abs(screenY - screenCenterY) < 50
+        );
+        
+        if (isCentered && currentIndex !== -1) {
+            // Cycle to next clone
+            const nextIndex = (currentIndex + 1) % resourceInstances.length;
+            targetResource = resourceInstances[nextIndex];
+        }
+    }
+    
+    // If no cycling needed, use first instance
+    if (!targetResource) {
+        targetResource = resourceInstances[0];
     }
     
     // Deselect any currently selected objects
@@ -2186,9 +2231,9 @@ function showResourceOnCanvas(resourceId) {
     fabricCanvas.renderAll();
     
     // Get resource center in canvas coordinates (not viewport coordinates)
-    // resourceObj properties (left, top, width, height) are in canvas space
-    const centerX = resourceObj.left + resourceObj.width / 2;
-    const centerY = resourceObj.top + resourceObj.height / 2;
+    // targetResource properties (left, top, width, height) are in canvas space
+    const centerX = targetResource.left + targetResource.width / 2;
+    const centerY = targetResource.top + targetResource.height / 2;
     
     // Get canvas wrapper element dimensions (actual visible area)
     const canvasElement = fabricCanvas.wrapperEl;
@@ -2213,8 +2258,8 @@ function showResourceOnCanvas(resourceId) {
         obj.setCoords();
     });
     
-    // Select the resource
-    fabricCanvas.setActiveObject(resourceObj);
+    // Select the target resource
+    fabricCanvas.setActiveObject(targetResource);
     fabricCanvas.renderAll();
     
     // Update grid and auto-save
@@ -2613,6 +2658,56 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         showResourceNotes(this.resourceId);
     });
     
+    // Clone badge (bottom-right) - initially hidden, shown if clones exist
+    const cloneBadgeCircle = new fabric.Circle({
+        left: cardLeft + 120 - 12,
+        top: cardTop + 80 - 4,
+        radius: 8,
+        fill: '#FFFFFF',
+        stroke: '#8B5CF6',
+        strokeWidth: 1,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceCloneBadge',
+        parentResourceId: boardResourceId,
+        visible: false, // Hidden by default, shown by updateCloneBadges
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Circle.prototype.toObject)
+    });
+    
+    const cloneBadgeText = new fabric.Text('c', {
+        left: cardLeft + 120 - 12,
+        top: cardTop + 80 - 4,
+        fontSize: 10,
+        fontWeight: 'bold',
+        fill: '#8B5CF6',
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        objectType: 'resourceCloneBadgeText',
+        parentResourceId: boardResourceId,
+        visible: false, // Hidden by default, shown by updateCloneBadges
+        // Preserve custom properties
+        toObject: (function(toObject) {
+            return function() {
+                return fabric.util.object.extend(toObject.call(this), {
+                    objectType: this.objectType,
+                    parentResourceId: this.parentResourceId
+                });
+            };
+        })(fabric.Text.prototype.toObject)
+    });
+    
     // Add to canvas
     fabricCanvas.add(resourceCard);
     fabricCanvas.add(nameText);
@@ -2621,6 +2716,8 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
     fabricCanvas.add(infoIconText);
     fabricCanvas.add(notesIconCircle);
     fabricCanvas.add(notesIconText);
+    fabricCanvas.add(cloneBadgeCircle);
+    fabricCanvas.add(cloneBadgeText);
     
     // Hide rotation control handle
     resourceCard.setControlVisible('mtr', false);
@@ -2655,6 +2752,14 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
             left: this.left + this.width - 12,
             top: this.top + 4
         });
+        cloneBadgeCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + this.height - 4
+        });
+        cloneBadgeText.set({
+            left: this.left + this.width - 12,
+            top: this.top + this.height - 4
+        });
         fabricCanvas.renderAll();
     });
     
@@ -2684,6 +2789,14 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         notesIconText.set({
             left: this.left + this.width - 12,
             top: this.top + 4
+        });
+        cloneBadgeCircle.set({
+            left: this.left + this.width - 12,
+            top: this.top + this.height - 4
+        });
+        cloneBadgeText.set({
+            left: this.left + this.width - 12,
+            top: this.top + this.height - 4
         });
         fabricCanvas.renderAll();
         
@@ -3934,6 +4047,17 @@ function loadResourcesOnCanvas(boardResources) {
         }
     });
     
+    // Update clone badges for all resources after loading
+    const uniqueResourceIds = new Set();
+    boardResources.forEach(br => {
+        if (br.resource && br.resource.id) {
+            uniqueResourceIds.add(br.resource.id);
+        }
+    });
+    uniqueResourceIds.forEach(resourceId => {
+        updateCloneBadges(resourceId);
+    });
+    
     fabricCanvas.renderAll();
 }
 
@@ -4124,7 +4248,9 @@ async function deleteResourceFromBoard(resourceCard) {
         const data = await response.json();
         
         if (data.success) {
-            // Remove resource card and associated text objects from canvas
+            const resourceId = resourceCard.resourceId;
+            
+            // Remove resource card and all associated objects from canvas
             const objects = fabricCanvas.getObjects();
             objects.forEach(obj => {
                 if (obj.boardResourceId === resourceCard.boardResourceId || 
@@ -4132,12 +4258,17 @@ async function deleteResourceFromBoard(resourceCard) {
                     obj.objectType === 'resourceInfoIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
                     obj.objectType === 'resourceNotesIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
                     obj.objectType === 'resourceInfoIconText' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === resourceCard.boardResourceId) {
+                    obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceCloneBadge' && obj.parentResourceId === resourceCard.boardResourceId ||
+                    obj.objectType === 'resourceCloneBadgeText' && obj.parentResourceId === resourceCard.boardResourceId) {
                     fabricCanvas.remove(obj);
                 }
             });
             
             fabricCanvas.renderAll();
+            
+            // Update clone badges for remaining instances of this resource
+            updateCloneBadges(resourceId);
             
             // Reload resources to update toolbox (resource should show as available again)
             await loadResources();
@@ -4154,6 +4285,129 @@ async function deleteResourceFromBoard(resourceCard) {
     } catch (error) {
         console.error('Error deleting resource:', error);
         showFlashMessage('error', 'Не удалось удалить ресурс');
+    }
+}
+
+/**
+ * Count how many instances of a resource are on the canvas
+ */
+function countResourceClones(resourceId) {
+    const objects = fabricCanvas.getObjects();
+    return objects.filter(obj => obj.objectType === 'resource' && obj.resourceId === resourceId).length;
+}
+
+/**
+ * Update clone badges for all instances of a resource
+ */
+function updateCloneBadges(resourceId) {
+    const objects = fabricCanvas.getObjects();
+    const resourceInstances = objects.filter(obj => obj.objectType === 'resource' && obj.resourceId === resourceId);
+    
+    const hasClones = resourceInstances.length > 1;
+    
+    resourceInstances.forEach(resourceCard => {
+        // Find the badge objects for this resource
+        const badge = objects.find(obj => 
+            obj.objectType === 'resourceCloneBadge' && obj.parentResourceId === resourceCard.boardResourceId
+        );
+        const badgeText = objects.find(obj => 
+            obj.objectType === 'resourceCloneBadgeText' && obj.parentResourceId === resourceCard.boardResourceId
+        );
+        
+        if (hasClones) {
+            // Show badge
+            if (badge) badge.set({ visible: true });
+            if (badgeText) badgeText.set({ visible: true });
+        } else {
+            // Hide badge
+            if (badge) badge.set({ visible: false });
+            if (badgeText) badgeText.set({ visible: false });
+        }
+    });
+    
+    fabricCanvas.renderAll();
+}
+
+/**
+ * Clone resource on canvas
+ */
+async function cloneResource(resourceCard) {
+    if (!resourceCard.resourceId || !currentBoard) return;
+    
+    try {
+        // Save state before cloning
+        saveToUndoStack();
+        isCreatingObjects = true;
+        
+        // Create offset position for the clone (50px down and right)
+        const cloneX = resourceCard.left + 50;
+        const cloneY = resourceCard.top + 50;
+        
+        // Check if dropped inside a group
+        const groupId = getGroupAtPosition(cloneX, cloneY);
+        
+        // Save clone to database (allows multiple placements of same resource)
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/resources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                resource_id: resourceCard.resourceId,
+                position_x: cloneX,
+                position_y: cloneY,
+                group_id: groupId
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Check for authentication errors
+        if (handleApiError(response, data)) {
+            isCreatingObjects = false;
+            return;
+        }
+        
+        if (data.success) {
+            // Get resource data
+            let resourceData = null;
+            for (const provider of allResources) {
+                const found = provider.resources.find(r => r.id === resourceCard.resourceId);
+                if (found) {
+                    resourceData = found;
+                    break;
+                }
+            }
+            
+            if (!resourceData) {
+                showFlashMessage('error', 'Resource data not found');
+                isCreatingObjects = false;
+                return;
+            }
+            
+            // Create the resource object on canvas
+            createResourceObject(resourceData, cloneX, cloneY, data.board_resource.id, groupId, true);
+            
+            // Update clone badges for all instances of this resource
+            updateCloneBadges(resourceCard.resourceId);
+            
+            // Update group cost if placed in a group
+            if (groupId) {
+                await updateGroupCost(groupId);
+            }
+            
+            // Reload resources to update toolbox
+            await loadResources();
+            
+            showFlashMessage('success', 'Ресурс клонирован');
+        } else {
+            showFlashMessage('error', data.error || 'Не удалось клонировать ресурс');
+        }
+        
+        isCreatingObjects = false;
+        scheduleAutoSave();
+    } catch (error) {
+        console.error('Error cloning resource:', error);
+        showFlashMessage('error', 'Не удалось клонировать ресурс');
+        isCreatingObjects = false;
     }
 }
 
