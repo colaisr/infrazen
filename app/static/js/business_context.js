@@ -5,6 +5,19 @@
  * to business contexts (customers, features, departments, etc.)
  */
 
+/**
+ * Handle API response errors (401, 403, etc.)
+ */
+function handleApiError(response, data) {
+    if (response.status === 401) {
+        // Session expired - redirect to login
+        alert('Ваша сессия истекла. Пожалуйста, войдите снова.');
+        window.location.href = '/login';
+        return true;
+    }
+    return false;
+}
+
 // Global state
 let currentBoard = null;
 let fabricCanvas = null;
@@ -817,7 +830,8 @@ function setupObjectEventHandlers() {
             });
             
             // Setup modified event
-            obj.on('modified', function() {
+            obj.on('modified', async function() {
+                await checkAndUpdateResourcesOutsideGroup(this);
                 updateGroupInDatabase(this);
             });
             
@@ -1085,7 +1099,9 @@ async function pasteGroup(originalGroup) {
                     // Children resize automatically! ✨
                 });
                 
-                clonedGroup.on('modified', function() {
+                // When group movement/resize finishes, check if resources moved outside
+                clonedGroup.on('modified', async function() {
+                    await checkAndUpdateResourcesOutsideGroup(this);
                     updateGroupInDatabase(this);
                 });
                 
@@ -2036,6 +2052,7 @@ function setupCanvasDropZone() {
         
         // Convert screen coordinates to canvas coordinates
         const pointer = fabricCanvas.getPointer(e);
+        console.log('📥 Drop at canvas coords:', pointer);
         
         // Check if it's a resource
         const resourceId = e.dataTransfer.getData('text/plain');
@@ -2119,6 +2136,8 @@ async function placeResourceOnCanvas(resourceId, x, y) {
         const data = await response.json();
         
         if (data.success) {
+            console.log('✅ Resource placed. Group:', groupId || 'none');
+            
             // Create Fabric.js object for resource
             createResourceObject(resourceData, x, y, data.board_resource.id, groupId);
             
@@ -2442,18 +2461,26 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
  * Get group at specific position (for drop detection)
  */
 function getGroupAtPosition(x, y) {
+    console.log('🔍 getGroupAtPosition:', { x, y });
     const objects = fabricCanvas.getObjects();
     
-    for (const obj of objects) {
-        if (obj.objectType === 'group') {
-            const bounds = obj.getBoundingRect();
-            if (x >= bounds.left && x <= bounds.left + bounds.width &&
-                y >= bounds.top && y <= bounds.top + bounds.height) {
-                return obj.dbId;
-            }
+    const groups = objects.filter(obj => obj.objectType === 'group');
+    
+    // Check each group using absolute bounding rect coordinates
+    for (const obj of groups) {
+        const bounds = obj.getBoundingRect(true); // true = absolute coordinates
+        
+        // Simple point-in-rectangle check
+        if (x >= bounds.left && 
+            x <= bounds.left + bounds.width &&
+            y >= bounds.top && 
+            y <= bounds.top + bounds.height) {
+            console.log('   ✅ Found group:', obj.dbId);
+            return obj.dbId;
         }
     }
     
+    console.log('   ❌ No group found at this position');
     return null;
 }
 
@@ -2525,7 +2552,7 @@ async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGro
  * Update group cost badge
  */
 async function updateGroupCost(groupDbId) {
-    if (!groupDbId) return; // Skip if no group
+    if (!groupDbId) return;
     
     try {
         const response = await fetch(`/api/business-context/groups/${groupDbId}/cost`);
@@ -2533,9 +2560,16 @@ async function updateGroupCost(groupDbId) {
         
         if (data.success) {
             const calculatedCost = data.calculated_cost || 0;
+            console.log('💰 Group cost updated:', {
+                groupId: groupDbId,
+                dailyCost: calculatedCost,
+                monthlyCost: (calculatedCost * 30).toFixed(2),
+                resourceCount: data.resource_count
+            });
             
             // Find group object on canvas and update cost display
             const objects = fabricCanvas.getObjects();
+            
             for (const obj of objects) {
                 if (obj.objectType === 'group' && obj.dbId === groupDbId) {
                     obj.calculatedCost = calculatedCost;
@@ -2556,7 +2590,7 @@ async function updateGroupCost(groupDbId) {
             }
         }
     } catch (error) {
-        console.error('Error updating group cost:', error);
+        console.error('❌ Error updating group cost:', error);
     }
 }
 
@@ -2902,6 +2936,13 @@ async function saveBoard(isAutoSave = false) {
         
         const data = await response.json();
         
+        // Check for authentication errors
+        if (handleApiError(response, data)) {
+            indicator.textContent = 'Не авторизован';
+            indicator.className = 'save-indicator';
+            return;
+        }
+        
         if (data.success) {
             indicator.textContent = 'Сохранено';
             indicator.className = 'save-indicator saved';
@@ -2919,6 +2960,74 @@ async function saveBoard(isAutoSave = false) {
         indicator.textContent = 'Ошибка';
         indicator.className = 'save-indicator';
         showFlashMessage('error', 'Failed to save board');
+    }
+}
+
+/**
+ * Check if resources moved outside a group and update their assignment
+ */
+async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
+    if (!businessGroup.dbId) return;
+    
+    console.log('🔍 Checking resources outside group', businessGroup.dbId);
+    
+    // Get group bounds
+    const groupBounds = businessGroup.getBoundingRect();
+    
+    // Find all resources on canvas
+    const allResources = fabricCanvas.getObjects().filter(obj => obj.objectType === 'resource');
+    
+    // Track resources that need updating
+    let needsCostRecalc = false;
+    
+    for (const resource of allResources) {
+        // Only check resources assigned to this group
+        if (resource.groupId !== businessGroup.dbId) continue;
+        
+        // Get resource center point
+        const resourceCenter = resource.getCenterPoint();
+        
+        // Check if resource center is inside group bounds
+        const isInside = (
+            resourceCenter.x >= groupBounds.left &&
+            resourceCenter.x <= groupBounds.left + groupBounds.width &&
+            resourceCenter.y >= groupBounds.top &&
+            resourceCenter.y <= groupBounds.top + groupBounds.height
+        );
+        
+        if (!isInside) {
+            console.log('   ⚠️ Resource', resource.resourceId, 'is now OUTSIDE group', businessGroup.dbId);
+            
+            // Resource moved outside - unassign from group
+            try {
+                const response = await fetch(`/api/business-context/board-resources/${resource.boardResourceId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        group_id: null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Check for authentication errors
+                if (handleApiError(response, data)) return;
+                
+                if (data.success) {
+                    resource.groupId = null;
+                    needsCostRecalc = true;
+                    console.log('   ✅ Resource unassigned from group');
+                }
+            } catch (error) {
+                console.error('Error unassigning resource from group:', error);
+            }
+        }
+    }
+    
+    // If any resources were unassigned, recalculate group cost
+    if (needsCostRecalc) {
+        console.log('   💰 Recalculating group cost');
+        await updateGroupCost(businessGroup.dbId);
     }
 }
 
@@ -3140,6 +3249,12 @@ async function createGroupOnCanvas(x, y) {
         // No need to update children - they move automatically with the group! ✨
     });
     
+    // When group movement finishes, check if any resources moved outside
+    businessGroup.on('modified', async function() {
+        await checkAndUpdateResourcesOutsideGroup(this);
+        updateGroupInDatabase(this);
+    });
+    
     businessGroup.on('scaling', function() {
         const newWidth = this.width * this.scaleX;
         const newHeight = this.height * this.scaleY;
@@ -3172,10 +3287,6 @@ async function createGroupOnCanvas(x, y) {
             this.lastValidHeight = this.height;
         }
         // Children resize automatically with the group! ✨
-    });
-    
-    businessGroup.on('modified', function() {
-        updateGroupInDatabase(this);
     });
     
     // Double-click to edit name
@@ -3457,7 +3568,9 @@ function loadGroupsOnCanvas(groups) {
                 // Children resize automatically! ✨
             });
             
-            businessGroup.on('modified', function() {
+            // When group movement/resize finishes, check if resources moved outside
+            businessGroup.on('modified', async function() {
+                await checkAndUpdateResourcesOutsideGroup(this);
                 updateGroupInDatabase(this);
             });
             
@@ -3609,6 +3722,9 @@ async function saveGroupToDatabase(groupRect) {
         
         const data = await response.json();
         
+        // Check for authentication errors
+        if (handleApiError(response, data)) return;
+        
         if (data.success) {
             groupRect.dbId = data.group.id;
         } else {
@@ -3641,6 +3757,9 @@ async function updateGroupInDatabase(groupRect) {
         });
         
         const data = await response.json();
+        
+        // Check for authentication errors
+        if (handleApiError(response, data)) return;
         
         if (!data.success) {
             console.error('Failed to update group:', data.error);

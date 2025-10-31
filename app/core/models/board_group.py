@@ -62,13 +62,18 @@ class BoardGroup(BaseModel):
         """Calculate total cost of resources in this group"""
         from .board_resource import BoardResource
         
+        resources_in_group = self.resources.all()
+        
         total = 0.0
-        for board_resource in self.resources.all():
+        for board_resource in resources_in_group:
             if board_resource.resource and board_resource.resource.daily_cost:
                 total += float(board_resource.resource.daily_cost)
         
         self.calculated_cost = total
         db.session.commit()
+        
+        print(f'💰 Group "{self.name}" cost: {total}/day ({len(resources_in_group)} resources)')
+        
         return total
     
     @classmethod

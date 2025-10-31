@@ -335,6 +335,7 @@ def place_resource_on_board(board_id):
     )
     
     board_resource.save()
+    print(f'📦 Resource placed: resource_id={resource_id}, group_id={group_id}')
     
     # Update group cost if assigned to group
     if group_id:
