@@ -2837,8 +2837,8 @@ function checkResourceGroupAssignment(resourceObj) {
         const oldGroupId = resourceObj.groupId;
         resourceObj.groupId = newGroupId;
         
-        // Update database and group costs
-        updateResourceGroupAssignment(resourceObj.boardResourceId, newGroupId, oldGroupId);
+        // Update database and group costs for ALL groups containing this resource
+        updateResourceGroupAssignment(resourceObj.boardResourceId, newGroupId, oldGroupId, resourceObj.resourceId);
     }
 }
 
@@ -2865,7 +2865,7 @@ async function updateResourcePosition(resourceObj) {
 /**
  * Update resource group assignment
  */
-async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGroupId) {
+async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGroupId, resourceId) {
     try {
         const response = await fetch(`/api/business-context/board-resources/${boardResourceId}`, {
             method: 'PUT',
@@ -2877,12 +2877,18 @@ async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGro
         
         const data = await response.json();
         
-        // Update costs for affected groups
-        if (oldGroupId) {
-            await updateGroupCost(oldGroupId);
-        }
-        if (newGroupId) {
-            await updateGroupCost(newGroupId);
+        // Update costs for ALL groups containing clones of this resource
+        // This ensures cost splitting is recalculated when a clone moves between groups
+        if (resourceId) {
+            await updateCostsForAllGroupsWithResource(resourceId);
+        } else {
+            // Fallback: Update just the affected groups if resourceId not provided
+            if (oldGroupId) {
+                await updateGroupCost(oldGroupId);
+            }
+            if (newGroupId) {
+                await updateGroupCost(newGroupId);
+            }
         }
         
     } catch (error) {
@@ -3319,8 +3325,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
     // Find all resources on canvas
     const allResources = fabricCanvas.getObjects().filter(obj => obj.objectType === 'resource');
     
-    // Track resources that need updating
-    let needsCostRecalc = false;
+    // Track which resources were moved (to update costs for all their groups)
+    const affectedResourceIds = new Set();
     
     for (const resource of allResources) {
         // Get resource center point
@@ -3355,7 +3361,7 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
                 
                 if (data.success) {
                     resource.groupId = null;
-                    needsCostRecalc = true;
+                    affectedResourceIds.add(resource.resourceId);
                     console.log('   ✅ Resource unassigned from group');
                 }
             } catch (error) {
@@ -3383,13 +3389,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
                 if (handleApiError(response, data)) return;
                 
                 if (data.success) {
-                    // Update old group cost if resource was in another group
-                    if (resource.groupId) {
-                        await updateGroupCost(resource.groupId);
-                    }
-                    
                     resource.groupId = businessGroup.dbId;
-                    needsCostRecalc = true;
+                    affectedResourceIds.add(resource.resourceId);
                     console.log('   ✅ Resource assigned to group');
                 }
             } catch (error) {
@@ -3398,10 +3399,12 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
         }
     }
     
-    // If any resources were assigned/unassigned, recalculate group cost
-    if (needsCostRecalc) {
-        console.log('   💰 Recalculating group cost');
-        await updateGroupCost(businessGroup.dbId);
+    // Update costs for all groups containing any affected resources
+    if (affectedResourceIds.size > 0) {
+        console.log(`   💰 Recalculating costs for ${affectedResourceIds.size} affected resources`);
+        for (const resourceId of affectedResourceIds) {
+            await updateCostsForAllGroupsWithResource(resourceId);
+        }
     }
 }
 
