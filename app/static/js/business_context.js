@@ -17,6 +17,7 @@ let undoStack = [];
 let redoStack = [];
 let maxUndoSteps = 50;
 let isRestoring = false; // Flag to prevent saving during restoration
+let isCreatingObjects = false; // Flag to prevent saving during object creation
 
 // Grid state
 let gridVisible = false;
@@ -563,10 +564,17 @@ function setupKeyboardShortcuts() {
  * Save current canvas state to undo stack
  */
 function saveToUndoStack() {
-    if (!fabricCanvas) return;
+    if (!fabricCanvas) {
+        return;
+    }
     
     // Don't save during restoration
     if (isRestoring) {
+        return;
+    }
+    
+    // Don't save during object creation (prevents intermediate states from overwriting the "before" state)
+    if (isCreatingObjects) {
         return;
     }
     
@@ -588,7 +596,6 @@ function saveToUndoStack() {
         timestamp: Date.now()
     };
     
-    
     // Add to undo stack
     undoStack.push(state);
     
@@ -608,7 +615,9 @@ function saveToUndoStack() {
  * Undo last action
  */
 function undo() {
-    if (undoStack.length === 0) return;
+    if (undoStack.length === 0) {
+        return;
+    }
     
     // Save current state to redo stack (excluding grid lines)
     const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
@@ -670,7 +679,9 @@ function redo() {
  * Restore canvas to a saved state
  */
 function restoreCanvasState(state) {
-    if (!fabricCanvas || !state) return;
+    if (!fabricCanvas || !state) {
+        return;
+    }
     
     // Set flag to prevent saving during restoration
     isRestoring = true;
@@ -875,6 +886,12 @@ function updateUndoRedoButtons() {
 function pasteObject(obj) {
     if (!fabricCanvas || !obj) return;
     
+    // Save state BEFORE pasting (so undo can restore to this state)
+    saveToUndoStack();
+    
+    // Set flag to prevent intermediate saves during object creation
+    isCreatingObjects = true;
+    
     // Handle groups separately (they need DB creation)
     if (obj.objectType === 'group') {
         pasteGroup(obj);
@@ -912,6 +929,10 @@ function pasteObject(obj) {
         fabricCanvas.add(cloned);
         fabricCanvas.setActiveObject(cloned);
         fabricCanvas.renderAll();
+        
+        // Re-enable automatic saves
+        isCreatingObjects = false;
+        
         scheduleAutoSave();
     });
 }
@@ -1051,12 +1072,18 @@ async function pasteGroup(originalGroup) {
                 
                 fabricCanvas.setActiveObject(clonedRect);
                 fabricCanvas.renderAll();
+                
+                // Re-enable automatic saves
+                isCreatingObjects = false;
+                
                 scheduleAutoSave();
             });
         } else {
+            isCreatingObjects = false;
             showFlashMessage('error', data.error || 'Failed to copy group');
         }
     } catch (error) {
+        isCreatingObjects = false;
         console.error('Error copying group:', error);
         showFlashMessage('error', 'Failed to copy group');
     }
@@ -2024,6 +2051,12 @@ async function placeResourceOnCanvas(resourceId, x, y) {
         return;
     }
     
+    // Save state BEFORE placing resource (so undo can restore to this state)
+    saveToUndoStack();
+    
+    // Set flag to prevent intermediate saves during object creation
+    isCreatingObjects = true;
+    
     // Find resource data
     let resourceData = null;
     for (const provider of allResources) {
@@ -2035,12 +2068,14 @@ async function placeResourceOnCanvas(resourceId, x, y) {
     }
     
     if (!resourceData) {
+        isCreatingObjects = false;
         showFlashMessage('error', 'Ресурс не найден');
         return;
     }
     
     // Check if already placed
     if (resourceData.is_placed) {
+        isCreatingObjects = false;
         showFlashMessage('error', 'Ресурс уже размещен на доске');
         return;
     }
@@ -2079,11 +2114,16 @@ async function placeResourceOnCanvas(resourceId, x, y) {
                 await updateGroupCost(groupId);
             }
             
+            // Re-enable automatic saves
+            isCreatingObjects = false;
+            
             scheduleAutoSave();
         } else {
+            isCreatingObjects = false;
             showFlashMessage('error', data.error || 'Ошибка размещения ресурса');
         }
     } catch (error) {
+        isCreatingObjects = false;
         console.error('Error placing resource:', error);
         showFlashMessage('error', 'Ошибка размещения ресурса');
     }
@@ -2113,6 +2153,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         hasControls: false,
         hasBorders: true,
         lockRotation: true,
+        hasRotate: false,
         objectType: 'resource',
         resourceId: resourceData.id,
         boardResourceId: boardResourceId,
@@ -2303,6 +2344,10 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
     fabricCanvas.add(infoIconText);
     fabricCanvas.add(notesIconCircle);
     fabricCanvas.add(notesIconText);
+    
+    // Hide rotation control handle
+    resourceCard.setControlVisible('mtr', false);
+    
     fabricCanvas.renderAll();
     
     // Setup event handlers for the card
@@ -2864,6 +2909,12 @@ async function saveBoard(isAutoSave = false) {
 async function createGroupOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
     
+    // Save state BEFORE creating the group (so undo can restore to this state)
+    saveToUndoStack();
+    
+    // Set flag to prevent intermediate saves during object creation
+    isCreatingObjects = true;
+    
     // Generate unique fabric_id
     const fabricId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     
@@ -2894,6 +2945,8 @@ async function createGroupOnCanvas(x, y) {
         selectable: true,
         hasControls: true,
         hasBorders: true,
+        lockRotation: true,
+        hasRotate: false,
         objectType: 'group',
         fabricId: fabricId,
         groupName: 'Новая группа',
@@ -2963,6 +3016,9 @@ async function createGroupOnCanvas(x, y) {
     fabricCanvas.add(groupText);
     fabricCanvas.add(costBadge);
     
+    // Hide rotation control handle
+    groupRect.setControlVisible('mtr', false);
+    
     // Make text and badge move with the group
     groupRect.on('moving', function() {
         updateGroupChildren(groupRect, groupText, costBadge);
@@ -2996,6 +3052,9 @@ async function createGroupOnCanvas(x, y) {
     // Save group to database
     await saveGroupToDatabase(groupRect);
     
+    // Re-enable automatic saves
+    isCreatingObjects = false;
+    
     scheduleAutoSave();
 }
 
@@ -3004,6 +3063,12 @@ async function createGroupOnCanvas(x, y) {
  */
 function createTextOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
+    
+    // Save state BEFORE creating text (so undo can restore to this state)
+    saveToUndoStack();
+    
+    // Set flag to prevent intermediate saves during object creation
+    isCreatingObjects = true;
     
     // If no coordinates provided, use canvas center
     let posX, posY;
@@ -3027,11 +3092,17 @@ function createTextOnCanvas(x, y) {
         fill: '#1F2937',
         objectType: 'freeText',
         selectable: true,
-        editable: true
+        editable: true,
+        lockRotation: true,
+        hasRotate: false
     });
     
     // Add to canvas
     fabricCanvas.add(text);
+    
+    // Hide rotation control handle
+    text.setControlVisible('mtr', false);
+    
     fabricCanvas.setActiveObject(text);
     
     // Enter edit mode immediately
@@ -3039,6 +3110,10 @@ function createTextOnCanvas(x, y) {
     text.selectAll();
     
     fabricCanvas.renderAll();
+    
+    // Re-enable automatic saves
+    isCreatingObjects = false;
+    
     scheduleAutoSave();
 }
 
@@ -3047,6 +3122,12 @@ function createTextOnCanvas(x, y) {
  */
 function createRectangleOnCanvas(x, y) {
     if (!fabricCanvas || !currentBoard) return;
+    
+    // Save state BEFORE creating rectangle (so undo can restore to this state)
+    saveToUndoStack();
+    
+    // Set flag to prevent intermediate saves during object creation
+    isCreatingObjects = true;
     
     // If no coordinates provided, use canvas center
     let posX, posY;
@@ -3075,14 +3156,24 @@ function createRectangleOnCanvas(x, y) {
         objectType: 'freeRect',
         selectable: true,
         hasControls: true,
-        hasBorders: true
+        hasBorders: true,
+        lockRotation: true,
+        hasRotate: false
     });
     
     // Add to canvas
     fabricCanvas.add(rect);
+    
+    // Hide rotation control handle
+    rect.setControlVisible('mtr', false);
+    
     fabricCanvas.setActiveObject(rect);
     
     fabricCanvas.renderAll();
+    
+    // Re-enable automatic saves
+    isCreatingObjects = false;
+    
     scheduleAutoSave();
 }
 
@@ -3110,6 +3201,8 @@ function loadGroupsOnCanvas(groups) {
             selectable: true,
             hasControls: true,
             hasBorders: true,
+            lockRotation: true,
+            hasRotate: false,
             objectType: 'group',
             fabricId: group.fabric_id,
             groupName: group.name,
@@ -3181,6 +3274,9 @@ function loadGroupsOnCanvas(groups) {
         fabricCanvas.add(groupRect);
         fabricCanvas.add(groupText);
         fabricCanvas.add(costBadge);
+        
+        // Hide rotation control handle
+        groupRect.setControlVisible('mtr', false);
         
         // Setup event handlers
         groupRect.on('moving', function() {
