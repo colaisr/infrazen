@@ -704,6 +704,13 @@ function restoreCanvasState(state) {
         fabricCanvas.setZoom(state.viewport.zoom);
         fabricCanvas.viewportTransform = state.viewport.pan.slice();
         
+        // Send all groups to the back (groups should always be behind resources)
+        fabricCanvas.forEachObject(function(obj) {
+            if (obj.objectType === 'group') {
+                obj.sendToBack();
+            }
+        });
+        
         // Update object coordinates after viewport restore for hit detection
         fabricCanvas.forEachObject(function(obj) {
             obj.setCoords();
@@ -3200,7 +3207,7 @@ async function saveBoard(isAutoSave = false) {
 async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
     if (!businessGroup.dbId) return;
     
-    console.log('🔍 Checking resources outside group', businessGroup.dbId);
+    console.log('🔍 Checking resource-group assignments for group', businessGroup.dbId);
     
     // Get group bounds
     const groupBounds = businessGroup.getBoundingRect();
@@ -3212,9 +3219,6 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
     let needsCostRecalc = false;
     
     for (const resource of allResources) {
-        // Only check resources assigned to this group
-        if (resource.groupId !== businessGroup.dbId) continue;
-        
         // Get resource center point
         const resourceCenter = resource.getCenterPoint();
         
@@ -3226,7 +3230,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
             resourceCenter.y <= groupBounds.top + groupBounds.height
         );
         
-        if (!isInside) {
+        // Case 1: Resource is assigned to this group but is now OUTSIDE
+        if (resource.groupId === businessGroup.dbId && !isInside) {
             console.log('   ⚠️ Resource', resource.resourceId, 'is now OUTSIDE group', businessGroup.dbId);
             
             // Resource moved outside - unassign from group
@@ -3253,9 +3258,43 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
                 console.error('Error unassigning resource from group:', error);
             }
         }
+        
+        // Case 2: Resource is NOT assigned to this group but is now INSIDE
+        else if (resource.groupId !== businessGroup.dbId && isInside) {
+            console.log('   ✅ Resource', resource.resourceId, 'is now INSIDE group', businessGroup.dbId);
+            
+            // Resource moved inside - assign to group
+            try {
+                const response = await fetch(`/api/business-context/board-resources/${resource.boardResourceId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        group_id: businessGroup.dbId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Check for authentication errors
+                if (handleApiError(response, data)) return;
+                
+                if (data.success) {
+                    // Update old group cost if resource was in another group
+                    if (resource.groupId) {
+                        await updateGroupCost(resource.groupId);
+                    }
+                    
+                    resource.groupId = businessGroup.dbId;
+                    needsCostRecalc = true;
+                    console.log('   ✅ Resource assigned to group');
+                }
+            } catch (error) {
+                console.error('Error assigning resource to group:', error);
+            }
+        }
     }
     
-    // If any resources were unassigned, recalculate group cost
+    // If any resources were assigned/unassigned, recalculate group cost
     if (needsCostRecalc) {
         console.log('   💰 Recalculating group cost');
         await updateGroupCost(businessGroup.dbId);
@@ -3445,6 +3484,9 @@ async function createGroupOnCanvas(x, y) {
     // Add group to canvas (all 3 objects as one unit!)
     fabricCanvas.add(businessGroup);
     
+    // Send group to back (groups should always be behind resources)
+    businessGroup.sendToBack();
+    
     // Hide rotation control handle
     businessGroup.setControlVisible('mtr', false);
     
@@ -3494,6 +3536,9 @@ async function createGroupOnCanvas(x, y) {
             },
             boundingRect: this.getBoundingRect()
         });
+        
+        // Keep group at the back (behind all resources)
+        this.sendToBack();
         
         // Update coordinates after modification to ensure selection boundary stays aligned
         this.setCoords();
@@ -3745,6 +3790,9 @@ function loadGroupsOnCanvas(groups) {
             // Add to canvas
             fabricCanvas.add(businessGroup);
             
+            // Send group to back (groups should always be behind resources)
+            businessGroup.sendToBack();
+            
             // Hide rotation control handle
             businessGroup.setControlVisible('mtr', false);
             
@@ -3821,6 +3869,9 @@ function loadGroupsOnCanvas(groups) {
                     },
                     boundingRect: this.getBoundingRect()
                 });
+                
+                // Keep group at the back (behind all resources)
+                this.sendToBack();
                 
                 // Update coordinates after modification to ensure selection boundary stays aligned
                 this.setCoords();
