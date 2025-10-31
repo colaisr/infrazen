@@ -2966,6 +2966,11 @@ function checkGroupIntersection(group, excludeGroup = null) {
         obj.objectType === 'group' && obj !== excludeGroup
     );
     
+    console.log('      🔍 checkGroupIntersection:', {
+        checkingGroup: { left: group.left, top: group.top, width: group.width, height: group.height },
+        otherGroupsCount: allGroups.length
+    });
+    
     for (const otherGroup of allGroups) {
         const otherBounds = {
             left: otherGroup.left,
@@ -2983,10 +2988,12 @@ function checkGroupIntersection(group, excludeGroup = null) {
         );
         
         if (intersects) {
+            console.log('         💥 Intersection with group at:', otherBounds);
             return true; // Intersection found
         }
     }
     
+    console.log('         ✓ No intersection');
     return false; // No intersection
 }
 
@@ -3157,19 +3164,31 @@ async function createGroupOnCanvas(x, y) {
     
     // Make text and badge move with the group
     groupRect.on('moving', function() {
+        console.log('🔵 Group moving event fired', {
+            fabricId: this.fabricId,
+            currentPos: { left: this.left, top: this.top },
+            lastValidPos: { left: this.lastValidLeft, top: this.lastValidTop }
+        });
+        
         // Check for intersection with other groups
         if (checkGroupIntersection(this, this)) {
+            console.log('⚠️ Collision detected! Reverting to last valid position');
             // Revert to last valid position
             this.set({
                 left: this.lastValidLeft,
                 top: this.lastValidTop
             });
+            console.log('   Reverted to:', { left: this.left, top: this.top });
         } else {
+            console.log('✅ No collision, storing position');
             // Store current position as valid
             this.lastValidLeft = this.left;
             this.lastValidTop = this.top;
         }
+        
+        console.log('   Updating children. Text at:', { left: groupText.left, top: groupText.top });
         updateGroupChildren(groupRect, groupText, costBadge);
+        console.log('   After update. Text at:', { left: groupText.left, top: groupText.top });
     });
     
     groupRect.on('scaling', function() {
@@ -3453,14 +3472,22 @@ function loadGroupsOnCanvas(groups) {
         
         // Setup event handlers
         groupRect.on('moving', function() {
+            console.log('🔵 [LOADED] Group moving event fired', {
+                fabricId: this.fabricId,
+                currentPos: { left: this.left, top: this.top },
+                lastValidPos: { left: this.lastValidLeft, top: this.lastValidTop }
+            });
+            
             // Check for intersection with other groups
             if (checkGroupIntersection(this, this)) {
+                console.log('⚠️ [LOADED] Collision detected! Reverting');
                 // Revert to last valid position
                 this.set({
                     left: this.lastValidLeft,
                     top: this.lastValidTop
                 });
             } else {
+                console.log('✅ [LOADED] No collision');
                 // Store current position as valid
                 this.lastValidLeft = this.left;
                 this.lastValidTop = this.top;
@@ -3564,6 +3591,12 @@ function loadResourcesOnCanvas(boardResources) {
  * Update group children (text and cost badge) position
  */
 function updateGroupChildren(groupRect, groupText, costBadge) {
+    console.log('      📐 updateGroupChildren called', {
+        groupPos: { left: groupRect.left, top: groupRect.top },
+        textBefore: { left: groupText.left, top: groupText.top },
+        badgeBefore: { left: costBadge.left, top: costBadge.top }
+    });
+    
     groupText.set({
         left: groupRect.left + 10,
         top: groupRect.top + 10
@@ -3572,6 +3605,12 @@ function updateGroupChildren(groupRect, groupText, costBadge) {
         left: groupRect.left + groupRect.width - 80,
         top: groupRect.top + 10
     });
+    
+    console.log('      📐 After setting:', {
+        textAfter: { left: groupText.left, top: groupText.top },
+        badgeAfter: { left: costBadge.left, top: costBadge.top }
+    });
+    
     fabricCanvas.renderAll();
 }
 
