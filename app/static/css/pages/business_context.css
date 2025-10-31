@@ -9,6 +9,15 @@
     position: relative;
 }
 
+/* Minimize header and body padding for business context to maximize canvas space */
+body:has(.business-context-container) .content-header {
+    padding: 0.75rem 2rem 0.5rem 2rem;
+}
+
+body:has(.business-context-container) .content-body {
+    padding: 2px;
+}
+
 /* ============================================================================
    BOARD LIST VIEW
    ============================================================================ */
@@ -170,7 +179,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0 1rem;
     background: #ffffff;
     border-bottom: 1px solid #E5E7EB;
     min-height: 60px;
@@ -345,6 +354,7 @@
 .toolbox-content {
     flex: 1;
     overflow-y: auto;
+    padding-top: 0.5rem;
 }
 
 /* Toolbox Sections */

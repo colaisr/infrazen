@@ -110,7 +110,6 @@ function setupEventListeners() {
     
     // Toolbox toggle
     document.getElementById('toggleToolboxBtn')?.addEventListener('click', toggleToolbox);
-    document.getElementById('closeToolboxBtn')?.addEventListener('click', toggleToolbox);
     
     // Save board button
     // Manual save button removed - autosave only
