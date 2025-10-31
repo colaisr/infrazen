@@ -2878,9 +2878,9 @@ async function updateResourceGroupAssignment(boardResourceId, newGroupId, oldGro
         const data = await response.json();
         
         // Update costs for ALL groups containing clones of this resource
-        // This ensures cost splitting is recalculated when a clone moves between groups
+        // Pass oldGroupId to ensure it's updated even if resource was removed from it
         if (resourceId) {
-            await updateCostsForAllGroupsWithResource(resourceId);
+            await updateCostsForAllGroupsWithResource(resourceId, oldGroupId);
         } else {
             // Fallback: Update just the affected groups if resourceId not provided
             if (oldGroupId) {
@@ -3325,8 +3325,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
     // Find all resources on canvas
     const allResources = fabricCanvas.getObjects().filter(obj => obj.objectType === 'resource');
     
-    // Track which resources were moved (to update costs for all their groups)
-    const affectedResourceIds = new Set();
+    // Track which resources were moved (resourceId -> oldGroupId)
+    const affectedResources = new Map();
     
     for (const resource of allResources) {
         // Get resource center point
@@ -3346,6 +3346,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
             
             // Resource moved outside - unassign from group
             try {
+                const oldGroupId = resource.groupId;  // Save before clearing
+                
                 const response = await fetch(`/api/business-context/board-resources/${resource.boardResourceId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -3361,7 +3363,7 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
                 
                 if (data.success) {
                     resource.groupId = null;
-                    affectedResourceIds.add(resource.resourceId);
+                    affectedResources.set(resource.resourceId, oldGroupId);  // Track old group
                     console.log('   ✅ Resource unassigned from group');
                 }
             } catch (error) {
@@ -3375,6 +3377,8 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
             
             // Resource moved inside - assign to group
             try {
+                const oldGroupId = resource.groupId;  // Save before changing
+                
                 const response = await fetch(`/api/business-context/board-resources/${resource.boardResourceId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -3390,7 +3394,7 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
                 
                 if (data.success) {
                     resource.groupId = businessGroup.dbId;
-                    affectedResourceIds.add(resource.resourceId);
+                    affectedResources.set(resource.resourceId, oldGroupId);  // Track old group
                     console.log('   ✅ Resource assigned to group');
                 }
             } catch (error) {
@@ -3400,10 +3404,10 @@ async function checkAndUpdateResourcesOutsideGroup(businessGroup) {
     }
     
     // Update costs for all groups containing any affected resources
-    if (affectedResourceIds.size > 0) {
-        console.log(`   💰 Recalculating costs for ${affectedResourceIds.size} affected resources`);
-        for (const resourceId of affectedResourceIds) {
-            await updateCostsForAllGroupsWithResource(resourceId);
+    if (affectedResources.size > 0) {
+        console.log(`   💰 Recalculating costs for ${affectedResources.size} affected resources`);
+        for (const [resourceId, oldGroupId] of affectedResources) {
+            await updateCostsForAllGroupsWithResource(resourceId, oldGroupId);
         }
     }
 }
@@ -4324,8 +4328,9 @@ function updateCloneBadges(resourceId) {
 
 /**
  * Update costs for all groups containing clones of a specific resource
+ * Also updates oldGroupId if provided (for when resource is removed from a group)
  */
-async function updateCostsForAllGroupsWithResource(resourceId) {
+async function updateCostsForAllGroupsWithResource(resourceId, oldGroupId = null) {
     if (!resourceId) return;
     
     const objects = fabricCanvas.getObjects();
@@ -4340,6 +4345,11 @@ async function updateCostsForAllGroupsWithResource(resourceId) {
             groupIds.add(resource.groupId);
         }
     });
+    
+    // Also include the old group if provided (important when resource was just removed)
+    if (oldGroupId) {
+        groupIds.add(oldGroupId);
+    }
     
     // Update cost for each group
     console.log(`💰 Updating costs for ${groupIds.size} groups containing resource ${resourceId}`);
