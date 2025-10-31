@@ -996,9 +996,14 @@ A Miro-inspired interactive canvas for mapping cloud resources to business conte
 - **Backend:** Flask API with 15+ endpoints for CRUD operations
 - **Database:** MySQL with three new tables:
   - `business_boards`: Board metadata, canvas state (JSON), viewport (JSON)
-  - `board_resources`: Resource placements with positions and group assignments
-  - `board_groups`: Group properties, positions, sizes, colors, calculated costs
+  - `board_resources`: Resource placements with positions and group assignments (allows multiple placements per resource for cloning)
+  - `board_groups`: Group properties, positions, sizes, colors, calculated costs (with clone-aware cost splitting)
 - **State Management:** Client-side localStorage for last board, debounced auto-save, real-time cost updates
+- **Cloning Architecture:**
+  - Removed `unique_resource_per_board` database constraint to enable multiple placements
+  - Each clone has unique `board_resource_id` but shares same `resource_id`
+  - Backend `calculate_cost()` method queries all clones and splits cost across unique groups
+  - Frontend `updateCostsForAllGroupsWithResource()` ensures all affected groups recalculate
 
 #### **User Experience Features**
 - **Board Management:** Create, rename, delete boards with "Create first board" empty state
@@ -1008,6 +1013,20 @@ A Miro-inspired interactive canvas for mapping cloud resources to business conte
   - Notes icon ("n", green, top-right): Opens notes editor with system-wide persistence
   - Green fill on notes icon when notes exist
   - Monthly cost display (₽/мес) on resource cards
+  - **Resource Cloning (NEW):**
+    - Right-click context menu on canvas resources with "Клонировать" (Clone) option
+    - Creates duplicate placements of the same resource on the canvas
+    - Purple (c) badge appears on all clones in bottom-right corner
+    - Clones share same info and notes (tied to original resource)
+    - **Cost Splitting:** Resource cost automatically splits across groups containing clones
+      - 1 resource in Group A: Group A gets 100% of cost
+      - Clone in Group A, clone in Group B: Each group gets 50% of cost
+      - Multiple clones in same group: Group gets full cost (counted once)
+      - Real-time cost recalculation on all movements (drag in/out/between groups)
+    - **Toolbox "Show" Feature:** Right-click placed resources in toolbox → "Show" option
+      - Pans canvas to center on resource and selects it
+      - If already centered, cycles to next clone of same resource
+    - Deleting clones: Last remaining instance auto-removes (c) badge
 - **Group Functionality:**
   - Right-click context menu (Edit, Delete, Properties)
   - Auto-calculated cost badge updates when resources added/removed
@@ -1050,6 +1069,10 @@ A Miro-inspired interactive canvas for mapping cloud resources to business conte
 #### **Business Value**
 - **Resource Accountability:** Visual mapping reveals orphaned/unmapped resources post-sync
 - **Cost Allocation:** Automatic calculation of business unit/customer costs
+- **Shared Resource Management:** Clone feature enables accurate cost splitting for resources used by multiple teams/projects
+  - Example: Shared database used by 3 projects → Each project sees 33% of database cost in their group
+  - Eliminates manual spreadsheet tracking of shared infrastructure costs
+  - Enables fair chargeback/showback models for multi-tenant resources
 - **Documentation:** Persistent notes capture tribal knowledge about resources
 - **Flexibility:** Multiple boards support different organizational views (by customer, feature, department)
 
