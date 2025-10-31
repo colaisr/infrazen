@@ -4511,8 +4511,7 @@ function showFlashMessage(type, message) {
     // Use existing flash message system from main.js if available
     if (typeof window.showMessage === 'function') {
         window.showMessage(type, message);
-    } else {
-        alert(message);
     }
+    // No fallback alert - visual feedback (badges, placement) is sufficient
 }
 
