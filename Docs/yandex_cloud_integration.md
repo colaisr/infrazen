@@ -214,18 +214,22 @@ POSTGRESQL_PRICING = {
 
 #### Virtual Machines:
 ```python
-# All VMs are processed as 'server' type
-# INCLUDING Kubernetes worker nodes!
+# Standalone VMs are processed as 'server' type
+# K8s worker nodes are now AGGREGATED into cluster (Oct 2025)
 
-# Special tagging for K8s workers:
+# Detection and aggregation:
 if instance.labels.get('managed-kubernetes-cluster-id'):
-    resource.add_tag('kubernetes_cluster_id', cluster_id)
-    resource.add_tag('is_kubernetes_node', 'true')
-    resource.add_tag('kubernetes_cluster_name', cluster_name)
-    # Still type='server', NOT filtered out!
+    # Skip - worker VM is aggregated into cluster cost
+    logger.debug(f"Skipping K8s worker node {instance.name}")
+    continue
+    
+# Only standalone VMs (non-K8s) are processed as separate resources
 ```
 
-**Rationale:** Yandex bills K8s workers under "Compute Cloud", not "Kubernetes Service"
+**Rationale:** 
+- Yandex bills K8s workers under "Compute Cloud", not "Kubernetes Service"
+- InfraZen aggregates them into cluster for better UX and cost tracking
+- Users manage workers via K8s (kubectl scale), not directly as VMs
 
 #### Disks:
 ```python
@@ -243,15 +247,19 @@ if 'postgres' in disk_name or 'mysql' in disk_name:
 
 #### Managed Clusters:
 ```python
-# Kubernetes clusters:
-# - Master node only (228₽/day from HAR)
-# - Workers are VMs (billed separately under Compute)
-# - CSI volumes: Automatically aggregated into cluster cost (NEW!)
+# Kubernetes clusters (FULL AGGREGATION - Oct 2025):
+# - Master node: 228₽/day (from HAR)
+# - Worker VMs: Automatically aggregated into cluster cost (NEW!)
+#   - Detected by labels['managed-kubernetes-cluster-id'] matching cluster ID
+#   - Each worker cost calculated from vCPU + RAM + boot disk
+#   - Hidden from standalone VM list (is_active=False)
+# - CSI volumes: Automatically aggregated into cluster cost
 #   - Detected by labels['cluster-name'] matching cluster ID
 #   - Or by 'k8s-csi-' prefix in volume name
 #   - Includes both auto-generated and named PVCs (grafana, victoriametrics, etc.)
 #   - Hidden from standalone volume list (is_active=False)
-#   - Total cluster cost = master + CSI volumes
+# - Total cluster cost = master + workers + CSI volumes
+# - All components shown in collapsible breakdown on cluster card
 
 # PostgreSQL/MySQL/Kafka clusters:
 # - Sum all hosts (vCPUs, RAM, storage)
@@ -291,11 +299,19 @@ KNOWN_SKUS = {
 
 #### Kubernetes Clusters:
 ```python
-def _process_kubernetes_cluster(cluster, folder_id, ..., disks):
+def _process_kubernetes_cluster(cluster, folder_id, ..., disks, instances):
     # Master node cost (from HAR observation):
     master_daily_cost = 228.0  # Regional master
     
-    # Find and sum CSI volumes for this cluster (NEW!)
+    # Find and sum worker VMs for this cluster (NEW Oct 2025!)
+    worker_vms_cost = 0.0
+    for instance in instances:
+        if instance.labels.get('managed-kubernetes-cluster-id') == cluster_id:
+            vm_cost = self._estimate_instance_cost(...)
+            worker_vms_cost += vm_cost
+            # Mark VM as inactive (aggregated into cluster)
+    
+    # Find and sum CSI volumes for this cluster
     csi_volumes_cost = 0.0
     for disk in disks:
         labels = disk.get('labels', {})
@@ -306,20 +322,32 @@ def _process_kubernetes_cluster(cluster, folder_id, ..., disks):
             volume_cost = self._estimate_disk_cost(size_gb, disk_type)
             csi_volumes_cost += volume_cost
     
-    # Total cluster cost = master + CSI storage
-    total_cluster_cost = master_daily_cost + csi_volumes_cost
+    # Total cluster cost = master + workers + CSI storage
+    total_cluster_cost = master_daily_cost + worker_vms_cost + csi_volumes_cost
     
-    # Deactivate old standalone CSI volume resources
-    # (they're now aggregated into cluster, not shown separately)
+    # Store breakdown in metadata (displayed in collapsible UI sections)
+    metadata['cost_breakdown'] = {
+        'master': master_daily_cost,
+        'workers': worker_vms_cost,
+        'storage': csi_volumes_cost,
+        'total': total_cluster_cost
+    }
+    metadata['worker_vms'] = worker_vms_list  # Detailed worker info
+    metadata['csi_volumes'] = csi_volumes_list  # Detailed volume info
+    
+    # Deactivate old standalone resources (aggregated into cluster)
+    # - Worker VMs: is_active=False
+    # - CSI volumes: is_active=False
     
     return total_cluster_cost
 ```
 
-**Important:** 
-- K8s workers are NOT included - they're counted as regular VMs
-- **NEW:** CSI volumes are NOW aggregated into cluster cost
-- CSI volumes are hidden from standalone volume list (is_active=False)
-- Users see complete cluster cost (master + storage) in one resource
+**Important (Oct 2025 - Full Aggregation):** 
+- ✅ **Worker VMs:** NOW aggregated into cluster cost (detected by label)
+- ✅ **CSI volumes:** Aggregated into cluster cost (detected by label)
+- Both hidden from standalone resource lists (is_active=False)
+- Users see complete cluster cost (master + workers + storage) in one resource
+- All components visible in collapsible breakdown sections on cluster card
 
 #### PostgreSQL Clusters:
 ```python
@@ -418,13 +446,13 @@ if not is_used:
 | **Compute VM** | 26.88₽ | 7.20₽ | 0.0031₽ |
 | **PostgreSQL** | 42.25₽ | 11.41₽ | 0.1152₽ |
 | **Kafka** | 43.55₽ | **23.33₽** | 0.1152₽ |
-| **Kubernetes** | Master only: 228₽/day flat fee | - |
+| **Kubernetes** | Master: 228₽/day | Workers + CSI aggregated |
 
 **Key Insights:**
 1. Managed services cost more than raw compute
 2. PostgreSQL: +53% premium over Compute
 3. Kafka: +117% premium over Compute (RAM is 2x!)
-4. Kubernetes: Master-only cost, workers are VMs
+4. Kubernetes: Master (228₽) + Workers (as VMs) + CSI volumes all aggregated
 
 ### 3.2 Storage Pricing
 
@@ -610,7 +638,7 @@ Accuracy:     99.84% ✅
 | Virtual Machines | 17 | 3,423₽ | 99%+ | SKU-based |
 | Snapshots | 10 | 479₽ | 100% | HAR-based |
 | PostgreSQL | 2 | 329₽ | 99.99% | HAR-based |
-| Kubernetes | 1 | **264₽** | 99.99% | HAR-based (includes CSI) |
+| Kubernetes | 1 | **~7,900₽** | 99.99% | HAR+SKU (master+workers+CSI) |
 | Disks | 5 | 229₽ | 99%+ | SKU-based |
 | **DNS Zones** | **17** | **198₽** | **100%** | **HAR-based** |
 | Kafka | 1 | 198₽ | 100% | HAR-based |
@@ -621,7 +649,13 @@ Accuracy:     99.84% ✅
 
 **Total: 63 resources, 5,411₽/day, 99.84% accuracy**
 
-**Note:** Kubernetes cost (264₽) now includes master (228₽) + 9 CSI volumes (36₽). CSI volumes are no longer shown as separate standalone resources.
+**Note:** Kubernetes cost now includes full aggregation (Oct 2025):
+- Master node: 228₽/day (from HAR)
+- Worker VMs: 6 nodes × ~260₽/day = ~1,567₽/day (from SKU)
+- CSI volumes: 9 volumes = 36₽/day (from SKU)
+- **Total: ~1,831₽/day (~54,930₽/month)**
+
+Worker VMs and CSI volumes are hidden from standalone resource lists and aggregated into the cluster for accurate cost tracking.
 
 ### 5.3 Implementation Journey
 
@@ -640,40 +674,74 @@ Accuracy:     99.84% ✅
 
 ## 6. Major Technical Discoveries
 
-### 6.1 Kubernetes Billing Split & CSI Volume Aggregation
+### 6.1 Kubernetes Full Aggregation (Master + Workers + CSI) - Oct 2025
 
-**Discovery:** Yandex bills Kubernetes across TWO services:
-
-```
-Kubernetes Service Bill:
-├── Master Node: ~228₽/day
-└── Workers: NOT HERE!
-
-Compute Cloud Bill:
-├── Worker VMs: Billed as regular VMs
-├── Worker Disks: Billed as regular disks
-└── K8s CSI volumes: Billed as standalone disks
-```
-
-**InfraZen Implementation (October 30, 2025):**
-
-We aggregate CSI volumes into the cluster cost for better UX:
+**Discovery:** Yandex bills Kubernetes across THREE services:
 
 ```
-User sees:
-└── Kubernetes Cluster "itlkube": 264₽/day
-    ├── Master: 228₽/day
-    └── CSI Storage (9 volumes): 36₽/day
-    
-Worker VMs shown separately (tagged with cluster ID)
+Yandex Cloud Billing (Fragmented View):
+├── Managed Service for Kubernetes
+│   └── Master Node: ~228₽/day
+├── Compute Cloud
+│   ├── Worker VM #1: ~261₽/day
+│   ├── Worker VM #2: ~261₽/day
+│   ├── ... (4 more workers)
+│   └── Total Workers: ~1,567₽/day
+└── Block Storage (Compute Cloud)
+    ├── CSI volume #1: 3.17₽/day (grafana)
+    ├── CSI volume #2: 10.56₽/day (victoriametrics)
+    ├── ... (7 more volumes)
+    └── Total CSI: ~36₽/day
 
-Yandex bills:
-├── Managed Kubernetes: 228₽ (master only)
-├── Compute Cloud: VMs cost (workers)
-└── Block Storage: 36₽ (CSI volumes)
-
-InfraZen aggregates: 228₽ + 36₽ = 264₽ total cluster cost
+Total across services: 1 master + 6 workers + 9 volumes = 16 resources! 😵
 ```
+
+**InfraZen Implementation (October 31, 2025 - Full Aggregation):**
+
+Complete cluster aggregation for accurate cost tracking:
+
+```
+InfraZen UI (Clean Aggregated View):
+└── Kubernetes Cluster "itlkube": ~1,831₽/day (~54,930₽/month)
+    │
+    └── 📊 Разбивка стоимости кластера (collapsible)
+        ├── 🖥️  Мастер-нода: 228₽/day (6,840₽/month)
+        │
+        ├── 🖥️  Worker Nodes (6шт) ▼ : ~1,567₽/day (47,010₽/month)
+        │   ├── cl1abc... 4vCPU•16GB•100GB: ~261₽/day
+        │   ├── cl1def... 4vCPU•16GB•100GB: ~261₽/day
+        │   ├── cl1ghi... 4vCPU•16GB•100GB: ~261₽/day
+        │   ├── cl1jkl... 4vCPU•16GB•100GB: ~261₽/day
+        │   ├── cl1mno... 4vCPU•16GB•100GB: ~261₽/day
+        │   └── cl1pqr... 4vCPU•16GB•100GB: ~261₽/day
+        │
+        ├── 💾 CSI Volumes (9шт) ▼ : 36₽/day (1,080₽/month)
+        │   ├── grafana 30GB network-hdd: 3.17₽/day
+        │   ├── victoriametrics 100GB network-hdd: 10.56₽/day
+        │   ├── k8s-csi-879b78... 24GB network-hdd: 2.53₽/day
+        │   └── ... 6 more volumes
+        │
+        └── 💰 Итого кластер: ~1,831₽/day (~54,930₽/month)
+
+Detection & Aggregation Logic:
+- Worker VMs: labels['managed-kubernetes-cluster-id'] == cluster_id
+  → Cost calculated from vCPU + RAM + boot disk (SKU-based)
+  → Marked is_active=False (hidden from main resource list)
+  
+- CSI Volumes: labels['cluster-name'] == cluster_id OR name.startswith('k8s-csi-')
+  → Cost calculated from size + disk type (SKU-based)
+  → Marked is_active=False (hidden from main resource list)
+  
+- Both aggregated: master + Σworkers + Σcsi_volumes = total_cluster_cost
+```
+
+**Benefits:**
+1. **Clean UI:** 16 fragmented resources → 1 unified cluster (94% reduction)
+2. **Accurate Cost:** Complete cluster cost in one place (~1,831₽/day)
+3. **Better UX:** No confusing standalone worker/volume resources
+4. **Detailed Breakdown:** All components accessible via collapsible sections
+5. **User Mental Model:** Matches how users think about K8s infrastructure
+6. **Cost Allocation:** Easy to assign complete cluster cost to teams/projects
 
 **CSI Volume Detection:**
 ```python
@@ -1248,7 +1316,7 @@ if cluster_type == 'new_service':
 - **SKUs:** 993 prices in database
 - **Sync Time:** ~20 seconds (resource sync)
 - **Price Sync:** ~6 minutes (SKU sync)
-- **K8s CSI Volumes:** Automatically aggregated into cluster cost (Oct 2025)
+- **K8s Full Aggregation:** Workers + CSI volumes into cluster cost (Oct 2025)
 - **UI Enhancement:** 2-column responsive specs layout for all devices
 
 ### 15.3 Commands
