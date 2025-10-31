@@ -69,7 +69,8 @@
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Общая стоимость</span>
-                    <span class="stat-value">{{ "{:,.2f}".format(last_complete_sync.total_daily_cost or 0) }} ₽/день</span>
+                    <span class="stat-value">{{ "{:,.2f}".format((last_complete_sync.total_daily_cost or 0) * 30) }} ₽/месяц</span>
+                    <span class="stat-sublabel" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">{{ "{:,.2f}".format(last_complete_sync.total_daily_cost or 0) }} ₽/день</span>
                 </div>
             {% else %}
                 <!-- Fallback to individual resource data -->
@@ -85,7 +86,8 @@
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">Общая стоимость</span>
-                    <span class="stat-value">{{ "{:,.2f}".format(all_resources|sum(attribute='daily_cost')|round(2)) }} ₽/день</span>
+                    <span class="stat-value">{{ "{:,.2f}".format((all_resources|sum(attribute='daily_cost')|round(2)) * 30) }} ₽/месяц</span>
+                    <span class="stat-sublabel" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 400;">{{ "{:,.2f}".format(all_resources|sum(attribute='daily_cost')|round(2)) }} ₽/день</span>
                 </div>
             {% endif %}
         </div>
