@@ -5,10 +5,11 @@ from app.core.models import db
 from .base import BaseModel
 
 class BoardResource(BaseModel):
-    """Resource placement on business context boards"""
+    """Resource placement on business context boards - allows multiple placements (clones)"""
     __tablename__ = 'board_resources'
     __table_args__ = (
-        db.UniqueConstraint('board_id', 'resource_id', name='unique_resource_per_board'),
+        # Note: Removed unique constraint to allow resource cloning
+        # Each placement gets unique board_resource_id
         {'extend_existing': True}
     )
     
