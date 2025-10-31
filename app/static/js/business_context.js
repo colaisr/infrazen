@@ -2393,12 +2393,8 @@ async function placeResourceOnCanvas(resourceId, x, y) {
         return;
     }
     
-    // Check if already placed
-    if (resourceData.is_placed) {
-        isCreatingObjects = false;
-        showFlashMessage('error', 'Ресурс уже размещен на доске');
-        return;
-    }
+    // Note: We allow multiple placements (clones) of the same resource
+    // No need to check is_placed - backend handles this now
     
     try {
         // Check if dropped inside a group
@@ -2424,11 +2420,7 @@ async function placeResourceOnCanvas(resourceId, x, y) {
             // Create Fabric.js object for resource
             createResourceObject(resourceData, x, y, data.board_resource.id, groupId);
             
-            // Update resource status in toolbox
-            resourceData.is_placed = true;
-            displayResources();
-            
-            // Reload resources to update counts
+            // Reload resources to update toolbox (shows placed badge, updates counts)
             await loadResources();
             
             // If placed in group, update group cost

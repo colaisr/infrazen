@@ -314,9 +314,8 @@ def place_resource_on_board(board_id):
     if not resource:
         return jsonify({'success': False, 'error': 'Resource not found'}), 404
     
-    # Check if already placed on this board
-    if BoardResource.is_resource_placed(board_id, resource_id):
-        return jsonify({'success': False, 'error': 'Resource already placed on this board'}), 400
+    # Note: We allow multiple placements (clones) of the same resource
+    # Each placement is tracked separately with its own board_resource_id
     
     # Verify group if provided
     if group_id:
