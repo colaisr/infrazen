@@ -105,7 +105,7 @@ class BoardGroup(BaseModel):
             
             total += split_cost
             
-            print(f'   Resource "{board_resource.resource.name}": {len(all_clones)} clones, {len(groups_with_clones)} groups → {split_cost}/day')
+            print(f'   Resource "{board_resource.resource.resource_name}": {len(all_clones)} clones, {len(groups_with_clones)} groups → {split_cost}/day')
         
         self.calculated_cost = total
         db.session.commit()

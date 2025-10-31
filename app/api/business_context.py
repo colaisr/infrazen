@@ -690,14 +690,21 @@ def get_group_cost(group_id):
     if not group:
         return jsonify({'success': False, 'error': 'Group not found'}), 404
     
+    print(f"🔍 get_group_cost: group {group_id} found, calculating cost...")
+    
     try:
+        print(f"🔍 Calling calculate_cost() for group {group_id}")
         cost = group.calculate_cost()
+        print(f"✅ Cost calculated: {cost}")
+        
+        resource_count = group.resources.count()
+        print(f"✅ Resource count: {resource_count}")
         
         return jsonify({
             'success': True,
             'group_id': group_id,
             'calculated_cost': cost,
-            'resource_count': group.resources.count()
+            'resource_count': resource_count
         })
     except Exception as e:
         print(f"❌ Error in get_group_cost: {e}")
