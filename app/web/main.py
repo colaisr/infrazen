@@ -633,17 +633,43 @@ def get_real_user_resources(user_id):
     all_resources = []
     
     for provider in providers:
-        # Get the latest successful sync snapshot for this provider
+        # Get the latest successful sync snapshot for this provider that has ResourceState entries
+        # This ensures we use the snapshot created by YandexService (with ResourceState), not the orchestrator's
         latest_snapshot = SyncSnapshot.query.filter_by(
             provider_id=provider.id, 
             sync_status='success'
         ).order_by(SyncSnapshot.created_at.desc()).first()
         
         if latest_snapshot:
-            # Get resources from the latest snapshot (correct architecture)
+            # Get resources from the snapshot WITH ResourceState entries (correct architecture)
             resource_states = ResourceState.query.filter_by(
                 sync_snapshot_id=latest_snapshot.id
             ).all()
+            
+            # If no ResourceState entries, try to find another snapshot from same time with entries
+            if len(resource_states) == 0 and latest_snapshot.created_at:
+                # Look for snapshots created within 5 seconds of this one (YandexService creates a second snapshot)
+                from datetime import timedelta
+                time_window_start = latest_snapshot.created_at - timedelta(seconds=5)
+                time_window_end = latest_snapshot.created_at + timedelta(seconds=5)
+                
+                alternate_snapshots = SyncSnapshot.query.filter(
+                    SyncSnapshot.provider_id == provider.id,
+                    SyncSnapshot.sync_status == 'success',
+                    SyncSnapshot.created_at >= time_window_start,
+                    SyncSnapshot.created_at <= time_window_end,
+                    SyncSnapshot.id != latest_snapshot.id
+                ).order_by(SyncSnapshot.created_at.desc()).all()
+                
+                # Find the one with ResourceState entries
+                for alt_snapshot in alternate_snapshots:
+                    alt_resource_states = ResourceState.query.filter_by(
+                        sync_snapshot_id=alt_snapshot.id
+                    ).all()
+                    if len(alt_resource_states) > 0:
+                        latest_snapshot = alt_snapshot
+                        resource_states = alt_resource_states
+                        break
             
             # Get the actual Resource objects
             resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id]
