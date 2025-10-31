@@ -2063,27 +2063,33 @@ function displayResources() {
  * Setup drag listeners for resource items
  */
 function setupResourceDragListeners() {
-    const resourceItems = document.querySelectorAll('.resource-item[draggable="true"]');
+    const resourceItems = document.querySelectorAll('.resource-item');
     
     resourceItems.forEach(item => {
-        item.addEventListener('dragstart', function(e) {
-            const resourceId = parseInt(this.dataset.resourceId);
-            e.dataTransfer.setData('text/plain', resourceId);
-            e.dataTransfer.effectAllowed = 'copy';
+        const isPlaced = item.classList.contains('placed');
+        
+        // Only add drag handlers to unplaced resources
+        if (!isPlaced) {
+            item.addEventListener('dragstart', function(e) {
+                const resourceId = parseInt(this.dataset.resourceId);
+                e.dataTransfer.setData('text/plain', resourceId);
+                e.dataTransfer.effectAllowed = 'copy';
+                
+                // Add dragging class for visual feedback
+                this.classList.add('dragging');
+            });
             
-            // Add dragging class for visual feedback
-            this.classList.add('dragging');
-        });
+            item.addEventListener('dragend', function(e) {
+                this.classList.remove('dragging');
+            });
+        }
         
-        item.addEventListener('dragend', function(e) {
-            this.classList.remove('dragging');
-        });
-        
-        // Add right-click context menu
+        // Add right-click context menu to ALL resources (placed and unplaced)
         item.addEventListener('contextmenu', function(e) {
             e.preventDefault();
             const resourceId = parseInt(this.dataset.resourceId);
-            showResourceContextMenu(e, resourceId);
+            const isResourcePlaced = this.classList.contains('placed');
+            showResourceContextMenu(e, resourceId, isResourcePlaced);
         });
     });
 }
@@ -2091,7 +2097,7 @@ function setupResourceDragListeners() {
 /**
  * Show resource context menu
  */
-function showResourceContextMenu(e, resourceId) {
+function showResourceContextMenu(e, resourceId, isPlaced) {
     const contextMenu = document.getElementById('resourceContextMenu');
     if (!contextMenu) return;
     
@@ -2106,6 +2112,27 @@ function showResourceContextMenu(e, resourceId) {
     // Remove existing event listeners by cloning
     const newMenu = contextMenu.cloneNode(true);
     contextMenu.parentNode.replaceChild(newMenu, contextMenu);
+    
+    // Hide/show Show and Place options based on whether resource is already placed
+    const showOption = newMenu.querySelector('[data-action="show"]');
+    const placeOption = newMenu.querySelector('[data-action="place"]');
+    const separator = placeOption ? placeOption.previousElementSibling : null;
+    
+    if (isPlaced) {
+        // Resource already placed - show Show option, hide Place option and separator
+        if (showOption) showOption.style.display = 'flex';
+        if (placeOption) placeOption.style.display = 'none';
+        if (separator && separator.classList.contains('context-menu-separator')) {
+            separator.style.display = 'none';
+        }
+    } else {
+        // Resource not placed - hide Show option, show Place option and separator
+        if (showOption) showOption.style.display = 'none';
+        if (placeOption) placeOption.style.display = 'flex';
+        if (separator && separator.classList.contains('context-menu-separator')) {
+            separator.style.display = 'block';
+        }
+    }
     
     // Add event listeners to menu items
     newMenu.querySelectorAll('.context-menu-item').forEach(item => {
@@ -2128,6 +2155,67 @@ function hideResourceContextMenu() {
 }
 
 /**
+ * Show resource on canvas - bring it into view and select it
+ */
+function showResourceOnCanvas(resourceId) {
+    if (!fabricCanvas || !currentBoard) {
+        showFlashMessage('error', 'Откройте доску');
+        return;
+    }
+    
+    // Find the resource on canvas by resourceId
+    const objects = fabricCanvas.getObjects();
+    const resourceObj = objects.find(obj => 
+        obj.objectType === 'resource' && obj.resourceId === resourceId
+    );
+    
+    if (!resourceObj) {
+        showFlashMessage('error', 'Ресурс не найден на доске');
+        return;
+    }
+    
+    // Deselect any currently selected objects
+    fabricCanvas.discardActiveObject();
+    fabricCanvas.renderAll();
+    
+    // Get resource center in canvas coordinates (not viewport coordinates)
+    // resourceObj properties (left, top, width, height) are in canvas space
+    const centerX = resourceObj.left + resourceObj.width / 2;
+    const centerY = resourceObj.top + resourceObj.height / 2;
+    
+    // Get canvas wrapper element dimensions (actual visible area)
+    const canvasElement = fabricCanvas.wrapperEl;
+    const canvasWidth = canvasElement.offsetWidth;
+    const canvasHeight = canvasElement.offsetHeight;
+    
+    // Get current zoom
+    const zoom = fabricCanvas.getZoom();
+    
+    // Fabric.js viewport transform: screenX = canvasX * zoom + vpt[4]
+    // To center: canvasWidth/2 = centerX * zoom + new_vpt[4]
+    // Therefore: new_vpt[4] = canvasWidth/2 - centerX * zoom
+    const panX = canvasWidth / 2 - centerX * zoom;
+    const panY = canvasHeight / 2 - centerY * zoom;
+    
+    // Pan canvas to center on resource
+    fabricCanvas.viewportTransform[4] = panX;
+    fabricCanvas.viewportTransform[5] = panY;
+    
+    // Update object coordinates after panning
+    fabricCanvas.forEachObject(function(obj) {
+        obj.setCoords();
+    });
+    
+    // Select the resource
+    fabricCanvas.setActiveObject(resourceObj);
+    fabricCanvas.renderAll();
+    
+    // Update grid and auto-save
+    updateGrid();
+    scheduleAutoSave();
+}
+
+/**
  * Handle resource context menu actions
  */
 function handleResourceContextAction(action, resourceId) {
@@ -2140,6 +2228,11 @@ function handleResourceContextAction(action, resourceId) {
         case 'notes':
             // Show notes editor for resource
             showResourceNotes(resourceId);
+            break;
+            
+        case 'show':
+            // Find resource on canvas and bring it into view, then select it
+            showResourceOnCanvas(resourceId);
             break;
             
         case 'place':
