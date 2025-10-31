@@ -944,19 +944,29 @@ async function pasteGroup(originalGroup) {
     if (!fabricCanvas || !currentBoard) return;
     
     const newFabricId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    const newLeft = originalGroup.left + 30;
-    const newTop = originalGroup.top + 30;
+    
+    // Initial position offset from original
+    let initialLeft = originalGroup.left + 30;
+    let initialTop = originalGroup.top + 30;
+    
+    // Find a non-overlapping position
+    const adjustedPosition = findNonOverlappingPosition(
+        initialLeft, 
+        initialTop, 
+        originalGroup.width, 
+        originalGroup.height
+    );
     
     try {
-        // Create group in database
+        // Create group in database with adjusted position
         const response = await fetch(`/api/business-context/boards/${currentBoard.id}/groups`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: originalGroup.groupName + ' (Copy)',
                 fabric_id: newFabricId,
-                position_x: newLeft,
-                position_y: newTop,
+                position_x: adjustedPosition.left,
+                position_y: adjustedPosition.top,
                 width: originalGroup.width,
                 height: originalGroup.height,
                 color: originalGroup.groupColor || '#3B82F6',
@@ -970,8 +980,8 @@ async function pasteGroup(originalGroup) {
             // Clone the group rectangle
             originalGroup.clone(function(clonedRect) {
                 clonedRect.set({
-                    left: newLeft,
-                    top: newTop,
+                    left: adjustedPosition.left,
+                    top: adjustedPosition.top,
                     fabricId: newFabricId,
                     groupName: originalGroup.groupName + ' (Copy)',
                     groupColor: originalGroup.groupColor || '#3B82F6',
@@ -2981,6 +2991,38 @@ function checkGroupIntersection(group, excludeGroup = null) {
 }
 
 /**
+ * Find a non-overlapping position for a new group
+ * Shifts the group right and down until a valid position is found
+ */
+function findNonOverlappingPosition(initialLeft, initialTop, width, height) {
+    const shiftAmount = 30; // Amount to shift right/down on each attempt
+    const maxAttempts = 20; // Prevent infinite loop
+    
+    let left = initialLeft;
+    let top = initialTop;
+    let attempts = 0;
+    
+    // Create a temporary group object for collision testing
+    const tempGroup = {
+        left: left,
+        top: top,
+        width: width,
+        height: height
+    };
+    
+    // Keep shifting until we find a non-overlapping position
+    while (checkGroupIntersection(tempGroup) && attempts < maxAttempts) {
+        left += shiftAmount;
+        top += shiftAmount;
+        tempGroup.left = left;
+        tempGroup.top = top;
+        attempts++;
+    }
+    
+    return { left, top };
+}
+
+/**
  * Create a new group on canvas
  */
 async function createGroupOnCanvas(x, y) {
@@ -3008,12 +3050,23 @@ async function createGroupOnCanvas(x, y) {
         posY = (fabricCanvas.height / 2 - vpt[5]) / zoom;
     }
     
+    // Define group dimensions
+    const groupWidth = 300;
+    const groupHeight = 200;
+    
+    // Calculate initial position (centered on click point)
+    let initialLeft = posX - groupWidth / 2;
+    let initialTop = posY - groupHeight / 2;
+    
+    // Find a non-overlapping position
+    const adjustedPosition = findNonOverlappingPosition(initialLeft, initialTop, groupWidth, groupHeight);
+    
     // Create group rectangle
     const groupRect = new fabric.Rect({
-        left: posX - 150,
-        top: posY - 100,
-        width: 300,
-        height: 200,
+        left: adjustedPosition.left,
+        top: adjustedPosition.top,
+        width: groupWidth,
+        height: groupHeight,
         fill: 'rgba(59, 130, 246, 0.05)',
         stroke: '#3B82F6',
         strokeWidth: 2,
