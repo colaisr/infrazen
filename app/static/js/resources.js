@@ -36,6 +36,19 @@ function toggleUsageSection(resourceId) {
     }
 }
 
+function toggleCostBreakdown(resourceId) {
+    const content = document.getElementById(`cost-breakdown-${resourceId}`);
+    const chevron = document.getElementById(`cost-chevron-${resourceId}`);
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        chevron.classList.add('rotated');
+    } else {
+        content.style.display = 'none';
+        chevron.classList.remove('rotated');
+    }
+}
+
 // ============================================================================
 // Chart Initialization
 // ============================================================================
@@ -334,5 +347,6 @@ function exportResourcesToCSV() {
 // Make functions globally available for onclick handlers
 window.toggleProviderSection = toggleProviderSection;
 window.toggleUsageSection = toggleUsageSection;
+window.toggleCostBreakdown = toggleCostBreakdown;
 window.exportResourcesToCSV = exportResourcesToCSV;
 
