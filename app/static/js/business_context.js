@@ -1546,7 +1546,6 @@ function setupCanvasEvents() {
                 obj.setCoords();
             });
             fabricCanvas.renderAll();
-            console.log('📐 Wheel pan ended - updated object coordinates for hit detection');
         }, 150); // Wait 150ms after last wheel event
     });
     
@@ -1577,21 +1576,6 @@ function setupCanvasEvents() {
     fabricCanvas.on('mouse:down', function(opt) {
         const evt = opt.e;
         const target = opt.target;
-        
-        console.log('🖱️ CANVAS CLICK:', {
-            hasTarget: !!target,
-            targetType: target ? target.type : null,
-            objectType: target ? target.objectType : null,
-            targetId: target ? (target.fabricId || target.id) : null,
-            selectable: target ? target.selectable : null,
-            evented: target ? target.evented : null,
-            button: evt.button,
-            clientX: evt.clientX,
-            clientY: evt.clientY,
-            pointer: fabricCanvas.getPointer(evt),
-            zoom: fabricCanvas.getZoom(),
-            vpt: fabricCanvas.viewportTransform
-        });
         
         // Start panning if: middle mouse, space key, or clicking on empty canvas
         // On touchpad, this will be triggered by 2-finger drag
@@ -1638,7 +1622,6 @@ function setupCanvasEvents() {
             
             // Force re-render after panning to refresh hit detection
             fabricCanvas.renderAll();
-            console.log('📐 Pan ended - updated object coordinates and re-rendered canvas for hit detection');
             updateGrid();
         }
     });
@@ -1647,54 +1630,9 @@ function setupCanvasEvents() {
     fabricCanvas.on('mouse:down', function(opt) {
         const target = opt.target;
         if (target && target.selectable) {
-            console.log('💾 Saving state before modification - target:', {
-                type: target.type,
-                objectType: target.objectType,
-                id: target.fabricId || target.id
-            });
             // Save state before any modification starts
             saveToUndoStack();
         }
-    });
-    
-    // Selection created - object was selected
-    fabricCanvas.on('selection:created', function(opt) {
-        console.log('✅ SELECTION CREATED:', {
-            selected: opt.selected ? opt.selected.map(o => ({
-                type: o.type,
-                objectType: o.objectType,
-                id: o.fabricId || o.id,
-                selectable: o.selectable
-            })) : null,
-            targetType: opt.target ? opt.target.type : null
-        });
-    });
-    
-    // Selection updated - different object was selected
-    fabricCanvas.on('selection:updated', function(opt) {
-        console.log('🔄 SELECTION UPDATED:', {
-            selected: opt.selected ? opt.selected.map(o => ({
-                type: o.type,
-                objectType: o.objectType,
-                id: o.fabricId || o.id
-            })) : null,
-            deselected: opt.deselected ? opt.deselected.map(o => ({
-                type: o.type,
-                objectType: o.objectType,
-                id: o.fabricId || o.id
-            })) : null
-        });
-    });
-    
-    // Selection cleared - object was deselected
-    fabricCanvas.on('selection:cleared', function(opt) {
-        console.log('❌ SELECTION CLEARED:', {
-            deselected: opt.deselected ? opt.deselected.map(o => ({
-                type: o.type,
-                objectType: o.objectType,
-                id: o.fabricId || o.id
-            })) : null
-        });
     });
     
     // Object modified - update database and trigger autosave
@@ -1718,15 +1656,6 @@ function setupCanvasEvents() {
     });
     
     fabricCanvas.on('object:added', function(opt) {
-        const obj = opt.target;
-        console.log('➕ OBJECT ADDED:', {
-            type: obj ? obj.type : null,
-            objectType: obj ? obj.objectType : null,
-            id: obj ? (obj.fabricId || obj.id) : null,
-            selectable: obj ? obj.selectable : null,
-            evented: obj ? obj.evented : null,
-            visible: obj ? obj.visible : null
-        });
         saveToUndoStack();
         scheduleAutoSave();
     });
@@ -1880,7 +1809,6 @@ function zoomIn() {
     if (!fabricCanvas) return;
     let zoom = fabricCanvas.getZoom();
     zoom = Math.min(zoom * 1.1, 5);
-    console.log('🔍 ZOOM IN:', { from: fabricCanvas.getZoom(), to: zoom });
     fabricCanvas.setZoom(zoom);
     // Update object coordinates after zoom for hit detection
     fabricCanvas.forEachObject(function(obj) {
@@ -1896,7 +1824,6 @@ function zoomOut() {
     if (!fabricCanvas) return;
     let zoom = fabricCanvas.getZoom();
     zoom = Math.max(zoom * 0.9, 0.1);
-    console.log('🔍 ZOOM OUT:', { from: fabricCanvas.getZoom(), to: zoom });
     fabricCanvas.setZoom(zoom);
     // Update object coordinates after zoom for hit detection
     fabricCanvas.forEachObject(function(obj) {
@@ -1910,7 +1837,6 @@ function zoomOut() {
 
 function zoomReset() {
     if (!fabricCanvas) return;
-    console.log('🔍 ZOOM RESET:', { from: fabricCanvas.getZoom(), to: 1 });
     fabricCanvas.setZoom(1);
     fabricCanvas.absolutePan({ x: 0, y: 0 });
     // Update object coordinates after zoom/pan reset for hit detection
@@ -3429,11 +3355,11 @@ async function createGroupOnCanvas(x, y) {
     // Hide rotation control handle
     businessGroup.setControlVisible('mtr', false);
     
-    // Store initial position for collision detection
+    // Store initial position and scale for collision detection
     businessGroup.lastValidLeft = businessGroup.left;
     businessGroup.lastValidTop = businessGroup.top;
-    businessGroup.lastValidWidth = businessGroup.width;
-    businessGroup.lastValidHeight = businessGroup.height;
+    businessGroup.lastValidScaleX = businessGroup.scaleX || 1;
+    businessGroup.lastValidScaleY = businessGroup.scaleY || 1;
     
     // Handle moving with collision detection
     businessGroup.on('moving', function() {
@@ -3463,42 +3389,54 @@ async function createGroupOnCanvas(x, y) {
     
     // When group movement finishes, check if any resources moved outside
     businessGroup.on('modified', async function() {
+        console.log('✅ GROUP MODIFIED (finished):', {
+            id: this.fabricId,
+            final: {
+                width: this.width,
+                height: this.height,
+                scaleX: this.scaleX,
+                scaleY: this.scaleY,
+                left: this.left,
+                top: this.top
+            },
+            boundingRect: this.getBoundingRect()
+        });
+        
+        // Update coordinates after modification to ensure selection boundary stays aligned
+        this.setCoords();
+        console.log('   Final setCoords() called in modified event');
+        console.log('   Final bounding rect:', this.getBoundingRect());
+        
         await checkAndUpdateResourcesOutsideGroup(this);
         updateGroupInDatabase(this);
     });
     
     businessGroup.on('scaling', function() {
-        const newWidth = this.width * this.scaleX;
-        const newHeight = this.height * this.scaleY;
-        
-        // Temporarily apply new size to check for intersection
-        const oldWidth = this.width;
-        const oldHeight = this.height;
-        const oldScaleX = this.scaleX;
-        const oldScaleY = this.scaleY;
-        
-        this.set({
-            width: newWidth,
-            height: newHeight,
-            scaleX: 1,
-            scaleY: 1
+        console.log('📏 GROUP SCALING:', {
+            id: this.fabricId,
+            scaleX: this.scaleX,
+            scaleY: this.scaleY,
+            boundingRect: this.getBoundingRect()
         });
         
-        // Check for intersection
+        // For fabric.Group, DON'T normalize scale - let it keep scaleX/scaleY
+        // The children will scale automatically
+        
+        // Check for intersection using current scaled bounds
         if (checkGroupIntersection(this, this)) {
-            // Revert to last valid size
+            console.log('   ❌ Intersection - reverting to last valid scale');
+            // Revert to last valid scale
             this.set({
-                width: this.lastValidWidth,
-                height: this.lastValidHeight,
-                scaleX: 1,
-                scaleY: 1
+                scaleX: this.lastValidScaleX || 1,
+                scaleY: this.lastValidScaleY || 1
             });
+            this.setCoords();
         } else {
-            // Store current size as valid
-            this.lastValidWidth = this.width;
-            this.lastValidHeight = this.height;
+            console.log('   ✅ No intersection');
+            // Store current scale as valid
+            this.lastValidScaleX = this.scaleX;
+            this.lastValidScaleY = this.scaleY;
         }
-        // Children resize automatically with the group! ✨
     });
     
     // Double-click to edit name
@@ -3717,11 +3655,11 @@ function loadGroupsOnCanvas(groups) {
             // Hide rotation control handle
             businessGroup.setControlVisible('mtr', false);
             
-            // Store initial position for collision detection
+            // Store initial position and scale for collision detection
             businessGroup.lastValidLeft = businessGroup.left;
             businessGroup.lastValidTop = businessGroup.top;
-            businessGroup.lastValidWidth = businessGroup.width;
-            businessGroup.lastValidHeight = businessGroup.height;
+            businessGroup.lastValidScaleX = businessGroup.scaleX || 1;
+            businessGroup.lastValidScaleY = businessGroup.scaleY || 1;
             
             // Setup event handlers
             businessGroup.on('moving', function() {
@@ -3749,39 +3687,53 @@ function loadGroupsOnCanvas(groups) {
             });
             
             businessGroup.on('scaling', function() {
-                const newWidth = this.width * this.scaleX;
-                const newHeight = this.height * this.scaleY;
-                
-                // Temporarily apply new size to check for intersection
-                const oldWidth = this.width;
-                const oldHeight = this.height;
-                
-                this.set({
-                    width: newWidth,
-                    height: newHeight,
-                    scaleX: 1,
-                    scaleY: 1
+                console.log('📏 GROUP SCALING:', {
+                    id: this.fabricId,
+                    scaleX: this.scaleX,
+                    scaleY: this.scaleY,
+                    boundingRect: this.getBoundingRect()
                 });
                 
-                // Check for intersection
+                // For fabric.Group, DON'T normalize scale - let it keep scaleX/scaleY
+                // The children will scale automatically
+                
+                // Check for intersection using current scaled bounds
                 if (checkGroupIntersection(this, this)) {
-                    // Revert to last valid size
+                    console.log('   ❌ Intersection - reverting to last valid scale');
+                    // Revert to last valid scale
                     this.set({
-                        width: this.lastValidWidth,
-                        height: this.lastValidHeight,
-                        scaleX: 1,
-                        scaleY: 1
+                        scaleX: this.lastValidScaleX || 1,
+                        scaleY: this.lastValidScaleY || 1
                     });
+                    this.setCoords();
                 } else {
-                    // Store current size as valid
-                    this.lastValidWidth = this.width;
-                    this.lastValidHeight = this.height;
+                    console.log('   ✅ No intersection');
+                    // Store current scale as valid
+                    this.lastValidScaleX = this.scaleX;
+                    this.lastValidScaleY = this.scaleY;
                 }
-                // Children resize automatically! ✨
             });
             
             // When group movement/resize finishes, check if resources moved outside
             businessGroup.on('modified', async function() {
+                console.log('✅ GROUP MODIFIED (finished, loaded):', {
+                    id: this.fabricId,
+                    final: {
+                        width: this.width,
+                        height: this.height,
+                        scaleX: this.scaleX,
+                        scaleY: this.scaleY,
+                        left: this.left,
+                        top: this.top
+                    },
+                    boundingRect: this.getBoundingRect()
+                });
+                
+                // Update coordinates after modification to ensure selection boundary stays aligned
+                this.setCoords();
+                console.log('   Final setCoords() called in modified event');
+                console.log('   Final bounding rect:', this.getBoundingRect());
+                
                 await checkAndUpdateResourcesOutsideGroup(this);
                 updateGroupInDatabase(this);
             });
@@ -3918,16 +3870,19 @@ async function saveGroupToDatabase(groupRect) {
     if (!currentBoard) return;
     
     try {
+        // Get actual dimensions from bounding rect (accounts for scale)
+        const bounds = groupRect.getBoundingRect();
+        
         const response = await fetch(`/api/business-context/boards/${currentBoard.id}/groups`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: groupRect.groupName,
                 fabric_id: groupRect.fabricId,
-                position_x: groupRect.left,
-                position_y: groupRect.top,
-                width: groupRect.width,
-                height: groupRect.height,
+                position_x: bounds.left,
+                position_y: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
                 color: groupRect.groupColor || '#3B82F6'
             })
         });
@@ -3955,15 +3910,18 @@ async function updateGroupInDatabase(groupRect) {
     if (!currentBoard || !groupRect.dbId) return;
     
     try {
+        // Get actual dimensions from bounding rect (accounts for scale)
+        const bounds = groupRect.getBoundingRect();
+        
         const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 name: groupRect.groupName,
-                position_x: groupRect.left,
-                position_y: groupRect.top,
-                width: groupRect.width,
-                height: groupRect.height,
+                position_x: bounds.left,
+                position_y: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
                 color: groupRect.groupColor || '#3B82F6'
             })
         });
