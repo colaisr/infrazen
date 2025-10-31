@@ -205,8 +205,18 @@ class YandexService:
                 # - "Compute Cloud" = ALL VMs including K8s worker nodes
                 k8s_cluster_ids = {cluster['id'] for cluster in k8s_clusters}
                 
-                # Process ALL VMs (including K8s worker nodes)
+                # Process standalone VMs (skip K8s worker nodes - they're aggregated into cluster)
                 for instance in instances:
+                    # Check if this is a K8s worker node (already aggregated into cluster)
+                    labels = instance.get('labels', {})
+                    cluster_id = labels.get('managed-kubernetes-cluster-id')
+                    
+                    if cluster_id:
+                        # Skip K8s worker nodes - they're aggregated into the cluster resource
+                        logger.debug(f"Skipping K8s worker node {instance.get('name', instance.get('id'))} (part of cluster {cluster_id})")
+                        continue
+                    
+                    # Process standalone VM (not part of K8s cluster)
                     vm_resource = self._process_instance_resource(
                         instance,
                         folder_id,
@@ -216,20 +226,6 @@ class YandexService:
                         disks
                     )
                     if vm_resource:
-                        # Tag K8s worker VMs so users know they're part of a cluster
-                        labels = instance.get('labels', {})
-                        cluster_id = labels.get('managed-kubernetes-cluster-id')
-                        if cluster_id:
-                            vm_resource.add_tag('kubernetes_cluster_id', cluster_id)
-                            vm_resource.add_tag('is_kubernetes_node', 'true')
-                            # Find cluster name
-                            cluster_name = 'unknown'
-                            for cluster in k8s_clusters:
-                                if cluster['id'] == cluster_id:
-                                    cluster_name = cluster.get('name', cluster_id)
-                                    break
-                            vm_resource.add_tag('kubernetes_cluster_name', cluster_name)
-                        
                         synced_resources.append(vm_resource)
                         total_instances += 1
                         total_cost += vm_resource.daily_cost or 0.0
