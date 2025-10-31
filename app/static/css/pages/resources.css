@@ -135,10 +135,23 @@
     gap: 1rem;
 }
 
+.provider-cost-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
 .provider-daily-cost {
     font-size: 1.125rem;
     font-weight: 700;
     color: var(--primary-blue);
+    line-height: 1.2;
+}
+
+.provider-daily-cost-sub {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 400;
 }
 
 .provider-resource-count {
