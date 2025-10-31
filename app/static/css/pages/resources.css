@@ -495,6 +495,14 @@
     color: var(--primary-blue);
 }
 
+.usage-header span {
+    flex: 1;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .usage-chevron {
     margin-left: auto;
     transition: transform 0.2s ease;
