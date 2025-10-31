@@ -489,7 +489,7 @@
                             <!-- Kubernetes Cost Breakdown (Yandex Provider) - Collapsible -->
                             {% if resource.resource_type == 'kubernetes-cluster' and config.get('cost_breakdown') %}
                             {% set cost_bd = config.get('cost_breakdown') %}
-                            <div class="usage-section" style="margin: 1rem;">
+                            <div class="usage-section">
                                 <div class="usage-header" onclick="toggleCostBreakdown('{{ resource.id }}')">
                                     <i class="fa-solid fa-chart-pie"></i>
                                     <span>Разбивка стоимости кластера</span>
