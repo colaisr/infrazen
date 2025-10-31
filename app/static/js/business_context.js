@@ -507,19 +507,10 @@ function setupKeyboardShortcuts() {
                 );
                 
                 // Also include group children (labels and cost badges) in the selection
-                const groupFabricIds = allObjects
-                    .filter(obj => obj.objectType === 'group')
-                    .map(obj => obj.fabricId);
-                
-                const groupChildren = fabricCanvas.getObjects().filter(obj => 
-                    groupFabricIds.includes(obj.parentFabricId) &&
-                    (obj.objectType === 'groupText' || obj.objectType === 'groupCost')
-                );
-                
-                const completeSelection = [...allObjects, ...groupChildren];
-                
-                if (completeSelection.length > 0) {
-                    const selection = new fabric.ActiveSelection(completeSelection, {
+                // With fabric.Group, children are already part of the group object
+                // No need to manually add groupText and groupCost
+                if (allObjects.length > 0) {
+                    const selection = new fabric.ActiveSelection(allObjects, {
                         canvas: fabricCanvas
                     });
                     fabricCanvas.setActiveObject(selection);
@@ -769,42 +760,71 @@ function setupObjectEventHandlers() {
     const objects = fabricCanvas.getObjects();
     
     objects.forEach(function(obj) {
-        // Setup group event handlers
+        // Setup group event handlers (fabric.Group with children)
         if (obj.objectType === 'group') {
-            const groupText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupText');
-            const costBadge = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'groupCost');
+            // Store initial position for collision detection
+            if (!obj.lastValidLeft) {
+                obj.lastValidLeft = obj.left;
+                obj.lastValidTop = obj.top;
+                obj.lastValidWidth = obj.width;
+                obj.lastValidHeight = obj.height;
+            }
             
-            if (groupText && costBadge) {
-                // Setup moving event
-                obj.on('moving', function() {
-                    updateGroupChildren(obj, groupText, costBadge);
+            // Setup moving event
+            obj.on('moving', function() {
+                // Check for intersection with other groups
+                if (checkGroupIntersection(this, this)) {
+                    // Revert to last valid position
+                    this.set({
+                        left: this.lastValidLeft,
+                        top: this.lastValidTop
+                    });
+                } else {
+                    // Store current position as valid
+                    this.lastValidLeft = this.left;
+                    this.lastValidTop = this.top;
+                }
+                // Children move automatically with fabric.Group! ✨
+            });
+            
+            // Setup scaling event
+            obj.on('scaling', function() {
+                const newWidth = this.width * this.scaleX;
+                const newHeight = this.height * this.scaleY;
+                
+                this.set({
+                    width: newWidth,
+                    height: newHeight,
+                    scaleX: 1,
+                    scaleY: 1
                 });
                 
-                // Setup scaling event
-                obj.on('scaling', function() {
-                    const newWidth = obj.width * obj.scaleX;
-                    const newHeight = obj.height * obj.scaleY;
-                    
-                    obj.set({
-                        width: newWidth,
-                        height: newHeight,
+                // Check for intersection
+                if (checkGroupIntersection(this, this)) {
+                    // Revert to last valid size
+                    this.set({
+                        width: this.lastValidWidth,
+                        height: this.lastValidHeight,
                         scaleX: 1,
                         scaleY: 1
                     });
-                    
-                    updateGroupChildren(obj, groupText, costBadge);
-                });
-                
-                // Setup modified event
-                obj.on('modified', function() {
-                    updateGroupInDatabase(obj);
-                });
-                
-                // Setup double-click event
-                obj.on('mousedblclick', function() {
-                    editGroupName(obj, groupText);
-                });
-            }
+                } else {
+                    // Store current size as valid
+                    this.lastValidWidth = this.width;
+                    this.lastValidHeight = this.height;
+                }
+                // Children resize automatically with fabric.Group! ✨
+            });
+            
+            // Setup modified event
+            obj.on('modified', function() {
+                updateGroupInDatabase(this);
+            });
+            
+            // Setup double-click event
+            obj.on('mousedblclick', function() {
+                editGroupName(this);
+            });
         }
         
         // Setup resource event handlers
@@ -977,9 +997,9 @@ async function pasteGroup(originalGroup) {
         const data = await response.json();
         
         if (data.success) {
-            // Clone the group rectangle
-            originalGroup.clone(function(clonedRect) {
-                clonedRect.set({
+            // Clone the group (clones all children automatically!)
+            originalGroup.clone(function(clonedGroup) {
+                clonedGroup.set({
                     left: adjustedPosition.left,
                     top: adjustedPosition.top,
                     fabricId: newFabricId,
@@ -990,8 +1010,15 @@ async function pasteGroup(originalGroup) {
                     objectType: 'group'
                 });
                 
+                // Update the name in the cloned text child
+                const children = clonedGroup.getObjects();
+                const groupText = children[1];
+                if (groupText) {
+                    groupText.set('text', originalGroup.groupName + ' (Copy)');
+                }
+                
                 // Preserve toObject method
-                clonedRect.toObject = (function(toObject) {
+                clonedGroup.toObject = (function(toObject) {
                     return function() {
                         return fabric.util.object.extend(toObject.call(this), {
                             objectType: this.objectType,
@@ -1002,65 +1029,18 @@ async function pasteGroup(originalGroup) {
                             dbId: this.dbId
                         });
                     };
-                })(fabric.Rect.prototype.toObject);
+                })(fabric.Group.prototype.toObject);
                 
-                fabricCanvas.add(clonedRect);
-                
-                // Add group label
-                const groupText = new fabric.Text(clonedRect.groupName, {
-                    left: clonedRect.left + 10,
-                    top: clonedRect.top + 10,
-                    fontSize: 14,
-                    fontWeight: 'bold',
-                    fill: clonedRect.groupColor,
-                    selectable: false,
-                    evented: false,
-                    objectType: 'groupText',
-                    parentFabricId: newFabricId,
-                    toObject: (function(toObject) {
-                        return function() {
-                            return fabric.util.object.extend(toObject.call(this), {
-                                objectType: this.objectType,
-                                parentFabricId: this.parentFabricId
-                            });
-                        };
-                    })(fabric.Text.prototype.toObject)
-                });
-                
-                fabricCanvas.add(groupText);
-                
-                // Add cost badge
-                const costText = '0 ₽/мес';
-                const costBadge = new fabric.Text(costText, {
-                    left: clonedRect.left + clonedRect.width - 80,
-                    top: clonedRect.top + 10,
-                    fontSize: 13,
-                    fontWeight: '600',
-                    fill: '#10B981',
-                    selectable: false,
-                    evented: false,
-                    objectType: 'groupCost',
-                    parentFabricId: newFabricId,
-                    toObject: (function(toObject) {
-                        return function() {
-                            return fabric.util.object.extend(toObject.call(this), {
-                                objectType: this.objectType,
-                                parentFabricId: this.parentFabricId
-                            });
-                        };
-                    })(fabric.Text.prototype.toObject)
-                });
-                
-                fabricCanvas.add(costBadge);
+                fabricCanvas.add(clonedGroup);
                 
                 // Store initial position for collision detection
-                clonedRect.lastValidLeft = clonedRect.left;
-                clonedRect.lastValidTop = clonedRect.top;
-                clonedRect.lastValidWidth = clonedRect.width;
-                clonedRect.lastValidHeight = clonedRect.height;
+                clonedGroup.lastValidLeft = clonedGroup.left;
+                clonedGroup.lastValidTop = clonedGroup.top;
+                clonedGroup.lastValidWidth = clonedGroup.width;
+                clonedGroup.lastValidHeight = clonedGroup.height;
                 
-                // Setup event handlers to keep label/cost in sync
-                clonedRect.on('moving', function() {
+                // Setup event handlers
+                clonedGroup.on('moving', function() {
                     // Check for intersection with other groups
                     if (checkGroupIntersection(this, this)) {
                         // Revert to last valid position
@@ -1073,17 +1053,14 @@ async function pasteGroup(originalGroup) {
                         this.lastValidLeft = this.left;
                         this.lastValidTop = this.top;
                     }
-                    updateGroupChildren(clonedRect, groupText, costBadge);
+                    // Children move automatically! ✨
                 });
                 
-                clonedRect.on('scaling', function() {
-                    const newWidth = clonedRect.width * clonedRect.scaleX;
-                    const newHeight = clonedRect.height * clonedRect.scaleY;
+                clonedGroup.on('scaling', function() {
+                    const newWidth = this.width * this.scaleX;
+                    const newHeight = this.height * this.scaleY;
                     
                     // Temporarily apply new size to check for intersection
-                    const oldWidth = this.width;
-                    const oldHeight = this.height;
-                    
                     this.set({
                         width: newWidth,
                         height: newHeight,
@@ -1105,19 +1082,18 @@ async function pasteGroup(originalGroup) {
                         this.lastValidWidth = this.width;
                         this.lastValidHeight = this.height;
                     }
-                    
-                    updateGroupChildren(clonedRect, groupText, costBadge);
+                    // Children resize automatically! ✨
                 });
                 
-                clonedRect.on('modified', function() {
-                    updateGroupInDatabase(clonedRect);
+                clonedGroup.on('modified', function() {
+                    updateGroupInDatabase(this);
                 });
                 
-                clonedRect.on('mousedblclick', function() {
-                    editGroupName(clonedRect, groupText);
+                clonedGroup.on('mousedblclick', function() {
+                    editGroupName(this);
                 });
                 
-                fabricCanvas.setActiveObject(clonedRect);
+                fabricCanvas.setActiveObject(clonedGroup);
                 fabricCanvas.renderAll();
                 
                 // Re-enable automatic saves
@@ -1696,10 +1672,7 @@ function setupContextMenu() {
             
             switch(action) {
                 case 'rename':
-                    const groupText = fabricCanvas.getObjects().find(obj => 
-                        obj.objectType === 'groupText' && obj.parentFabricId === contextTarget.fabricId
-                    );
-                    editGroupName(contextTarget, groupText);
+                    editGroupName(contextTarget);
                     break;
                     
                 case 'change-color':
@@ -2567,15 +2540,14 @@ async function updateGroupCost(groupDbId) {
                 if (obj.objectType === 'group' && obj.dbId === groupDbId) {
                     obj.calculatedCost = calculatedCost;
                     
-                    // Update cost badge text
-                    const costBadgeText = objects.find(o => 
-                        o.objectType === 'groupCost' && o.parentFabricId === obj.fabricId
-                    );
+                    // Update cost badge text (children[2] in the fabric.Group)
+                    const children = obj.getObjects();
+                    const costBadge = children[2]; // [0]=rect, [1]=text, [2]=cost
                     
-                    if (costBadgeText) {
+                    if (costBadge) {
                         const monthlyCost = calculatedCost * 30;
                         const costText = monthlyCost > 0 ? `${monthlyCost.toFixed(2)} ₽/мес` : '0 ₽/мес';
-                        costBadgeText.set('text', costText);
+                        costBadge.set('text', costText);
                     }
                     
                     fabricCanvas.renderAll();
@@ -3068,22 +3040,48 @@ async function createGroupOnCanvas(x, y) {
     // Find a non-overlapping position
     const adjustedPosition = findNonOverlappingPosition(initialLeft, initialTop, groupWidth, groupHeight);
     
-    // Create group rectangle
+    // Create group rectangle (background)
     const groupRect = new fabric.Rect({
-        left: adjustedPosition.left,
-        top: adjustedPosition.top,
+        left: 0,
+        top: 0,
         width: groupWidth,
         height: groupHeight,
         fill: 'rgba(59, 130, 246, 0.05)',
         stroke: '#3B82F6',
         strokeWidth: 2,
         rx: 4,
-        ry: 4,
+        ry: 4
+    });
+    
+    // Create group name text (positioned relative to rectangle)
+    const groupText = new fabric.Text('Новая группа', {
+        left: 10,
+        top: 10,
+        fontSize: 16,
+        fontWeight: 'bold',
+        fill: '#1F2937'
+    });
+    
+    // Create cost badge text (positioned relative to rectangle)
+    const costBadge = new fabric.Text('0 ₽/мес', {
+        left: groupWidth - 80,
+        top: 10,
+        fontSize: 14,
+        fontWeight: '600',
+        fill: '#10B981'
+    });
+    
+    // Create Fabric.js Group (bundles all 3 objects together)
+    const businessGroup = new fabric.Group([groupRect, groupText, costBadge], {
+        left: adjustedPosition.left,
+        top: adjustedPosition.top,
         selectable: true,
         hasControls: true,
         hasBorders: true,
         lockRotation: true,
         hasRotate: false,
+        subTargetCheck: true, // Allow clicking on children for double-click edit
+        // Custom properties for our business logic
         objectType: 'group',
         fabricId: fabricId,
         groupName: 'Новая группа',
@@ -3101,69 +3099,23 @@ async function createGroupOnCanvas(x, y) {
                     dbId: this.dbId
                 });
             };
-        })(fabric.Rect.prototype.toObject)
+        })(fabric.Group.prototype.toObject)
     });
     
-    // Create group name text
-    const groupText = new fabric.Text('Новая группа', {
-        left: posX - 140,
-        top: posY - 90,
-        fontSize: 16,
-        fontWeight: 'bold',
-        fill: '#1F2937',
-        selectable: false,
-        evented: false,
-        objectType: 'groupText',
-        parentFabricId: fabricId,
-        // Preserve custom properties in JSON
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentFabricId: this.parentFabricId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Create cost badge text
-    const costBadge = new fabric.Text('0 ₽/мес', {
-        left: posX + 100,
-        top: posY - 90,
-        fontSize: 14,
-        fontWeight: '600',
-        fill: '#10B981',
-        selectable: false,
-        evented: false,
-        objectType: 'groupCost',
-        parentFabricId: fabricId,
-        // Preserve custom properties in JSON
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentFabricId: this.parentFabricId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Add objects to canvas
-    fabricCanvas.add(groupRect);
-    fabricCanvas.add(groupText);
-    fabricCanvas.add(costBadge);
+    // Add group to canvas (all 3 objects as one unit!)
+    fabricCanvas.add(businessGroup);
     
     // Hide rotation control handle
-    groupRect.setControlVisible('mtr', false);
+    businessGroup.setControlVisible('mtr', false);
     
     // Store initial position for collision detection
-    groupRect.lastValidLeft = groupRect.left;
-    groupRect.lastValidTop = groupRect.top;
-    groupRect.lastValidWidth = groupRect.width;
-    groupRect.lastValidHeight = groupRect.height;
+    businessGroup.lastValidLeft = businessGroup.left;
+    businessGroup.lastValidTop = businessGroup.top;
+    businessGroup.lastValidWidth = businessGroup.width;
+    businessGroup.lastValidHeight = businessGroup.height;
     
-    // Make text and badge move with the group
-    groupRect.on('moving', function() {
+    // Handle moving with collision detection
+    businessGroup.on('moving', function() {
         console.log('🔵 Group moving event fired', {
             fabricId: this.fabricId,
             currentPos: { left: this.left, top: this.top },
@@ -3185,19 +3137,18 @@ async function createGroupOnCanvas(x, y) {
             this.lastValidLeft = this.left;
             this.lastValidTop = this.top;
         }
-        
-        console.log('   Updating children. Text at:', { left: groupText.left, top: groupText.top });
-        updateGroupChildren(groupRect, groupText, costBadge);
-        console.log('   After update. Text at:', { left: groupText.left, top: groupText.top });
+        // No need to update children - they move automatically with the group! ✨
     });
     
-    groupRect.on('scaling', function() {
-        const newWidth = groupRect.width * groupRect.scaleX;
-        const newHeight = groupRect.height * groupRect.scaleY;
+    businessGroup.on('scaling', function() {
+        const newWidth = this.width * this.scaleX;
+        const newHeight = this.height * this.scaleY;
         
         // Temporarily apply new size to check for intersection
         const oldWidth = this.width;
         const oldHeight = this.height;
+        const oldScaleX = this.scaleX;
+        const oldScaleY = this.scaleY;
         
         this.set({
             width: newWidth,
@@ -3220,23 +3171,22 @@ async function createGroupOnCanvas(x, y) {
             this.lastValidWidth = this.width;
             this.lastValidHeight = this.height;
         }
-        
-        updateGroupChildren(groupRect, groupText, costBadge);
+        // Children resize automatically with the group! ✨
     });
     
-    groupRect.on('modified', function() {
-        updateGroupInDatabase(groupRect);
+    businessGroup.on('modified', function() {
+        updateGroupInDatabase(this);
     });
     
     // Double-click to edit name
-    groupRect.on('mousedblclick', function() {
-        editGroupName(groupRect, groupText);
+    businessGroup.on('mousedblclick', function() {
+        editGroupName(this);
     });
     
     fabricCanvas.renderAll();
     
     // Save group to database
-    await saveGroupToDatabase(groupRect);
+    await saveGroupToDatabase(businessGroup);
     
     // Re-enable automatic saves
     isCreatingObjects = false;
@@ -3373,168 +3323,147 @@ function loadGroupsOnCanvas(groups) {
     
     groups.forEach(group => {
         try {
-            // Create group rectangle
+            // Create group rectangle (background)
             const groupRect = new fabric.Rect({
-            left: group.position.x,
-            top: group.position.y,
-            width: group.size.width,
-            height: group.size.height,
-            fill: hexToRgba(group.color, 0.05),
-            stroke: group.color,
-            strokeWidth: 2,
-            rx: 4,
-            ry: 4,
-            selectable: true,
-            hasControls: true,
-            hasBorders: true,
-            lockRotation: true,
-            hasRotate: false,
-            objectType: 'group',
-            fabricId: group.fabric_id,
-            groupName: group.name,
-            groupColor: group.color,
-            calculatedCost: group.calculated_cost || 0,
-            dbId: group.id,
-            // Make sure Fabric.js preserves our custom properties
-            toObject: (function(toObject) {
-                return function() {
-                    return fabric.util.object.extend(toObject.call(this), {
-                        objectType: this.objectType,
-                        fabricId: this.fabricId,
-                        groupName: this.groupName,
-                        groupColor: this.groupColor,
-                        calculatedCost: this.calculatedCost,
-                        dbId: this.dbId
-                    });
-                };
-            })(fabric.Rect.prototype.toObject)
-        });
-        
-        // Create group name text
-        const groupText = new fabric.Text(group.name, {
-            left: group.position.x + 10,
-            top: group.position.y + 10,
-            fontSize: 16,
-            fontWeight: 'bold',
-            fill: '#1F2937',
-            selectable: false,
-            evented: false,
-            objectType: 'groupText',
-            parentFabricId: group.fabric_id,
-            // Preserve custom properties in JSON
-            toObject: (function(toObject) {
-                return function() {
-                    return fabric.util.object.extend(toObject.call(this), {
-                        objectType: this.objectType,
-                        parentFabricId: this.parentFabricId
-                    });
-                };
-            })(fabric.Text.prototype.toObject)
-        });
-        
-        // Create cost badge text
-        const monthlyCost = (group.calculated_cost || 0) * 30;
-        const costText = monthlyCost > 0 ? `${monthlyCost.toFixed(2)} ₽/мес` : '0 ₽/мес';
-        const costBadge = new fabric.Text(costText, {
-            left: group.position.x + group.size.width - 80,
-            top: group.position.y + 10,
-            fontSize: 14,
-            fontWeight: '600',
-            fill: '#10B981',
-            selectable: false,
-            evented: false,
-            objectType: 'groupCost',
-            parentFabricId: group.fabric_id,
-            // Preserve custom properties in JSON
-            toObject: (function(toObject) {
-                return function() {
-                    return fabric.util.object.extend(toObject.call(this), {
-                        objectType: this.objectType,
-                        parentFabricId: this.parentFabricId
-                    });
-                };
-            })(fabric.Text.prototype.toObject)
-        });
-        
-        // Add to canvas
-        fabricCanvas.add(groupRect);
-        fabricCanvas.add(groupText);
-        fabricCanvas.add(costBadge);
-        
-        // Hide rotation control handle
-        groupRect.setControlVisible('mtr', false);
-        
-        // Store initial position for collision detection
-        groupRect.lastValidLeft = groupRect.left;
-        groupRect.lastValidTop = groupRect.top;
-        groupRect.lastValidWidth = groupRect.width;
-        groupRect.lastValidHeight = groupRect.height;
-        
-        // Setup event handlers
-        groupRect.on('moving', function() {
-            console.log('🔵 [LOADED] Group moving event fired', {
-                fabricId: this.fabricId,
-                currentPos: { left: this.left, top: this.top },
-                lastValidPos: { left: this.lastValidLeft, top: this.lastValidTop }
+                left: 0,
+                top: 0,
+                width: group.size.width,
+                height: group.size.height,
+                fill: hexToRgba(group.color, 0.05),
+                stroke: group.color,
+                strokeWidth: 2,
+                rx: 4,
+                ry: 4
             });
             
-            // Check for intersection with other groups
-            if (checkGroupIntersection(this, this)) {
-                console.log('⚠️ [LOADED] Collision detected! Reverting');
-                // Revert to last valid position
-                this.set({
-                    left: this.lastValidLeft,
-                    top: this.lastValidTop
+            // Create group name text (positioned relative to rectangle)
+            const groupText = new fabric.Text(group.name, {
+                left: 10,
+                top: 10,
+                fontSize: 16,
+                fontWeight: 'bold',
+                fill: '#1F2937'
+            });
+            
+            // Create cost badge text (positioned relative to rectangle)
+            const monthlyCost = (group.calculated_cost || 0) * 30;
+            const costText = monthlyCost > 0 ? `${monthlyCost.toFixed(2)} ₽/мес` : '0 ₽/мес';
+            const costBadge = new fabric.Text(costText, {
+                left: group.size.width - 80,
+                top: 10,
+                fontSize: 14,
+                fontWeight: '600',
+                fill: '#10B981'
+            });
+            
+            // Create Fabric.js Group (bundles all 3 objects together)
+            const businessGroup = new fabric.Group([groupRect, groupText, costBadge], {
+                left: group.position.x,
+                top: group.position.y,
+                selectable: true,
+                hasControls: true,
+                hasBorders: true,
+                lockRotation: true,
+                hasRotate: false,
+                subTargetCheck: true,
+                // Custom properties for our business logic
+                objectType: 'group',
+                fabricId: group.fabric_id,
+                groupName: group.name,
+                groupColor: group.color,
+                calculatedCost: group.calculated_cost || 0,
+                dbId: group.id,
+                // Make sure Fabric.js preserves our custom properties
+                toObject: (function(toObject) {
+                    return function() {
+                        return fabric.util.object.extend(toObject.call(this), {
+                            objectType: this.objectType,
+                            fabricId: this.fabricId,
+                            groupName: this.groupName,
+                            groupColor: this.groupColor,
+                            calculatedCost: this.calculatedCost,
+                            dbId: this.dbId
+                        });
+                    };
+                })(fabric.Group.prototype.toObject)
+            });
+            
+            // Add to canvas
+            fabricCanvas.add(businessGroup);
+            
+            // Hide rotation control handle
+            businessGroup.setControlVisible('mtr', false);
+            
+            // Store initial position for collision detection
+            businessGroup.lastValidLeft = businessGroup.left;
+            businessGroup.lastValidTop = businessGroup.top;
+            businessGroup.lastValidWidth = businessGroup.width;
+            businessGroup.lastValidHeight = businessGroup.height;
+            
+            // Setup event handlers
+            businessGroup.on('moving', function() {
+                console.log('🔵 [LOADED] Group moving event fired', {
+                    fabricId: this.fabricId,
+                    currentPos: { left: this.left, top: this.top },
+                    lastValidPos: { left: this.lastValidLeft, top: this.lastValidTop }
                 });
-            } else {
-                console.log('✅ [LOADED] No collision');
-                // Store current position as valid
-                this.lastValidLeft = this.left;
-                this.lastValidTop = this.top;
-            }
-            updateGroupChildren(groupRect, groupText, costBadge);
-        });
-        
-        groupRect.on('scaling', function() {
-            const newWidth = groupRect.width * groupRect.scaleX;
-            const newHeight = groupRect.height * groupRect.scaleY;
-            
-            // Temporarily apply new size to check for intersection
-            const oldWidth = this.width;
-            const oldHeight = this.height;
-            
-            this.set({
-                width: newWidth,
-                height: newHeight,
-                scaleX: 1,
-                scaleY: 1
+                
+                // Check for intersection with other groups
+                if (checkGroupIntersection(this, this)) {
+                    console.log('⚠️ [LOADED] Collision detected! Reverting');
+                    // Revert to last valid position
+                    this.set({
+                        left: this.lastValidLeft,
+                        top: this.lastValidTop
+                    });
+                } else {
+                    console.log('✅ [LOADED] No collision');
+                    // Store current position as valid
+                    this.lastValidLeft = this.left;
+                    this.lastValidTop = this.top;
+                }
+                // No need to update children - they move automatically! ✨
             });
             
-            // Check for intersection
-            if (checkGroupIntersection(this, this)) {
-                // Revert to last valid size
+            businessGroup.on('scaling', function() {
+                const newWidth = this.width * this.scaleX;
+                const newHeight = this.height * this.scaleY;
+                
+                // Temporarily apply new size to check for intersection
+                const oldWidth = this.width;
+                const oldHeight = this.height;
+                
                 this.set({
-                    width: this.lastValidWidth,
-                    height: this.lastValidHeight,
+                    width: newWidth,
+                    height: newHeight,
                     scaleX: 1,
                     scaleY: 1
                 });
-            } else {
-                // Store current size as valid
-                this.lastValidWidth = this.width;
-                this.lastValidHeight = this.height;
-            }
+                
+                // Check for intersection
+                if (checkGroupIntersection(this, this)) {
+                    // Revert to last valid size
+                    this.set({
+                        width: this.lastValidWidth,
+                        height: this.lastValidHeight,
+                        scaleX: 1,
+                        scaleY: 1
+                    });
+                } else {
+                    // Store current size as valid
+                    this.lastValidWidth = this.width;
+                    this.lastValidHeight = this.height;
+                }
+                // Children resize automatically! ✨
+            });
             
-            updateGroupChildren(groupRect, groupText, costBadge);
-        });
-        
-        groupRect.on('modified', function() {
-            updateGroupInDatabase(groupRect);
-        });
-        
-        groupRect.on('mousedblclick', function() {
-            editGroupName(groupRect, groupText);
-        });
+            businessGroup.on('modified', function() {
+                updateGroupInDatabase(this);
+            });
+            
+            businessGroup.on('mousedblclick', function() {
+                editGroupName(this);
+            });
         } catch (error) {
             console.error('Error loading group:', error);
         }
@@ -3588,46 +3517,26 @@ function loadResourcesOnCanvas(boardResources) {
 }
 
 /**
- * Update group children (text and cost badge) position
- */
-function updateGroupChildren(groupRect, groupText, costBadge) {
-    console.log('      📐 updateGroupChildren called', {
-        groupPos: { left: groupRect.left, top: groupRect.top },
-        textBefore: { left: groupText.left, top: groupText.top },
-        badgeBefore: { left: costBadge.left, top: costBadge.top }
-    });
-    
-    groupText.set({
-        left: groupRect.left + 10,
-        top: groupRect.top + 10
-    });
-    costBadge.set({
-        left: groupRect.left + groupRect.width - 80,
-        top: groupRect.top + 10
-    });
-    
-    console.log('      📐 After setting:', {
-        textAfter: { left: groupText.left, top: groupText.top },
-        badgeAfter: { left: costBadge.left, top: costBadge.top }
-    });
-    
-    fabricCanvas.renderAll();
-}
-
-/**
  * Edit group name
  */
-function editGroupName(groupRect, groupText) {
-    const currentName = groupRect.groupName || 'Новая группа';
+function editGroupName(businessGroup) {
+    const currentName = businessGroup.groupName || 'Новая группа';
     const newName = prompt('Введите название группы:', currentName);
     
     if (newName && newName.trim()) {
-        groupRect.groupName = newName.trim();
-        groupText.set('text', newName.trim());
+        // Update group property
+        businessGroup.groupName = newName.trim();
+        
+        // Update the text child (children[1] is the name text)
+        const groupText = businessGroup.getObjects()[1];
+        if (groupText) {
+            groupText.set('text', newName.trim());
+        }
+        
         fabricCanvas.renderAll();
         
         // Update in database
-        updateGroupInDatabase(groupRect);
+        updateGroupInDatabase(businessGroup);
         scheduleAutoSave();
     }
 }
@@ -3635,7 +3544,7 @@ function editGroupName(groupRect, groupText) {
 /**
  * Change group color
  */
-function changeGroupColor(groupRect) {
+function changeGroupColor(businessGroup) {
     const colors = [
         { name: 'Синий', value: '#3B82F6' },
         { name: 'Зелёный', value: '#10B981' },
@@ -3652,62 +3561,30 @@ function changeGroupColor(groupRect) {
     const index = parseInt(choice) - 1;
     if (index >= 0 && index < colors.length) {
         const newColor = colors[index].value;
-        groupRect.groupColor = newColor;
-        groupRect.set({
-            stroke: newColor,
-            fill: hexToRgba(newColor, 0.05)
-        });
+        businessGroup.groupColor = newColor;
+        
+        // Update the background rectangle child (children[0])
+        const children = businessGroup.getObjects();
+        const groupRect = children[0];
+        if (groupRect) {
+            groupRect.set({
+                stroke: newColor,
+                fill: hexToRgba(newColor, 0.05)
+            });
+        }
+        
         fabricCanvas.renderAll();
         
         // Update in database
-        updateGroupInDatabase(groupRect);
+        updateGroupInDatabase(businessGroup);
         scheduleAutoSave();
     }
 }
 
 /**
- * Update group children by fabric ID (used when group is part of ActiveSelection)
+ * NOTE: updateGroupChildren() and updateGroupChildrenByFabricId() are NO LONGER NEEDED!
+ * fabric.Group automatically keeps children in sync - this was causing ghost objects!
  */
-function updateGroupChildrenByFabricId(fabricId) {
-    if (!fabricCanvas || !fabricId) return;
-    
-    const objects = fabricCanvas.getObjects();
-    const groupRect = objects.find(obj => obj.fabricId === fabricId && obj.objectType === 'group');
-    const groupText = objects.find(obj => obj.parentFabricId === fabricId && obj.objectType === 'groupText');
-    const costBadge = objects.find(obj => obj.parentFabricId === fabricId && obj.objectType === 'groupCost');
-    
-    if (groupRect && groupText && costBadge) {
-        updateGroupChildren(groupRect, groupText, costBadge);
-    }
-}
-
-/**
- * Update group in database when modified
- */
-async function updateGroupInDatabase(groupRect) {
-    if (!currentBoard || !groupRect.dbId) return;
-    
-    try {
-        const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                position_x: groupRect.left,
-                position_y: groupRect.top,
-                width: groupRect.width,
-                height: groupRect.height,
-                color: groupRect.groupColor || '#3B82F6'
-            })
-        });
-        
-        const data = await response.json();
-        if (!data.success) {
-            console.error('Failed to update group in database:', data.error);
-        }
-    } catch (error) {
-        console.error('Error updating group in database:', error);
-    }
-}
 
 /**
  * Save group to database
@@ -3776,24 +3653,19 @@ async function updateGroupInDatabase(groupRect) {
 /**
  * Delete group
  */
-async function deleteGroup(groupRect) {
-    if (!groupRect.dbId) return;
+async function deleteGroup(businessGroup) {
+    if (!businessGroup.dbId) return;
     
     try {
-        const response = await fetch(`/api/business-context/groups/${groupRect.dbId}`, {
+        const response = await fetch(`/api/business-context/groups/${businessGroup.dbId}`, {
             method: 'DELETE'
         });
         
         const data = await response.json();
         
         if (data.success) {
-            // Remove from canvas
-            const objects = fabricCanvas.getObjects();
-            objects.forEach(obj => {
-                if (obj.fabricId === groupRect.fabricId || obj.parentFabricId === groupRect.fabricId) {
-                    fabricCanvas.remove(obj);
-                }
-            });
+            // Remove from canvas (removes the entire group with all children automatically!)
+            fabricCanvas.remove(businessGroup);
             fabricCanvas.renderAll();
             scheduleAutoSave();
         } else {
