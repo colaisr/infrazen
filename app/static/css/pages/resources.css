@@ -444,30 +444,28 @@
 
 .spec-content {
     display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+    align-items: baseline;
+    gap: 0.4rem;
     min-width: 0;
     flex: 1;
 }
 
 .spec-value {
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #1F2937;
-    line-height: 1.2;
+    line-height: 1;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .spec-label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #6B7280;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.025em;
     line-height: 1;
-    font-weight: 500;
+    white-space: nowrap;
 }
 
 /* Usage Data Section */
