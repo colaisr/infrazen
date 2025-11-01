@@ -394,16 +394,16 @@ def update_board_resource(board_resource_id):
     
     # Update group costs if group changed
     try:
-    if old_group_id != board_resource.group_id:
-        if old_group_id:
-            old_group = BoardGroup.query.get(old_group_id)
-            if old_group:
-                old_group.calculate_cost()
-        
-        if board_resource.group_id:
-            new_group = BoardGroup.query.get(board_resource.group_id)
-            if new_group:
-                new_group.calculate_cost()
+        if old_group_id != board_resource.group_id:
+            if old_group_id:
+                old_group = BoardGroup.query.get(old_group_id)
+                if old_group:
+                    old_group.calculate_cost()
+            
+            if board_resource.group_id:
+                new_group = BoardGroup.query.get(board_resource.group_id)
+                if new_group:
+                    new_group.calculate_cost()
     except Exception as e:
         print(f"❌ Error calculating group cost: {e}")
         import traceback
@@ -694,16 +694,16 @@ def get_group_cost(group_id):
     
     try:
         print(f"🔍 Calling calculate_cost() for group {group_id}")
-    cost = group.calculate_cost()
+        cost = group.calculate_cost()
         print(f"✅ Cost calculated: {cost}")
         
         resource_count = group.resources.count()
         print(f"✅ Resource count: {resource_count}")
-    
-    return jsonify({
-        'success': True,
-        'group_id': group_id,
-        'calculated_cost': cost,
+        
+        return jsonify({
+            'success': True,
+            'group_id': group_id,
+            'calculated_cost': cost,
             'resource_count': resource_count
         })
     except Exception as e:
