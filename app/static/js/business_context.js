@@ -64,7 +64,9 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             radius: 10,
             fill: '#3B82F6',
             originX: 'center',
-            originY: 'center'
+            originY: 'center',
+            evented: true,
+            hoverCursor: 'pointer'
         }));
         
         // 5. Info icon text (white 'i' on blue)
@@ -75,7 +77,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fontWeight: 'bold',
             fill: '#FFFFFF',
             originX: 'center',
-            originY: 'center'
+            originY: 'center',
+            evented: false
         }));
         
         // 6. Notes icon circle (solid green badge when has notes)
@@ -86,7 +89,9 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             radius: 10,
             fill: hasNotes ? '#10B981' : '#9CA3AF',
             originX: 'center',
-            originY: 'center'
+            originY: 'center',
+            evented: true,
+            hoverCursor: 'pointer'
         }));
         
         // 7. Notes icon text (white 'n' on colored background)
@@ -97,7 +102,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fontWeight: 'bold',
             fill: '#FFFFFF',
             originX: 'center',
-            originY: 'center'
+            originY: 'center',
+            evented: false
         }));
         
         // 8. Clone badge circle (initially hidden, solid purple badge)
