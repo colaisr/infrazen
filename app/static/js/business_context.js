@@ -57,73 +57,73 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             textAlign: 'center'
         }));
         
-        // 4. Info icon circle
+        // 4. Info icon circle (solid blue badge)
         elements.push(new fabric.Circle({
-            left: 12,
-            top: 4,
-            radius: 8,
-            fill: '#FFFFFF',
-            stroke: '#3B82F6',
-            strokeWidth: 1,
-            originX: 'center',
-            originY: 'center'
-        }));
-        
-        // 5. Info icon text
-        elements.push(new fabric.Text('i', {
-            left: 12,
-            top: 4,
-            fontSize: 10,
-            fontWeight: 'bold',
+            left: 10,
+            top: 0,
+            radius: 10,
             fill: '#3B82F6',
+            stroke: '#FFFFFF',
+            strokeWidth: 2,
             originX: 'center',
             originY: 'center'
         }));
         
-        // 6. Notes icon circle
+        // 5. Info icon text (white 'i' on blue)
+        elements.push(new fabric.Text('i', {
+            left: 10,
+            top: 0,
+            fontSize: 12,
+            fontWeight: 'bold',
+            fill: '#FFFFFF',
+            originX: 'center',
+            originY: 'center'
+        }));
+        
+        // 6. Notes icon circle (solid green badge when has notes)
         const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
         elements.push(new fabric.Circle({
-            left: cardWidth - 12,
-            top: 4,
-            radius: 8,
-            fill: hasNotes ? '#10B981' : '#FFFFFF',
-            stroke: '#10B981',
-            strokeWidth: 1,
+            left: cardWidth - 10,
+            top: 0,
+            radius: 10,
+            fill: hasNotes ? '#10B981' : '#9CA3AF',
+            stroke: '#FFFFFF',
+            strokeWidth: 2,
             originX: 'center',
             originY: 'center'
         }));
         
-        // 7. Notes icon text
+        // 7. Notes icon text (white 'n' on colored background)
         elements.push(new fabric.Text('n', {
-            left: cardWidth - 12,
-            top: 4,
-            fontSize: 10,
+            left: cardWidth - 10,
+            top: 0,
+            fontSize: 12,
             fontWeight: 'bold',
-            fill: hasNotes ? '#FFFFFF' : '#10B981',
+            fill: '#FFFFFF',
             originX: 'center',
             originY: 'center'
         }));
         
-        // 8. Clone badge circle (initially hidden)
+        // 8. Clone badge circle (initially hidden, solid purple badge)
         elements.push(new fabric.Circle({
-            left: cardWidth - 12,
-            top: cardHeight - 4,
-            radius: 8,
-            fill: '#FFFFFF',
-            stroke: '#8B5CF6',
-            strokeWidth: 1,
+            left: cardWidth - 10,
+            top: cardHeight,
+            radius: 10,
+            fill: '#8B5CF6',
+            stroke: '#FFFFFF',
+            strokeWidth: 2,
             originX: 'center',
             originY: 'center',
             visible: false
         }));
         
-        // 9. Clone badge text (initially hidden)
+        // 9. Clone badge text (initially hidden, white 'c' on purple)
         elements.push(new fabric.Text('c', {
-            left: cardWidth - 12,
-            top: cardHeight - 4,
-            fontSize: 10,
+            left: cardWidth - 10,
+            top: cardHeight,
+            fontSize: 12,
             fontWeight: 'bold',
-            fill: '#8B5CF6',
+            fill: '#FFFFFF',
             originX: 'center',
             originY: 'center',
             visible: false
@@ -3236,11 +3236,13 @@ async function saveResourceNotes() {
                 const notesIconText = children[6];  // notesIconText
                 
                 if (notesIcon && notesIconText) {
+                    // Update to solid colored badge (green when has notes, gray when empty)
                     notesIcon.set({
-                        fill: hasNotes ? '#10B981' : '#FFFFFF'
+                        fill: hasNotes ? '#10B981' : '#9CA3AF'
                     });
+                    // Icon text is always white on colored background
                     notesIconText.set({
-                        fill: hasNotes ? '#FFFFFF' : '#10B981'
+                        fill: '#FFFFFF'
                     });
                 }
             });
