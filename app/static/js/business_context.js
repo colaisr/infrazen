@@ -1659,7 +1659,20 @@ function initializeCanvas() {
         selection: true,
         preserveObjectStacking: true,
         width: initialWidth,
-        height: initialHeight
+        height: initialHeight,
+        // Make selection more visible
+        selectionBorderColor: '#F59E0B',
+        selectionLineWidth: 3,
+        selectionColor: 'rgba(245, 158, 11, 0.1)'
+    });
+    
+    // Set global selection styling for all objects
+    fabric.Object.prototype.set({
+        borderColor: '#F59E0B',
+        cornerColor: '#F59E0B',
+        cornerSize: 10,
+        transparentCorners: false,
+        borderScaleFactor: 3
     });
     
     // Load canvas state if exists (for free objects only)
@@ -3507,8 +3520,8 @@ async function createGroupOnCanvas(x, y) {
         top: 0,
         width: groupWidth,
         height: groupHeight,
-        fill: 'rgba(59, 130, 246, 0.05)',
-        stroke: '#3B82F6',
+        fill: 'rgba(146, 64, 14, 0.05)',
+        stroke: '#92400E',
         strokeWidth: 2,
         rx: 4,
         ry: 4
@@ -3546,7 +3559,7 @@ async function createGroupOnCanvas(x, y) {
         objectType: 'group',
         fabricId: fabricId,
         groupName: 'Новая группа',
-        groupColor: '#3B82F6',
+        groupColor: '#92400E',
         calculatedCost: 0,
         // Make sure Fabric.js preserves our custom properties
         toObject: (function(toObject) {
@@ -4060,12 +4073,13 @@ function editGroupName(businessGroup) {
  */
 function changeGroupColor(businessGroup) {
     const colors = [
-        { name: 'Синий', value: '#3B82F6' },
+        { name: 'Коричневый', value: '#92400E' },
         { name: 'Зелёный', value: '#10B981' },
         { name: 'Фиолетовый', value: '#8B5CF6' },
         { name: 'Оранжевый', value: '#F59E0B' },
         { name: 'Красный', value: '#EF4444' },
         { name: 'Розовый', value: '#EC4899' },
+        { name: 'Синий', value: '#3B82F6' },
         { name: 'Серый', value: '#6B7280' }
     ];
     

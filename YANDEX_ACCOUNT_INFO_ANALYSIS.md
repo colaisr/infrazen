@@ -492,3 +492,4 @@ https://console.cloud.yandex.ru/folders/{folder_id}/billing
 
 The lack of billing API is **not a blocker** - we have excellent infrastructure data and can calculate all financial metrics from synced resources.
 
+
