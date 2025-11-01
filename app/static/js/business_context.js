@@ -3071,6 +3071,10 @@ function filterResources() {
  * Show resource info modal
  */
 async function showResourceInfo(resourceId) {
+    // Hide any visible tooltips
+    hideResourceTooltip();
+    hideNotesTooltip();
+    
     const modal = document.getElementById('resourceInfoModal');
     const content = document.getElementById('resourceInfoContent');
     
@@ -3331,6 +3335,10 @@ function hideNotesTooltip() {
  * Show resource notes modal
  */
 async function showResourceNotes(resourceId) {
+    // Hide any visible tooltips
+    hideResourceTooltip();
+    hideNotesTooltip();
+    
     const modal = document.getElementById('resourceNotesModal');
     const header = document.getElementById('resourceNotesHeader');
     const textarea = document.getElementById('resourceNotesText');
