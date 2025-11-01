@@ -609,6 +609,7 @@ function showPropertiesPanel(obj) {
     const textProperties = document.getElementById('textProperties');
     const rectangleProperties = document.getElementById('rectangleProperties');
     const groupProperties = document.getElementById('groupProperties');
+    const layerButtons = document.getElementById('bringToFrontBtn')?.parentElement.parentElement;
     
     // Hide all property sections
     textProperties.style.display = 'none';
@@ -625,6 +626,9 @@ function showPropertiesPanel(obj) {
         document.getElementById('boldBtn').classList.toggle('active', obj.fontWeight === 'bold');
         document.getElementById('italicBtn').classList.toggle('active', obj.fontStyle === 'italic');
         document.getElementById('underlineBtn').classList.toggle('active', obj.underline === true);
+        
+        // Show layer buttons for free objects
+        if (layerButtons) layerButtons.style.display = 'block';
     } else if (obj.objectType === 'freeRect') {
         rectangleProperties.style.display = 'block';
         
@@ -639,6 +643,9 @@ function showPropertiesPanel(obj) {
             document.getElementById('rectOpacityValue').textContent = opacity + '%';
         }
         document.getElementById('rectStrokeColor').value = obj.stroke || '#3B82F6';
+        
+        // Show layer buttons for free objects
+        if (layerButtons) layerButtons.style.display = 'block';
     } else if (obj.objectType === 'group') {
         groupProperties.style.display = 'block';
         
@@ -647,6 +654,9 @@ function showPropertiesPanel(obj) {
         document.querySelectorAll('.color-option').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.color === currentColor);
         });
+        
+        // Hide layer buttons for groups (they're always at the bottom)
+        if (layerButtons) layerButtons.style.display = 'none';
     }
     
     propertiesPanel.style.display = 'flex';
