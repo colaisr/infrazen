@@ -1242,6 +1242,15 @@ function setupObjectEventHandlers() {
                         e.e.stopPropagation();
                         showResourceInfo(obj.resourceId);
                     });
+                    
+                    // Re-attach hover handlers
+                    infoIconCircle.on('mouseover', function(e) {
+                        showResourceTooltip(obj.resourceId, e);
+                    });
+                    
+                    infoIconCircle.on('mouseout', function() {
+                        hideResourceTooltip();
+                    });
                 }
                 
                 if (notesIconCircle) {
@@ -2846,6 +2855,15 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
             e.e.stopPropagation();
             showResourceInfo(resourceCard.resourceId);
         });
+        
+        // Show tooltip on hover
+        infoIcon.on('mouseover', function(e) {
+            showResourceTooltip(resourceCard.resourceId, e);
+        });
+        
+        infoIcon.on('mouseout', function() {
+            hideResourceTooltip();
+        });
     }
     
     if (notesIcon) {
@@ -3125,6 +3143,65 @@ async function showResourceInfo(resourceId) {
  */
 function closeResourceInfoModal() {
     document.getElementById('resourceInfoModal').classList.remove('active');
+}
+
+/**
+ * Show resource tooltip on hover
+ */
+function showResourceTooltip(resourceId, event) {
+    // Find resource data
+    let resource = null;
+    for (const provider of allResources) {
+        const found = provider.resources.find(r => r.id === resourceId);
+        if (found) {
+            resource = {
+                ...found,
+                provider_name: provider.provider_name
+            };
+            break;
+        }
+    }
+    
+    if (!resource) return;
+    
+    // Create or get tooltip element
+    let tooltip = document.getElementById('resourceTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'resourceTooltip';
+        tooltip.className = 'resource-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    // Build tooltip content (shorter version)
+    const costText = resource.daily_cost ? `${(resource.daily_cost * 30).toFixed(2)} ₽/мес` : 'Не указана';
+    const html = `
+        <div class="tooltip-header">${escapeHtml(resource.name)}</div>
+        <div class="tooltip-row"><strong>Тип:</strong> ${escapeHtml(resource.type)}</div>
+        <div class="tooltip-row"><strong>IP:</strong> ${escapeHtml(resource.ip || 'Не указан')}</div>
+        <div class="tooltip-row"><strong>Стоимость:</strong> ${costText}</div>
+        <div class="tooltip-footer">Нажмите для подробной информации</div>
+    `;
+    
+    tooltip.innerHTML = html;
+    
+    // Position tooltip near cursor
+    const pointer = fabricCanvas.getPointer(event.e);
+    const canvasOffset = fabricCanvas.getElement().getBoundingClientRect();
+    
+    tooltip.style.left = (canvasOffset.left + pointer.x + 15) + 'px';
+    tooltip.style.top = (canvasOffset.top + pointer.y - 10) + 'px';
+    tooltip.style.display = 'block';
+}
+
+/**
+ * Hide resource tooltip
+ */
+function hideResourceTooltip() {
+    const tooltip = document.getElementById('resourceTooltip');
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
 }
 
 /**

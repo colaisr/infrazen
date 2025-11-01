@@ -1236,3 +1236,48 @@ textarea.form-control {
     }
 }
 
+/* Resource Tooltip */
+.resource-tooltip {
+    position: fixed;
+    background: #1F2937;
+    color: #FFFFFF;
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    min-width: 200px;
+    max-width: 300px;
+    display: none;
+    pointer-events: none;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.resource-tooltip .tooltip-header {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #FFFFFF;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 6px;
+}
+
+.resource-tooltip .tooltip-row {
+    margin: 4px 0;
+    color: #E5E7EB;
+}
+
+.resource-tooltip .tooltip-row strong {
+    color: #9CA3AF;
+    font-weight: 600;
+}
+
+.resource-tooltip .tooltip-footer {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+    color: #9CA3AF;
+    font-style: italic;
+}
+
