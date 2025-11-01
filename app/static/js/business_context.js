@@ -1300,8 +1300,13 @@ async function pasteGroup(originalGroup) {
                     groupColor: originalGroup.groupColor || '#3B82F6',
                     calculatedCost: 0,
                     dbId: data.group.id,
-                    objectType: 'group'
+                    objectType: 'group',
+                    lockRotation: true,
+                    hasRotate: false
                 });
+                
+                // Disable rotation control
+                clonedGroup.setControlVisible('mtr', false);
                 
                 // Update the name in the cloned text child
                 const children = clonedGroup.getObjects();
