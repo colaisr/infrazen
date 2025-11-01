@@ -3185,13 +3185,25 @@ function showResourceTooltip(resourceId, event) {
     
     tooltip.innerHTML = html;
     
-    // Position tooltip near cursor
+    // Position tooltip above the badge
     const pointer = fabricCanvas.getPointer(event.e);
     const canvasOffset = fabricCanvas.getElement().getBoundingClientRect();
     
-    tooltip.style.left = (canvasOffset.left + pointer.x + 15) + 'px';
-    tooltip.style.top = (canvasOffset.top + pointer.y - 10) + 'px';
+    // Make tooltip visible to measure its height
     tooltip.style.display = 'block';
+    tooltip.style.visibility = 'hidden';
+    
+    // Get tooltip dimensions
+    const tooltipHeight = tooltip.offsetHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+    
+    // Position above badge with some margin
+    const leftPos = canvasOffset.left + pointer.x - (tooltipWidth / 2);
+    const topPos = canvasOffset.top + pointer.y - tooltipHeight - 15;
+    
+    tooltip.style.left = leftPos + 'px';
+    tooltip.style.top = topPos + 'px';
+    tooltip.style.visibility = 'visible';
 }
 
 /**
