@@ -60,7 +60,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // 4. Info icon circle (solid blue badge)
         elements.push(new fabric.Circle({
             left: 10,
-            top: 0,
+            top: 10,
             radius: 10,
             fill: '#3B82F6',
             stroke: '#FFFFFF',
@@ -72,7 +72,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // 5. Info icon text (white 'i' on blue)
         elements.push(new fabric.Text('i', {
             left: 10,
-            top: 0,
+            top: 10,
             fontSize: 12,
             fontWeight: 'bold',
             fill: '#FFFFFF',
@@ -84,7 +84,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
         elements.push(new fabric.Circle({
             left: cardWidth - 10,
-            top: 0,
+            top: 10,
             radius: 10,
             fill: hasNotes ? '#10B981' : '#9CA3AF',
             stroke: '#FFFFFF',
@@ -96,7 +96,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // 7. Notes icon text (white 'n' on colored background)
         elements.push(new fabric.Text('n', {
             left: cardWidth - 10,
-            top: 0,
+            top: 10,
             fontSize: 12,
             fontWeight: 'bold',
             fill: '#FFFFFF',
@@ -107,7 +107,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // 8. Clone badge circle (initially hidden, solid purple badge)
         elements.push(new fabric.Circle({
             left: cardWidth - 10,
-            top: cardHeight,
+            top: cardHeight - 10,
             radius: 10,
             fill: '#8B5CF6',
             stroke: '#FFFFFF',
@@ -120,7 +120,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // 9. Clone badge text (initially hidden, white 'c' on purple)
         elements.push(new fabric.Text('c', {
             left: cardWidth - 10,
-            top: cardHeight,
+            top: cardHeight - 10,
             fontSize: 12,
             fontWeight: 'bold',
             fill: '#FFFFFF',
