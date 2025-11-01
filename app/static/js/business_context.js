@@ -388,6 +388,11 @@ function setupGroupTool() {
     groupTool.addEventListener('dragend', function() {
         this.classList.remove('dragging');
     });
+    
+    // Prevent default context menu on right-click
+    groupTool.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
 }
 
 /**
@@ -412,6 +417,11 @@ function setupFreeObjectsTools() {
         textTool.addEventListener('dragend', function() {
             this.classList.remove('dragging');
         });
+        
+        // Prevent default context menu on right-click
+        textTool.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
     }
     
     // Rectangle tool
@@ -431,6 +441,11 @@ function setupFreeObjectsTools() {
         
         rectangleTool.addEventListener('dragend', function() {
             this.classList.remove('dragging');
+        });
+        
+        // Prevent default context menu on right-click
+        rectangleTool.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
         });
     }
 }
