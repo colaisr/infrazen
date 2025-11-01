@@ -6,6 +6,190 @@
  */
 
 /**
+ * Custom Fabric.js class for Resource Cards
+ * This is a monolithic object that manages all its child elements (card, text, badges)
+ * Separate from fabric.Group used for business context containers
+ */
+fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
+    type: 'resourceCard',
+    
+    initialize: function(resourceData, options) {
+        options = options || {};
+        
+        const cardWidth = 120;
+        const cardHeight = 80;
+        
+        // Create all child elements with relative positions
+        const elements = [];
+        
+        // 1. Main card rectangle
+        elements.push(new fabric.Rect({
+            left: 0,
+            top: 0,
+            width: cardWidth,
+            height: cardHeight,
+            fill: '#FFFFFF',
+            stroke: '#E5E7EB',
+            strokeWidth: 2,
+            rx: 8,
+            ry: 8
+        }));
+        
+        // 2. Resource name text
+        elements.push(new fabric.Text(resourceData.name, {
+            left: cardWidth / 2,
+            top: 15,
+            fontSize: 13,
+            fontWeight: 'bold',
+            fill: '#1F2937',
+            originX: 'center',
+            originY: 'top'
+        }));
+        
+        // 3. Resource type/IP text
+        elements.push(new fabric.Text(`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`, {
+            left: cardWidth / 2,
+            top: 40,
+            fontSize: 10,
+            fill: '#6B7280',
+            originX: 'center',
+            originY: 'top',
+            textAlign: 'center'
+        }));
+        
+        // 4. Info icon circle
+        elements.push(new fabric.Circle({
+            left: 12,
+            top: 4,
+            radius: 8,
+            fill: '#FFFFFF',
+            stroke: '#3B82F6',
+            strokeWidth: 1,
+            originX: 'center',
+            originY: 'center'
+        }));
+        
+        // 5. Info icon text
+        elements.push(new fabric.Text('i', {
+            left: 12,
+            top: 4,
+            fontSize: 10,
+            fontWeight: 'bold',
+            fill: '#3B82F6',
+            originX: 'center',
+            originY: 'center'
+        }));
+        
+        // 6. Notes icon circle
+        const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
+        elements.push(new fabric.Circle({
+            left: cardWidth - 12,
+            top: 4,
+            radius: 8,
+            fill: hasNotes ? '#10B981' : '#FFFFFF',
+            stroke: '#10B981',
+            strokeWidth: 1,
+            originX: 'center',
+            originY: 'center'
+        }));
+        
+        // 7. Notes icon text
+        elements.push(new fabric.Text('n', {
+            left: cardWidth - 12,
+            top: 4,
+            fontSize: 10,
+            fontWeight: 'bold',
+            fill: hasNotes ? '#FFFFFF' : '#10B981',
+            originX: 'center',
+            originY: 'center'
+        }));
+        
+        // 8. Clone badge circle (initially hidden)
+        elements.push(new fabric.Circle({
+            left: cardWidth - 12,
+            top: cardHeight - 4,
+            radius: 8,
+            fill: '#FFFFFF',
+            stroke: '#8B5CF6',
+            strokeWidth: 1,
+            originX: 'center',
+            originY: 'center',
+            visible: false
+        }));
+        
+        // 9. Clone badge text (initially hidden)
+        elements.push(new fabric.Text('c', {
+            left: cardWidth - 12,
+            top: cardHeight - 4,
+            fontSize: 10,
+            fontWeight: 'bold',
+            fill: '#8B5CF6',
+            originX: 'center',
+            originY: 'center',
+            visible: false
+        }));
+        
+        // Call parent constructor
+        this.callSuper('initialize', elements, {
+            ...options,
+            subTargetCheck: true,
+            interactive: true,
+            lockRotation: true,
+            hasRotate: false,
+            hasControls: false,
+            hasBorders: true
+        });
+        
+        // Store custom properties
+        this.objectType = 'resource';
+        this.resourceId = options.resourceId;
+        this.boardResourceId = options.boardResourceId;
+        this.groupId = options.groupId;
+        this.resourceData = resourceData;
+        this.width = cardWidth;
+        this.height = cardHeight;
+        
+        // Disable rotation completely (same as business groups)
+        this.lockRotation = true;
+        this.hasRotate = false;
+        this.setControlVisible('mtr', false);
+    },
+    
+    toObject: function() {
+        return fabric.util.object.extend(this.callSuper('toObject'), {
+            objectType: this.objectType,
+            resourceId: this.resourceId,
+            boardResourceId: this.boardResourceId,
+            groupId: this.groupId,
+            type: 'resourceCard'
+        });
+    }
+});
+
+fabric.ResourceCard.fromObject = function(object, callback) {
+    // During deserialization, we need to reconstruct the ResourceCard
+    fabric.Group.fromObject(object, function(group) {
+        // Convert back to ResourceCard and restore all properties
+        group.type = 'resourceCard';
+        group.objectType = 'resource';
+        group.resourceId = object.resourceId;
+        group.boardResourceId = object.boardResourceId;
+        group.groupId = object.groupId;
+        
+        // Disable rotation completely (must be set after deserialization)
+        group.lockRotation = true;
+        group.hasRotate = false;
+        group.setControlVisible('mtr', false);
+        
+        // Disable other controls
+        group.hasControls = false;
+        group.hasBorders = true;
+        
+        callback && callback(group);
+    });
+};
+
+/**
  * Handle API response errors (401, 403, etc.)
  */
 function handleApiError(response, data) {
@@ -599,6 +783,18 @@ function saveToUndoStack() {
         timestamp: Date.now()
     };
     
+    console.log('💾 SAVE TO UNDO STACK:', {
+        totalObjects: filteredObjects.length,
+        resources: filteredObjects.filter(o => o.objectType === 'resource').length,
+        groups: filteredObjects.filter(o => o.objectType === 'group').length,
+        resourceDetails: filteredObjects.filter(o => o.objectType === 'resource').map(r => ({
+            resourceId: r.resourceId,
+            boardResourceId: r.boardResourceId,
+            left: r.left,
+            top: r.top
+        }))
+    });
+    
     // Add to undo stack
     undoStack.push(state);
     
@@ -622,9 +818,22 @@ function undo() {
         return;
     }
     
+    console.log('⏪ UNDO TRIGGERED');
+    
     // Save current state to redo stack (excluding grid lines)
     const canvasJSON = fabricCanvas.toJSON(['objectType', 'fabricId', 'groupName', 'groupColor', 'calculatedCost', 'dbId', 'parentFabricId', 'resourceId', 'boardResourceId', 'groupId']);
     const filteredObjects = canvasJSON.objects.filter(obj => obj.objectType !== 'gridLine');
+    
+    console.log('📸 Current state before undo:', {
+        totalObjects: filteredObjects.length,
+        resources: filteredObjects.filter(o => o.objectType === 'resource').length,
+        resourceDetails: filteredObjects.filter(o => o.objectType === 'resource').map(r => ({
+            resourceId: r.resourceId,
+            boardResourceId: r.boardResourceId,
+            left: r.left,
+            top: r.top
+        }))
+    });
     
     const currentState = {
         objects: {
@@ -641,6 +850,18 @@ function undo() {
     
     // Restore previous state
     const previousState = undoStack.pop();
+    
+    console.log('🔙 Restoring to previous state:', {
+        totalObjects: previousState.objects.objects.length,
+        resources: previousState.objects.objects.filter(o => o.objectType === 'resource').length,
+        resourceDetails: previousState.objects.objects.filter(o => o.objectType === 'resource').map(r => ({
+            resourceId: r.resourceId,
+            boardResourceId: r.boardResourceId,
+            left: r.left,
+            top: r.top
+        }))
+    });
+    
     restoreCanvasState(previousState);
     
     // Update button states
@@ -683,8 +904,20 @@ function redo() {
  */
 function restoreCanvasState(state) {
     if (!fabricCanvas || !state) {
+        console.log('❌ Cannot restore: no canvas or state');
         return;
     }
+    
+    console.log('🔄 RESTORE CANVAS STATE:', {
+        objectsToRestore: state.objects.objects.length,
+        resources: state.objects.objects.filter(o => o.objectType === 'resource').length,
+        resourceDetails: state.objects.objects.filter(o => o.objectType === 'resource').map(r => ({
+            resourceId: r.resourceId,
+            boardResourceId: r.boardResourceId,
+            left: r.left,
+            top: r.top
+        }))
+    });
     
     // Set flag to prevent saving during restoration
     isRestoring = true;
@@ -696,10 +929,43 @@ function restoreCanvasState(state) {
     fabricCanvas.off('object:removed');
     
     // Clear current canvas
+    console.log('🗑️ Clearing canvas');
     fabricCanvas.clear();
     
     // Restore objects
+    console.log('📦 Loading objects from JSON');
     fabricCanvas.loadFromJSON(state.objects, function() {
+        console.log('✅ Objects loaded from JSON:', fabricCanvas.getObjects().length);
+        
+        // Log all objects that were restored
+        fabricCanvas.forEachObject(function(obj) {
+            const logData = {
+                objectType: obj.objectType,
+                fabricType: obj.type,
+                resourceId: obj.resourceId,
+                boardResourceId: obj.boardResourceId,
+                left: obj.left,
+                top: obj.top,
+                visible: obj.visible,
+                opacity: obj.opacity,
+                width: obj.width,
+                height: obj.height
+            };
+            
+            if (obj.type === 'group' || obj.type === 'resourceCard') {
+                const children = obj.getObjects();
+                logData.childCount = children.length;
+                logData.children = children.map((child, idx) => ({
+                    index: idx,
+                    type: child.type,
+                    visible: child.visible,
+                    opacity: child.opacity
+                }));
+            }
+            
+            console.log(`   📦 Restored object:`, logData);
+        });
+        
         // Restore viewport
         fabricCanvas.setZoom(state.viewport.zoom);
         fabricCanvas.viewportTransform = state.viewport.pan.slice();
@@ -718,7 +984,21 @@ function restoreCanvasState(state) {
         fabricCanvas.renderAll(); // Ensure hit detection works after viewport restore
         
         // Re-setup event handlers for all objects
+        console.log('🔧 Setting up event handlers');
         setupObjectEventHandlers();
+        
+        // Update clone badges for all resources after restore
+        console.log('🏷️ Updating clone badges');
+        const resourceIds = new Set();
+        fabricCanvas.forEachObject(function(obj) {
+            if (obj.objectType === 'resource' && obj.resourceId) {
+                resourceIds.add(obj.resourceId);
+            }
+        });
+        console.log(`   Found ${resourceIds.size} unique resources`);
+        resourceIds.forEach(resourceId => updateCloneBadges(resourceId));
+        
+        console.log('✅ RESTORE COMPLETE - Final object count:', fabricCanvas.getObjects().filter(o => o.objectType === 'resource').length, 'resources');
         
         // Re-attach canvas event listeners
         
@@ -726,6 +1006,13 @@ function restoreCanvasState(state) {
         fabricCanvas.on('mouse:down', function(opt) {
             const target = opt.target;
             if (target && target.selectable) {
+                console.log('🖱️ Mouse down on object:', {
+                    type: target.objectType,
+                    resourceId: target.resourceId,
+                    boardResourceId: target.boardResourceId,
+                    left: target.left,
+                    top: target.top
+                });
                 saveToUndoStack();
             }
         });
@@ -853,59 +1140,39 @@ function setupObjectEventHandlers() {
             });
         }
         
-        // Setup resource event handlers
-        if (obj.objectType === 'resource') {
-            const nameText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceName');
-            const metaText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceMeta');
-            const infoIconCircle = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceInfoIcon');
-            const infoIconText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceInfoText');
-            const notesIconCircle = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceNotesIcon');
-            const notesIconText = objects.find(o => o.parentFabricId === obj.fabricId && o.objectType === 'resourceNotesText');
+        // Setup resource event handlers (restored from undo/redo)
+        if (obj.objectType === 'resource' || obj.type === 'resourceCard') {
+            // Resources are custom fabric.ResourceCard objects
+            // Need to re-attach event handlers after deserialization
             
-            if (nameText && metaText) {
-                // Setup moving event for resource
-                obj.on('moving', function() {
-                    // Update text positions
-                    nameText.set({
-                        left: this.left + this.width / 2,
-                        top: this.top + 15
+            const children = obj.getObjects();
+            if (children && children.length >= 9) {
+                const infoIconCircle = children[3];
+                const notesIconCircle = children[5];
+                
+                // Re-attach click handlers to icons
+                if (infoIconCircle) {
+                    infoIconCircle.on('mousedown', function(e) {
+                        e.e.stopPropagation();
+                        showResourceInfo(obj.resourceId);
                     });
-                    metaText.set({
-                        left: this.left + this.width / 2,
-                        top: this.top + 40
+                }
+                
+                if (notesIconCircle) {
+                    notesIconCircle.on('mousedown', function(e) {
+                        e.e.stopPropagation();
+                        showResourceNotes(obj.resourceId);
                     });
-                    
-                    // Update icon positions
-                    if (infoIconCircle && infoIconText) {
-                        infoIconCircle.set({
-                            left: this.left + 12,
-                            top: this.top + 4
-                        });
-                        infoIconText.set({
-                            left: this.left + 12,
-                            top: this.top + 4
-                        });
-                    }
-                    if (notesIconCircle && notesIconText) {
-                        notesIconCircle.set({
-                            left: this.left + this.width - 12,
-                            top: this.top + 4
-                        });
-                        notesIconText.set({
-                            left: this.left + this.width - 12,
-                            top: this.top + 4
-                        });
-                    }
-                    
-                    fabricCanvas.renderAll();
-                    
-                    // Check if moved into/out of groups
-                    checkResourceGroupAssignment(this);
-                    
-                    // Save new position to database
-                    updateResourcePosition(this);
-                });
+                }
             }
+            
+            // Re-attach modified handler
+            obj.on('modified', function() {
+                checkResourceGroupAssignment(this);
+                updateResourcePosition(this);
+            });
+            
+            obj.setCoords();
         }
     });
 }
@@ -1402,15 +1669,9 @@ function initializeCanvas() {
                 // Remove group and resource objects from canvas_state (they'll be loaded from database)
                 const objectsToRemove = [];
                 fabricCanvas.getObjects().forEach(obj => {
-                    if (obj.objectType === 'group' || 
-                        obj.objectType === 'groupText' || 
-                        obj.objectType === 'groupCost' ||
-                        obj.objectType === 'resource' ||
-                        obj.objectType === 'resourceText' ||
-                        obj.objectType === 'resourceInfoIcon' ||
-                        obj.objectType === 'resourceInfoIconText' ||
-                        obj.objectType === 'resourceNotesIcon' ||
-                        obj.objectType === 'resourceNotesIconText') {
+                    // Groups and resources are now fabric.Group objects
+                    // Remove them (their children are automatically removed)
+                    if (obj.objectType === 'group' || obj.objectType === 'resource') {
                         objectsToRemove.push(obj);
                     }
                 });
@@ -2443,361 +2704,67 @@ async function placeResourceOnCanvas(resourceId, x, y) {
 }
 
 /**
- * Create Fabric.js object for resource on canvas
+ * Create fabric.ResourceCard object on canvas (custom monolithic class)
  */
 function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAbsolutePosition = false) {
-    // Create resource card as a simple rectangle with overlaid text
+    // Calculate final position
     // If isAbsolutePosition is true, x/y are already the final card positions
     // If false (default), x/y are click positions that need to be centered
     const cardLeft = isAbsolutePosition ? x : (x - 60);
     const cardTop = isAbsolutePosition ? y : (y - 40);
     
-    const resourceCard = new fabric.Rect({
+    // Create the custom ResourceCard object
+    const resourceCard = new fabric.ResourceCard(resourceData, {
         left: cardLeft,
         top: cardTop,
-        width: 120,
-        height: 80,
-        fill: '#FFFFFF',
-        stroke: '#E5E7EB',
-        strokeWidth: 2,
-        rx: 8,
-        ry: 8,
-        selectable: true,
-        hasControls: false,
-        hasBorders: true,
-        lockRotation: true,
-        hasRotate: false,
-        objectType: 'resource',
         resourceId: resourceData.id,
         boardResourceId: boardResourceId,
-        groupId: groupId,
-        resourceData: resourceData,
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    resourceId: this.resourceId,
-                    boardResourceId: this.boardResourceId,
-                    groupId: this.groupId
-                });
-            };
-        })(fabric.Rect.prototype.toObject)
+        groupId: groupId
     });
     
-    // Resource name text
-    const nameText = new fabric.Text(resourceData.name, {
-        left: cardLeft + 60,
-        top: cardTop + 15,
-        fontSize: 13,
-        fontWeight: 'bold',
-        fill: '#1F2937',
-        originX: 'center',
-        originY: 'top',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceText',
-        parentResourceId: boardResourceId,
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Resource type and IP text
-    const metaText = new fabric.Text(`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`, {
-        left: cardLeft + 60,
-        top: cardTop + 40,
-        fontSize: 10,
-        fill: '#6B7280',
-        originX: 'center',
-        originY: 'top',
-        textAlign: 'center',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceText',
-        parentResourceId: boardResourceId,
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Info icon circle (top-left)
-    const infoIconCircle = new fabric.Circle({
-        left: cardLeft + 12,
-        top: cardTop + 4,
-        radius: 8,
-        fill: '#FFFFFF',
-        stroke: '#3B82F6',
-        strokeWidth: 1,
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: true,
-        objectType: 'resourceInfoIcon',
-        parentResourceId: boardResourceId,
-        resourceId: resourceData.id,
-        hoverCursor: 'pointer',
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId,
-                    resourceId: this.resourceId
-                });
-            };
-        })(fabric.Circle.prototype.toObject)
-    });
-    
-    const infoIconText = new fabric.Text('i', {
-        left: cardLeft + 12,
-        top: cardTop + 4,
-        fontSize: 10,
-        fontWeight: 'bold',
-        fill: '#3B82F6',
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceInfoIconText',
-        parentResourceId: boardResourceId,
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Notes icon circle (top-right)
-    const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
-    const notesIconCircle = new fabric.Circle({
-        left: cardLeft + 120 - 12,
-        top: cardTop + 4,
-        radius: 8,
-        fill: hasNotes ? '#10B981' : '#FFFFFF',
-        stroke: '#10B981',
-        strokeWidth: 1,
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: true,
-        objectType: 'resourceNotesIcon',
-        parentResourceId: boardResourceId,
-        resourceId: resourceData.id,
-        hasNotes: hasNotes,
-        hoverCursor: 'pointer',
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId,
-                    resourceId: this.resourceId,
-                    hasNotes: this.hasNotes
-                });
-            };
-        })(fabric.Circle.prototype.toObject)
-    });
-    
-    const notesIconText = new fabric.Text('n', {
-        left: cardLeft + 120 - 12,
-        top: cardTop + 4,
-        fontSize: 10,
-        fontWeight: 'bold',
-        fill: hasNotes ? '#FFFFFF' : '#10B981',
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceNotesIconText',
-        parentResourceId: boardResourceId,
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
-    
-    // Add click handlers to icons
-    infoIconCircle.on('mousedown', function(e) {
-        e.e.stopPropagation();
-        showResourceInfo(this.resourceId);
-    });
-    
-    notesIconCircle.on('mousedown', function(e) {
-        e.e.stopPropagation();
-        showResourceNotes(this.resourceId);
-    });
-    
-    // Clone badge (bottom-right) - initially hidden, shown if clones exist
-    const cloneBadgeCircle = new fabric.Circle({
-        left: cardLeft + 120 - 12,
-        top: cardTop + 80 - 4,
-        radius: 8,
-        fill: '#FFFFFF',
-        stroke: '#8B5CF6',
-        strokeWidth: 1,
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceCloneBadge',
-        parentResourceId: boardResourceId,
-        visible: false, // Hidden by default, shown by updateCloneBadges
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Circle.prototype.toObject)
-    });
-    
-    const cloneBadgeText = new fabric.Text('c', {
-        left: cardLeft + 120 - 12,
-        top: cardTop + 80 - 4,
-        fontSize: 10,
-        fontWeight: 'bold',
-        fill: '#8B5CF6',
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false,
-        objectType: 'resourceCloneBadgeText',
-        parentResourceId: boardResourceId,
-        visible: false, // Hidden by default, shown by updateCloneBadges
-        // Preserve custom properties
-        toObject: (function(toObject) {
-            return function() {
-                return fabric.util.object.extend(toObject.call(this), {
-                    objectType: this.objectType,
-                    parentResourceId: this.parentResourceId
-                });
-            };
-        })(fabric.Text.prototype.toObject)
-    });
+    // Get child elements for event handling
+    const children = resourceCard.getObjects();
+    const infoIcon = children[3];  // Info icon circle
+    const notesIcon = children[5];  // Notes icon circle
     
     // Add to canvas
     fabricCanvas.add(resourceCard);
-    fabricCanvas.add(nameText);
-    fabricCanvas.add(metaText);
-    fabricCanvas.add(infoIconCircle);
-    fabricCanvas.add(infoIconText);
-    fabricCanvas.add(notesIconCircle);
-    fabricCanvas.add(notesIconText);
-    fabricCanvas.add(cloneBadgeCircle);
-    fabricCanvas.add(cloneBadgeText);
     
-    // Hide rotation control handle
-    resourceCard.setControlVisible('mtr', false);
-    
-    fabricCanvas.renderAll();
-    
-    // Setup event handlers for the card
-    resourceCard.on('moving', function() {
-        // Move text with card
-        nameText.set({
-            left: this.left + this.width / 2,
-            top: this.top + 15
-        });
-        metaText.set({
-            left: this.left + this.width / 2,
-            top: this.top + 40
-        });
-        // Move icons with card
-        infoIconCircle.set({
-            left: this.left + 12,
-            top: this.top + 4
-        });
-        infoIconText.set({
-            left: this.left + 12,
-            top: this.top + 4
-        });
-        notesIconCircle.set({
-            left: this.left + this.width - 12,
-            top: this.top + 4
-        });
-        notesIconText.set({
-            left: this.left + this.width - 12,
-            top: this.top + 4
-        });
-        cloneBadgeCircle.set({
-            left: this.left + this.width - 12,
-            top: this.top + this.height - 4
-        });
-        cloneBadgeText.set({
-            left: this.left + this.width - 12,
-            top: this.top + this.height - 4
-        });
-        fabricCanvas.renderAll();
+    console.log('✅ ResourceCard created:', {
+        objectType: resourceCard.objectType,
+        fabricType: resourceCard.type,
+        resourceId: resourceCard.resourceId,
+        boardResourceId: resourceCard.boardResourceId,
+        childCount: children.length,
+        left: resourceCard.left,
+        top: resourceCard.top
     });
     
+    // Setup event handlers for icon clicks
+    if (infoIcon) {
+        infoIcon.on('mousedown', function(e) {
+            e.e.stopPropagation();
+            showResourceInfo(resourceCard.resourceId);
+        });
+    }
+    
+    if (notesIcon) {
+        notesIcon.on('mousedown', function(e) {
+            e.e.stopPropagation();
+            showResourceNotes(resourceCard.resourceId);
+        });
+    }
+    
+    // Modified event - check group assignment and save position
     resourceCard.on('modified', function() {
-        // Update text positions
-        nameText.set({
-            left: this.left + this.width / 2,
-            top: this.top + 15
-        });
-        metaText.set({
-            left: this.left + this.width / 2,
-            top: this.top + 40
-        });
-        // Update icon positions
-        infoIconCircle.set({
-            left: this.left + 12,
-            top: this.top + 4
-        });
-        infoIconText.set({
-            left: this.left + 12,
-            top: this.top + 4
-        });
-        notesIconCircle.set({
-            left: this.left + this.width - 12,
-            top: this.top + 4
-        });
-        notesIconText.set({
-            left: this.left + this.width - 12,
-            top: this.top + 4
-        });
-        cloneBadgeCircle.set({
-            left: this.left + this.width - 12,
-            top: this.top + this.height - 4
-        });
-        cloneBadgeText.set({
-            left: this.left + this.width - 12,
-            top: this.top + this.height - 4
-        });
-        fabricCanvas.renderAll();
-        
-        // Check if moved into/out of groups (when drag is complete)
         checkResourceGroupAssignment(this);
-        
-        // Save new position to database
         updateResourcePosition(this);
     });
+    
+    // Render
+    fabricCanvas.renderAll();
 }
+
 
 /**
  * Get group at specific position (for drop detection)
@@ -3155,26 +3122,30 @@ async function saveResourceNotes() {
             // Reload resources to update "has notes" indicator in toolbox
             await loadResources();
             
-            // Update notes icon on canvas if resource is placed
+            // Update notes icon on canvas for all instances of this resource
             const hasNotes = data.has_notes;
             const objects = fabricCanvas.getObjects();
-            const notesIcon = objects.find(obj => 
-                obj.objectType === 'resourceNotesIcon' && obj.resourceId === resourceId
-            );
-            const notesIconText = objects.find(obj => 
-                obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === notesIcon?.parentResourceId
+            const resourceGroups = objects.filter(obj => 
+                obj.objectType === 'resource' && obj.resourceId === resourceId
             );
             
-            if (notesIcon && notesIconText) {
-                notesIcon.set({
-                    fill: hasNotes ? '#10B981' : '#FFFFFF',
-                    hasNotes: hasNotes
-                });
-                notesIconText.set({
-                    fill: hasNotes ? '#FFFFFF' : '#10B981'
-                });
-                fabricCanvas.renderAll();
-            }
+            resourceGroups.forEach(resourceGroup => {
+                // Access notes icon from group's children (index 5 and 6)
+                const children = resourceGroup.getObjects();
+                const notesIcon = children[5];  // notesIconCircle
+                const notesIconText = children[6];  // notesIconText
+                
+                if (notesIcon && notesIconText) {
+                    notesIcon.set({
+                        fill: hasNotes ? '#10B981' : '#FFFFFF'
+                    });
+                    notesIconText.set({
+                        fill: hasNotes ? '#FFFFFF' : '#10B981'
+                    });
+                }
+            });
+            
+            fabricCanvas.renderAll();
             
             console.log('Resources reloaded and canvas updated');
         } else {
@@ -4235,34 +4206,22 @@ async function deleteGroup(businessGroup) {
 /**
  * Delete resource from board
  */
-async function deleteResourceFromBoard(resourceCard) {
-    if (!resourceCard.boardResourceId) return;
+async function deleteResourceFromBoard(resourceGroup) {
+    if (!resourceGroup.boardResourceId) return;
     
     try {
-        const response = await fetch(`/api/business-context/board-resources/${resourceCard.boardResourceId}`, {
+        const response = await fetch(`/api/business-context/board-resources/${resourceGroup.boardResourceId}`, {
             method: 'DELETE'
         });
         
         const data = await response.json();
         
         if (data.success) {
-            const resourceId = resourceCard.resourceId;
+            const resourceId = resourceGroup.resourceId;
+            const oldGroupId = resourceGroup.groupId;
             
-            // Remove resource card and all associated objects from canvas
-            const objects = fabricCanvas.getObjects();
-            objects.forEach(obj => {
-                if (obj.boardResourceId === resourceCard.boardResourceId || 
-                    obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceInfoIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceNotesIcon' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceInfoIconText' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceNotesIconText' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceCloneBadge' && obj.parentResourceId === resourceCard.boardResourceId ||
-                    obj.objectType === 'resourceCloneBadgeText' && obj.parentResourceId === resourceCard.boardResourceId) {
-                    fabricCanvas.remove(obj);
-                }
-            });
-            
+            // Remove the entire resource group (all child elements removed automatically)
+            fabricCanvas.remove(resourceGroup);
             fabricCanvas.renderAll();
             
             // Update clone badges for remaining instances of this resource
@@ -4271,10 +4230,9 @@ async function deleteResourceFromBoard(resourceCard) {
             // Reload resources to update toolbox (resource should show as available again)
             await loadResources();
             
-            // If resource was in a group, update group cost
-            if (resourceCard.groupId) {
-                await updateGroupCost(resourceCard.groupId);
-            }
+            // Update costs for all groups containing this resource
+            // Pass oldGroupId to ensure the group this resource was in gets updated
+            await updateCostsForAllGroupsWithResource(resourceId, oldGroupId);
             
             scheduleAutoSave();
         } else {
@@ -4303,23 +4261,20 @@ function updateCloneBadges(resourceId) {
     
     const hasClones = resourceInstances.length > 1;
     
-    resourceInstances.forEach(resourceCard => {
-        // Find the badge objects for this resource
-        const badge = objects.find(obj => 
-            obj.objectType === 'resourceCloneBadge' && obj.parentResourceId === resourceCard.boardResourceId
-        );
-        const badgeText = objects.find(obj => 
-            obj.objectType === 'resourceCloneBadgeText' && obj.parentResourceId === resourceCard.boardResourceId
-        );
+    resourceInstances.forEach(resourceGroup => {
+        // Access badge elements from the group's child array
+        const children = resourceGroup.getObjects();
+        const cloneBadge = children[7];  // cloneBadgeCircle is index 7
+        const cloneBadgeText = children[8];  // cloneBadgeText is index 8
         
         if (hasClones) {
             // Show badge
-            if (badge) badge.set({ visible: true });
-            if (badgeText) badgeText.set({ visible: true });
+            if (cloneBadge) cloneBadge.set({ visible: true });
+            if (cloneBadgeText) cloneBadgeText.set({ visible: true });
         } else {
             // Hide badge
-            if (badge) badge.set({ visible: false });
-            if (badgeText) badgeText.set({ visible: false });
+            if (cloneBadge) cloneBadge.set({ visible: false });
+            if (cloneBadgeText) cloneBadgeText.set({ visible: false });
         }
     });
     
