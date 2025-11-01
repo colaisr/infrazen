@@ -49,10 +49,21 @@ class YandexSKUPricing:
         'dns.zones.v1': 'dn2in5tir8ghu37ik2al',  # DNS zone hosting - 0.054 ₽/hour = 1.30 ₽/day
     }
     
+    # Fallback prices for legacy platforms (extracted from HAR billing data)
+    # These are used when SKUs are not in database (e.g., standard-v2 deprecated by Yandex)
+    FALLBACK_PRICES = {
+        # Standard-v2 (Cascade Lake) - extracted from Oct 31, 2025 HAR billing data
+        'compute.vm.cpu.c100.v2': {'hourly': 1.285208, 'source': 'HAR billing data (Oct 31, 2025)'},
+        'compute.vm.cpu.c50.v2': {'hourly': 0.777604, 'source': 'HAR billing data (Oct 31, 2025)'},
+        'compute.vm.cpu.c20.v2': {'hourly': 0.529167, 'source': 'HAR billing data (Oct 31, 2025)'},
+        'compute.vm.cpu.c5.v2': {'hourly': 0.132292, 'source': 'HAR billing data (estimated)'},
+        'compute.vm.ram.v2': {'hourly': 0.334798, 'source': 'HAR billing data (Oct 31, 2025)'},
+    }
+    
     @classmethod
     def get_sku_price(cls, sku_code: str) -> Optional[Dict[str, float]]:
         """
-        Get SKU price from database
+        Get SKU price from database, with fallback for legacy platforms
         
         Args:
             sku_code: SKU code (e.g., 'compute.vm.cpu.c100.v3')
@@ -72,7 +83,25 @@ class YandexSKUPricing:
             ).first()
             
             if not price:
-                logger.warning(f"SKU {sku_code} ({sku_id}) not found in database")
+                # Check if we have a fallback price (for legacy platforms)
+                fallback = cls.FALLBACK_PRICES.get(sku_code)
+                if fallback:
+                    hourly = fallback['hourly']
+                    daily = hourly * 24
+                    monthly = hourly * 730
+                    logger.info(f"Using fallback price for {sku_code}: {hourly:.6f}₽/h (source: {fallback['source']})")
+                    
+                    return {
+                        'hourly': hourly,
+                        'daily': daily,
+                        'monthly': monthly,
+                        'sku_id': sku_id,
+                        'sku_code': sku_code,
+                        'accuracy': 'har_based',
+                        'source': fallback['source']
+                    }
+                
+                logger.warning(f"SKU {sku_code} ({sku_id}) not found in database or fallback")
                 return None
             
             hourly = float(price.hourly_cost or 0)
@@ -84,7 +113,9 @@ class YandexSKUPricing:
                 'daily': daily,
                 'monthly': monthly,
                 'sku_id': sku_id,
-                'sku_code': sku_code
+                'sku_code': sku_code,
+                'accuracy': 'sku_based',
+                'source': 'Yandex SKU API'
             }
         
         except Exception as e:
