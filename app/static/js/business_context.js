@@ -1245,7 +1245,7 @@ function setupObjectEventHandlers() {
                     
                     // Re-attach hover handlers
                     infoIconCircle.on('mouseover', function(e) {
-                        showResourceTooltip(obj.resourceId, e);
+                        showResourceTooltip(obj.resourceId, obj, infoIconCircle);
                     });
                     
                     infoIconCircle.on('mouseout', function() {
@@ -2858,7 +2858,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         
         // Show tooltip on hover
         infoIcon.on('mouseover', function(e) {
-            showResourceTooltip(resourceCard.resourceId, e);
+            showResourceTooltip(resourceCard.resourceId, resourceCard, infoIcon);
         });
         
         infoIcon.on('mouseout', function() {
@@ -3148,7 +3148,7 @@ function closeResourceInfoModal() {
 /**
  * Show resource tooltip on hover
  */
-function showResourceTooltip(resourceId, event) {
+function showResourceTooltip(resourceId, resourceCard, badge) {
     // Find resource data
     let resource = null;
     for (const provider of allResources) {
@@ -3185,9 +3185,20 @@ function showResourceTooltip(resourceId, event) {
     
     tooltip.innerHTML = html;
     
-    // Position tooltip above the badge
-    const pointer = fabricCanvas.getPointer(event.e);
-    const canvasOffset = fabricCanvas.getElement().getBoundingClientRect();
+    // Calculate badge position on screen
+    const canvasEl = fabricCanvas.getElement();
+    const canvasOffset = canvasEl.getBoundingClientRect();
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    
+    // Get badge position in canvas coordinates
+    // Badge is at left: 10, top: 10 relative to resourceCard
+    const badgeCanvasX = resourceCard.left + 10;
+    const badgeCanvasY = resourceCard.top + 10;
+    
+    // Convert to screen coordinates
+    const badgeScreenX = canvasOffset.left + (badgeCanvasX * zoom + vpt[4]);
+    const badgeScreenY = canvasOffset.top + (badgeCanvasY * zoom + vpt[5]);
     
     // Make tooltip visible to measure its height
     tooltip.style.display = 'block';
@@ -3197,9 +3208,9 @@ function showResourceTooltip(resourceId, event) {
     const tooltipHeight = tooltip.offsetHeight;
     const tooltipWidth = tooltip.offsetWidth;
     
-    // Position above badge with some margin
-    const leftPos = canvasOffset.left + pointer.x - (tooltipWidth / 2);
-    const topPos = canvasOffset.top + pointer.y - tooltipHeight - 15;
+    // Position above badge with margin
+    const leftPos = badgeScreenX - (tooltipWidth / 2);
+    const topPos = badgeScreenY - tooltipHeight - 20; // 20px above badge
     
     tooltip.style.left = leftPos + 'px';
     tooltip.style.top = topPos + 'px';
