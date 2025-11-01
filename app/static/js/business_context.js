@@ -63,8 +63,6 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             top: 10,
             radius: 10,
             fill: '#3B82F6',
-            stroke: '#FFFFFF',
-            strokeWidth: 2,
             originX: 'center',
             originY: 'center'
         }));
@@ -87,8 +85,6 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             top: 10,
             radius: 10,
             fill: hasNotes ? '#10B981' : '#9CA3AF',
-            stroke: '#FFFFFF',
-            strokeWidth: 2,
             originX: 'center',
             originY: 'center'
         }));
@@ -110,8 +106,6 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             top: cardHeight - 10,
             radius: 10,
             fill: '#8B5CF6',
-            stroke: '#FFFFFF',
-            strokeWidth: 2,
             originX: 'center',
             originY: 'center',
             visible: false
