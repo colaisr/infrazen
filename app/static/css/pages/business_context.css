@@ -1295,3 +1295,12 @@ textarea.form-control {
     font-style: italic;
 }
 
+.resource-tooltip .tooltip-notes-content {
+    color: #E5E7EB;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 150px;
+    overflow-y: auto;
+}
+

@@ -1258,6 +1258,15 @@ function setupObjectEventHandlers() {
                         e.e.stopPropagation();
                         showResourceNotes(obj.resourceId);
                     });
+                    
+                    // Re-attach hover handlers for notes
+                    notesIconCircle.on('mouseover', function(e) {
+                        showNotesTooltip(obj.resourceId, obj, notesIconCircle);
+                    });
+                    
+                    notesIconCircle.on('mouseout', function() {
+                        hideNotesTooltip();
+                    });
                 }
             }
             
@@ -2871,6 +2880,15 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
             e.e.stopPropagation();
             showResourceNotes(resourceCard.resourceId);
         });
+        
+        // Show notes tooltip on hover
+        notesIcon.on('mouseover', function(e) {
+            showNotesTooltip(resourceCard.resourceId, resourceCard, notesIcon);
+        });
+        
+        notesIcon.on('mouseout', function() {
+            hideNotesTooltip();
+        });
     }
     
     // Modified event - check group assignment and save position
@@ -3222,6 +3240,88 @@ function showResourceTooltip(resourceId, resourceCard, badge) {
  */
 function hideResourceTooltip() {
     const tooltip = document.getElementById('resourceTooltip');
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
+}
+
+/**
+ * Show notes tooltip on hover
+ */
+function showNotesTooltip(resourceId, resourceCard, badge) {
+    // Find resource data with notes
+    let resource = null;
+    for (const provider of allResources) {
+        const found = provider.resources.find(r => r.id === resourceId);
+        if (found) {
+            resource = found;
+            break;
+        }
+    }
+    
+    if (!resource) return;
+    
+    // Create or get tooltip element
+    let tooltip = document.getElementById('notesTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'notesTooltip';
+        tooltip.className = 'resource-tooltip notes-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    // Build tooltip content with notes
+    const hasNotes = resource.notes && resource.notes.trim().length > 0;
+    const notesPreview = hasNotes 
+        ? resource.notes.substring(0, 150) + (resource.notes.length > 150 ? '...' : '')
+        : 'Заметок пока нет';
+    
+    const html = `
+        <div class="tooltip-header">Заметки</div>
+        <div class="tooltip-notes-content">${escapeHtml(notesPreview)}</div>
+        <div class="tooltip-footer">${hasNotes ? 'Нажмите для редактирования' : 'Нажмите, чтобы добавить заметку'}</div>
+    `;
+    
+    tooltip.innerHTML = html;
+    
+    // Calculate badge position on screen (notes badge is at right side)
+    const canvasEl = fabricCanvas.getElement();
+    const canvasOffset = canvasEl.getBoundingClientRect();
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    
+    // Get badge position in canvas coordinates
+    // Notes badge is at left: cardWidth - 10, top: 10 relative to resourceCard
+    const cardWidth = 120;
+    const badgeCanvasX = resourceCard.left + (cardWidth - 10);
+    const badgeCanvasY = resourceCard.top + 10;
+    
+    // Convert to screen coordinates
+    const badgeScreenX = canvasOffset.left + (badgeCanvasX * zoom + vpt[4]);
+    const badgeScreenY = canvasOffset.top + (badgeCanvasY * zoom + vpt[5]);
+    
+    // Make tooltip visible to measure its height
+    tooltip.style.display = 'block';
+    tooltip.style.visibility = 'hidden';
+    
+    // Get tooltip dimensions
+    const tooltipHeight = tooltip.offsetHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+    
+    // Position above badge with margin
+    const leftPos = badgeScreenX - (tooltipWidth / 2);
+    const topPos = badgeScreenY - tooltipHeight - 20; // 20px above badge
+    
+    tooltip.style.left = leftPos + 'px';
+    tooltip.style.top = topPos + 'px';
+    tooltip.style.visibility = 'visible';
+}
+
+/**
+ * Hide notes tooltip
+ */
+function hideNotesTooltip() {
+    const tooltip = document.getElementById('notesTooltip');
     if (tooltip) {
         tooltip.style.display = 'none';
     }
