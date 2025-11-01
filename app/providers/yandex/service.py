@@ -672,12 +672,14 @@ class YandexService:
             has_public_ip = bool(external_ip)
             
             # Calculate cost using official Yandex pricing
+            # Pass status to handle STOPPED VMs correctly (disk-only cost)
             estimated_daily_cost = self._estimate_instance_cost(
                 vcpus, ram_gb, total_storage_gb, zone_id,
                 platform_id=platform_id,
                 core_fraction=core_fraction,
                 disk_type=disk_type,
-                has_public_ip=has_public_ip
+                has_public_ip=has_public_ip,
+                status=status
             )
             
             # Create resource metadata
@@ -814,13 +816,29 @@ class YandexService:
                                  platform_id: str = 'standard-v3',
                                  core_fraction: int = 100,
                                  disk_type: str = 'network-ssd',
-                                 has_public_ip: bool = False) -> float:
+                                 has_public_ip: bool = False,
+                                 status: str = 'RUNNING') -> float:
         """
         Calculate instance cost using SKU-based pricing (99.97% accuracy!)
         
         Uses actual SKU prices from Yandex Billing API, synced to our database.
         Falls back to documented pricing if SKUs not available.
+        
+        IMPORTANT: Yandex Cloud billing rules for STOPPED VMs:
+        - STOPPED VMs only pay for disk storage (no CPU/RAM charges)
+        - RUNNING VMs pay full cost (CPU + RAM + disk + optional public IP)
+        
+        Args:
+            status: VM status ('RUNNING', 'STOPPED', etc.)
         """
+        # STOPPED VMs only pay for disk storage
+        if status in ['STOPPED', 'STOPPING']:
+            logger.debug(f"VM is {status} - calculating disk-only cost")
+            disk_only_cost = self._estimate_disk_cost(storage_gb, disk_type)
+            logger.info(f"  STOPPED VM: disk only = {disk_only_cost:.2f} ₽/day (storage: {storage_gb} GB)")
+            return disk_only_cost
+        
+        # RUNNING VMs: full cost calculation
         # Try SKU-based pricing first (99.97% accurate)
         sku_cost = YandexSKUPricing.calculate_vm_cost(
             vcpus=vcpus,
@@ -1687,9 +1705,19 @@ class YandexService:
                                     boot_disk_type = disk.get('typeId', 'network-hdd')
                                     break
                         
-                        # Estimate VM cost
+                        # Get VM status for correct cost calculation (STOPPED VMs only pay for disk)
+                        status_raw = instance.get('status', 'RUNNING')
+                        status_map = {
+                            'RUNNING': 'RUNNING', 'STOPPED': 'STOPPED', 'STOPPING': 'STOPPING',
+                            'STARTING': 'STARTING', 'RESTARTING': 'RESTARTING', 'UPDATING': 'UPDATING',
+                            'ERROR': 'ERROR', 'CRASHED': 'ERROR', 'DELETING': 'DELETING'
+                        }
+                        status = status_map.get(status_raw, status_raw)
+                        
+                        # Estimate VM cost (handles STOPPED VMs correctly - disk-only cost)
                         zone_id = instance.get('zoneId', 'ru-central1-a')
-                        vm_cost = self._estimate_instance_cost(cores, memory_gb, boot_disk_size_gb, boot_disk_type, zone_id)
+                        vm_cost = self._estimate_instance_cost(cores, memory_gb, boot_disk_size_gb, zone_id,
+                                                               disk_type=boot_disk_type, status=status)
                         
                         worker_vms_cost += vm_cost
                         worker_vms_count += 1
@@ -1701,7 +1729,7 @@ class YandexService:
                             'disk_gb': round(boot_disk_size_gb, 1),
                             'disk_type': boot_disk_type,
                             'zone': zone_id,
-                            'status': instance.get('status', 'unknown'),
+                            'status': status,
                             'cost': round(vm_cost, 2)
                         })
                         

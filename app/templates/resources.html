@@ -730,6 +730,14 @@
                             {% endif %}
                         {% endif %}
 
+                        <!-- Info message for stopped servers -->
+                        {% if resource.status == 'STOPPED' and resource.resource_type in ['server', 'vm', 'vps'] %}
+                        <div class="resource-card-info">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>Взимается плата только за диск - остановлен</span>
+                        </div>
+                        {% endif %}
+
                 </div>
                 {% endfor %}
             </div>
