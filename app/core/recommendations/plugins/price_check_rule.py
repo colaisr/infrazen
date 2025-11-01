@@ -77,10 +77,33 @@ class CrossProviderPriceCheckRule(BaseRule):
             getattr(resource, 'id', None), getattr(resource, 'resource_name', None), getattr(norm_res, 'vcpu', None), getattr(norm_res, 'memory_gib', None), region,
         )
 
+        # Get user's enabled providers for recommendations
+        from app.core.models.user_provider_preference import UserProviderPreference
+        user_id = resource.user_id if hasattr(resource, 'user_id') else (provider.user_id if provider else None)
+        enabled_providers = []
+        
+        if user_id:
+            try:
+                enabled_providers = UserProviderPreference.get_enabled_providers_for_user(user_id)
+                logger.info(
+                    "price_check: user preferences | user_id=%s enabled_providers=%s",
+                    user_id, enabled_providers
+                )
+            except Exception as e:
+                logger.warning(
+                    "price_check: failed to get user preferences (defaulting to all) | user_id=%s error=%s",
+                    user_id, str(e)
+                )
+                enabled_providers = []  # Empty list means all providers when no preferences set
+
         # Query candidate price rows excluding same provider to focus on cross-provider
         base_query = ProviderPrice.query.filter(ProviderPrice.cpu_cores.isnot(None), ProviderPrice.ram_gb.isnot(None))
         if provider_code:
             base_query = base_query.filter(ProviderPrice.provider != provider_code)
+        
+        # Filter by user's enabled providers if preferences are set
+        if enabled_providers:
+            base_query = base_query.filter(ProviderPrice.provider.in_(enabled_providers))
         # Narrow by specs when known to ensure relevant matches are included in the limited window
         if getattr(norm_res, 'vcpu', None) is not None:
             base_query = base_query.filter(ProviderPrice.cpu_cores == int(norm_res.vcpu))

@@ -25,6 +25,7 @@ from .provider_resource_type import ProviderResourceType
 from .business_board import BusinessBoard
 from .board_resource import BoardResource
 from .board_group import BoardGroup
+from .user_provider_preference import UserProviderPreference
 
 __all__ = [
     'db',
@@ -54,5 +55,6 @@ __all__ = [
     'ProviderResourceType',
     'BusinessBoard',
     'BoardResource',
-    'BoardGroup'
+    'BoardGroup',
+    'UserProviderPreference'
 ]

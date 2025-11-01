@@ -228,6 +228,15 @@ class User(BaseModel):
         
         db.session.add(user)
         db.session.commit()
+        
+        # Initialize provider preferences for new user (all providers enabled by default)
+        try:
+            from .user_provider_preference import UserProviderPreference
+            UserProviderPreference.initialize_for_user(user.id)
+        except Exception:
+            # Don't fail user creation if preference initialization fails
+            pass
+        
         return user
     
     def get_initials(self):

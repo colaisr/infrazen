@@ -226,6 +226,13 @@ def create_user():
         db.session.add(user)
         db.session.commit()
         
+        # Initialize provider preferences for new user (all providers enabled by default)
+        try:
+            from app.core.models.user_provider_preference import UserProviderPreference
+            UserProviderPreference.initialize_for_user(user.id)
+        except Exception as e:
+            logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
+        
         return jsonify({
             'success': True,
             'user': user.to_dict()

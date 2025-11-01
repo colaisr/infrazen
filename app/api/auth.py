@@ -466,6 +466,13 @@ def handle_register():
         db.session.add(user)
         db.session.commit()
         
+        # Initialize provider preferences for new user (all providers enabled by default)
+        try:
+            from app.core.models.user_provider_preference import UserProviderPreference
+            UserProviderPreference.initialize_for_user(user.id)
+        except Exception as e:
+            logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
+        
         # Generate confirmation token and send email
         token = user.generate_email_confirmation_token()
         confirmation_link = f"{request.url_root}api/auth/verify-email?token={token}"
@@ -689,6 +696,75 @@ def verify_email():
         return render_template('email_verification_result.html',
                              success=False,
                              message='Произошла ошибка при подтверждении')
+
+@auth_bp.route('/provider-preferences')
+@validate_session
+def get_provider_preferences():
+    """Get user's provider preferences for recommendations"""
+    try:
+        from app.core.models.user_provider_preference import UserProviderPreference
+        from app.core.models.provider_catalog import ProviderCatalog
+        
+        user_data = session.get('user')
+        user_id = user_data.get('db_id')
+        
+        # Get all providers from catalog
+        catalog_providers = ProviderCatalog.query.filter_by(is_enabled=True).all()
+        
+        # Get user preferences
+        user_prefs = UserProviderPreference.get_all_preferences_for_user(user_id)
+        prefs_dict = {pref.provider_type: pref.is_enabled for pref in user_prefs}
+        
+        # Build response with provider info and user preferences
+        providers = []
+        for provider in catalog_providers:
+            providers.append({
+                'provider_type': provider.provider_type,
+                'display_name': provider.display_name,
+                'logo_url': provider.logo_url,
+                'is_enabled': prefs_dict.get(provider.provider_type, True)  # Default true if not set
+            })
+        
+        return jsonify({
+            'success': True,
+            'providers': providers
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching provider preferences: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@auth_bp.route('/provider-preferences', methods=['POST'])
+@validate_session
+def update_provider_preferences():
+    """Update user's provider preferences for recommendations"""
+    try:
+        from app.core.models.user_provider_preference import UserProviderPreference
+        
+        user_data = session.get('user')
+        user_id = user_data.get('db_id')
+        
+        data = request.get_json()
+        provider_type = data.get('provider_type')
+        is_enabled = data.get('is_enabled')
+        
+        if not provider_type:
+            return jsonify({'success': False, 'error': 'Provider type is required'})
+        
+        if is_enabled is None:
+            return jsonify({'success': False, 'error': 'is_enabled is required'})
+        
+        # Update preference
+        preference = UserProviderPreference.set_provider_enabled(user_id, provider_type, is_enabled)
+        
+        return jsonify({
+            'success': True,
+            'preference': preference.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating provider preference: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 @auth_bp.route('/logout')
 def logout():

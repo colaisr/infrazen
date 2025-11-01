@@ -472,11 +472,109 @@ function showMessage(message, type) {
 }
 
 // ============================================================================
+// Provider Preferences for Recommendations
+// ============================================================================
+
+function loadProviderPreferences() {
+    fetch('/api/auth/provider-preferences')
+        .then(response => {
+            if (response.status === 401) {
+                window.location.href = '/api/auth/login';
+                return;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.success) {
+                displayProviderPreferences(data.providers);
+            } else {
+                showMessage('Failed to load provider preferences', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading provider preferences:', error);
+            showMessage('Failed to load provider preferences', 'error');
+        });
+}
+
+function displayProviderPreferences(providers) {
+    const container = document.getElementById('providerPreferencesList');
+    
+    if (!providers || providers.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #64748b;">No providers available</p>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    providers.forEach(provider => {
+        const item = document.createElement('div');
+        item.className = 'provider-preference-item';
+        item.dataset.providerType = provider.provider_type;
+        
+        const logoHtml = provider.logo_url 
+            ? `<img src="${provider.logo_url}" alt="${provider.display_name}" class="provider-logo">`
+            : `<div class="provider-logo-placeholder">${provider.display_name.substring(0, 2).toUpperCase()}</div>`;
+        
+        item.innerHTML = `
+            <div class="provider-info">
+                ${logoHtml}
+                <span class="provider-name">${provider.display_name}</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" ${provider.is_enabled ? 'checked' : ''} 
+                       onchange="toggleProviderPreference('${provider.provider_type}', this.checked)">
+                <span class="slider"></span>
+            </label>
+        `;
+        
+        container.appendChild(item);
+    });
+}
+
+function toggleProviderPreference(providerType, isEnabled) {
+    fetch('/api/auth/provider-preferences', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            provider_type: providerType,
+            is_enabled: isEnabled
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const action = isEnabled ? 'включен' : 'отключен';
+            showMessage(`Провайдер ${action} для рекомендаций`, 'success');
+        } else {
+            showMessage('Failed to update provider preference: ' + data.error, 'error');
+            // Revert the toggle on error
+            const checkbox = document.querySelector(`[data-provider-type="${providerType}"] input[type="checkbox"]`);
+            if (checkbox) {
+                checkbox.checked = !isEnabled;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Failed to update provider preference', 'error');
+        // Revert the toggle on error
+        const checkbox = document.querySelector(`[data-provider-type="${providerType}"] input[type="checkbox"]`);
+        if (checkbox) {
+            checkbox.checked = !isEnabled;
+        }
+    });
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
     loadUserDetails();
+    loadProviderPreferences();
 });
 
 // ============================================================================
@@ -527,4 +625,5 @@ window.changePassword = changePassword;
 window.checkPasswordStrength = checkPasswordStrength;
 window.checkPasswordMatch = checkPasswordMatch;
 window.sendConfirmationEmail = sendConfirmationEmail;
+window.toggleProviderPreference = toggleProviderPreference;
 
