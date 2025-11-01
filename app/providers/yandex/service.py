@@ -1351,7 +1351,9 @@ class YandexService:
                 # Private zones are free - don't charge
                 daily_cost = 0.0
                 zone_type = 'auto-created' if is_auto_created else 'manual'
-                logger.debug(f"Private DNS zone ({zone_type}): {zone_name} = FREE")
+                logger.debug(f"Skipping free private DNS zone ({zone_type}): {zone_name} = FREE (FinOps: zero-cost resources not tracked)")
+                # FinOps Best Practice: Do not store resources with zero cost
+                return None
             else:
                 # Regular DNS zones (public or manually created private)
                 # Try to get DNS zone pricing from SKU database
@@ -1368,6 +1370,7 @@ class YandexService:
                     daily_cost = 1.30
                     logger.warning(f"DNS SKU not found, using HAR-based pricing: {daily_cost:.2f} ₽/day")
             
+            # Only paid zones reach here (free zones return None above)
             metadata = {
                 'dns_zone': zone,
                 'folder_id': folder_id,
@@ -1376,12 +1379,11 @@ class YandexService:
                 'zone_name': zone_name,
                 'api_name': api_name,
                 'created_at': zone.get('createdAt'),
-                'is_service_zone': is_service_zone,
                 'has_private_visibility': has_private_visibility,
                 'has_public_visibility': has_public_visibility,
-                'cost_source': 'private_free' if is_service_zone else ('sku_based' if sku_cost else 'har_analysis'),
-                'note': 'Private zone (FREE)' if is_service_zone else 'Zone hosting cost only (queries are variable)',
-                'pricing_sku': 'dns.zones.v1' if not is_service_zone else None
+                'cost_source': 'sku_based' if sku_cost else 'har_analysis',
+                'note': 'Zone hosting cost only (queries are variable)',
+                'pricing_sku': 'dns.zones.v1'
             }
             
             resource = self._create_resource(
@@ -1401,17 +1403,13 @@ class YandexService:
                 resource.currency = 'RUB'
                 resource.status = status
                 resource.add_tag('zone_name', zone_name)
-                resource.add_tag('is_private_zone', 'true' if is_service_zone else 'false')
-                resource.add_tag('is_auto_created', 'true' if is_auto_created else 'false')
-                resource.add_tag('visibility_type', 'private' if has_private_visibility and not has_public_visibility else ('public' if has_public_visibility else 'none'))
-                resource.add_tag('cost_source', 'private_free' if is_service_zone else ('sku_based' if sku_cost else 'har_analysis'))
+                resource.add_tag('visibility_type', 'public' if has_public_visibility else 'none')
+                resource.add_tag('cost_source', 'sku_based' if sku_cost else 'har_analysis')
                 resource.add_tag('pricing_per_day', str(round(daily_cost, 2)))
-                resource.add_tag('note', 'Private zone (FREE)' if is_service_zone else 'Query costs not included (variable)')
+                resource.add_tag('pricing_sku', 'dns.zones.v1')
+                resource.add_tag('note', 'Query costs not included (variable)')
                 
-                if not is_service_zone:
-                    resource.add_tag('pricing_sku', 'dns.zones.v1')
-                
-                logger.debug(f"    DNS Zone: {zone_name} = {daily_cost:.2f} ₽/day {'(PRIVATE - FREE)' if is_service_zone else ''}")
+                logger.debug(f"    DNS Zone (PAID): {zone_name} = {daily_cost:.2f} ₽/day")
             
             return resource
             
