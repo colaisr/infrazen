@@ -578,11 +578,20 @@ function setupPropertiesPanel() {
     // Delete object
     document.getElementById('deleteObjectBtn')?.addEventListener('click', function() {
         const activeObj = fabricCanvas.getActiveObject();
-        if (activeObj && (activeObj.objectType === 'freeText' || activeObj.objectType === 'freeRect')) {
+        if (activeObj && activeObj.objectType === 'freeText') {
             fabricCanvas.remove(activeObj);
             fabricCanvas.renderAll();
             hidePropertiesPanel();
             scheduleAutoSave();
+        } else if (activeObj && activeObj.objectType === 'freeRect') {
+            fabricCanvas.remove(activeObj);
+            fabricCanvas.renderAll();
+            hidePropertiesPanel();
+            scheduleAutoSave();
+        } else if (activeObj && activeObj.objectType === 'group') {
+            // Groups need database deletion
+            deleteGroup(activeObj);
+            hidePropertiesPanel();
         }
     });
 }
