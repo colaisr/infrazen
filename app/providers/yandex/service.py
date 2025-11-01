@@ -1327,16 +1327,19 @@ class YandexService:
             # DNS zones don't have explicit status in API response
             status = 'RUNNING'
             
-            # DNS pricing from HAR analysis:
-            # Total: 13.47₽/day for yc-it
-            # Breakdown:
-            #   - Zone hosting: 11.66₽ (dns.zones.v1)
-            #   - Queries: 1.81₽ (dns.requests.public.*)
-            # 
-            # Average per zone: 13.47₽ if 1 zone, split if multiple
-            # For simplicity, use 11.66₽ per zone (zone hosting only)
-            # Query costs are variable and small
-            daily_cost = 11.66
+            # Try to get DNS zone pricing from SKU database
+            sku_cost = YandexSKUPricing.calculate_dns_zone_cost()
+            
+            if sku_cost and sku_cost.get('accuracy') == 'sku_based':
+                # Use SKU-based pricing (most accurate)
+                daily_cost = sku_cost['daily_cost']
+                logger.debug(f"Using SKU-based DNS zone pricing: {daily_cost:.2f} ₽/day")
+            else:
+                # Fallback to HAR-derived pricing if SKU not available
+                # DNS pricing from HAR analysis: 1.30₽/day per zone (dns.zones.v1)
+                # Query costs are variable and small (~0.10₽/day)
+                daily_cost = 1.30
+                logger.warning(f"DNS SKU not found, using HAR-based pricing: {daily_cost:.2f} ₽/day")
             
             metadata = {
                 'dns_zone': zone,
@@ -1345,8 +1348,9 @@ class YandexService:
                 'cloud_id': cloud_id,
                 'zone_name': zone_name,
                 'created_at': zone.get('createdAt'),
-                'cost_source': 'har_analysis',
-                'note': 'Zone hosting cost only (queries are variable)'
+                'cost_source': 'sku_based' if sku_cost else 'har_analysis',
+                'note': 'Zone hosting cost only (queries are variable)',
+                'pricing_sku': 'dns.zones.v1'
             }
             
             resource = self._create_resource(
@@ -1366,9 +1370,10 @@ class YandexService:
                 resource.currency = 'RUB'
                 resource.status = status
                 resource.add_tag('zone_name', zone_name)
-                resource.add_tag('cost_source', 'har_analysis')
-                resource.add_tag('pricing_per_day', '11.66')
+                resource.add_tag('cost_source', 'sku_based' if sku_cost else 'har_analysis')
+                resource.add_tag('pricing_per_day', str(round(daily_cost, 2)))
                 resource.add_tag('note', 'Query costs not included (variable)')
+                resource.add_tag('pricing_sku', 'dns.zones.v1')
                 
                 logger.debug(f"    DNS Zone: {zone_name} = {daily_cost:.2f} ₽/day")
             

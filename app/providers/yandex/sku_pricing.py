@@ -44,6 +44,9 @@ class YandexSKUPricing:
         'network.public_fips': 'dn229q5mnmp58t58tfel',  # Public IP
         'network.egress.inet': 'dn28ml7sjbb5v98jkuj3',  # Egress traffic
         'network.ingress.inet': 'dn2qdioekaj903nccfam', # Ingress traffic (free)
+        
+        # DNS
+        'dns.zones.v1': 'dn2in5tir8ghu37ik2al',  # DNS zone hosting - 0.054 ₽/hour = 1.30 ₽/day
     }
     
     @classmethod
@@ -263,4 +266,32 @@ class YandexSKUPricing:
         except Exception as e:
             logger.error(f"Error calculating cluster cost: {e}")
             return {'daily_cost': 0, 'monthly_cost': 0, 'breakdown': {}}
+    
+    @classmethod
+    def calculate_dns_zone_cost(cls) -> Optional[Dict[str, float]]:
+        """
+        Calculate DNS zone hosting cost using SKU pricing
+        
+        Returns:
+            Dict with daily and monthly costs or None if SKU not found
+        """
+        try:
+            # Get DNS zone SKU price
+            sku_data = cls.get_sku_price('dns.zones.v1')
+            
+            if sku_data and sku_data.get('accuracy') == 'sku_based':
+                return {
+                    'daily_cost': sku_data['daily_cost'],
+                    'monthly_cost': sku_data['monthly_cost'],
+                    'hourly_cost': sku_data['hourly_cost'],
+                    'accuracy': 'sku_based',
+                    'source': 'Yandex SKU API'
+                }
+            
+            # Fallback if SKU not found
+            return None
+        
+        except Exception as e:
+            logger.error(f"Error calculating DNS zone cost: {e}")
+            return None
 
