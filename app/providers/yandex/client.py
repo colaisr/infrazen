@@ -931,33 +931,67 @@ class YandexClient:
                 'total_networks': 0
             }
             
-            # If no clouds found, try to discover folder from service account
+            # If no clouds found, try to discover ALL folders via service account's cloud
             if len(clouds) == 0:
-                logger.warning("No clouds accessible - attempting to discover folder from service account")
+                logger.warning("No clouds accessible - attempting to discover folders via service account")
                 try:
-                    folder_id = self._get_service_account_folder()
-                    if folder_id:
-                        logger.info(f"Using service account folder: {folder_id}")
-                        folder_details = self._get_folder_details(folder_id)
+                    # Get service account's folder to find its cloud
+                    sa_folder_id = self._get_service_account_folder()
+                    if sa_folder_id:
+                        logger.info(f"Service account belongs to folder: {sa_folder_id}")
+                        folder_details = self._get_folder_details(sa_folder_id)
                         
                         if folder_details:
-                            folder_resources = self.get_all_resources_from_folder(folder_id)
+                            cloud_id = folder_details.get('cloudId')
+                            logger.info(f"Discovered cloud ID: {cloud_id}")
                             
-                            folder_info = {
-                                'folder': folder_details,
-                                'cloud_id': folder_details.get('cloudId', 'unknown'),
-                                'resources': folder_resources
-                            }
+                            # Now list ALL folders in this cloud (not just service account's folder)
+                            try:
+                                all_cloud_folders = self.list_folders(cloud_id)
+                                logger.info(f"Found {len(all_cloud_folders)} total folder(s) in cloud {cloud_id}")
+                                
+                                # Process each accessible folder
+                                for folder in all_cloud_folders:
+                                    folder_id = folder['id']
+                                    folder_name = folder.get('name', folder_id)
+                                    
+                                    try:
+                                        logger.info(f"Processing folder: {folder_name} ({folder_id})")
+                                        folder_resources = self.get_all_resources_from_folder(folder_id)
+                                        
+                                        folder_info = {
+                                            'folder': folder,
+                                            'cloud_id': cloud_id,
+                                            'resources': folder_resources
+                                        }
+                                        
+                                        all_resources['folders'].append(folder_info)
+                                        all_resources['total_instances'] += len(folder_resources.get('instances', []))
+                                        all_resources['total_disks'] += len(folder_resources.get('disks', []))
+                                        all_resources['total_networks'] += len(folder_resources.get('networks', []))
+                                    
+                                    except Exception as folder_err:
+                                        logger.warning(f"Failed to access folder {folder_name}: {folder_err}")
+                                        logger.warning(f"Skipping folder {folder_id} - likely permission denied")
                             
-                            all_resources['folders'].append(folder_info)
-                            all_resources['total_instances'] += len(folder_resources.get('instances', []))
-                            all_resources['total_disks'] += len(folder_resources.get('disks', []))
-                            all_resources['total_networks'] += len(folder_resources.get('networks', []))
-                            
-                            logger.info(f"Found {all_resources['total_instances']} instances from folder {folder_id}")
-                            return all_resources
+                            except Exception as list_err:
+                                logger.warning(f"Cannot list folders in cloud {cloud_id}: {list_err}")
+                                logger.info("Falling back to service account folder only")
+                                
+                                # Fallback: just process the service account's folder
+                                folder_resources = self.get_all_resources_from_folder(sa_folder_id)
+                                folder_info = {
+                                    'folder': folder_details,
+                                    'cloud_id': cloud_id,
+                                    'resources': folder_resources
+                                }
+                                all_resources['folders'].append(folder_info)
+                                all_resources['total_instances'] += len(folder_resources.get('instances', []))
+                                all_resources['total_disks'] += len(folder_resources.get('disks', []))
+                                all_resources['total_networks'] += len(folder_resources.get('networks', []))
+                
                 except Exception as folder_error:
-                    logger.error(f"Failed to use service account folder: {folder_error}")
+                    logger.error(f"Failed to discover folders via service account: {folder_error}")
             
             for cloud in clouds:
                 cloud_id = cloud['id']
