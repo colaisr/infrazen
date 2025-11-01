@@ -1057,7 +1057,9 @@ class YandexService:
         Process reserved but unused public IP address
         
         Reserved IPs that are not attached to any resource still cost money.
-        From HAR analysis: 4.61₽/day per unused IP (40.18₽ for ~9 IPs)
+        SKU: network.public_fips.deallocated
+        Pricing: 8.04₽/day per unused IP (0.335₽/hour)
+        Source: Yandex billing data (Oct 31: 120 fip*hour = 40.18₽ for 5 IPs)
         
         Args:
             address: Address data from API
@@ -1078,8 +1080,11 @@ class YandexService:
             if is_used:
                 return None  # Skip active IPs (they're counted in VM costs)
             
-            # Reserved IP pricing: 0.1920₽/hour = 4.608₽/day
-            daily_cost = 4.608
+            # Reserved IP pricing (deallocated/inactive public static IP)
+            # SKU: network.public_fips.deallocated (dn2nqa0nqffbhihsq2n5)
+            # Source: Yandex billing data (Oct 31: 120 fip*hour = 40.18₽)
+            # Calculation: 40.18₽ / 120 fip*hour = 0.3348₽/hour = 8.04₽/day
+            daily_cost = 8.04
             
             metadata = {
                 'address': address,
@@ -1090,7 +1095,9 @@ class YandexService:
                 'is_used': is_used,
                 'reserved': address.get('reserved', False),
                 'created_at': address.get('createdAt'),
-                'cost_source': 'documented'
+                'cost_source': 'billing_data',
+                'sku': 'network.public_fips.deallocated',
+                'sku_id': 'dn2nqa0nqffbhihsq2n5'
             }
             
             resource = self._create_resource(
