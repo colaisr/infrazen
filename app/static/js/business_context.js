@@ -114,7 +114,9 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fill: '#8B5CF6',
             originX: 'center',
             originY: 'center',
-            visible: false
+            visible: false,
+            evented: true,
+            hoverCursor: 'pointer'
         }));
         
         // 9. Clone badge text (initially hidden, white 'c' on purple)
@@ -1235,6 +1237,7 @@ function setupObjectEventHandlers() {
             if (children && children.length >= 9) {
                 const infoIconCircle = children[3];
                 const notesIconCircle = children[5];
+                const cloneBadgeCircle = children[7];
                 
                 // Re-attach click handlers to icons
                 if (infoIconCircle) {
@@ -1266,6 +1269,17 @@ function setupObjectEventHandlers() {
                     
                     notesIconCircle.on('mouseout', function() {
                         hideNotesTooltip();
+                    });
+                }
+                
+                if (cloneBadgeCircle) {
+                    // Re-attach hover handlers for clone badge
+                    cloneBadgeCircle.on('mouseover', function(e) {
+                        showCloneTooltip(obj.resourceId, obj, cloneBadgeCircle);
+                    });
+                    
+                    cloneBadgeCircle.on('mouseout', function() {
+                        hideCloneTooltip();
                     });
                 }
             }
@@ -2844,6 +2858,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
     const children = resourceCard.getObjects();
     const infoIcon = children[3];  // Info icon circle
     const notesIcon = children[5];  // Notes icon circle
+    const cloneBadge = children[7];  // Clone badge circle
     
     // Add to canvas
     fabricCanvas.add(resourceCard);
@@ -2888,6 +2903,17 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         
         notesIcon.on('mouseout', function() {
             hideNotesTooltip();
+        });
+    }
+    
+    if (cloneBadge) {
+        // Show clone tooltip on hover
+        cloneBadge.on('mouseover', function(e) {
+            showCloneTooltip(resourceCard.resourceId, resourceCard, cloneBadge);
+        });
+        
+        cloneBadge.on('mouseout', function() {
+            hideCloneTooltip();
         });
     }
     
@@ -3074,6 +3100,7 @@ async function showResourceInfo(resourceId) {
     // Hide any visible tooltips
     hideResourceTooltip();
     hideNotesTooltip();
+    hideCloneTooltip();
     
     const modal = document.getElementById('resourceInfoModal');
     const content = document.getElementById('resourceInfoContent');
@@ -3332,12 +3359,83 @@ function hideNotesTooltip() {
 }
 
 /**
+ * Show clone tooltip on hover
+ */
+function showCloneTooltip(resourceId, resourceCard, badge) {
+    // Create or get tooltip element
+    let tooltip = document.getElementById('cloneTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'cloneTooltip';
+        tooltip.className = 'resource-tooltip clone-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    // Count number of clones on canvas
+    const objects = fabricCanvas.getObjects();
+    const cloneCount = objects.filter(obj => obj.objectType === 'resource' && obj.resourceId === resourceId).length;
+    
+    // Build tooltip content
+    const html = `
+        <div class="tooltip-header">Клонирован</div>
+        <div class="tooltip-notes-content">У ресурса есть клон на доске (${cloneCount} экземпляров)</div>
+        <div class="tooltip-footer">Стоимость разделена между клонами</div>
+    `;
+    
+    tooltip.innerHTML = html;
+    
+    // Calculate badge position on screen (clone badge is at bottom-right)
+    const canvasEl = fabricCanvas.getElement();
+    const canvasOffset = canvasEl.getBoundingClientRect();
+    const zoom = fabricCanvas.getZoom();
+    const vpt = fabricCanvas.viewportTransform;
+    
+    // Get badge position in canvas coordinates
+    // Clone badge is at left: cardWidth - 10, top: cardHeight - 10 relative to resourceCard
+    const cardWidth = 120;
+    const cardHeight = 80;
+    const badgeCanvasX = resourceCard.left + (cardWidth - 10);
+    const badgeCanvasY = resourceCard.top + (cardHeight - 10);
+    
+    // Convert to screen coordinates
+    const badgeScreenX = canvasOffset.left + (badgeCanvasX * zoom + vpt[4]);
+    const badgeScreenY = canvasOffset.top + (badgeCanvasY * zoom + vpt[5]);
+    
+    // Make tooltip visible to measure its height
+    tooltip.style.display = 'block';
+    tooltip.style.visibility = 'hidden';
+    
+    // Get tooltip dimensions
+    const tooltipHeight = tooltip.offsetHeight;
+    const tooltipWidth = tooltip.offsetWidth;
+    
+    // Position above badge with margin
+    const leftPos = badgeScreenX - (tooltipWidth / 2);
+    const topPos = badgeScreenY - tooltipHeight - 20; // 20px above badge
+    
+    tooltip.style.left = leftPos + 'px';
+    tooltip.style.top = topPos + 'px';
+    tooltip.style.visibility = 'visible';
+}
+
+/**
+ * Hide clone tooltip
+ */
+function hideCloneTooltip() {
+    const tooltip = document.getElementById('cloneTooltip');
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
+}
+
+/**
  * Show resource notes modal
  */
 async function showResourceNotes(resourceId) {
     // Hide any visible tooltips
     hideResourceTooltip();
     hideNotesTooltip();
+    hideCloneTooltip();
     
     const modal = document.getElementById('resourceNotesModal');
     const header = document.getElementById('resourceNotesHeader');
