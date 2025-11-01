@@ -313,16 +313,117 @@ function createMemoryChart(canvas, resourceId) {
 // ============================================================================
 
 function exportResourcesToCSV() {
+    // Check if SheetJS (XLSX) library is available
+    if (typeof XLSX === 'undefined') {
+        console.error('SheetJS library not loaded, falling back to CSV export');
+        exportResourcesToCSVFallback();
+        return;
+    }
+    
     // Get all provider sections
+    const providerSections = document.querySelectorAll('.provider-section');
+    
+    // Get summary statistics
+    const summaryStats = document.querySelector('.summary-stats');
+    const totalResources = summaryStats?.querySelector('.stat-value')?.textContent || '0';
+    const totalCost = summaryStats?.querySelectorAll('.stat-value')[1]?.textContent || '0 ₽/день';
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Create summary sheet
+    const summaryData = [
+        ['ЭКСПОРТ РЕСУРСОВ - InfraZen FinOps Platform'],
+        ['Дата экспорта:', new Date().toLocaleDateString('ru-RU')],
+        [],
+        ['ОБЩАЯ СТАТИСТИКА:'],
+        ['Всего ресурсов:', totalResources],
+        ['Общая стоимость:', totalCost],
+        [],
+        ['ДЕТАЛЬНЫЕ ДАННЫЕ:']
+    ];
+    
+    const ws_summary = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    // Set column widths for summary
+    ws_summary['!cols'] = [
+        { wch: 30 },
+        { wch: 20 }
+    ];
+    
+    // Create resources data array
+    const resourcesData = [
+        ['Провайдер', 'Ресурс', 'Тип', 'Статус', 'External IP', 'Регион', 'Стоимость день (₽)', 'Стоимость месяц (₽)']
+    ];
+    
+    // Process each provider section
+    providerSections.forEach(section => {
+        const providerName = section.querySelector('.provider-name').textContent;
+        const resourceCards = section.querySelectorAll('.resource-card');
+        
+        if (resourceCards.length === 0) {
+            resourcesData.push([providerName, 'Нет ресурсов', '', '', '', '', '', '']);
+        } else {
+            resourceCards.forEach(card => {
+                const resourceName = card.querySelector('.resource-name').textContent;
+                const resourceType = card.querySelector('.resource-type').textContent;
+                const status = card.querySelector('.status-badge').textContent.trim();
+                const externalIp = card.querySelector('.detail-row:nth-child(1) .detail-value').textContent;
+                const region = card.querySelector('.detail-row:nth-child(2) .detail-value').textContent;
+                const costMonthly = card.querySelector('.detail-row:nth-child(3) .detail-value').textContent;
+                const costDaily = card.querySelector('.detail-row:nth-child(4) .detail-value').textContent;
+                
+                // Extract numeric values from cost strings
+                const dailyNumeric = parseFloat(costDaily.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+                const monthlyNumeric = parseFloat(costMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+                
+                resourcesData.push([
+                    providerName,
+                    resourceName,
+                    resourceType,
+                    status,
+                    externalIp,
+                    region,
+                    dailyNumeric,
+                    monthlyNumeric
+                ]);
+            });
+        }
+    });
+    
+    // Create resources worksheet
+    const ws_resources = XLSX.utils.aoa_to_sheet(resourcesData);
+    
+    // Set column widths
+    ws_resources['!cols'] = [
+        { wch: 15 }, // Провайдер
+        { wch: 35 }, // Ресурс
+        { wch: 20 }, // Тип
+        { wch: 12 }, // Статус
+        { wch: 15 }, // External IP
+        { wch: 20 }, // Регион
+        { wch: 18 }, // Стоимость день
+        { wch: 18 }  // Стоимость месяц
+    ];
+    
+    // Add both sheets to workbook
+    XLSX.utils.book_append_sheet(wb, ws_summary, 'Сводка');
+    XLSX.utils.book_append_sheet(wb, ws_resources, 'Ресурсы');
+    
+    // Generate Excel file and download
+    const fileName = `resources_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+}
+
+// Fallback CSV export if XLSX library not available
+function exportResourcesToCSVFallback() {
     const providerSections = document.querySelectorAll('.provider-section');
     let csvContent = '\uFEFF'; // UTF-8 BOM for proper encoding
     
-    // Add title and summary from main sync
     csvContent += 'ЭКСПОРТ РЕСУРСОВ - InfraZen FinOps Platform\n';
     csvContent += 'Дата экспорта: ' + new Date().toLocaleDateString('ru-RU') + '\n';
     csvContent += '\n';
     
-    // Add summary statistics
     const summaryStats = document.querySelector('.summary-stats');
     if (summaryStats) {
         const totalResources = summaryStats.querySelector('.stat-value')?.textContent || '0';
@@ -333,11 +434,9 @@ function exportResourcesToCSV() {
         csvContent += '\n';
     }
     
-    // Add data header
     csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
     csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Стоимость (₽/день)\n';
     
-    // Process each provider section
     providerSections.forEach(section => {
         const providerName = section.querySelector('.provider-name').textContent;
         const resourceCards = section.querySelectorAll('.resource-card');
@@ -358,7 +457,6 @@ function exportResourcesToCSV() {
         }
     });
     
-    // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
