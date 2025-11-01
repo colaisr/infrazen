@@ -608,34 +608,42 @@ class YandexService:
             if boot_disk:
                 boot_disk_id = boot_disk.get('diskId')
                 
-                # Get size from disks list (instance API doesn't include size)
+                # Get size and type from disks list (instance API doesn't include these)
                 boot_disk_size = 0
+                boot_disk_type = 'network-ssd'  # Default
                 if boot_disk_id and boot_disk_id in disk_map:
                     boot_disk_size_bytes = int(disk_map[boot_disk_id].get('size', '0') or 0)
                     boot_disk_size = boot_disk_size_bytes / (1024**3)
+                    boot_disk_type = disk_map[boot_disk_id].get('typeId', 'network-ssd')
                 
                 total_storage_gb += boot_disk_size
                 attached_disks.append({
                     'disk_id': boot_disk_id,
                     'mode': boot_disk.get('mode', 'READ_WRITE'),
                     'size_gb': round(boot_disk_size, 2),
+                    'type': boot_disk_type,
+                    'device_name': boot_disk.get('deviceName', 'boot'),
                     'is_boot': True
                 })
             
             for disk in secondary_disks:
                 disk_id = disk.get('diskId')
                 
-                # Get size from disks list (instance API doesn't include size)
+                # Get size and type from disks list (instance API doesn't include these)
                 disk_size = 0
+                disk_type = 'network-ssd'  # Default
                 if disk_id and disk_id in disk_map:
                     disk_size_bytes = int(disk_map[disk_id].get('size', '0') or 0)
                     disk_size = disk_size_bytes / (1024**3)
+                    disk_type = disk_map[disk_id].get('typeId', 'network-ssd')
                 
                 total_storage_gb += disk_size
                 attached_disks.append({
                     'disk_id': disk_id,
                     'mode': disk.get('mode', 'READ_WRITE'),
                     'size_gb': round(disk_size, 2),
+                    'type': disk_type,
+                    'device_name': disk.get('deviceName', f'disk-{disk_id[:8]}'),
                     'is_boot': False
                 })
             
@@ -659,28 +667,37 @@ class YandexService:
             platform_id = instance.get('platformId', 'standard-v3')
             core_fraction = int(resources_spec.get('coreFraction', 100))
             
-            # Determine disk type from boot disk
-            disk_type = 'network-ssd'  # Default
-            if boot_disk:
-                boot_disk_id = boot_disk.get('diskId')
-                if boot_disk_id and all_disks:
-                    boot_disk_obj = next((d for d in all_disks if d.get('id') == boot_disk_id), None)
-                    if boot_disk_obj:
-                        disk_type = boot_disk_obj.get('typeId', 'network-ssd')
-            
             # Check for public IP
             has_public_ip = bool(external_ip)
             
-            # Calculate cost using official Yandex pricing
-            # Pass status to handle STOPPED VMs correctly (disk-only cost)
-            estimated_daily_cost = self._estimate_instance_cost(
-                vcpus, ram_gb, total_storage_gb, zone_id,
+            # Calculate CPU + RAM cost first (without storage)
+            base_cost = self._estimate_instance_cost(
+                vcpus, ram_gb, 0,  # Pass 0 for storage - we'll calculate disks separately
+                zone_id,
                 platform_id=platform_id,
                 core_fraction=core_fraction,
-                disk_type=disk_type,
+                disk_type='network-ssd',  # Not used when storage_gb=0
                 has_public_ip=has_public_ip,
                 status=status
             )
+            
+            # Calculate storage cost for each disk separately (with their individual types)
+            total_disk_cost = 0
+            for disk_info in attached_disks:
+                disk_size = disk_info.get('size_gb', 0)
+                disk_type = disk_info.get('type', 'network-ssd')
+                
+                # For stopped VMs, only charge for disks
+                if status in ['STOPPED', 'STOPPING']:
+                    disk_cost = self._estimate_disk_cost(disk_size, disk_type)
+                    total_disk_cost += disk_cost
+                else:
+                    # For running VMs, charge for disks normally
+                    disk_cost = self._estimate_disk_cost(disk_size, disk_type)
+                    total_disk_cost += disk_cost
+            
+            # Total VM cost = base (CPU+RAM+IP) + all disks
+            estimated_daily_cost = base_cost + total_disk_cost
             
             # Create resource metadata
             metadata = {
