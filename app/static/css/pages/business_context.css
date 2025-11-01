@@ -1070,6 +1070,45 @@ textarea.form-control {
     color: #6B7280;
 }
 
+/* Color Palette for Group Properties */
+.color-palette {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.color-option {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.color-option.active {
+    border-color: #1F2937;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #1F2937;
+}
+
+.color-option.active::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffffff;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
 /* ============================================================================
    RESOURCE INFO & NOTES MODAL SPECIFIC STYLES
    ============================================================================ */

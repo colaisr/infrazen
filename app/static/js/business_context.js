@@ -523,6 +523,39 @@ function setupPropertiesPanel() {
         }
     });
     
+    // Group properties - color buttons
+    document.querySelectorAll('.color-option').forEach(button => {
+        button.addEventListener('click', function() {
+            const activeObj = fabricCanvas.getActiveObject();
+            if (activeObj && activeObj.objectType === 'group') {
+                const newColor = this.dataset.color;
+                activeObj.groupColor = newColor;
+                
+                // Update the background rectangle child (children[0])
+                const children = activeObj.getObjects();
+                const groupRect = children[0];
+                if (groupRect) {
+                    groupRect.set({
+                        stroke: newColor,
+                        fill: hexToRgba(newColor, 0.05)
+                    });
+                }
+                
+                // Update active state on buttons
+                document.querySelectorAll('.color-option').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                fabricCanvas.renderAll();
+                
+                // Update in database
+                updateGroupInDatabase(activeObj);
+                scheduleAutoSave();
+            }
+        });
+    });
+    
     // Layer ordering
     document.getElementById('bringToFrontBtn')?.addEventListener('click', function() {
         const activeObj = fabricCanvas.getActiveObject();
@@ -558,7 +591,7 @@ function setupPropertiesPanel() {
  * Show properties panel for selected object
  */
 function showPropertiesPanel(obj) {
-    if (!obj || (obj.objectType !== 'freeText' && obj.objectType !== 'freeRect')) {
+    if (!obj || (obj.objectType !== 'freeText' && obj.objectType !== 'freeRect' && obj.objectType !== 'group')) {
         hidePropertiesPanel();
         return;
     }
@@ -566,10 +599,12 @@ function showPropertiesPanel(obj) {
     const propertiesPanel = document.getElementById('propertiesPanel');
     const textProperties = document.getElementById('textProperties');
     const rectangleProperties = document.getElementById('rectangleProperties');
+    const groupProperties = document.getElementById('groupProperties');
     
     // Hide all property sections
     textProperties.style.display = 'none';
     rectangleProperties.style.display = 'none';
+    groupProperties.style.display = 'none';
     
     // Show relevant properties
     if (obj.objectType === 'freeText') {
@@ -595,6 +630,14 @@ function showPropertiesPanel(obj) {
             document.getElementById('rectOpacityValue').textContent = opacity + '%';
         }
         document.getElementById('rectStrokeColor').value = obj.stroke || '#3B82F6';
+    } else if (obj.objectType === 'group') {
+        groupProperties.style.display = 'block';
+        
+        // Highlight the active color
+        const currentColor = obj.groupColor || '#92400E';
+        document.querySelectorAll('.color-option').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.color === currentColor);
+        });
     }
     
     propertiesPanel.style.display = 'flex';
@@ -2010,13 +2053,9 @@ function setupContextMenu() {
                 case 'rename':
                     editGroupName(contextTarget);
                     break;
-                    
-                case 'change-color':
-                    changeGroupColor(contextTarget);
-                    break;
                 
                 case 'properties':
-                    // Show properties panel for free objects
+                    // Show properties panel for free objects and groups
                     showPropertiesPanel(contextTarget);
                     fabricCanvas.setActiveObject(contextTarget);
                     fabricCanvas.renderAll();
@@ -4075,6 +4114,8 @@ function editGroupName(businessGroup) {
 
 /**
  * Change group color
+ * @deprecated This function is replaced by the properties panel.
+ * Use showPropertiesPanel() instead.
  */
 function changeGroupColor(businessGroup) {
     const colors = [

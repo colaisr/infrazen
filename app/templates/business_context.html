@@ -220,6 +220,23 @@
                         </div>
                     </div>
                     
+                    <!-- Group Properties -->
+                    <div id="groupProperties" style="display: none;">
+                        <div class="property-group">
+                            <label>Цвет границы</label>
+                            <div class="color-palette">
+                                <button class="color-option" data-color="#92400E" style="background-color: #92400E;" title="Коричневый"></button>
+                                <button class="color-option" data-color="#10B981" style="background-color: #10B981;" title="Зелёный"></button>
+                                <button class="color-option" data-color="#8B5CF6" style="background-color: #8B5CF6;" title="Фиолетовый"></button>
+                                <button class="color-option" data-color="#F59E0B" style="background-color: #F59E0B;" title="Оранжевый"></button>
+                                <button class="color-option" data-color="#EF4444" style="background-color: #EF4444;" title="Красный"></button>
+                                <button class="color-option" data-color="#EC4899" style="background-color: #EC4899;" title="Розовый"></button>
+                                <button class="color-option" data-color="#3B82F6" style="background-color: #3B82F6;" title="Синий"></button>
+                                <button class="color-option" data-color="#6B7280" style="background-color: #6B7280;" title="Серый"></button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Common Properties for all objects -->
                     <div id="commonProperties">
                         <div class="property-group">
@@ -321,9 +338,9 @@
         <i class="fa-solid fa-edit"></i>
         <span>Переименовать</span>
     </div>
-    <div class="context-menu-item" data-action="change-color" data-for="group">
-        <i class="fa-solid fa-palette"></i>
-        <span>Изменить цвет</span>
+    <div class="context-menu-item" data-action="properties" data-for="group">
+        <i class="fa-solid fa-sliders"></i>
+        <span>Свойства</span>
     </div>
     
     <!-- Free object options (text, rectangle) -->
