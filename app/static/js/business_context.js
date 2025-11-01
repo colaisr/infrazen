@@ -274,6 +274,15 @@ function setupEventListeners() {
         createBoardBtn.addEventListener('click', openCreateBoardModal);
     }
     
+    // Create board form submit handler
+    const createBoardForm = document.getElementById('createBoardForm');
+    if (createBoardForm) {
+        createBoardForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            createBoard();
+        });
+    }
+    
     // Back to list button
     const backToListBtn = document.getElementById('backToListBtn');
     if (backToListBtn) {
