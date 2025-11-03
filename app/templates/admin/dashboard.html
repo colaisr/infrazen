@@ -87,6 +87,10 @@
                 <i class="fa-solid fa-sync"></i>
                 Reseed Demo User
             </button>
+            <button class="btn btn-primary" onclick="downloadDatabase()">
+                <i class="fa-solid fa-download"></i>
+                Download DB
+            </button>
         </div>
         <p class="action-note">
             <i class="fa-solid fa-info-circle"></i>
@@ -183,6 +187,62 @@ function reseedDemoUser() {
     .finally(() => {
         button.disabled = false;
         button.innerHTML = '<i class="fa-solid fa-sync"></i> Reseed Demo User';
+    });
+}
+
+function downloadDatabase() {
+    if (!confirm('Download database backup? This may take a moment depending on database size.')) {
+        return;
+    }
+    
+    const button = event.target.closest('button');
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Preparing...';
+    
+    fetch('/api/admin/download-database', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            // Get filename from Content-Disposition header if available
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'database_backup.zip';
+            if (contentDisposition) {
+                const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+                if (matches != null && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            
+            // Download the file
+            return response.blob().then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                alert('✅ Database backup downloaded successfully!');
+            });
+        } else {
+            return response.json().then(data => {
+                alert('❌ Error: ' + (data.error || 'Failed to download database'));
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error downloading database:', error);
+        alert('❌ Failed to download database. Check console for details.');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fa-solid fa-download"></i> Download DB';
     });
 }
 </script>
@@ -341,6 +401,30 @@ function reseedDemoUser() {
 }
 
 .btn-warning:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--primary-blue);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+}
+
+.btn-primary:disabled {
     background: #9ca3af;
     cursor: not-allowed;
 }

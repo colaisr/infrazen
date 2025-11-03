@@ -1,7 +1,7 @@
 """
 Admin API routes for user management and impersonation
 """
-from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, flash
+from flask import Blueprint, render_template, redirect, url_for, session, request, jsonify, flash, after_this_request
 from datetime import datetime
 import logging
 from app.core.database import db
@@ -1874,4 +1874,233 @@ def sync_all_prices():
         return jsonify({
             'success': False,
             'error': f'Failed to execute price sync: {str(e)}'
+        }), 500
+
+@admin_bp.route('/download-database', methods=['POST'])
+def download_database():
+    """Create database dump, zip it, and download (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    import subprocess
+    import tempfile
+    import zipfile
+    import os
+    from flask import send_file
+    from urllib.parse import urlparse, parse_qs
+    
+    temp_dir = None
+    dump_file = None
+    zip_file = None
+    
+    try:
+        logger.info("Admin initiated database download")
+        
+        # Get database URI from config
+        from flask import current_app
+        db_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        
+        if not db_uri:
+            return jsonify({
+                'success': False,
+                'error': 'Database URI not configured'
+            }), 500
+        
+        # Parse database URI
+        parsed = urlparse(db_uri)
+        db_type = parsed.scheme.split('+')[0]  # mysql, postgresql, sqlite, etc.
+        
+        # Create temporary directory for dump files
+        temp_dir = tempfile.mkdtemp()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        if db_type == 'mysql':
+            # MySQL dump
+            db_name = parsed.path.lstrip('/')
+            # Remove query parameters from db_name if present
+            if '?' in db_name:
+                db_name = db_name.split('?')[0]
+            
+            db_host = parsed.hostname or 'localhost'
+            db_port = parsed.port or 3306
+            db_user = parsed.username
+            db_password = parsed.password
+            
+            dump_file = os.path.join(temp_dir, f'infrazen_dump_{timestamp}.sql')
+            
+            # Build mysqldump command
+            cmd = [
+                'mysqldump',
+                f'--host={db_host}',
+                f'--port={db_port}',
+                f'--user={db_user}',
+                '--single-transaction',
+                '--quick',
+                '--lock-tables=false',
+                '--routines',
+                '--triggers',
+                '--events',
+                db_name
+            ]
+            
+            # Set password via environment variable for security
+            env = os.environ.copy()
+            if db_password:
+                env['MYSQL_PWD'] = db_password
+            
+            logger.info(f"Creating MySQL dump for database: {db_name}")
+            
+            # Execute mysqldump
+            with open(dump_file, 'w') as f:
+                result = subprocess.run(
+                    cmd,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    env=env,
+                    text=True
+                )
+            
+            if result.returncode != 0:
+                error_msg = result.stderr
+                logger.error(f"mysqldump failed: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Database dump failed: {error_msg}'
+                }), 500
+        
+        elif db_type == 'sqlite':
+            # SQLite dump
+            db_path = parsed.path
+            dump_file = os.path.join(temp_dir, f'infrazen_dump_{timestamp}.db')
+            
+            logger.info(f"Creating SQLite copy: {db_path}")
+            
+            # For SQLite, just copy the file
+            import shutil
+            shutil.copy2(db_path, dump_file)
+        
+        elif db_type == 'postgresql':
+            # PostgreSQL dump
+            db_name = parsed.path.lstrip('/')
+            db_host = parsed.hostname or 'localhost'
+            db_port = parsed.port or 5432
+            db_user = parsed.username
+            db_password = parsed.password
+            
+            dump_file = os.path.join(temp_dir, f'infrazen_dump_{timestamp}.sql')
+            
+            # Build pg_dump command
+            cmd = [
+                'pg_dump',
+                f'--host={db_host}',
+                f'--port={db_port}',
+                f'--username={db_user}',
+                '--no-password',
+                '--format=plain',
+                db_name
+            ]
+            
+            # Set password via environment variable
+            env = os.environ.copy()
+            if db_password:
+                env['PGPASSWORD'] = db_password
+            
+            logger.info(f"Creating PostgreSQL dump for database: {db_name}")
+            
+            # Execute pg_dump
+            with open(dump_file, 'w') as f:
+                result = subprocess.run(
+                    cmd,
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    env=env,
+                    text=True
+                )
+            
+            if result.returncode != 0:
+                error_msg = result.stderr
+                logger.error(f"pg_dump failed: {error_msg}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Database dump failed: {error_msg}'
+                }), 500
+        
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Unsupported database type: {db_type}'
+            }), 400
+        
+        # Create zip file
+        zip_file = os.path.join(temp_dir, f'infrazen_backup_{timestamp}.zip')
+        
+        logger.info(f"Creating zip archive: {zip_file}")
+        
+        with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.write(dump_file, os.path.basename(dump_file))
+        
+        # Get file size for logging
+        zip_size = os.path.getsize(zip_file)
+        logger.info(f"Database backup created: {zip_size / (1024*1024):.2f} MB")
+        
+        # Register cleanup function to run after request
+        @after_this_request
+        def cleanup_files(response):
+            try:
+                if dump_file and os.path.exists(dump_file):
+                    os.remove(dump_file)
+                    logger.debug(f"Cleaned up dump file: {dump_file}")
+                if zip_file and os.path.exists(zip_file):
+                    os.remove(zip_file)
+                    logger.debug(f"Cleaned up zip file: {zip_file}")
+                if temp_dir and os.path.exists(temp_dir):
+                    os.rmdir(temp_dir)
+                    logger.debug(f"Cleaned up temp directory: {temp_dir}")
+            except Exception as cleanup_error:
+                logger.warning(f"Error during cleanup: {cleanup_error}")
+            return response
+        
+        # Send file as download
+        return send_file(
+            zip_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'infrazen_backup_{timestamp}.zip'
+        )
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Database dump command failed: {str(e)}")
+        # Clean up files on error
+        try:
+            if dump_file and os.path.exists(dump_file):
+                os.remove(dump_file)
+            if zip_file and os.path.exists(zip_file):
+                os.remove(zip_file)
+            if temp_dir and os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+        except Exception:
+            pass
+        return jsonify({
+            'success': False,
+            'error': f'Database dump command failed: {str(e)}'
+        }), 500
+    
+    except Exception as e:
+        logger.error(f"Error creating database backup: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        # Clean up files on error
+        try:
+            if dump_file and os.path.exists(dump_file):
+                os.remove(dump_file)
+            if zip_file and os.path.exists(zip_file):
+                os.remove(zip_file)
+            if temp_dir and os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+        except Exception:
+            pass
+        return jsonify({
+            'success': False,
+            'error': f'Failed to create database backup: {str(e)}'
         }), 500
