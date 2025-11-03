@@ -121,6 +121,20 @@
             <div id="snapshotsLoading" style="text-align: center; padding: 2rem;">
                 <i class="fa-solid fa-spinner fa-spin"></i> Loading snapshots...
             </div>
+            <!-- Bulk Action Bar (stays outside of dynamic content) -->
+            <div id="bulkActionBar" class="bulk-action-bar" style="display: none;">
+                <div class="bulk-action-info">
+                    <span id="selectedCount">0</span> selected
+                </div>
+                <div class="bulk-action-buttons">
+                    <button onclick="bulkDeleteSelected()" class="btn btn-danger">
+                        <i class="fa-solid fa-trash"></i> Delete Selected
+                    </button>
+                    <button onclick="clearSelection()" class="btn btn-secondary">
+                        <i class="fa-solid fa-times"></i> Clear Selection
+                    </button>
+                </div>
+            </div>
             <div id="snapshotsContent" style="display: none;">
                 <!-- Snapshots will be loaded here -->
             </div>
@@ -415,6 +429,7 @@ function viewSnapshots(userId) {
 function displaySnapshots(data) {
     document.getElementById('snapshotsLoading').style.display = 'none';
     document.getElementById('snapshotsContent').style.display = 'block';
+    document.getElementById('bulkActionBar').style.display = 'none'; // Reset bulk action bar
     
     const content = document.getElementById('snapshotsContent');
     document.getElementById('snapshotsModalTitle').textContent = `Sync Snapshots - ${data.user.name}`;
@@ -437,7 +452,16 @@ function displaySnapshots(data) {
     
     // Complete Syncs (Main Syncs)
     if (data.data.complete_syncs.length > 0) {
-        html += '<div class="snapshots-section"><h3><i class="fa-solid fa-layer-group"></i> Main Syncs (All Providers)</h3>';
+        html += `
+            <div class="snapshots-section">
+                <div class="section-header">
+                    <h3><i class="fa-solid fa-layer-group"></i> Main Syncs (All Providers)</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="selectAllMainSyncs" onchange="toggleSelectAllMainSyncs(this)">
+                        <span>Select All</span>
+                    </label>
+                </div>
+        `;
         
         data.data.complete_syncs.forEach(cs => {
             const startDate = new Date(cs.sync_started_at);
@@ -447,6 +471,9 @@ function displaySnapshots(data) {
             html += `
                 <div class="snapshot-card main-sync" data-snapshot-id="${cs.id}" data-snapshot-type="complete">
                     <div class="snapshot-header" onclick="toggleSnapshotDetails(this)">
+                        <div class="snapshot-checkbox">
+                            <input type="checkbox" class="snapshot-select main-sync-select" data-id="${cs.id}" data-type="complete" onclick="event.stopPropagation(); updateBulkActionBar()">
+                        </div>
                         <div class="snapshot-info">
                             <span class="snapshot-badge badge-main-sync">MAIN SYNC</span>
                             <span class="snapshot-status ${statusClass}">${cs.sync_status.toUpperCase()}</span>
@@ -481,7 +508,16 @@ function displaySnapshots(data) {
     
     // Individual Snapshots
     if (data.data.individual_snapshots.length > 0) {
-        html += '<div class="snapshots-section"><h3><i class="fa-solid fa-server"></i> Individual Provider Syncs</h3>';
+        html += `
+            <div class="snapshots-section">
+                <div class="section-header">
+                    <h3><i class="fa-solid fa-server"></i> Individual Provider Syncs</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="selectAllIndividualSyncs" onchange="toggleSelectAllIndividualSyncs(this)">
+                        <span>Select All</span>
+                    </label>
+                </div>
+        `;
         
         data.data.individual_snapshots.forEach(snap => {
             const startDate = new Date(snap.sync_started_at);
@@ -491,6 +527,9 @@ function displaySnapshots(data) {
             html += `
                 <div class="snapshot-card individual-sync" data-snapshot-id="${snap.id}" data-snapshot-type="individual">
                     <div class="snapshot-header" onclick="toggleSnapshotDetails(this)">
+                        <div class="snapshot-checkbox">
+                            <input type="checkbox" class="snapshot-select individual-sync-select" data-id="${snap.id}" data-type="individual" onclick="event.stopPropagation(); updateBulkActionBar()">
+                        </div>
                         <div class="snapshot-info">
                             <span class="snapshot-provider">${snap.provider_name}</span>
                             <span class="snapshot-type">${snap.provider_type}</span>
@@ -571,8 +610,8 @@ function renderProviderSnapshots(snapshots) {
 }
 
 function toggleSnapshotDetails(header) {
-    // Don't toggle if clicking on delete button
-    if (event && event.target.closest('.btn-delete-snapshot')) {
+    // Don't toggle if clicking on delete button or checkbox
+    if (event && (event.target.closest('.btn-delete-snapshot') || event.target.closest('.snapshot-checkbox'))) {
         return;
     }
     
@@ -586,6 +625,161 @@ function toggleSnapshotDetails(header) {
         details.style.display = 'none';
         icon.style.transform = 'rotate(0deg)';
     }
+}
+
+function toggleSelectAllMainSyncs(checkbox) {
+    const checkboxes = document.querySelectorAll('.main-sync-select');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateBulkActionBar();
+}
+
+function toggleSelectAllIndividualSyncs(checkbox) {
+    const checkboxes = document.querySelectorAll('.individual-sync-select');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+    const selectedCheckboxes = document.querySelectorAll('.snapshot-select:checked');
+    const count = selectedCheckboxes.length;
+    const bulkActionBar = document.getElementById('bulkActionBar');
+    const selectedCountSpan = document.getElementById('selectedCount');
+    
+    // Safety check - elements might not exist during page transitions
+    if (!bulkActionBar || !selectedCountSpan) {
+        return;
+    }
+    
+    if (count > 0) {
+        bulkActionBar.style.display = 'flex';
+        selectedCountSpan.textContent = count;
+    } else {
+        bulkActionBar.style.display = 'none';
+    }
+    
+    // Update "Select All" checkboxes state
+    const mainSyncCheckboxes = document.querySelectorAll('.main-sync-select');
+    const mainSyncChecked = Array.from(mainSyncCheckboxes).filter(cb => cb.checked).length;
+    const selectAllMainSyncs = document.getElementById('selectAllMainSyncs');
+    if (selectAllMainSyncs) {
+        selectAllMainSyncs.checked = mainSyncChecked === mainSyncCheckboxes.length && mainSyncCheckboxes.length > 0;
+        selectAllMainSyncs.indeterminate = mainSyncChecked > 0 && mainSyncChecked < mainSyncCheckboxes.length;
+    }
+    
+    const individualSyncCheckboxes = document.querySelectorAll('.individual-sync-select');
+    const individualSyncChecked = Array.from(individualSyncCheckboxes).filter(cb => cb.checked).length;
+    const selectAllIndividualSyncs = document.getElementById('selectAllIndividualSyncs');
+    if (selectAllIndividualSyncs) {
+        selectAllIndividualSyncs.checked = individualSyncChecked === individualSyncCheckboxes.length && individualSyncCheckboxes.length > 0;
+        selectAllIndividualSyncs.indeterminate = individualSyncChecked > 0 && individualSyncChecked < individualSyncCheckboxes.length;
+    }
+}
+
+function clearSelection() {
+    const checkboxes = document.querySelectorAll('.snapshot-select:checked');
+    checkboxes.forEach(cb => {
+        cb.checked = false;
+    });
+    updateBulkActionBar();
+}
+
+function bulkDeleteSelected() {
+    const selectedCheckboxes = document.querySelectorAll('.snapshot-select:checked');
+    
+    if (selectedCheckboxes.length === 0) {
+        showError('No snapshots selected');
+        return;
+    }
+    
+    // Separate complete syncs and individual snapshots
+    const completeSyncIds = [];
+    const individualSnapshotIds = [];
+    
+    selectedCheckboxes.forEach(cb => {
+        const id = parseInt(cb.getAttribute('data-id'));
+        const type = cb.getAttribute('data-type');
+        
+        if (type === 'complete') {
+            completeSyncIds.push(id);
+        } else {
+            individualSnapshotIds.push(id);
+        }
+    });
+    
+    const totalCount = completeSyncIds.length + individualSnapshotIds.length;
+    let confirmMessage = `⚠️ WARNING: You are about to delete ${totalCount} snapshot(s):\n\n`;
+    
+    if (completeSyncIds.length > 0) {
+        confirmMessage += `- ${completeSyncIds.length} main sync(s) (and their related provider snapshots)\n`;
+    }
+    if (individualSnapshotIds.length > 0) {
+        confirmMessage += `- ${individualSnapshotIds.length} individual snapshot(s)\n`;
+    }
+    
+    confirmMessage += '\nThis action cannot be undone. Are you sure?';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // Show loading state
+    const bulkActionBar = document.getElementById('bulkActionBar');
+    const originalContent = bulkActionBar.innerHTML;
+    bulkActionBar.innerHTML = '<div class="bulk-action-info"><i class="fa-solid fa-spinner fa-spin"></i> Deleting...</div>';
+    
+    // Process deletions
+    const promises = [];
+    
+    if (completeSyncIds.length > 0) {
+        promises.push(
+            fetch('/api/admin/complete-syncs/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ complete_sync_ids: completeSyncIds })
+            }).then(r => r.json())
+        );
+    }
+    
+    if (individualSnapshotIds.length > 0) {
+        promises.push(
+            fetch('/api/admin/snapshots/bulk-delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ snapshot_ids: individualSnapshotIds })
+            }).then(r => r.json())
+        );
+    }
+    
+    Promise.all(promises)
+        .then(results => {
+            // Check if all operations succeeded
+            const allSuccessful = results.every(r => r.success);
+            
+            if (allSuccessful) {
+                const totalDeleted = results.reduce((sum, r) => sum + (r.deleted_count || r.deleted_complete_syncs || 0), 0);
+                
+                // Refresh the snapshots view immediately (this will hide the bulk action bar)
+                if (currentViewUserId) {
+                    viewSnapshots(currentViewUserId);
+                    // Show success message after a brief delay so the modal is ready
+                    setTimeout(() => showSuccess(`Successfully deleted ${totalDeleted} snapshot(s)`), 300);
+                }
+            } else {
+                // Show errors
+                const errors = results.filter(r => !r.success).map(r => r.error).join('\n');
+                showError('Some deletions failed:\n' + errors);
+                bulkActionBar.innerHTML = originalContent;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showError('Failed to bulk delete snapshots');
+            bulkActionBar.innerHTML = originalContent;
+        });
 }
 
 let currentViewUserId = null;
@@ -664,6 +858,7 @@ function deleteCompleteSync(completeSyncId, event) {
 
 function closeSnapshotsModal() {
     document.getElementById('snapshotsModal').style.display = 'none';
+    document.getElementById('bulkActionBar').style.display = 'none'; // Hide bulk action bar
     currentViewUserId = null;
 }
 
@@ -1267,6 +1462,155 @@ function getStatusClass(status) {
 
 .btn-info:hover {
     background-color: #138496;
+}
+
+/* Bulk Action Bar */
+.bulk-action-bar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.bulk-action-info {
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bulk-action-info span {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+.bulk-action-buttons {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.bulk-action-buttons .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border: 2px solid white;
+}
+
+.bulk-action-buttons .btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+.bulk-action-buttons .btn-danger:hover {
+    background-color: #c82333;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.bulk-action-buttons .btn-secondary {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.bulk-action-buttons .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Section Header with Select All */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    margin: 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: #495057;
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.checkbox-label:hover {
+    color: #212529;
+}
+
+/* Snapshot Checkbox */
+.snapshot-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-right: 0.75rem;
+}
+
+.snapshot-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.snapshot-select {
+    cursor: pointer;
+}
+
+/* Adjust snapshot header layout for checkbox */
+.snapshot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.snapshot-header .snapshot-info {
+    flex: 1;
+    min-width: 0; /* Allow flex item to shrink */
+}
+
+/* Improve snapshot card selection state */
+.snapshot-card:has(.snapshot-select:checked) {
+    background-color: #f0f4ff;
+    border-color: #667eea;
+}
+
+.snapshot-card:has(.snapshot-select:checked) .snapshot-header {
+    background-color: #e6ecff;
 }
 </style>
 {% endblock %}

@@ -1632,6 +1632,144 @@ def delete_complete_sync(complete_sync_id):
             'error': f'Failed to delete complete sync: {str(e)}'
         })
 
+@admin_bp.route('/snapshots/bulk-delete', methods=['POST'])
+def bulk_delete_snapshots():
+    """Bulk delete individual snapshots (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.models.sync import SyncSnapshot, ResourceState
+        from app.core.models.complete_sync import ProviderSyncReference
+        
+        data = request.get_json()
+        snapshot_ids = data.get('snapshot_ids', [])
+        
+        if not snapshot_ids:
+            return jsonify({'success': False, 'error': 'No snapshot IDs provided'})
+        
+        # Check which snapshots are part of complete syncs
+        refs = ProviderSyncReference.query.filter(
+            ProviderSyncReference.sync_snapshot_id.in_(snapshot_ids)
+        ).all()
+        
+        if refs:
+            conflicting_ids = [ref.sync_snapshot_id for ref in refs]
+            return jsonify({
+                'success': False,
+                'error': f'Cannot delete {len(conflicting_ids)} snapshot(s) that are part of main syncs. Delete the main sync instead.',
+                'conflicting_ids': conflicting_ids
+            })
+        
+        # Delete resource states first
+        deleted_states = ResourceState.query.filter(
+            ResourceState.sync_snapshot_id.in_(snapshot_ids)
+        ).delete(synchronize_session=False)
+        
+        # Delete the snapshots
+        deleted_count = SyncSnapshot.query.filter(
+            SyncSnapshot.id.in_(snapshot_ids)
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        
+        logger.info(f"Admin bulk deleted {deleted_count} snapshots and {deleted_states} resource states")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_count} snapshot(s)',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error bulk deleting snapshots: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to bulk delete snapshots: {str(e)}'
+        })
+
+@admin_bp.route('/complete-syncs/bulk-delete', methods=['POST'])
+def bulk_delete_complete_syncs():
+    """Bulk delete complete syncs and all related snapshots (admin only)"""
+    admin_check = require_admin()
+    if admin_check:
+        return admin_check
+    
+    try:
+        from app.core.models.sync import SyncSnapshot, ResourceState
+        from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
+        
+        data = request.get_json()
+        complete_sync_ids = data.get('complete_sync_ids', [])
+        
+        if not complete_sync_ids:
+            return jsonify({'success': False, 'error': 'No complete sync IDs provided'})
+        
+        # Get all complete syncs
+        complete_syncs = CompleteSync.query.filter(
+            CompleteSync.id.in_(complete_sync_ids)
+        ).all()
+        
+        if not complete_syncs:
+            return jsonify({'success': False, 'error': 'No complete syncs found'})
+        
+        # Collect all snapshot IDs
+        all_snapshot_ids = []
+        for cs in complete_syncs:
+            for ref in cs.provider_syncs:
+                all_snapshot_ids.append(ref.sync_snapshot_id)
+        
+        # Step 1: Delete all ResourceStates related to these snapshots
+        if all_snapshot_ids:
+            deleted_states = ResourceState.query.filter(
+                ResourceState.sync_snapshot_id.in_(all_snapshot_ids)
+            ).delete(synchronize_session=False)
+            logger.info(f"Deleted {deleted_states} resource states")
+        
+        # Step 2: Delete ProviderSyncReferences first (foreign key constraint)
+        deleted_refs = ProviderSyncReference.query.filter(
+            ProviderSyncReference.complete_sync_id.in_(complete_sync_ids)
+        ).delete(synchronize_session=False)
+        logger.info(f"Deleted {deleted_refs} provider sync references")
+        
+        # Step 3: Delete all complete syncs
+        deleted_complete_syncs = CompleteSync.query.filter(
+            CompleteSync.id.in_(complete_sync_ids)
+        ).delete(synchronize_session=False)
+        logger.info(f"Deleted {deleted_complete_syncs} complete syncs")
+        
+        # Step 4: Delete all the individual snapshots
+        if all_snapshot_ids:
+            deleted_snapshots = SyncSnapshot.query.filter(
+                SyncSnapshot.id.in_(all_snapshot_ids)
+            ).delete(synchronize_session=False)
+            logger.info(f"Deleted {deleted_snapshots} snapshots")
+        
+        db.session.commit()
+        
+        logger.info(f"Admin bulk deleted {deleted_complete_syncs} complete syncs and {len(all_snapshot_ids)} related snapshots")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_complete_syncs} main sync(s) and {len(all_snapshot_ids)} related snapshot(s)',
+            'deleted_complete_syncs': deleted_complete_syncs,
+            'deleted_snapshots': len(all_snapshot_ids)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error bulk deleting complete syncs: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': f'Failed to bulk delete complete syncs: {str(e)}'
+        })
+
 @admin_bp.route('/sync-all-prices', methods=['POST'])
 def sync_all_prices():
     """Sync prices for all enabled providers with pricing API (admin only)"""
