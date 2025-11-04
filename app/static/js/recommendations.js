@@ -104,9 +104,37 @@ function formatMoney(v){
 function cardTemplate(rec){
     const created = rec.created_at? new Date(rec.created_at).toLocaleString('ru-RU') : '';
     const sev = `<span class="sev-dot ${sevClass(rec.severity)}"></span>`;
-    const ctx = [rec.provider_code, rec.resource_name, rec.resource_type].filter(Boolean);
-    const chips = ctx.map(x=>`<span class="chip">${x}</span>`).join('');
     const id = rec.id;
+    
+    // Provider icon/badge with better styling
+    const providerBadge = rec.provider_code ? 
+        `<span class="provider-badge provider-${rec.provider_code}">${rec.provider_code}</span>` : '';
+    
+    // Resource type icon
+    const resourceTypeIcon = {
+        'server': '🖥️',
+        'vm': '🖥️',
+        'volume': '💾',
+        'disk': '💾',
+        'database': '🗄️',
+        'kubernetes': '☸️',
+        'snapshot': '📸',
+        'image': '💿',
+        'ip': '🌐',
+        'dns': '🔗'
+    }[rec.resource_type?.toLowerCase()] || '📦';
+    
+    // Clean resource header (replaces messy pills)
+    const resourceHeader = `
+        <div class="resource-header">
+            ${providerBadge}
+            <div class="resource-info">
+                <span class="resource-icon">${resourceTypeIcon}</span>
+                <span class="resource-name" title="${rec.resource_name}">${rec.resource_name || 'Unknown'}</span>
+                <span class="resource-type">${rec.resource_type || ''}</span>
+            </div>
+        </div>
+    `;
     
     // Action buttons for all users (including demo users)
     const actionButtons = `
@@ -123,7 +151,7 @@ function cardTemplate(rec){
             <div class="rec-title" title="${rec.title}">${rec.title}</div>
         </div>
         <div class="kpi">Экономия/мес: ${formatMoney(rec.estimated_monthly_savings)}</div>
-        <div class="rec-context">${chips}</div>
+        ${resourceHeader}
         ${actionButtons}
         <div class="rec-body">${(rec.description||'').slice(0,220)}${(rec.description||'').length>220?'…':''}
             <button class="link-btn more" data-id="${id}">Подробнее</button>
