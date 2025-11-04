@@ -15,6 +15,7 @@ from app.core.models.recommendations import OptimizationRecommendation
 
 from .registry import RuleRegistry
 from .interfaces import RecommendationOutput, RuleScope
+from app.core.services.ai_text_generator import generate_recommendation_text
 
 
 logger = logging.getLogger(__name__)
@@ -349,6 +350,20 @@ class RecommendationOrchestrator:
                     verification_fail_count=0,
                 )
                 db.session.add(rec)
+                db.session.flush()  # Get ID before generating AI text
+                
+                # Generate AI text for the new recommendation
+                try:
+                    ai_text = generate_recommendation_text(rec.id)
+                    if ai_text:
+                        rec.ai_short_description = ai_text.get('short_description_html')
+                        rec.ai_detailed_description = ai_text.get('detailed_description_html')
+                        rec.ai_generated_at = datetime.utcnow()
+                        self.logger.info(f"✓ AI text generated and stored for recommendation {rec.id}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate AI text for rec {rec.id}: {e}")
+                    # Non-fatal - recommendation still created without AI text
+                
                 return 1, 0
             else:
                 # Auto-dismiss stale "seen" recommendations after 30 days

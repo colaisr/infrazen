@@ -40,6 +40,11 @@ class OptimizationRecommendation(BaseModel):
     # Detailed insights/inputs (JSON encoded as text)
     metrics_snapshot = db.Column(db.Text)
     insights = db.Column(db.Text)
+    
+    # AI-generated text (HTML)
+    ai_short_description = db.Column(db.Text)  # Short description for collapsed card
+    ai_detailed_description = db.Column(db.Text)  # Detailed description for expanded view
+    ai_generated_at = db.Column(db.DateTime)  # When AI text was generated
 
     # Lifecycle state
     status = db.Column(

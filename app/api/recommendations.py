@@ -62,6 +62,10 @@ def _serialize(rec: OptimizationRecommendation):
         'metrics_snapshot': rec.metrics_snapshot,
         'insights': rec.insights,
         'source': rec.source,
+        # AI-generated text
+        'ai_short_description': rec.ai_short_description,
+        'ai_detailed_description': rec.ai_detailed_description,
+        'ai_generated_at': rec.ai_generated_at.isoformat() if rec.ai_generated_at else None,
         # Verification tracking
         'last_verified_at': rec.last_verified_at.isoformat() if rec.last_verified_at else None,
         'verification_fail_count': rec.verification_fail_count,
