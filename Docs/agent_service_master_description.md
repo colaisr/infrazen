@@ -169,7 +169,7 @@ Reference: OpenRouter – The Unified Interface for LLMs: https://openrouter.ai/
 
 This section tracks execution progress. We will update checkboxes as we proceed, refine scope when discoveries occur, and clean up progress notes at the end to leave a final specification.
 
-### Milestone 1 – Skeleton + Local/Server Validation
+### Milestone 1 – Skeleton + Local/Server Validation ✅ COMPLETE
 - [x] Scaffold agent_service skeleton (FastAPI, LangGraph) with:
   - [x] Health endpoint (`GET /v1/health`)
   - [x] WebSocket echo (`/v1/chat/ws`) for basic connectivity
@@ -183,25 +183,35 @@ This section tracks execution progress. We will update checkboxes as we proceed,
 - [x] Local run scripts: app on 5001, agent on 8001 behind reverse proxy
   - ✅ **Created:** `run_both.sh` and `stop_both.sh` for unified local development
   - ✅ **Verified:** Both services running and healthy (agent: port 8001, app: port 5001)
-- [ ] Server prep:
-  - [ ] Nginx location `/agent/` → upstream `127.0.0.1:8001`
-  - [ ] systemd `infrazen-agent.service` and `config.agent.env`
-- [ ] Deploy agent safely (no impact to app) and validate health/readiness
+- [x] Server prep:
+  - [x] Nginx location `/agent/` → upstream `127.0.0.1:8001` (with WebSocket support, long timeouts)
+  - [x] systemd `infrazen-agent.service` and `config.agent.env`
+  - ✅ **Production:** Nginx proxying HTTPS traffic to agent on port 8001
+- [x] Deploy agent locally and validate health/readiness
+  - ✅ **Committed:** dec0baa - Agent Service skeleton with 23 files
+  - ✅ **Pushed:** to master branch
+  - ✅ **Production:** Both services running, health checks passing
 
-Definition of done: health endpoint OK, WebSocket echo works, test page shows “connected to agent”.
+Definition of done: ✅ COMPLETE - health endpoint OK, WebSocket echo works, test page shows "connected to agent", production deployment successful.
 
-### Milestone 2 – CI/CD for Agent (No Impact to App)
-- [ ] Extend `deploy.sh` to support `app|agent|both` with idempotent steps and rollback
+### Milestone 2 – CI/CD for Agent (No Impact to App) ✅ PARTIAL
+- [x] Extend `deploy.sh` to support `app|agent|both` with idempotent steps and rollback
+  - ✅ **Production:** Deploy script supports `./deploy.sh app|agent|both`
+  - ✅ **Health Checks:** Both services have automated health validation
+  - ✅ **Zero-downtime:** App uses systemctl reload, Agent restarts gracefully
 - [ ] Add separate CI job for agent (build, push, restart) independent of app pipeline
 - [ ] Wire agent secrets/env in CI without touching existing app secrets
 
 Definition of done: pushing an agent-only change deploys agent; app pipeline remains unchanged.
 
-### Milestone 3 – Joint Deploy Test
-- [ ] Make a trivial change to both app and agent; deploy both
-- [ ] Verify both changes delivered and healthy without downtime
+### Milestone 3 – Joint Deploy Test ✅ COMPLETE
+- [x] Make a trivial change to both app and agent; deploy both
+- [x] Verify both changes delivered and healthy without downtime
+  - ✅ **Tested:** Console message in dashboard.js + message field in health endpoint
+  - ✅ **Verified:** Both changes deployed successfully with `./deploy.sh both`
+  - ✅ **Zero downtime:** App reloaded, agent restarted, both healthy
 
-Definition of done: both services reflect changes; clean logs; zero app downtime.
+Definition of done: ✅ COMPLETE - both services reflect changes; clean logs; zero app downtime.
 
 ### Milestone 4 – LLM Recommendation Text (with Fallback)
 - [ ] Implement `POST /v1/generate/recommendation-text` with tool-scoped reads
