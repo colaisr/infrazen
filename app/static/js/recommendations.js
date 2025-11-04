@@ -106,26 +106,31 @@ function cardTemplate(rec){
     const sev = `<span class="sev-dot ${sevClass(rec.severity)}"></span>`;
     const id = rec.id;
     
-    // Small provider logo/icon for connection badge
+    // Small provider logo/icon for connection badge with tooltip
     const providerLogo = {
-        'yandex': '<span class="provider-logo" style="background:#FF3333">Y</span>',
-        'selectel': '<span class="provider-logo" style="background:#0066FF">S</span>',
-        'beget': '<span class="provider-logo" style="background:#8B5CF6">B</span>'
-    }[rec.provider_code?.toLowerCase()] || '<span class="provider-logo" style="background:#94a3b8">?</span>';
+        'yandex': '<span class="provider-logo" style="background:#FF3333" title="Yandex Cloud">Y</span>',
+        'selectel': '<span class="provider-logo" style="background:#0066FF" title="Selectel">S</span>',
+        'beget': '<span class="provider-logo" style="background:#8B5CF6" title="Beget">B</span>'
+    }[rec.provider_code?.toLowerCase()] || '<span class="provider-logo" style="background:#94a3b8" title="Неизвестный провайдер">?</span>';
     
-    // Resource type icon
+    // Resource type icon (FontAwesome for professional look)
     const resourceTypeIcon = {
-        'server': '🖥️',
-        'vm': '🖥️',
-        'volume': '💾',
-        'disk': '💾',
-        'database': '🗄️',
-        'kubernetes': '☸️',
-        'snapshot': '📸',
-        'image': '💿',
-        'ip': '🌐',
-        'dns': '🔗'
-    }[rec.resource_type?.toLowerCase()] || '📦';
+        'server': '<i class="fa-solid fa-server"></i>',
+        'vm': '<i class="fa-solid fa-server"></i>',
+        'volume': '<i class="fa-solid fa-hard-drive"></i>',
+        'disk': '<i class="fa-solid fa-hard-drive"></i>',
+        'database': '<i class="fa-solid fa-database"></i>',
+        'postgresql': '<i class="fa-solid fa-database"></i>',
+        'mysql': '<i class="fa-solid fa-database"></i>',
+        'redis': '<i class="fa-solid fa-database"></i>',
+        'kafka': '<i class="fa-solid fa-stream"></i>',
+        'kubernetes': '<i class="fa-brands fa-docker"></i>',
+        'snapshot': '<i class="fa-solid fa-camera"></i>',
+        'image': '<i class="fa-solid fa-compact-disc"></i>',
+        'ip': '<i class="fa-solid fa-network-wired"></i>',
+        'dns': '<i class="fa-solid fa-globe"></i>',
+        'container_registry': '<i class="fa-solid fa-box"></i>'
+    }[rec.resource_type?.toLowerCase()] || '<i class="fa-solid fa-cube"></i>';
     
     // Connection name from provider metadata (most important!)
     const connectionName = rec.connection_name || rec.provider_code || 'Unknown';
@@ -135,7 +140,7 @@ function cardTemplate(rec){
         <div class="resource-line">
             <span class="connection-badge">${providerLogo} ${connectionName}</span>
             <span class="separator">›</span>
-            <span class="resource-icon-emoji">${resourceTypeIcon}</span>
+            <span class="resource-icon">${resourceTypeIcon}</span>
             <span class="resource-name" title="${rec.resource_name || 'Unknown'}">${rec.resource_name || 'Unknown'}</span>
         </div>
     `;
