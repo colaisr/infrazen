@@ -42,10 +42,16 @@ class Settings(BaseSettings):
     # Vector store
     VECTOR_STORE: str = os.getenv("VECTOR_STORE", "chroma")
     
+    # Database (inherits from InfraZen app)
+    # Agent uses the same MySQL database as the main app
+    # Connection is established via the Flask app context
+    
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:5001",
         "http://127.0.0.1:5001",
+        "https://infrazen.ru",
+        "https://www.infrazen.ru",
         "https://infrazen.team"
     ]
     

@@ -10,7 +10,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from agent_service.api import health, chat
+from agent_service.api import health, chat, recommendations
 from agent_service.core.config import settings
 
 # Configure logging
@@ -26,6 +26,17 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     logger.info(f"Starting Agent Service v{settings.VERSION} in {settings.AGENT_ENV} mode")
     logger.info(f"Internal API base: {settings.AGENT_INTERNAL_API_BASE}")
+    
+    # Initialize InfraZen app context for database access
+    try:
+        from app import create_app
+        flask_app = create_app()
+        app.state.flask_app = flask_app
+        logger.info("✓ Database connection initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+    
     yield
     logger.info("Shutting down Agent Service")
 
@@ -50,6 +61,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, prefix="/v1", tags=["health"])
 app.include_router(chat.router, prefix="/v1/chat", tags=["chat"])
+app.include_router(recommendations.router, prefix="/v1", tags=["recommendations"])
 
 
 @app.get("/")
