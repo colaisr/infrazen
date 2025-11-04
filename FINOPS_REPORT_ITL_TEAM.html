@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinOps Отчет - ITL Team | InfraZen</title>
+    <style>
+        :root {
+            --primary-blue: #2563eb;
+            --success-green: #10b981;
+            --warning-orange: #f59e0b;
+            --danger-red: #ef4444;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-700: #374151;
+            --gray-900: #111827;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-900);
+            background: var(--gray-50);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header .meta {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        
+        .header .meta span {
+            margin-right: 20px;
+        }
+        
+        /* Executive Summary */
+        .executive-summary {
+            background: var(--gray-50);
+            border-left: 4px solid var(--primary-blue);
+            padding: 30px;
+            margin: 30px;
+        }
+        
+        .executive-summary h2 {
+            color: var(--primary-blue);
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .kpi-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .kpi-card .label {
+            font-size: 13px;
+            color: var(--gray-700);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .kpi-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .kpi-card .subtext {
+            font-size: 12px;
+            color: var(--gray-700);
+        }
+        
+        .kpi-card.success .value { color: var(--success-green); }
+        .kpi-card.danger .value { color: var(--danger-red); }
+        .kpi-card.warning .value { color: var(--warning-orange); }
+        
+        /* Content */
+        .content {
+            padding: 30px 40px;
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section h2 {
+            color: var(--gray-900);
+            font-size: 28px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--gray-200);
+        }
+        
+        .section h3 {
+            color: var(--primary-blue);
+            font-size: 22px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        .section h4 {
+            color: var(--gray-700);
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        /* Alert Boxes */
+        .alert {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        
+        .alert.critical {
+            background: #fee2e2;
+            border-color: var(--danger-red);
+            color: #991b1b;
+        }
+        
+        .alert.warning {
+            background: #fef3c7;
+            border-color: var(--warning-orange);
+            color: #92400e;
+        }
+        
+        .alert.info {
+            background: #dbeafe;
+            border-color: var(--primary-blue);
+            color: #1e40af;
+        }
+        
+        .alert.success {
+            background: #d1fae5;
+            border-color: var(--success-green);
+            color: #065f46;
+        }
+        
+        .alert strong {
+            font-weight: 700;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        th {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--gray-300);
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        tr:hover {
+            background: var(--gray-50);
+        }
+        
+        .table-highlight {
+            background: #fef3c7 !important;
+            font-weight: 600;
+        }
+        
+        /* Recommendation Cards */
+        .recommendation {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            transition: box-shadow 0.2s;
+        }
+        
+        .recommendation:hover {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .recommendation .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 10px;
+        }
+        
+        .recommendation .provider-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .provider-tag.selectel {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .provider-tag.beget {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .recommendation .costs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        
+        .cost-item {
+            text-align: center;
+            padding: 10px;
+            background: var(--gray-50);
+            border-radius: 6px;
+        }
+        
+        .cost-item .label {
+            font-size: 11px;
+            color: var(--gray-700);
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .cost-item .value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .cost-item.current .value { color: var(--gray-700); }
+        .cost-item.recommended .value { color: var(--primary-blue); }
+        .cost-item.savings .value { color: var(--success-green); }
+        
+        .recommendation .details {
+            font-size: 13px;
+            color: var(--gray-700);
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--gray-200);
+        }
+        
+        /* Cleanup Cards */
+        .cleanup-card {
+            background: #fee2e2;
+            border: 2px solid var(--danger-red);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        
+        .cleanup-card .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #991b1b;
+            margin-bottom: 10px;
+        }
+        
+        .cleanup-card .wasted {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--danger-red);
+            margin: 10px 0;
+        }
+        
+        .cleanup-card .age {
+            font-size: 14px;
+            color: #7f1d1d;
+        }
+        
+        /* Summary Boxes */
+        .summary-box {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 30px 0;
+        }
+        
+        .summary-box h3 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .summary-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 6px;
+        }
+        
+        .summary-item .label {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .summary-item .value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        /* Scenario Comparison */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin: 30px 0;
+        }
+        
+        .scenario-card {
+            border: 2px solid var(--gray-200);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .scenario-card .header {
+            background: var(--gray-100);
+            padding: 20px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .scenario-card .body {
+            padding: 20px;
+        }
+        
+        .scenario-card.recommended {
+            border-color: var(--success-green);
+        }
+        
+        .scenario-card.recommended .header {
+            background: var(--success-green);
+            color: white;
+        }
+        
+        /* Progress Bar */
+        .progress-bar {
+            background: var(--gray-200);
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+            position: relative;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, var(--success-green) 0%, #059669 100%);
+            height: 100%;
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        /* Resource List */
+        .resource-list {
+            margin: 20px 0;
+        }
+        
+        .resource-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .resource-item:hover {
+            background: var(--gray-50);
+        }
+        
+        .resource-item .name {
+            font-weight: 500;
+        }
+        
+        .resource-item .cost {
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .badge.success { background: #d1fae5; color: #065f46; }
+        .badge.warning { background: #fef3c7; color: #92400e; }
+        .badge.danger { background: #fee2e2; color: #991b1b; }
+        
+        /* Print Styles */
+        @media print {
+            body { background: white; }
+            .container { box-shadow: none; }
+            .recommendation, .cleanup-card { page-break-inside: avoid; }
+        }
+        
+        /* Charts */
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: var(--gray-50);
+            border-radius: 8px;
+        }
+        
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .bar-item .label {
+            min-width: 200px;
+            font-weight: 500;
+        }
+        
+        .bar-item .bar {
+            flex: 1;
+            background: var(--gray-200);
+            height: 30px;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .bar-item .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .bar-item .value {
+            min-width: 150px;
+            text-align: right;
+            font-weight: 600;
+        }
+        
+        /* Footer */
+        .footer {
+            background: var(--gray-100);
+            padding: 30px 40px;
+            border-radius: 0 0 8px 8px;
+            text-align: center;
+            color: var(--gray-700);
+            font-size: 14px;
+        }
+        
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .mt-20 { margin-top: 20px; }
+        .mb-20 { margin-bottom: 20px; }
+        .font-bold { font-weight: 700; }
+        
+        /* Callout Boxes */
+        .callout {
+            background: #f0fdf4;
+            border-left: 4px solid var(--success-green);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .callout.warning {
+            background: #fef3c7;
+            border-color: var(--warning-orange);
+        }
+        
+        .callout.danger {
+            background: #fee2e2;
+            border-color: var(--danger-red);
+        }
+        
+        /* Icons */
+        .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        
+        /* Comparison Table */
+        .comparison-table {
+            margin: 30px 0;
+        }
+        
+        .comparison-table td.savings {
+            color: var(--success-green);
+            font-weight: 700;
+            font-size: 16px;
+        }
+        
+        .comparison-table tr.total {
+            background: var(--gray-100);
+            font-weight: 700;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Отчет по оптимизации облачной инфраструктуры</h1>
+            <div class="meta">
+                <span>📅 <strong>Дата:</strong> 04.11.2025</span>
+                <span>👤 <strong>Клиент:</strong> ITL Team</span>
+                <span>☁️ <strong>Текущий провайдер:</strong> Yandex Cloud</span>
+            </div>
+        </div>
+        
+        <!-- Executive Summary -->
+        <div class="executive-summary">
+            <h2>🎯 Исполнительное резюме</h2>
+            <p>Проведен комплексный анализ текущей облачной инфраструктуры с целью выявления возможностей оптимизации затрат. Анализ включал сравнение цен с альтернативными облачными провайдерами (Selectel, Beget), а также выявление неиспользуемых ресурсов.</p>
+            
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="label">Всего ресурсов</div>
+                    <div class="value">44</div>
+                    <div class="subtext">активных ресурсов</div>
+                </div>
+                
+                <div class="kpi-card">
+                    <div class="label">Текущие расходы</div>
+                    <div class="value">149,583 ₽</div>
+                    <div class="subtext">в месяц</div>
+                </div>
+                
+                <div class="kpi-card success">
+                    <div class="label">Потенциальная экономия</div>
+                    <div class="value">21,335 ₽</div>
+                    <div class="subtext">в месяц (14.3%)</div>
+                </div>
+                
+                <div class="kpi-card danger">
+                    <div class="label">Невозвратные потери</div>
+                    <div class="value">32,972 ₽</div>
+                    <div class="subtext">на неиспользуемые ресурсы</div>
+                </div>
+            </div>
+            
+            <div class="alert critical mt-20">
+                <strong>⚠️ КРИТИЧНО!</strong> Компания уже потеряла <strong>32,972 ₽</strong> на простаивающие ресурсы. Каждый день промедления увеличивает эту сумму на <strong>~90 ₽</strong>.
+            </div>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <!-- Section 1: Current Infrastructure -->
+            <div class="section">
+                <h2>1. Текущая инфраструктура</h2>
+                
+                <h3>1.1. Распределение расходов по типам ресурсов</h3>
+                
+                <div class="chart-container">
+                    <div class="bar-chart">
+                        <div class="bar-item">
+                            <div class="label">Серверы (17 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 37.6%;">67,526 ₽/мес</div>
+                            </div>
+                            <div class="value">67,526 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Kubernetes (1 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 27.7%;">49,901 ₽/мес</div>
+                            </div>
+                            <div class="value">49,901 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Снапшоты (17 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 14.6%;">26,325 ₽/мес</div>
+                            </div>
+                            <div class="value">26,325 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">PostgreSQL (2 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 7.1%;">12,740 ₽/мес</div>
+                            </div>
+                            <div class="value">12,740 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Диски (1 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 3.7%;">6,599 ₽/мес</div>
+                            </div>
+                            <div class="value">6,599 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Container Registry (2 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 2.5%;">4,556 ₽/мес</div>
+                            </div>
+                            <div class="value">4,556 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Kafka (1 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 2.2%;">3,979 ₽/мес</div>
+                            </div>
+                            <div class="value">3,979 ₽/мес</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Образы (4 шт.)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 2.1%;">3,781 ₽/мес</div>
+                            </div>
+                            <div class="value">3,781 ₽/мес</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>1.2. Топ-5 самых дорогих ресурсов</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ресурс</th>
+                            <th>Тип</th>
+                            <th>Статус</th>
+                            <th style="text-align: right;">Стоимость/месяц</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>itlkube</strong></td>
+                            <td>kubernetes-cluster</td>
+                            <td><span class="badge success">ACTIVE</span></td>
+                            <td style="text-align: right; font-weight: 600;">49,901 ₽</td>
+                        </tr>
+                        <tr>
+                            <td><strong>punch-dev-backend-1</strong></td>
+                            <td>server</td>
+                            <td><span class="badge success">RUNNING</span></td>
+                            <td style="text-align: right; font-weight: 600;">13,379 ₽</td>
+                        </tr>
+                        <tr>
+                            <td><strong>gitlab</strong></td>
+                            <td>server</td>
+                            <td><span class="badge success">RUNNING</span></td>
+                            <td style="text-align: right; font-weight: 600;">12,664 ₽</td>
+                        </tr>
+                        <tr>
+                            <td><strong>chartsstorage</strong></td>
+                            <td>server</td>
+                            <td><span class="badge success">RUNNING</span></td>
+                            <td style="text-align: right; font-weight: 600;">9,464 ₽</td>
+                        </tr>
+                        <tr>
+                            <td><strong>punch-dev-runner-1</strong></td>
+                            <td>server</td>
+                            <td><span class="badge success">RUNNING</span></td>
+                            <td style="text-align: right; font-weight: 600;">6,461 ₽</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="alert info">
+                    <strong>ℹ️ Примечание:</strong> Топ-5 ресурсов составляют <strong>61%</strong> от общих расходов (91,869 ₽ из 149,583 ₽). Фокус на оптимизации этих ресурсов даст максимальный эффект.
+                </div>
+            </div>
+            
+            <!-- Section 2: Optimization Opportunities -->
+            <div class="section">
+                <h2>2. Возможности оптимизации</h2>
+                
+                <h3>2.1. Миграция на Selectel (Консервативный сценарий)</h3>
+                
+                <div class="callout">
+                    <strong>✅ О провайдере Selectel:</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>Надежная российская компания, работает с 2008 года</li>
+                        <li>Собственная инфраструктура — 6 дата-центров в России</li>
+                        <li>Поддержка 24/7 на русском языке</li>
+                        <li>Managed Kubernetes, Managed Databases</li>
+                        <li>Подходит для production-нагрузок</li>
+                    </ul>
+                </div>
+                
+                <h4>Рекомендуемые миграции:</h4>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ gitlab <span class="provider-tag selectel">Selectel</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">12,664 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Selectel</div>
+                            <div class="value">10,096 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">2,568 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: v4-r12-d512-network_ssd:ru-6a | 🌍 Регион: ru-6a | 📊 Экономия: <strong>20.3%</strong> | 💰 Годовая экономия: <strong>30,816 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="recommendation">
+                    <div class="title">☸️ itlkube <span class="provider-tag selectel">Selectel</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">49,901 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Selectel</div>
+                            <div class="value">47,832 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">2,069 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: managed-k8s-cluster | 🌍 Регион: ru | 📊 Экономия: <strong>4.1%</strong> | 💰 Годовая экономия: <strong>24,827 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ gateway <span class="provider-tag selectel">Selectel</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">2,287 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Selectel</div>
+                            <div class="value">1,832 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">455 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: v2-r2-d10-hdd:ru-6a | 🌍 Регион: ru-6a | 📊 Экономия: <strong>19.9%</strong> | 💰 Годовая экономия: <strong>5,462 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ office <span class="provider-tag selectel">Selectel</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">5,610 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Selectel</div>
+                            <div class="value">5,349 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">261 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: v4-r8-d100-network_ssd:ru-6a | 🌍 Регион: ru-6a | 📊 Экономия: <strong>4.6%</strong> | 💰 Годовая экономия: <strong>3,130 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="summary-box">
+                    <h3>💰 Итого по Selectel</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="label">Ресурсов для миграции</div>
+                            <div class="value">4</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Экономия в месяц</div>
+                            <div class="value">5,353 ₽</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Экономия в год</div>
+                            <div class="value">64,235 ₽</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Процент экономии</div>
+                            <div class="value">3.0%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="callout">
+                    <strong>💡 Рекомендация:</strong> Миграция на Selectel — <strong>консервативный и надежный вариант</strong> для любых типов нагрузок, включая production. Подходит для компаний, которые ценят стабильность выше максимальной экономии.
+                </div>
+            </div>
+            
+            <!-- Section 2.2: Beget -->
+            <div class="section">
+                <h3>2.2. Миграция на Beget (Агрессивный сценарий)</h3>
+                
+                <div class="callout warning">
+                    <strong>⚠️ ВАЖНО:</strong> Beget является меньшим провайдером. Рекомендуется <strong>только для некритичных нагрузок</strong> (dev/test окружения, внутренние инструменты).
+                    <br><br>
+                    <strong>✅ Рекомендуется для:</strong> dev, test, staging окружения<br>
+                    <strong>❌ НЕ рекомендуется для:</strong> production кластеров, критичных БД, высоконагруженных сервисов
+                </div>
+                
+                <h4>Рекомендуемые миграции (только dev/test):</h4>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ punch-dev-backend-1 <span class="provider-tag beget">Beget</span> <span class="badge success">Подходит для Beget</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">13,379 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Beget</div>
+                            <div class="value">6,570 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">6,809 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: mysql5_v1_220 | 📊 Экономия: <strong>50.9%</strong> | 💰 Годовая экономия: <strong>81,713 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ punch-dev-runner-1 <span class="provider-tag beget">Beget</span> <span class="badge success">Подходит для Beget</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">6,461 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Beget</div>
+                            <div class="value">2,520 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">3,941 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: mysql5_v1_80 | 📊 Экономия: <strong>61.0%</strong> | 💰 Годовая экономия: <strong>47,290 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="recommendation">
+                    <div class="title">🖥️ punch-dev-mysql-1 <span class="provider-tag beget">Beget</span> <span class="badge success">Подходит для Beget</span></div>
+                    <div class="costs">
+                        <div class="cost-item current">
+                            <div class="label">Текущая (Yandex)</div>
+                            <div class="value">4,459 ₽</div>
+                        </div>
+                        <div class="cost-item recommended">
+                            <div class="label">На Beget</div>
+                            <div class="value">1,934 ₽</div>
+                        </div>
+                        <div class="cost-item savings">
+                            <div class="label">Экономия</div>
+                            <div class="value">2,525 ₽</div>
+                        </div>
+                    </div>
+                    <div class="details">
+                        📦 Конфигурация: ru2-normal_cpu-4cpu-7gb-105gb | 📊 Экономия: <strong>56.6%</strong> | 💰 Годовая экономия: <strong>30,301 ₽</strong>
+                    </div>
+                </div>
+                
+                <div class="summary-box" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                    <h3>💰 Итого по Beget</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="label">Ресурсов для миграции</div>
+                            <div class="value">3</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Экономия в месяц</div>
+                            <div class="value">13,275 ₽</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Экономия в год</div>
+                            <div class="value">159,304 ₽</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Средняя экономия</div>
+                            <div class="value">56%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="callout warning">
+                    <strong>⚠️ Рекомендация:</strong> Beget — <strong>высокорисковая, но очень выгодная стратегия</strong>. Экономия в <strong>2.5 раза выше</strong>, чем у Selectel (13,275 ₽ vs 5,353 ₽), но подходит только для dev/test окружений. Требует готовности к компромиссам в SLA.
+                </div>
+            </div>
+            
+            <!-- Section 2.3: Cleanup -->
+            <div class="section">
+                <h3>2.3. Удаление неиспользуемых ресурсов</h3>
+                
+                <div class="alert critical">
+                    <strong>🔴 КРИТИЧНО!</strong> Обнаружены ресурсы, которые не используются и уже обошлись компании в <strong>32,972 ₽</strong> потраченных средств!
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">📸 gitdisk-1740816592565 (snapshot)</div>
+                    <div class="age">⏰ Возраст: 248 дней (0.7 лет)</div>
+                    <div class="wasted">💸 Уже потрачено: 14,124 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>1,709 ₽/мес</strong> | Экономия после удаления: <strong>20,502 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">🌐 Reserved IP: 158.160.107.171</div>
+                    <div class="age">⏰ Возраст: 900 дней (2.5 лет)</div>
+                    <div class="wasted">💸 Уже потрачено: 7,236 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>241 ₽/мес</strong> | Экономия после удаления: <strong>2,894 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">🌐 kafka_ip</div>
+                    <div class="age">⏰ Возраст: 566 дней (1.6 года)</div>
+                    <div class="wasted">💸 Уже потрачено: 4,551 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>241 ₽/мес</strong> | Экономия после удаления: <strong>2,894 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">🌐 gitlab_new</div>
+                    <div class="age">⏰ Возраст: 546 дней (1.5 года)</div>
+                    <div class="wasted">💸 Уже потрачено: 4,390 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>241 ₽/мес</strong> | Экономия после удаления: <strong>2,894 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">🌐 chartsstorage_ip</div>
+                    <div class="age">⏰ Возраст: 227 дней (0.6 лет)</div>
+                    <div class="wasted">💸 Уже потрачено: 1,825 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>241 ₽/мес</strong> | Экономия после удаления: <strong>2,894 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <div class="cleanup-card">
+                    <div class="title">📸 gate-021023 (snapshot)</div>
+                    <div class="age">⏰ Возраст: 763 дней (2.1 лет)</div>
+                    <div class="wasted">💸 Уже потрачено: 847 ₽</div>
+                    <div class="details" style="margin-top: 10px; font-size: 14px;">
+                        Текущие расходы: <strong>33 ₽/мес</strong> | Экономия после удаления: <strong>400 ₽/год</strong>
+                    </div>
+                </div>
+                
+                <table class="comparison-table">
+                    <tr class="total">
+                        <td>ИТОГО по очистке</td>
+                        <td style="text-align: right;">6 ресурсов</td>
+                        <td style="text-align: right;" class="savings">2,707 ₽/мес</td>
+                        <td style="text-align: right;" class="savings">32,479 ₽/год</td>
+                    </tr>
+                </table>
+                
+                <div class="alert danger">
+                    <strong>📉 Ежедневные потери:</strong> Каждый день компания теряет <strong>~90 ₽</strong> на ненужные ресурсы. За год это составит еще <strong>32,479 ₽</strong> сверх уже потраченных <strong>32,972 ₽</strong>.
+                </div>
+            </div>
+            
+            <!-- Section 3: Financial Summary -->
+            <div class="section">
+                <h2>3. Финансовое резюме</h2>
+                
+                <h3>3.1. Сравнение сценариев</h3>
+                
+                <div class="scenario-grid">
+                    <div class="scenario-card">
+                        <div class="header">📘 Сценарий 1: Консервативный</div>
+                        <div class="body">
+                            <p><strong>Стратегия:</strong> Selectel для всех ресурсов + удаление неиспользуемых</p>
+                            <table style="margin-top: 15px;">
+                                <tr>
+                                    <td>Экономия/месяц:</td>
+                                    <td style="text-align: right; font-weight: 700; color: var(--success-green);">8,060 ₽</td>
+                                </tr>
+                                <tr>
+                                    <td>Экономия/год:</td>
+                                    <td style="text-align: right; font-weight: 700; color: var(--success-green);">96,715 ₽</td>
+                                </tr>
+                                <tr>
+                                    <td>Процент экономии:</td>
+                                    <td style="text-align: right; font-weight: 700;">4.5%</td>
+                                </tr>
+                            </table>
+                            <div style="margin-top: 15px; padding: 10px; background: #d1fae5; border-radius: 4px; font-size: 13px;">
+                                <strong>✅ Плюсы:</strong> Низкий риск, высокая надежность
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="scenario-card recommended">
+                        <div class="header">🏆 Сценарий 2: Оптимальный (РЕКОМЕНДУЕТСЯ)</div>
+                        <div class="body">
+                            <p><strong>Стратегия:</strong> Selectel для prod + Beget для dev/test + удаление неиспользуемых</p>
+                            <table style="margin-top: 15px;">
+                                <tr>
+                                    <td>Экономия/месяц:</td>
+                                    <td style="text-align: right; font-weight: 700; color: var(--success-green); font-size: 18px;">21,335 ₽</td>
+                                </tr>
+                                <tr>
+                                    <td>Экономия/год:</td>
+                                    <td style="text-align: right; font-weight: 700; color: var(--success-green); font-size: 18px;">256,018 ₽</td>
+                                </tr>
+                                <tr>
+                                    <td>Процент экономии:</td>
+                                    <td style="text-align: right; font-weight: 700; font-size: 18px;">11.9%</td>
+                                </tr>
+                            </table>
+                            <div style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.3); border-radius: 4px; font-size: 13px;">
+                                <strong>✅ Плюсы:</strong> Максимальная экономия при разумных рисках
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>3.2. Разбивка экономии по источникам</h3>
+                
+                <div class="chart-container">
+                    <div class="bar-chart">
+                        <div class="bar-item">
+                            <div class="label">Beget (dev/test)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 62.2%; background: linear-gradient(90deg, #10b981 0%, #059669 100%);">13,275 ₽/мес</div>
+                            </div>
+                            <div class="value">13,275 ₽/мес (62.2%)</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Selectel (prod)</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 25.1%; background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);">5,353 ₽/мес</div>
+                            </div>
+                            <div class="value">5,353 ₽/мес (25.1%)</div>
+                        </div>
+                        <div class="bar-item">
+                            <div class="label">Очистка ресурсов</div>
+                            <div class="bar">
+                                <div class="bar-fill" style="width: 12.7%; background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);">2,707 ₽/мес</div>
+                            </div>
+                            <div class="value">2,707 ₽/мес (12.7%)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>3.3. Анализ потерь и упущенных выгод</h3>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Метрика</th>
+                            <th style="text-align: right;">Сумма</th>
+                            <th>Комментарий</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="background: #fee2e2;">
+                            <td><strong>💸 Невозвратные потери</strong></td>
+                            <td style="text-align: right; font-weight: 700; color: var(--danger-red); font-size: 18px;">32,972 ₽</td>
+                            <td>Деньги, которые невозможно вернуть</td>
+                        </tr>
+                        <tr style="background: #fef3c7;">
+                            <td><strong>⚠️ Ежедневные потери</strong></td>
+                            <td style="text-align: right; font-weight: 700; color: var(--warning-orange);">~90 ₽/день</td>
+                            <td>На простаивающие ресурсы</td>
+                        </tr>
+                        <tr style="background: #dcfce7;">
+                            <td><strong>✅ Потенциальная экономия</strong></td>
+                            <td style="text-align: right; font-weight: 700; color: var(--success-green); font-size: 18px;">256,018 ₽/год</td>
+                            <td>При реализации всех рекомендаций</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="callout danger">
+                    <strong>💡 Критический инсайт:</strong> Компания потеряла <strong>32,972 ₽</strong> на ресурсах, которые простаивали от 7 месяцев до 2.5 лет. Откладывая решение об удалении, вы теряете <strong>~2,707 ₽ каждый месяц</strong> и <strong>~90 ₽ каждый день</strong>.
+                </div>
+            </div>
+            
+            <!-- Section 4: Implementation Plan -->
+            <div class="section">
+                <h2>4. План реализации</h2>
+                
+                <h3>Этап 1: Немедленные действия (СЕГОДНЯ) 🔴</h3>
+                <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #92400e; margin-top: 0;">Удалить неиспользуемые ресурсы</h4>
+                    <ul style="margin-left: 20px; color: #92400e;">
+                        <li><strong>Экономия:</strong> 2,707 ₽/мес (32,479 ₽/год)</li>
+                        <li><strong>Сложность:</strong> Низкая (1-2 часа работы)</li>
+                        <li><strong>Риск:</strong> Минимальный</li>
+                        <li><strong>Уже потрачено:</strong> 32,972 ₽</li>
+                    </ul>
+                    <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 4px;">
+                        <strong>Действия:</strong>
+                        <ol style="margin-left: 20px; margin-top: 10px;">
+                            <li>Проверить, что снапшоты действительно не нужны для восстановления</li>
+                            <li>Убедиться, что зарезервированные IP не используются в DNS/конфигах</li>
+                            <li>Удалить через консоль Yandex Cloud</li>
+                            <li>Подтвердить удаление в течение 24 часов</li>
+                        </ol>
+                    </div>
+                </div>
+                
+                <h3>Этап 2: Краткосрочные действия (1-3 месяца) 🟡</h3>
+                <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #1e40af; margin-top: 0;">Пилотная миграция на Beget (dev/test)</h4>
+                    <p><strong>Кандидаты:</strong> punch-dev-backend-1, punch-dev-runner-1, punch-dev-mysql-1</p>
+                    <p><strong>Потенциальная экономия:</strong> 13,275 ₽/мес (159,304 ₽/год)</p>
+                    
+                    <table style="margin-top: 15px;">
+                        <thead>
+                            <tr style="background: #1e40af; color: white;">
+                                <th>Неделя</th>
+                                <th>Действие</th>
+                                <th>Ответственный</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Создать тестовые инстансы на Beget</td>
+                                <td>DevOps</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Мигрировать punch-dev-mysql-1 (минимальный риск)</td>
+                                <td>DevOps + DBA</td>
+                            </tr>
+                            <tr>
+                                <td>3-4</td>
+                                <td>Мониторинг производительности</td>
+                                <td>DevOps</td>
+                            </tr>
+                            <tr>
+                                <td>5-6</td>
+                                <td>Миграция остальных dev-серверов</td>
+                                <td>DevOps</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #1e40af; margin-top: 0;">Пилотная миграция на Selectel</h4>
+                    <p><strong>Кандидат:</strong> gateway (минимальная стоимость, некритичный сервис)</p>
+                    <p><strong>Экономия:</strong> 455 ₽/мес (5,462 ₽/год)</p>
+                    
+                    <div style="margin-top: 15px; padding: 15px; background: white; border-radius: 4px;">
+                        <strong>Критерии успеха:</strong>
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Стабильная работа 30 дней</li>
+                            <li>Производительность не ниже текущей</li>
+                            <li>Отсутствие инцидентов</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h3>Этап 3: Среднесрочные действия (3-6 месяцев) 🟢</h3>
+                <div style="background: #d1fae5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h4 style="color: #065f46; margin-top: 0;">Полномасштабная миграция production</h4>
+                    <p><strong>Приоритеты:</strong></p>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>gitlab</strong> → Selectel (экономия 2,568 ₽/мес)</li>
+                        <li><strong>office</strong> → Selectel (экономия 261 ₽/мес)</li>
+                        <li><strong>itlkube</strong> → Selectel (экономия 2,069 ₽/мес, высокая сложность)</li>
+                    </ol>
+                    
+                    <div class="alert warning" style="margin-top: 15px;">
+                        <strong>⚠️ Внимание:</strong> Миграция Kubernetes-кластера требует максимальной подготовки:
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Полное резервное копирование всех данных</li>
+                            <li>План отката (rollback)</li>
+                            <li>Тестирование всех приложений в новом кластере</li>
+                            <li>Поэтапная миграция сервисов</li>
+                            <li>Мониторинг 24/7 в первую неделю</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 5: ROI Analysis -->
+            <div class="section">
+                <h2>5. ROI-анализ</h2>
+                
+                <h3>5.1. Инвестиции в миграцию</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Статья затрат</th>
+                            <th style="text-align: right;">Часы</th>
+                            <th>Описание</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>DevOps-специалист</td>
+                            <td style="text-align: right;">40 часов</td>
+                            <td>Настройка инфраструктуры, миграция</td>
+                        </tr>
+                        <tr>
+                            <td>QA-инженер</td>
+                            <td style="text-align: right;">20 часов</td>
+                            <td>Тестирование приложений</td>
+                        </tr>
+                        <tr>
+                            <td>Техлид</td>
+                            <td style="text-align: right;">10 часов</td>
+                            <td>Планирование, контроль</td>
+                        </tr>
+                        <tr class="table-highlight">
+                            <td><strong>ИТОГО</strong></td>
+                            <td style="text-align: right;"><strong>70 часов</strong></td>
+                            <td><strong>Полная миграция (Сценарий 2)</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div class="kpi-grid" style="margin-top: 30px;">
+                    <div class="kpi-card success">
+                        <div class="label">Окупаемость</div>
+                        <div class="value">< 1 мес</div>
+                        <div class="subtext">при экономии 21,335 ₽/мес</div>
+                    </div>
+                    
+                    <div class="kpi-card success">
+                        <div class="label">Годовая выгода</div>
+                        <div class="value">256,018 ₽</div>
+                        <div class="subtext">чистая экономия</div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="label">ROI через год</div>
+                        <div class="value">366%</div>
+                        <div class="subtext">отличный показатель</div>
+                    </div>
+                    
+                    <div class="kpi-card warning">
+                        <div class="label">Время простоя</div>
+                        <div class="value">Минимально</div>
+                        <div class="subtext">поэтапная миграция</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section 6: Conclusion -->
+            <div class="section">
+                <h2>6. Заключение и рекомендация</h2>
+                
+                <div class="summary-box" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <h3>🎯 Итоговая рекомендация</h3>
+                    <div style="font-size: 16px; line-height: 1.8;">
+                        <p><strong>Этап 1 (СРОЧНО - сегодня):</strong> Удалить 6 неиспользуемых ресурсов<br>
+                        → Экономия: <strong>2,707 ₽/мес</strong>, предотвращение дальнейших потерь</p>
+                        
+                        <p><strong>Этап 2 (месяцы 1-3):</strong> Мигрировать dev/test на Beget<br>
+                        → Дополнительная экономия: <strong>13,275 ₽/мес</strong></p>
+                        
+                        <p><strong>Этап 3 (месяцы 3-6):</strong> Мигрировать production на Selectel<br>
+                        → Дополнительная экономия: <strong>5,353 ₽/мес</strong></p>
+                        
+                        <div style="margin-top: 20px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 8px; font-size: 18px;">
+                            <strong>📈 Общий эффект через 6 месяцев:</strong><br>
+                            <div style="font-size: 32px; margin-top: 10px;">
+                                <strong>21,335 ₽/мес</strong> | <strong>256,018 ₽/год</strong>
+                            </div>
+                        <div style="font-size: 24px; margin-top: 10px;">
+                            Экономия <strong>14.3%</strong> от текущих расходов
+                        </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3>6.1. Ключевые выводы</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                    <div class="callout">
+                        <h4 style="color: var(--success-green); margin-bottom: 10px;">✅ Возможности</h4>
+                        <ul style="margin-left: 20px;">
+                            <li>Экономия до <strong>11.9%</strong> от расходов</li>
+                            <li><strong>256,018 ₽/год</strong> — потенциальная выгода</li>
+                            <li>Окупаемость < 1 месяца</li>
+                            <li>Минимальный риск при поэтапной реализации</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="callout danger">
+                        <h4 style="color: var(--danger-red); margin-bottom: 10px;">⚠️ Риски и потери</h4>
+                        <ul style="margin-left: 20px;">
+                            <li><strong>32,972 ₽</strong> уже потеряно</li>
+                            <li><strong>~90 ₽/день</strong> продолжают теряться</li>
+                            <li>Откладывание = еще <strong>32,479 ₽</strong> в следующем году</li>
+                            <li>Миграция требует планирования</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="alert info">
+                    <strong>📌 Следующий шаг:</strong> Рекомендуется начать с удаления неиспользуемых ресурсов (нулевой риск, немедленный эффект), а затем провести пилотную миграцию 1-2 некритичных сервисов для оценки качества альтернативных провайдеров.
+                </div>
+            </div>
+            
+            <!-- Appendix -->
+            <div class="section">
+                <h2>Приложение: Детализация</h2>
+                
+                <h3>A. Детализация потраченных средств</h3>
+                
+                <h4>Неиспользуемые IP-адреса (4 шт.)</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>IP-адрес</th>
+                            <th>Возраст</th>
+                            <th style="text-align: right;">Ежемесячно</th>
+                            <th style="text-align: right;">Потрачено</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Reserved IP: 158.160.107.171</td>
+                            <td>900 дней (2.5 лет)</td>
+                            <td style="text-align: right;">241 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">7,236 ₽</td>
+                        </tr>
+                        <tr>
+                            <td>kafka_ip (158.160.85.164)</td>
+                            <td>566 дней (1.6 года)</td>
+                            <td style="text-align: right;">241 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">4,551 ₽</td>
+                        </tr>
+                        <tr>
+                            <td>gitlab_new (158.160.78.143)</td>
+                            <td>546 дней (1.5 года)</td>
+                            <td style="text-align: right;">241 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">4,390 ₽</td>
+                        </tr>
+                        <tr>
+                            <td>chartsstorage_ip (158.160.88.24)</td>
+                            <td>227 дней (0.6 лет)</td>
+                            <td style="text-align: right;">241 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">1,825 ₽</td>
+                        </tr>
+                        <tr class="table-highlight">
+                            <td colspan="3"><strong>Подытог IP-адреса</strong></td>
+                            <td style="text-align: right;"><strong>18,002 ₽</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h4>Устаревшие снапшоты (2 шт.)</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Снапшот</th>
+                            <th>Возраст</th>
+                            <th style="text-align: right;">Ежемесячно</th>
+                            <th style="text-align: right;">Потрачено</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>gitdisk-1740816592565 (507 GB)</td>
+                            <td>248 дней (0.7 лет)</td>
+                            <td style="text-align: right;">1,709 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">14,124 ₽</td>
+                        </tr>
+                        <tr>
+                            <td>gate-021023 (10 GB)</td>
+                            <td>763 дней (2.1 лет)</td>
+                            <td style="text-align: right;">33 ₽</td>
+                            <td style="text-align: right; color: var(--danger-red); font-weight: 700;">847 ₽</td>
+                        </tr>
+                        <tr class="table-highlight">
+                            <td colspan="3"><strong>Подытог снапшоты</strong></td>
+                            <td style="text-align: right;"><strong>14,971 ₽</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <table style="margin-top: 20px;">
+                    <tr style="background: #fee2e2; font-size: 18px;">
+                        <td colspan="3"><strong>💸 ИТОГО ПОТРАЧЕНО ВПУСТУЮ</strong></td>
+                        <td style="text-align: right; color: var(--danger-red); font-weight: 700; font-size: 24px;">32,972 ₽</td>
+                    </tr>
+                </table>
+                
+                <div style="margin-top: 15px; padding: 15px; background: var(--gray-50); border-radius: 4px; font-size: 13px; color: var(--gray-700);">
+                    <strong>Примечание:</strong> Сумма рассчитана как <code>месячная_стоимость × (возраст_в_днях / 30)</code>. Это консервативная оценка, не учитывающая возможные изменения цен в прошлом.
+                </div>
+                
+                <h3>B. Сравнительная таблица провайдеров</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Критерий</th>
+                            <th>Yandex Cloud</th>
+                            <th>Selectel</th>
+                            <th>Beget</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Размер компании</strong></td>
+                            <td>Крупный</td>
+                            <td>Средний</td>
+                            <td>Малый</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Надежность</strong></td>
+                            <td>Очень высокая</td>
+                            <td>Высокая</td>
+                            <td>Средняя</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Цены</strong></td>
+                            <td>Высокие</td>
+                            <td>Средние (-20-30%)</td>
+                            <td>Низкие (-50-60%)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Managed K8s</strong></td>
+                            <td>✅ Да</td>
+                            <td>✅ Да</td>
+                            <td>❌ Нет</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Managed DB</strong></td>
+                            <td>✅ Полная линейка</td>
+                            <td>✅ Полная линейка</td>
+                            <td>⚠️ Только MySQL, PostgreSQL</td>
+                        </tr>
+                        <tr>
+                            <td><strong>SLA</strong></td>
+                            <td>99.95%</td>
+                            <td>99.9%</td>
+                            <td>99.5%</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Поддержка</strong></td>
+                            <td>24/7 (RU/EN)</td>
+                            <td>24/7 (RU)</td>
+                            <td>Рабочие часы</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Для production</strong></td>
+                            <td>✅ Отлично</td>
+                            <td>✅ Отлично</td>
+                            <td>⚠️ С осторожностью</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Для dev/test</strong></td>
+                            <td>✅ Избыточно</td>
+                            <td>✅ Хорошо</td>
+                            <td>✅ Идеально</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Final Summary -->
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 40px; border-radius: 8px; margin-top: 40px; text-align: center;">
+                <h2 style="color: white; font-size: 32px; margin-bottom: 20px;">📊 Итоговые показатели</h2>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-top: 30px;">
+                    <div>
+                        <div style="font-size: 14px; opacity: 0.9;">Годовая экономия</div>
+                        <div style="font-size: 48px; font-weight: 700; margin: 10px 0;">256,018 ₽</div>
+                        <div style="font-size: 16px; opacity: 0.9;">при полной реализации</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 14px; opacity: 0.9;">Процент экономии</div>
+                        <div style="font-size: 48px; font-weight: 700; margin: 10px 0;">11.9%</div>
+                        <div style="font-size: 16px; opacity: 0.9;">от текущих расходов</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 14px; opacity: 0.9;">Упущенная выгода</div>
+                        <div style="font-size: 48px; font-weight: 700; margin: 10px 0; color: #fca5a5;">32,972 ₽</div>
+                        <div style="font-size: 16px; opacity: 0.9;">уже потрачено</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <div style="font-size: 18px; font-weight: 600;">⚡ Срочность действий</div>
+                    <div style="font-size: 16px; margin-top: 10px;">
+                        Каждый день промедления = <strong>~90 ₽</strong> дополнительных потерь<br>
+                        Рекомендуется начать реализацию <strong>в течение недели</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Подготовлено:</strong> InfraZen FinOps Platform</p>
+            <p><strong>Дата:</strong> 04.11.2025</p>
+            <p><strong>Контакт:</strong> finops@infrazen.team</p>
+            <p style="margin-top: 15px; font-size: 12px; color: var(--gray-700);">
+                Этот отчет основан на актуальных данных по состоянию на 04.11.2025 13:37.<br>
+                Цены и конфигурации могут меняться. Рекомендуется актуализировать анализ перед началом миграции.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
