@@ -186,18 +186,6 @@ def _apply_action(rec: OptimizationRecommendation, action: str, payload: dict):
         rec.status = 'pending'
         rec.dismissed_at = None
         rec.dismissed_reason = None
-        rec.snoozed_until = None
-    elif action == 'snooze':
-        rec.status = 'snoozed'
-        until = payload.get('until')
-        try:
-            if until:
-                rec.snoozed_until = datetime.fromisoformat(until)
-            else:
-                # Default snooze period: 1 month
-                rec.snoozed_until = datetime.utcnow() + timedelta(days=30)
-        except Exception:
-            rec.snoozed_until = datetime.utcnow() + timedelta(days=30)
     else:
         return False
     return True

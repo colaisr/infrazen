@@ -81,7 +81,6 @@ function sevClass(sev){
 function statusBadge(st){
     const colors = {
         pending:'#1a73e8', 
-        snoozed:'#a142f4', 
         implemented:'#34a853', 
         dismissed:'#9aa0a6'
     };
@@ -114,7 +113,6 @@ function cardTemplate(rec){
         <div class="rec-actions">
             <input type="checkbox" class="rowCheck" />
             <button class="btn-icon act" data-act="implemented" title="Отметить внедрённой">✅</button>
-            <button class="btn-icon act" data-act="snooze" title="Отложить на 1 месяц">⏱</button>
             <button class="btn-icon act" data-act="dismiss" title="Скрыть">🗑</button>
         </div>
     `;
