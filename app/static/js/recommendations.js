@@ -480,7 +480,8 @@ function initializeEventListeners() {
         if(e.target.classList.contains('more')){ 
             e.preventDefault(); 
             const id = e.target.dataset.id; 
-            toggleDetails(id); 
+            toggleDetails(id);
+            e.target.blur(); // Remove focus to clear the blue border
         }
     });
 }
