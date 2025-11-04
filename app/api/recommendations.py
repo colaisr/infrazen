@@ -283,3 +283,66 @@ def recommendations_summary():
     })
 
 
+@recommendations_bp.route('/recommendations/clear-all', methods=['POST'])
+def clear_all_recommendations():
+    """Clear all recommendations for the current user. Next sync will start fresh."""
+    # Check if demo user (read-only)
+    from app.api.auth import check_demo_user_write_access
+    demo_check = check_demo_user_write_access()
+    if demo_check:
+        return demo_check
+    
+    # Resolve current user
+    current_user_id = None
+    try:
+        user_data = session.get('user') or {}
+        if user_data.get('email') == 'demo@infrazen.com':
+            demo_user = User.find_by_email('demo@infrazen.com')
+            if demo_user:
+                current_user_id = demo_user.id
+        else:
+            current_user_id = user_data.get('db_id')
+    except Exception:
+        current_user_id = None
+
+    if not current_user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        # Find all recommendations for this user's providers
+        # Note: Can't use delete() with join(), so we get IDs first
+        rec_ids_query = db.session.query(OptimizationRecommendation.id).join(
+            CloudProvider, 
+            OptimizationRecommendation.provider_id == CloudProvider.id
+        ).filter(CloudProvider.user_id == current_user_id)
+        
+        rec_ids = [r[0] for r in rec_ids_query.all()]
+        count = len(rec_ids)
+        
+        if count == 0:
+            return jsonify({
+                'status': 'success',
+                'deleted_count': 0,
+                'message': 'Нет рекомендаций для удаления.'
+            })
+        
+        # Delete recommendations by ID
+        OptimizationRecommendation.query.filter(
+            OptimizationRecommendation.id.in_(rec_ids)
+        ).delete(synchronize_session=False)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'deleted_count': count,
+            'message': f'Удалено {count} рекомендаций. При следующей синхронизации система создаст новые рекомендации.'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Internal server error',
+            'detail': str(e)
+        }), 500
+
+

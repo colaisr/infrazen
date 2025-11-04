@@ -569,12 +569,58 @@ function toggleProviderPreference(providerType, isEnabled) {
 }
 
 // ============================================================================
+// Clear All Recommendations
+// ============================================================================
+
+async function clearAllRecommendations() {
+    // Confirm action
+    const confirmed = confirm(
+        'Вы уверены, что хотите удалить ВСЕ рекомендации?\n\n' +
+        'Это действие нельзя отменить. При следующей синхронизации система создаст новые рекомендации на основе актуальных данных.\n\n' +
+        'Удалить все рекомендации?'
+    );
+    
+    if (!confirmed) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/recommendations/clear-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Ошибка при удалении рекомендаций');
+        }
+        
+        const result = await response.json();
+        
+        // Show success message
+        showMessage(result.message || `Успешно удалено ${result.deleted_count} рекомендаций`, 'success');
+        
+    } catch (error) {
+        console.error('Error clearing recommendations:', error);
+        showMessage('Ошибка при удалении рекомендаций: ' + error.message, 'error');
+    }
+}
+
+// ============================================================================
 // Initialization
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', function() {
     loadUserDetails();
     loadProviderPreferences();
+    
+    // Clear all recommendations button
+    const clearAllBtn = document.getElementById('clearAllRecommendations');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', clearAllRecommendations);
+    }
 });
 
 // ============================================================================
