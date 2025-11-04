@@ -132,8 +132,7 @@ function cardTemplate(rec){
         <div class="resource-line">
             ${providerIcon}
             <span class="resource-icon-emoji">${resourceTypeIcon}</span>
-            <span class="resource-name" title="${rec.resource_name}">${rec.resource_name || 'Unknown'}</span>
-            <span class="resource-type-tag">${rec.resource_type || ''}</span>
+            <span class="resource-name" title="${rec.resource_name || 'Unknown'}">${rec.resource_name || 'Unknown'}</span>
         </div>
     `;
     
