@@ -1038,6 +1038,17 @@ class BegetProviderPlugin(ProviderPlugin):
                     len(manual_pricing),
                 )
 
+            # Collect managed database pricing (MySQL, PostgreSQL)
+            try:
+                from scripts.beget_dbaas_pricing_fetch import BegetDBaaSPricingClient
+                dbaas_client = BegetDBaaSPricingClient()
+                dbaas_client.session.headers['Authorization'] = f'Bearer {access_token}' if access_token else ''
+                dbaas_pricing = dbaas_client.get_dbaas_prices()
+                pricing_data.extend(dbaas_pricing)
+                self.logger.info("Collected %d Beget managed DB pricing records", len(dbaas_pricing))
+            except Exception as dbaas_error:
+                self.logger.warning(f"Failed to fetch Beget DBaaS pricing: {dbaas_error}")
+
             self.logger.info("Total Beget pricing records collected: %d", len(pricing_data))
             return pricing_data
             

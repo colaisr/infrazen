@@ -135,13 +135,14 @@ class YandexService:
                 # Get compute resources early (needed for K8s CSI volume and worker VM detection)
                 folder_disks = self.client.list_disks(folder_id)
                 folder_instances = self.client.list_instances(folder_id)
-                logger.info(f"  Found {len(folder_disks)} disks and {len(folder_instances)} instances in folder")
+                folder_load_balancers = self.client.list_network_load_balancers(folder_id)
+                logger.info(f"  Found {len(folder_disks)} disks, {len(folder_instances)} instances, and {len(folder_load_balancers)} load balancers in folder")
                 
-                # Process Kubernetes clusters (pass disks for CSI volume aggregation and instances for worker VM aggregation)
+                # Process Kubernetes clusters (pass disks for CSI volume aggregation, instances for worker VM aggregation, and LBs for K8s service LB aggregation)
                 k8s_clusters = managed_services.get('kubernetes_clusters', [])
                 for cluster in k8s_clusters:
                     cluster_resource = self._process_kubernetes_cluster(
-                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id, folder_disks, folder_instances
+                        cluster, folder_id, folder_name, cloud_id, sync_snapshot.id, folder_disks, folder_instances, folder_load_balancers
                     )
                     if cluster_resource:
                         synced_resources.append(cluster_resource)
@@ -316,9 +317,18 @@ class YandexService:
                 
                 # PHASE 2F: Process network load balancers
                 logger.info(f"  Processing load balancers...")
-                load_balancers = self.client.list_network_load_balancers(folder_id)
+                load_balancers = folder_load_balancers  # Reuse LBs fetched earlier
                 total_load_balancers = 0
                 for lb in load_balancers:
+                    lb_name = lb.get('name', '')
+                    lb_folder = lb.get('folderId')
+                    
+                    # Skip K8s-created load balancers - they're aggregated into the cluster resource
+                    # K8s-created LBs have names starting with "k8s-" and are in the same folder
+                    if lb_name.startswith('k8s-') and lb_folder == folder_id:
+                        logger.debug(f"    Skipping K8s load balancer '{lb_name}' (included in cluster cost)")
+                        continue
+                    
                     lb_resource = self._process_load_balancer_resource(
                         lb,
                         folder_id,
@@ -1103,12 +1113,25 @@ class YandexService:
             # Calculation: 40.18₽ / 120 fip*hour = 0.3348₽/hour = 8.04₽/day
             daily_cost = 8.04
             
+            # Get user-friendly name from Yandex (e.g., "kafka_ip")
+            yandex_name = address.get('name', '')
+            # Get actual IP address for display (nested in externalIpv4Address at top level)
+            actual_ip = address.get('externalIpv4Address', {}).get('address', address_id)
+            
+            # Create a friendly resource name
+            if yandex_name:
+                resource_name = yandex_name  # Use user-friendly name from Yandex
+            else:
+                resource_name = f"Reserved IP: {actual_ip}"  # Fallback to IP address
+            
             metadata = {
                 'address': address,
                 'folder_id': folder_id,
                 'folder_name': folder_name,
                 'cloud_id': cloud_id,
                 'ip_address': address_value,
+                'yandex_name': yandex_name,
+                'actual_ip_address': actual_ip,
                 'is_used': is_used,
                 'reserved': address.get('reserved', False),
                 'created_at': address.get('createdAt'),
@@ -1120,7 +1143,7 @@ class YandexService:
             resource = self._create_resource(
                 resource_type='reserved_ip',
                 resource_id=address_id,
-                name=f"Reserved IP: {address_value}",
+                name=resource_name,
                 metadata=metadata,
                 sync_snapshot_id=sync_snapshot_id,
                 region=folder_id,
@@ -1133,12 +1156,13 @@ class YandexService:
                 resource.original_cost = round(daily_cost * 30, 2)
                 resource.currency = 'RUB'
                 resource.status = 'RUNNING'
+                resource.external_ip = actual_ip  # Show the actual IP address on card
                 resource.add_tag('ip_address', address_value)
                 resource.add_tag('is_reserved', 'true')
                 resource.add_tag('cost_source', 'documented')
                 resource.add_tag('pricing_per_day', '4.608')
                 
-                logger.debug(f"    Reserved IP: {address_value} = {daily_cost:.2f} ₽/day")
+                logger.debug(f"    Reserved IP: {yandex_name or actual_ip} = {daily_cost:.2f} ₽/day")
             
             return resource
             
@@ -1278,13 +1302,14 @@ class YandexService:
             status = status_map.get(status_raw, status_raw)
             
             # Container registry pricing:
-            # From HAR: 75.94₽/day total
-            # Assuming ~700GB storage: 75.94 ÷ 700 = 0.1085₽/GB/day
-            # Since we can't get storage from API, we'll use the total from HAR
-            # and divide by number of registries if we find multiple
-            
-            # For now, use the HAR total as a flat fee per registry
-            # This will be accurate if there's only 1 registry in the account
+            # Storage-based: cr.bucket.used_space.standard (SKU: dn2bs67ot2ejnfr4rqmf)
+            # Pricing unit: gbyte*hour (0.108₽/GB/day)
+            # 
+            # LIMITATION: Container Registry API doesn't provide storage size or cost
+            # Hardcoded from HAR billing analysis until we implement billing API sync
+            # 
+            # From HAR (Nov 2025): 75.94₽/day for itlteam-repo (~703 GB storage)
+            # SKU: cr.bucket.used_space.standard (dn2bs67ot2ejnfr4rqmf)
             daily_cost = 75.94
             
             metadata = {
@@ -1293,8 +1318,12 @@ class YandexService:
                 'folder_name': folder_name,
                 'cloud_id': cloud_id,
                 'created_at': registry.get('createdAt'),
-                'cost_source': 'har_total',
-                'note': 'Storage-based pricing - total from HAR analysis'
+                'cost_source': 'har_analysis',
+                'note': 'Hardcoded from HAR billing data. Storage-based: cr.bucket.used_space.standard',
+                'sku_id': 'dn2bs67ot2ejnfr4rqmf',
+                'sku_name': 'cr.bucket.used_space.standard',
+                'estimated_storage_gb': 703,  # Calculated: 75.94 ÷ 0.108₽/GB/day
+                'limitation': 'Cost is hardcoded - needs billing API for dynamic updates'
             }
             
             resource = self._create_resource(
@@ -1313,8 +1342,9 @@ class YandexService:
                 resource.original_cost = round(daily_cost * 30, 2)
                 resource.currency = 'RUB'
                 resource.status = status
-                resource.add_tag('cost_source', 'har_total')
+                resource.add_tag('cost_source', 'har_analysis')
                 resource.add_tag('pricing_model', 'storage_based')
+                resource.add_tag('sku_id', 'dn2bs67ot2ejnfr4rqmf')
                 
                 logger.debug(f"    Container Registry: {registry_name} = {daily_cost:.2f} ₽/day")
             
@@ -1634,7 +1664,7 @@ class YandexService:
     def _process_kubernetes_cluster(self, cluster: Dict, folder_id: str, 
                                   folder_name: str, cloud_id: str,
                                   sync_snapshot_id: int, disks: List[Dict] = None,
-                                  instances: List[Dict] = None) -> Optional[Resource]:
+                                  instances: List[Dict] = None, load_balancers: List[Dict] = None) -> Optional[Resource]:
         """
         Process Kubernetes cluster resource
         
@@ -1798,10 +1828,40 @@ class YandexService:
                         
                         logger.info(f"  Found worker VM '{instance_name}' for cluster '{cluster_name}': {vm_cost:.2f}₽/day")
             
-            # Total cluster cost = master + storage + worker VMs
-            estimated_daily_cost = master_daily_cost + csi_volumes_cost + worker_vms_cost
+            # Find and sum load balancers created by this K8s cluster
+            k8s_lb_cost = 0.0
+            k8s_lb_count = 0
+            k8s_lb_list = []
             
-            logger.info(f"  K8s cluster '{cluster_name}' total cost: {estimated_daily_cost:.2f}₽/day (master: {master_daily_cost:.2f}₽, storage: {csi_volumes_cost:.2f}₽, workers: {worker_vms_cost:.2f}₽)")
+            if load_balancers:
+                for lb in load_balancers:
+                    lb_name = lb.get('name', '')
+                    lb_folder = lb.get('folderId')
+                    
+                    # Check if this LB belongs to this K8s cluster
+                    # K8s-created LBs have names starting with "k8s-" and are in the same folder
+                    if lb_name.startswith('k8s-') and lb_folder == folder_id:
+                        lb_id = lb.get('id')
+                        
+                        # LB cost: ~40.44₽/day per LB (from billing data analysis)
+                        # This includes public IP + LB service charge
+                        lb_daily_cost = 40.44
+                        
+                        k8s_lb_cost += lb_daily_cost
+                        k8s_lb_count += 1
+                        k8s_lb_list.append({
+                            'name': lb_name,
+                            'id': lb_id,
+                            'listeners': len(lb.get('listeners', [])),
+                            'cost': round(lb_daily_cost, 2)
+                        })
+                        
+                        logger.info(f"  Found K8s load balancer '{lb_name}' for cluster '{cluster_name}': {lb_daily_cost:.2f}₽/day")
+            
+            # Total cluster cost = master + storage + worker VMs + load balancers
+            estimated_daily_cost = master_daily_cost + csi_volumes_cost + worker_vms_cost + k8s_lb_cost
+            
+            logger.info(f"  K8s cluster '{cluster_name}' total cost: {estimated_daily_cost:.2f}₽/day (master: {master_daily_cost:.2f}₽, storage: {csi_volumes_cost:.2f}₽, workers: {worker_vms_cost:.2f}₽, LBs: {k8s_lb_cost:.2f}₽)")
             
             # Mark CSI volumes as inactive (they're now part of cluster, not standalone)
             # This prevents them from showing up as separate resources in the UI
@@ -1835,6 +1895,21 @@ class YandexService:
                         old_vm.is_active = False
                         logger.debug(f"  Deactivated standalone VM resource '{worker_vm['name']}' (now part of cluster)")
             
+            # Mark K8s load balancers as inactive (they're now part of cluster, not standalone)
+            if k8s_lb_list:
+                for k8s_lb in k8s_lb_list:
+                    lb_id = k8s_lb['id']
+                    # Find and deactivate old LB resource if it exists
+                    old_lb = Resource.query.filter_by(
+                        provider_id=self.provider.id,
+                        resource_id=lb_id,
+                        resource_type='load_balancer',
+                        is_active=True
+                    ).first()
+                    if old_lb:
+                        old_lb.is_active = False
+                        logger.debug(f"  Deactivated standalone LB resource '{k8s_lb['name'][:50]}...' (now part of cluster)")
+            
             # Create resource metadata
             metadata = {
                 'cluster': cluster,
@@ -1855,13 +1930,16 @@ class YandexService:
                     'master': round(master_daily_cost, 2),
                     'workers': round(worker_vms_cost, 2),
                     'storage': round(csi_volumes_cost, 2),
+                    'load_balancers': round(k8s_lb_cost, 2),
                     'total': round(estimated_daily_cost, 2)
                 },
                 'csi_volumes': csi_volumes_list,
                 'csi_volumes_count': csi_volumes_count,
                 'worker_vms': worker_vms_list,
                 'worker_vms_count': worker_vms_count,
-                'note': f'Total cost includes master ({master_daily_cost:.2f}₽), {worker_vms_count} worker VM(s) ({worker_vms_cost:.2f}₽), and {csi_volumes_count} CSI volume(s) ({csi_volumes_cost:.2f}₽). All components are aggregated for complete cluster cost tracking.'
+                'k8s_load_balancers': k8s_lb_list,
+                'k8s_lb_count': k8s_lb_count,
+                'note': f'Total cost includes master ({master_daily_cost:.2f}₽), {worker_vms_count} worker VM(s) ({worker_vms_cost:.2f}₽), {csi_volumes_count} CSI volume(s) ({csi_volumes_cost:.2f}₽), and {k8s_lb_count} load balancer(s) ({k8s_lb_cost:.2f}₽). All components are aggregated for complete cluster cost tracking.'
             }
             
             resource = self._create_resource(

@@ -147,13 +147,40 @@ class SelectelGridPricingClient:
         if not self.api_key:
             return []
 
+        # Retail multiplier for Selectel "Произвольная" UI pricing.
+        # The VPC matrix returns base per-unit prices; the UI applies an
+        # approximately 7.3x coefficient consistently to CPU, RAM and Disk
+        # components in the custom configurator. We mirror that here so our
+        # stored monthly_cost reflects the retail price users see.
+        import os
+        try:
+            retail_multiplier = float(os.getenv("SELECTEL_RETAIL_MULTIPLIER", "7.3"))
+        except ValueError:
+            retail_multiplier = 7.3
+
         price_map = self._fetch_price_map()
         regions = self._regions_from_price_map(price_map)
 
         # Balanced sampling grid
+        # Expanded to cover real-world workloads including large storage (databases, GitLab, etc.)
         vcpus_list = [1, 2, 4, 8, 16, 32]
-        ram_gb_list = [1, 2, 4, 8, 16, 32, 64]
-        disk_gb_list = [10, 50, 100, 200]
+        ram_gb_list = [1, 2, 4, 8, 12, 16, 32, 64]  # Added 12 GB for database/app server workloads
+        disk_gb_list = [10, 50, 100, 128, 200, 512, 1024]  # Added 128 GB for K8s nodes, 512 GB, 1 TB for databases
+
+        # Selectel storage types for FinOps comparison:
+        # - volume_gigabytes_basic -> HDD Базовый (cheapest HDD)
+        # - volume_gigabytes_universal2 -> SSD Универсальный v2 (cheapest SSD, monthly billing)
+        # 
+        # Note: Skipping performance tiers (Fast SSD, v1 hourly billing) as Yandex doesn't
+        # expose IOPS/performance metrics - we focus on price comparison with basic matching
+        # 
+        # Mapping to normalized storage types:
+        # - 'hdd' matches Yandex 'network-hdd' → 'hdd'
+        # - 'network_ssd' matches Yandex 'network-ssd' → 'network_ssd'
+        storage_configs = [
+            ("volume_gigabytes_basic", "hdd", "HDD Базовый"),
+            ("volume_gigabytes_universal2", "network_ssd", "SSD Универсальный v2"),
+        ]
 
         records: List[Dict[str, Any]] = []
         for region in regions:
@@ -162,36 +189,52 @@ class SelectelGridPricingClient:
                     for disk_gb in disk_gb_list:
                         cpu_cost = self._get_price(price_map, "compute_cores", region, vcpus)
                         ram_cost = self._get_price(price_map, "compute_ram", region, ram_gb * 1024)
-                        storage_cost = self._get_price(price_map, "volume_gigabytes_universal", region, disk_gb)
-                        total_monthly = cpu_cost + ram_cost + storage_cost
+                        
+                        # Generate pricing for each storage type
+                        for storage_resource, storage_type, storage_label in storage_configs:
+                            storage_cost = self._get_price(price_map, storage_resource, region, disk_gb)
+                            total_monthly_base = cpu_cost + ram_cost + storage_cost
+                            # Apply retail multiplier to reflect UI pricing
+                            total_monthly = total_monthly_base * retail_multiplier
 
-                        provider_sku = f"v{vcpus}-r{ram_gb}-d{disk_gb}:{region}"
+                            # Only include if pricing is available for this storage type
+                            if storage_cost > 0:
+                                provider_sku = f"v{vcpus}-r{ram_gb}-d{disk_gb}-{storage_type}:{region}"
 
-                        records.append(
-                            {
-                                "provider": "selectel",
-                                "resource_type": "server",
-                                "provider_sku": provider_sku,
-                                "region": region,
-                                "cpu_cores": vcpus,
-                                "ram_gb": float(ram_gb),
-                                "storage_gb": float(disk_gb),
-                                "storage_type": "universal",
-                                "extended_specs": {
-                                    "pricing_method": "grid_from_matrix",
-                                    "components": {
-                                        "cpu_monthly": round(cpu_cost, 2),
-                                        "ram_monthly": round(ram_cost, 2),
-                                        "storage_monthly": round(storage_cost, 2),
-                                    },
-                                },
-                                "hourly_cost": None,
-                                "monthly_cost": round(total_monthly, 2),
-                                "currency": "RUB",
-                                "source": "selectel_vpc_grid",
-                                "notes": "Generated from VPC billing matrix",
-                            }
-                        )
+                                records.append(
+                                    {
+                                        "provider": "selectel",
+                                        "resource_type": "server",
+                                        "provider_sku": provider_sku,
+                                        "region": region,
+                                        "cpu_cores": vcpus,
+                                        "ram_gb": float(ram_gb),
+                                        "storage_gb": float(disk_gb),
+                                        "storage_type": storage_type,
+                                        "extended_specs": {
+                                            "pricing_method": "grid_from_matrix",
+                                            "storage_type_label": storage_label,
+                                            "storage_resource": storage_resource,
+                                            "components": {
+                                                "cpu_monthly": round(cpu_cost * retail_multiplier, 2),
+                                                "ram_monthly": round(ram_cost * retail_multiplier, 2),
+                                                "storage_monthly": round(storage_cost * retail_multiplier, 2),
+                                            },
+                                            "retail_multiplier": retail_multiplier,
+                                            "base_components": {
+                                                "cpu_monthly": round(cpu_cost, 2),
+                                                "ram_monthly": round(ram_cost, 2),
+                                                "storage_monthly": round(storage_cost, 2),
+                                                "total_base": round(total_monthly_base, 2),
+                                            },
+                                        },
+                                        "hourly_cost": None,
+                                        "monthly_cost": round(total_monthly, 2),
+                                        "currency": "RUB",
+                                        "source": "selectel_vpc_grid",
+                                        "notes": f"Generated from VPC billing matrix - {storage_label}",
+                                    }
+                                )
 
         return records
 
@@ -323,8 +366,21 @@ class SelectelProviderPlugin(ProviderPlugin):
             raw = self.pricing_client.get_vpc_prices()
             self.logger.info("Collected %d Selectel raw unit price records", len(raw))
 
+            # Collect managed database pricing (PostgreSQL, MySQL, Kafka, Redis, etc.)
+            try:
+                from scripts.selectel_dbaas_pricing_fetch import SelectelDBaaSPricingClient
+                dbaas_client = SelectelDBaaSPricingClient(self.pricing_client.api_key)
+                dbaas = dbaas_client.get_dbaas_prices()
+                self.logger.info("Collected %d Selectel DBaaS pricing records", len(dbaas))
+            except Exception as dbaas_error:
+                self.logger.warning(f"Failed to fetch DBaaS pricing: {dbaas_error}")
+                dbaas = []
+
+            # Note: Container Registry pricing not included - resource type excluded from price comparison
+            # due to lack of storage size in API and high migration complexity
+
             # Combine so UI can filter by resource_type across categories
-            return (grid or []) + (raw or [])
+            return (grid or []) + (raw or []) + (dbaas or [])
         except Exception as exc:
             self.logger.error("Failed to collect Selectel pricing: %s", exc, exc_info=True)
             return []
