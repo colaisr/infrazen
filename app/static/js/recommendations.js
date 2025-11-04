@@ -114,23 +114,27 @@ function cardTemplate(rec){
     }[rec.provider_code?.toLowerCase()] || '<span class="provider-logo" style="background:#94a3b8" title="Неизвестный провайдер">?</span>';
     
     // Resource type icon (FontAwesome for professional look)
-    const resourceTypeIcon = {
-        'server': '<i class="fa-solid fa-server"></i>',
-        'vm': '<i class="fa-solid fa-server"></i>',
-        'volume': '<i class="fa-solid fa-hard-drive"></i>',
-        'disk': '<i class="fa-solid fa-hard-drive"></i>',
-        'database': '<i class="fa-solid fa-database"></i>',
-        'postgresql': '<i class="fa-solid fa-database"></i>',
-        'mysql': '<i class="fa-solid fa-database"></i>',
-        'redis': '<i class="fa-solid fa-database"></i>',
-        'kafka': '<i class="fa-solid fa-stream"></i>',
-        'kubernetes': '<i class="fa-brands fa-docker"></i>',
-        'snapshot': '<i class="fa-solid fa-camera"></i>',
-        'image': '<i class="fa-solid fa-compact-disc"></i>',
-        'ip': '<i class="fa-solid fa-network-wired"></i>',
-        'dns': '<i class="fa-solid fa-globe"></i>',
-        'container_registry': '<i class="fa-solid fa-box"></i>'
-    }[rec.resource_type?.toLowerCase()] || '<i class="fa-solid fa-cube"></i>';
+    const resourceTypeMap = {
+        'server': { icon: 'fa-server', label: 'Сервер' },
+        'vm': { icon: 'fa-server', label: 'Виртуальная машина' },
+        'volume': { icon: 'fa-hard-drive', label: 'Том' },
+        'disk': { icon: 'fa-hard-drive', label: 'Диск' },
+        'database': { icon: 'fa-database', label: 'База данных' },
+        'postgresql': { icon: 'fa-database', label: 'PostgreSQL' },
+        'mysql': { icon: 'fa-database', label: 'MySQL' },
+        'redis': { icon: 'fa-database', label: 'Redis' },
+        'kafka': { icon: 'fa-stream', label: 'Kafka' },
+        'kubernetes': { icon: 'fa-docker', label: 'Kubernetes' },
+        'snapshot': { icon: 'fa-camera', label: 'Снапшот' },
+        'image': { icon: 'fa-compact-disc', label: 'Образ' },
+        'ip': { icon: 'fa-network-wired', label: 'IP-адрес' },
+        'dns': { icon: 'fa-globe', label: 'DNS' },
+        'container_registry': { icon: 'fa-box', label: 'Container Registry' }
+    };
+    
+    const resourceType = rec.resource_type?.toLowerCase() || 'unknown';
+    const typeInfo = resourceTypeMap[resourceType] || { icon: 'fa-cube', label: rec.resource_type || 'Ресурс' };
+    const resourceTypeIcon = `<i class="fa-solid ${typeInfo.icon}" title="${typeInfo.label}"></i>`;
     
     // Connection name from provider metadata (most important!)
     const connectionName = rec.connection_name || rec.provider_code || 'Unknown';
