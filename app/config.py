@@ -43,6 +43,10 @@ class Config:
     # Logging
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     
+    # Feature Flags
+    ENABLE_AI_RECOMMENDATIONS = os.environ.get('ENABLE_AI_RECOMMENDATIONS', 'true').lower() == 'true'
+    AGENT_SERVICE_URL = os.environ.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
+    
     # Email Configuration (Beget SMTP)
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.beget.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', 465))

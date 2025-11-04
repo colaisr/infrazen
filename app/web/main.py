@@ -433,7 +433,9 @@ def recommendations():
                         active_page='recommendations',
                         page_title='Рекомендации',
                         page_subtitle='Оптимизация расходов и рекомендации',
-                        is_demo_user=is_demo_user)
+                        is_demo_user=is_demo_user,
+                        enable_ai_recommendations=current_app.config.get('ENABLE_AI_RECOMMENDATIONS', False),
+                        agent_service_url=current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001'))
 
 @main_bp.route('/business_context')
 def business_context():

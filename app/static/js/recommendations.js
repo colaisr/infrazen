@@ -98,6 +98,54 @@ function formatMoney(v){
 }
 
 // ============================================================================
+// AI-Generated Text Cache
+// ============================================================================
+
+const aiTextCache = new Map();
+
+async function getAIRecommendationText(recId) {
+    // Check if AI is enabled
+    const enableAI = window.INFRAZEN_DATA?.enableAIRecommendations || false;
+    if (!enableAI) {
+        return null;
+    }
+    
+    // Check cache
+    if (aiTextCache.has(recId)) {
+        return aiTextCache.get(recId);
+    }
+    
+    try {
+        const agentUrl = window.INFRAZEN_DATA?.agentServiceUrl || 'http://127.0.0.1:8001';
+        const response = await fetch(`${agentUrl}/v1/generate/recommendation-text`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ recommendation_id: recId })
+        });
+        
+        if (!response.ok) {
+            console.warn(`Failed to get AI text for rec ${recId}:`, response.status);
+            return null;
+        }
+        
+        const data = await response.json();
+        
+        // Cache successful responses
+        if (!data.error && data.short_description_html && data.detailed_description_html) {
+            aiTextCache.set(recId, data);
+            return data;
+        }
+        
+        return null;
+    } catch (error) {
+        console.warn(`Error fetching AI text for rec ${recId}:`, error);
+        return null;
+    }
+}
+
+// ============================================================================
 // Card Rendering
 // ============================================================================
 
@@ -166,7 +214,8 @@ function cardTemplate(rec){
         <div class="kpi">Экономия/мес: ${formatMoney(rec.estimated_monthly_savings)}</div>
         ${resourceLine}
         ${actionButtons}
-        <div class="rec-body">${(rec.description||'').slice(0,220)}${(rec.description||'').length>220?'…':''}
+        <div class="rec-body" id="body-${id}">
+            <span class="rec-description">${(rec.description||'').slice(0,220)}${(rec.description||'').length>220?'…':''}</span>
             <button class="link-btn more" data-id="${id}">Подробнее</button>
         </div>
         <div class="rec-details" id="details-${id}"></div>
@@ -216,6 +265,24 @@ async function load(){
             list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
         } else {
             list.innerHTML = items.map(cardTemplate).join('');
+            
+            // Async: Load AI-generated text for each recommendation
+            if (window.INFRAZEN_DATA?.enableAIRecommendations) {
+                items.forEach(async (rec) => {
+                    const aiText = await getAIRecommendationText(rec.id);
+                    if (aiText && aiText.short_description_html) {
+                        const bodyEl = document.querySelector(`#body-${rec.id} .rec-description`);
+                        if (bodyEl) {
+                            bodyEl.innerHTML = aiText.short_description_html;
+                        }
+                        
+                        const card = document.querySelector(`.rec-card[data-id="${rec.id}"]`);
+                        if (card) {
+                            card.dataset.aiDetailedHtml = aiText.detailed_description_html;
+                        }
+                    }
+                });
+            }
         }
         
         enableBulkButtons();
@@ -252,6 +319,24 @@ function filterRecommendations() {
         list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">Рекомендации не найдены. Попробуйте изменить фильтры или обновить страницу.</div>';
     } else {
         list.innerHTML = items.map(cardTemplate).join('');
+        
+        // Async: Load AI-generated text for each recommendation
+        if (window.INFRAZEN_DATA?.enableAIRecommendations) {
+            items.forEach(async (rec) => {
+                const aiText = await getAIRecommendationText(rec.id);
+                if (aiText && aiText.short_description_html) {
+                    const bodyEl = document.querySelector(`#body-${rec.id} .rec-description`);
+                    if (bodyEl) {
+                        bodyEl.innerHTML = aiText.short_description_html;
+                    }
+                    
+                    const card = document.querySelector(`.rec-card[data-id="${rec.id}"]`);
+                    if (card) {
+                        card.dataset.aiDetailedHtml = aiText.detailed_description_html;
+                    }
+                }
+            });
+        }
     }
     
     enableBulkButtons();
@@ -303,22 +388,40 @@ async function toggleDetails(id){
         return;
     }
     
-    const res = await fetch(`/api/recommendations/${id}`);
-    const rec = await res.json();
-    const insights = rec.insights || '';
-    const metrics = rec.metrics_snapshot || '';
+    const card = document.querySelector(`.rec-card[data-id="${id}"]`);
+    const aiDetailedHtml = card?.dataset?.aiDetailedHtml;
     
-    box.innerHTML = `
-        <div class="rec-split">
-            <div>
-                <div style="font-weight:600; margin-bottom:4px;">Пояснения</div>
-                <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${insights}</pre>
+    // If AI-generated text is available, use it
+    if (aiDetailedHtml && window.INFRAZEN_DATA?.enableAIRecommendations) {
+        box.innerHTML = `
+            <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-top: 0.5rem;">
+                <div style="font-size: 14px; line-height: 1.6; color: #1f2937; margin-bottom: 1rem;">
+                    ${aiDetailedHtml}
+                </div>
+                <button class="btn btn-primary" onclick="alert('Чат с FinOps будет доступен в следующей версии')" style="font-size: 14px;">
+                    💬 Обсудить с FinOps
+                </button>
             </div>
-            <div>
-                <div style="font-weight:600; margin-bottom:4px;">Метрики</div>
-                <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${metrics}</pre>
-            </div>
-        </div>`;
+        `;
+    } else {
+        // Fallback to original insights/metrics display
+        const res = await fetch(`/api/recommendations/${id}`);
+        const rec = await res.json();
+        const insights = rec.insights || '';
+        const metrics = rec.metrics_snapshot || '';
+        
+        box.innerHTML = `
+            <div class="rec-split">
+                <div>
+                    <div style="font-weight:600; margin-bottom:4px;">Пояснения</div>
+                    <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${insights}</pre>
+                </div>
+                <div>
+                    <div style="font-weight:600; margin-bottom:4px;">Метрики</div>
+                    <pre style="white-space:pre-wrap;background:#f6f7f9;border:1px solid #e0e3e7;border-radius:8px;padding:8px;">${metrics}</pre>
+                </div>
+            </div>`;
+    }
     
     box.dataset.loaded = '1';
     box.style.display = 'block';
