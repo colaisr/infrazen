@@ -159,18 +159,23 @@
     <script>
         let ws = null;
         
+        // Environment detection
+        const isLocal = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+        const agentHealthUrl = isLocal ? 'http://127.0.0.1:8001/v1/health' : '/agent/v1/health';
+        const agentWsUrl = isLocal ? 'ws://127.0.0.1:8001/v1/chat/ws' : (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/agent/v1/chat/ws';
+        
         // Test health endpoint
         async function testHealth() {
             const log = document.getElementById('healthLog');
             const status = document.getElementById('healthStatus');
             log.style.display = 'block';
             log.innerHTML = '<div class="log-entry info">[INFO] Testing health endpoint...</div>';
+            log.innerHTML += `<div class="log-entry info">[INFO] URL: ${agentHealthUrl}</div>`;
             status.className = 'status pending';
             status.textContent = 'Testing...';
             
             try {
-                // Direct access to agent on port 8001 (for local testing)
-                const response = await fetch('http://127.0.0.1:8001/v1/health');
+                const response = await fetch(agentHealthUrl);
                 const data = await response.json();
                 
                 if (response.ok) {
@@ -194,8 +199,7 @@
             const messages = document.getElementById('wsMessages');
             
             try {
-                // Direct WebSocket connection to agent on port 8001 (for local testing)
-                const wsUrl = `ws://127.0.0.1:8001/v1/chat/ws?session=test_${Date.now()}`;
+                const wsUrl = `${agentWsUrl}?session=test_${Date.now()}`;
                 
                 messages.innerHTML = `<div class="message">[INFO] Connecting to ${wsUrl}...</div>`;
                 status.className = 'status pending';
