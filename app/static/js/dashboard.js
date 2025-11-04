@@ -3,6 +3,8 @@
  * Handles dashboard-specific functionality
  */
 
+console.log('🚀 InfraZen Dashboard v1.1 - Agent Integration Active');
+
 // ============================================================================
 // Expense Dynamics Chart
 // ============================================================================

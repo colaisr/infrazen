@@ -20,7 +20,8 @@ async def health_check():
             "status": "healthy",
             "service": "infrazen-agent",
             "version": settings.VERSION,
-            "environment": settings.AGENT_ENV
+            "environment": settings.AGENT_ENV,
+            "message": "Agent Service v0.1.0 - Ready for FinOps Assistance"
         }
     )
 
