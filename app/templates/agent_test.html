@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Service Test | InfraZen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f9fafb;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 40px;
+        }
+        h1 {
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+        .test-section h2 {
+            color: #374151;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1e40af;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .status.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .log {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+        .log-entry.error {
+            color: #ef4444;
+        }
+        .log-entry.info {
+            color: #60a5fa;
+        }
+        #wsMessages {
+            margin-top: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background: white;
+            border-left: 3px solid #3b82f6;
+        }
+        input[type="text"] {
+            width: calc(100% - 120px);
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Agent Service Test Page</h1>
+        <p class="subtitle">Test connectivity and basic functionality of the Agent Service</p>
+        
+        <!-- Health Check -->
+        <div class="test-section">
+            <h2>1. Health Check <span id="healthStatus" class="status pending">Not Tested</span></h2>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="healthLog" class="log" style="display:none;"></div>
+        </div>
+        
+        <!-- WebSocket Echo -->
+        <div class="test-section">
+            <h2>2. WebSocket Echo Test <span id="wsStatus" class="status pending">Not Connected</span></h2>
+            <button id="wsConnect" onclick="connectWebSocket()">Connect WebSocket</button>
+            <button id="wsDisconnect" onclick="disconnectWebSocket()" disabled>Disconnect</button>
+            <div style="margin-top: 15px;">
+                <input type="text" id="wsMessage" placeholder="Type a message..." disabled>
+                <button id="wsSend" onclick="sendMessage()" disabled>Send</button>
+            </div>
+            <div id="wsMessages"></div>
+        </div>
+        
+        <!-- Full Test -->
+        <div class="test-section">
+            <h2>3. Run All Tests</h2>
+            <button onclick="runAllTests()">Run Complete Test Suite</button>
+            <div id="allTestsLog" class="log" style="display:none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        
+        // Test health endpoint
+        async function testHealth() {
+            const log = document.getElementById('healthLog');
+            const status = document.getElementById('healthStatus');
+            log.style.display = 'block';
+            log.innerHTML = '<div class="log-entry info">[INFO] Testing health endpoint...</div>';
+            status.className = 'status pending';
+            status.textContent = 'Testing...';
+            
+            try {
+                // Direct access to agent on port 8001 (for local testing)
+                const response = await fetch('http://127.0.0.1:8001/v1/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log.innerHTML += `<div class="log-entry">[SUCCESS] Health check passed!</div>`;
+                    log.innerHTML += `<div class="log-entry">[DATA] ${JSON.stringify(data, null, 2)}</div>`;
+                    status.className = 'status success';
+                    status.textContent = 'Healthy';
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                log.innerHTML += `<div class="log-entry error">[ERROR] ${error.message}</div>`;
+                status.className = 'status error';
+                status.textContent = 'Failed';
+            }
+        }
+        
+        // Connect WebSocket
+        function connectWebSocket() {
+            const status = document.getElementById('wsStatus');
+            const messages = document.getElementById('wsMessages');
+            
+            try {
+                // Direct WebSocket connection to agent on port 8001 (for local testing)
+                const wsUrl = `ws://127.0.0.1:8001/v1/chat/ws?session=test_${Date.now()}`;
+                
+                messages.innerHTML = `<div class="message">[INFO] Connecting to ${wsUrl}...</div>`;
+                status.className = 'status pending';
+                status.textContent = 'Connecting...';
+                
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    messages.innerHTML += '<div class="message" style="border-color: #10b981;">[SUCCESS] WebSocket connected!</div>';
+                    status.className = 'status success';
+                    status.textContent = 'Connected';
+                    document.getElementById('wsConnect').disabled = true;
+                    document.getElementById('wsDisconnect').disabled = false;
+                    document.getElementById('wsMessage').disabled = false;
+                    document.getElementById('wsSend').disabled = false;
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    messages.innerHTML += `<div class="message">[RECEIVED] ${JSON.stringify(data, null, 2)}</div>`;
+                    messages.scrollTop = messages.scrollHeight;
+                };
+                
+                ws.onerror = (error) => {
+                    messages.innerHTML += `<div class="message" style="border-color: #ef4444;">[ERROR] WebSocket error</div>`;
+                    status.className = 'status error';
+                    status.textContent = 'Error';
+                };
+                
+                ws.onclose = () => {
+                    messages.innerHTML += '<div class="message">[INFO] WebSocket disconnected</div>';
+                    status.className = 'status pending';
+                    status.textContent = 'Disconnected';
+                    document.getElementById('wsConnect').disabled = false;
+                    document.getElementById('wsDisconnect').disabled = true;
+                    document.getElementById('wsMessage').disabled = true;
+                    document.getElementById('wsSend').disabled = true;
+                };
+            } catch (error) {
+                messages.innerHTML += `<div class="message" style="border-color: #ef4444;">[ERROR] ${error.message}</div>`;
+                status.className = 'status error';
+                status.textContent = 'Failed';
+            }
+        }
+        
+        // Disconnect WebSocket
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        // Send message
+        function sendMessage() {
+            const input = document.getElementById('wsMessage');
+            const messages = document.getElementById('wsMessages');
+            const message = input.value.trim();
+            
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                const payload = { text: message, timestamp: new Date().toISOString() };
+                ws.send(JSON.stringify(payload));
+                messages.innerHTML += `<div class="message" style="border-color: #f59e0b;">[SENT] ${message}</div>`;
+                input.value = '';
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+        
+        // Run all tests
+        async function runAllTests() {
+            const log = document.getElementById('allTestsLog');
+            log.style.display = 'block';
+            log.innerHTML = '<div class="log-entry info">[INFO] Starting test suite...</div>';
+            
+            // Test 1: Health
+            log.innerHTML += '<div class="log-entry info">[TEST 1] Health check...</div>';
+            await testHealth();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Test 2: WebSocket
+            log.innerHTML += '<div class="log-entry info">[TEST 2] WebSocket connection...</div>';
+            connectWebSocket();
+            
+            log.innerHTML += '<div class="log-entry">[SUCCESS] Test suite complete!</div>';
+        }
+        
+        // Allow Enter key to send message
+        document.getElementById('wsMessage')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
+

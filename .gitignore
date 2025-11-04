@@ -23,6 +23,7 @@ MANIFEST
 
 # Virtual environments
 venv/
+venv 2/
 env/
 ENV/
 env.bak/
@@ -64,6 +65,12 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Runtime files
+.infrazen.pids
+
+# Cursor IDE
+.cursor/
 
 # Temporary files
 *.tmp

@@ -499,6 +499,16 @@ def settings():
                         is_demo_user=is_demo_user,
                         google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'))
 
+
+@main_bp.route('/agent-test')
+def agent_test():
+    """Agent Service test page"""
+    auth_check = require_auth()
+    if auth_check:
+        return auth_check
+    
+    return render_template('agent_test.html')
+
 # Helper functions for real user data
 def get_real_user_overview(user_id):
     """Get overview data for a real user from database using unified models"""
