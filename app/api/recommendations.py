@@ -24,9 +24,12 @@ def _parse_float(value, default=None):
 
 def _serialize(rec: OptimizationRecommendation):
     provider_code = None
+    connection_name = None
     if rec.provider_id:
         provider = CloudProvider.find_by_id(rec.provider_id)
-        provider_code = provider.provider_type if provider else None
+        if provider:
+            provider_code = provider.provider_type
+            connection_name = provider.connection_name
 
     return {
         'id': rec.id,
@@ -41,6 +44,7 @@ def _serialize(rec: OptimizationRecommendation):
         'resource_type': rec.resource_type,
         'provider_id': rec.provider_id,
         'provider_code': provider_code,
+        'connection_name': connection_name,
         # Provider-specific tracking
         'target_provider': rec.target_provider,
         'target_sku': rec.target_sku,
