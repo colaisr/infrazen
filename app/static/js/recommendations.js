@@ -106,9 +106,12 @@ function cardTemplate(rec){
     const sev = `<span class="sev-dot ${sevClass(rec.severity)}"></span>`;
     const id = rec.id;
     
-    // Provider icon/badge with better styling
-    const providerBadge = rec.provider_code ? 
-        `<span class="provider-badge provider-${rec.provider_code}">${rec.provider_code}</span>` : '';
+    // Small provider icon (not dominant)
+    const providerIcon = {
+        'yandex': '<span class="provider-icon" style="background:#FF3333" title="Yandex Cloud">Y</span>',
+        'selectel': '<span class="provider-icon" style="background:#0066FF" title="Selectel">S</span>',
+        'beget': '<span class="provider-icon" style="background:#8B5CF6" title="Beget">B</span>'
+    }[rec.provider_code?.toLowerCase()] || '';
     
     // Resource type icon
     const resourceTypeIcon = {
@@ -124,15 +127,13 @@ function cardTemplate(rec){
         'dns': '🔗'
     }[rec.resource_type?.toLowerCase()] || '📦';
     
-    // Clean resource header (replaces messy pills)
-    const resourceHeader = `
-        <div class="resource-header">
-            ${providerBadge}
-            <div class="resource-info">
-                <span class="resource-icon">${resourceTypeIcon}</span>
-                <span class="resource-name" title="${rec.resource_name}">${rec.resource_name || 'Unknown'}</span>
-                <span class="resource-type">${rec.resource_type || ''}</span>
-            </div>
+    // Compact, elegant resource line
+    const resourceLine = `
+        <div class="resource-line">
+            ${providerIcon}
+            <span class="resource-icon-emoji">${resourceTypeIcon}</span>
+            <span class="resource-name" title="${rec.resource_name}">${rec.resource_name || 'Unknown'}</span>
+            <span class="resource-type-tag">${rec.resource_type || ''}</span>
         </div>
     `;
     
@@ -151,7 +152,7 @@ function cardTemplate(rec){
             <div class="rec-title" title="${rec.title}">${rec.title}</div>
         </div>
         <div class="kpi">Экономия/мес: ${formatMoney(rec.estimated_monthly_savings)}</div>
-        ${resourceHeader}
+        ${resourceLine}
         ${actionButtons}
         <div class="rec-body">${(rec.description||'').slice(0,220)}${(rec.description||'').length>220?'…':''}
             <button class="link-btn more" data-id="${id}">Подробнее</button>
