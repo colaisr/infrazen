@@ -75,6 +75,19 @@ function toggleWorkerVMs(resourceId) {
     }
 }
 
+function toggleK8sLBs(resourceId) {
+    const content = document.getElementById(`k8s-lbs-${resourceId}`);
+    const chevron = document.getElementById(`k8slb-chevron-${resourceId}`);
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
 // ============================================================================
 // Chart Initialization
 // ============================================================================
