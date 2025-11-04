@@ -46,6 +46,61 @@ class CrossProviderPriceCheckRule(BaseRule):
 
     def evaluate(self, resource: Resource, context) -> List[RecommendationOutput]:
         logger = logging.getLogger(__name__)
+        
+        # Skip resources that are part of aggregated services (e.g., Kubernetes nodes, CSI volumes)
+        # These should be recommended at the cluster/service level, not individually
+        try:
+            tags = {t.tag_key: t.tag_value for t in getattr(resource, 'tags', [])}
+            resource_name = getattr(resource, 'resource_name', '') or ''
+            
+            # Check if it's a Kubernetes node
+            if tags.get('is_kubernetes_node') == 'true' or tags.get('is_kubernetes_node') is True:
+                logger.info(
+                    "price_check: skip (kubernetes node) | res_id=%s name=%s cluster=%s",
+                    getattr(resource, 'id', None), 
+                    resource_name,
+                    tags.get('kubernetes_cluster_name', 'unknown')
+                )
+                return []
+            
+            # Check if it's a Kubernetes CSI volume (persistent volume)
+            if resource_name.startswith('k8s-csi-'):
+                logger.info(
+                    "price_check: skip (kubernetes CSI volume) | res_id=%s name=%s",
+                    getattr(resource, 'id', None),
+                    resource_name
+                )
+                return []
+            
+            # Check if it has kubernetes cluster tag (other K8s resources)
+            if tags.get('kubernetes_cluster_id'):
+                logger.info(
+                    "price_check: skip (kubernetes resource) | res_id=%s name=%s cluster=%s",
+                    getattr(resource, 'id', None),
+                    resource_name,
+                    tags.get('kubernetes_cluster_name', tags.get('kubernetes_cluster_id'))
+                )
+                return []
+            
+            # Skip stopped resources from price comparisons
+            # Stopped resources only incur storage costs, comparing to full running cost is unfair
+            # These should be handled by the stopped_resources cleanup rule instead
+            resource_status = getattr(resource, 'status', '').upper()
+            if resource_status in ('STOPPED', 'DEALLOCATED', 'TERMINATED'):
+                logger.info(
+                    "price_check: skip (resource stopped) | res_id=%s name=%s status=%s",
+                    getattr(resource, 'id', None),
+                    resource_name,
+                    resource_status
+                )
+                return []
+        except Exception as e:
+            logger.warning(
+                "price_check: error in early filtering | res_id=%s error=%s",
+                getattr(resource, 'id', None), str(e)
+            )
+            pass
+        
         # Load provider code and region
         provider: Optional[CloudProvider] = CloudProvider.query.get(resource.provider_id) if resource.provider_id else None
         provider_code = provider.provider_type if provider else None
@@ -156,14 +211,45 @@ class CrossProviderPriceCheckRule(BaseRule):
                 min_score=min_score,
                 limit=5,
             )
+        if not candidates:
+            logger.info(
+                "price_check: no candidates | res_id=%s min_score=%.2f specs_unknown=%s",
+                getattr(resource, 'id', None), min_score, specs_unknown,
+            )
+            return []
+
+        # Progressive disclosure: Filter out dismissed providers for THIS resource
+        from app.core.models.recommendations import OptimizationRecommendation
+        dismissed_recs = OptimizationRecommendation.query.filter_by(
+            resource_id=resource.id,
+            recommendation_type="price_compare_cross_provider",
+            source=self.id,
+            status='dismissed'
+        ).all()
+        
+        dismissed_providers = {rec.target_provider for rec in dismissed_recs if rec.target_provider}
+        
+        if dismissed_providers:
+            logger.info(
+                "price_check: dismissed filter | res_id=%s dismissed_providers=%s",
+                getattr(resource, 'id', None), dismissed_providers
+            )
+            
+            # Filter out dismissed providers from candidates
+            candidates = [
+                (ns, score, row) 
+                for ns, score, row in candidates 
+                if ns.provider not in dismissed_providers
+            ]
+            
             if not candidates:
                 logger.info(
-                    "price_check: no candidates | res_id=%s min_score=%.2f specs_unknown=%s",
-                    getattr(resource, 'id', None), min_score, specs_unknown,
+                    "price_check: all alternatives dismissed | res_id=%s",
+                    getattr(resource, 'id', None)
                 )
-                return []
+                return []  # User dismissed all alternatives >= threshold
 
-        # Choose the cheapest among top scored and also collect top-2
+        # Choose the cheapest among remaining (non-dismissed) candidates and also collect top-2
         best_norm, best_score, best_row = None, 0.0, None
         alt_list: List[Tuple] = []
         for ns, score, row in candidates:
@@ -193,6 +279,15 @@ class CrossProviderPriceCheckRule(BaseRule):
             )
             return []
         savings = round(max(0.0, current_monthly - rec_monthly), 2)
+        
+        # Skip if alternative is more expensive or equal cost
+        if rec_monthly >= current_monthly:
+            logger.info(
+                "price_check: skip (alternative more expensive) | res_id=%s rec_monthly=%.2f current_monthly=%.2f",
+                getattr(resource, 'id', None), rec_monthly, current_monthly,
+            )
+            return []
+        
         # Apply configurable thresholds (default 0)
         try:
             min_abs = float(current_app.config.get('PRICE_CHECK_MIN_SAVINGS_RUB', 0) or 0)
@@ -201,11 +296,19 @@ class CrossProviderPriceCheckRule(BaseRule):
             min_abs, min_pct = 0.0, 0.0
         if current_monthly > 0 and min_pct > 0:
             min_abs = max(min_abs, current_monthly * (min_pct / 100.0))
+        
+        # Skip if savings don't meet minimum thresholds
+        if savings < min_abs:
+            logger.info(
+                "price_check: skip (below threshold) | res_id=%s savings=%.2f min_required=%.2f",
+                getattr(resource, 'id', None), savings, min_abs,
+            )
+            return []
+        
         logger.info(
             "price_check: candidate | res_id=%s best_price_id=%s score=%.2f target_monthly=%.2f current_monthly=%.2f savings=%.2f min_abs=%.2f",
             getattr(resource, 'id', None), getattr(best_row, 'id', None), best_score, rec_monthly, current_monthly, savings, min_abs,
         )
-        # If savings less than threshold, still proceed (thresholds default to 0); we only log
 
         # Create or update a PriceComparisonRecommendation (idempotent)
         try:
