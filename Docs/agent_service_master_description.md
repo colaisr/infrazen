@@ -213,11 +213,21 @@ Definition of done: pushing an agent-only change deploys agent; app pipeline rem
 
 Definition of done: ✅ COMPLETE - both services reflect changes; clean logs; zero app downtime.
 
-### Milestone 4 – LLM Recommendation Text (with Fallback)
-- [ ] Implement `POST /v1/generate/recommendation-text` with tool-scoped reads
-- [ ] UI feature flag to switch from hardcoded text to agent output; preserve fallback
+### Milestone 4 – LLM Recommendation Text (with Fallback) ✅ COMPLETE
+- [x] Implement `POST /v1/generate/recommendation-text` with tool-scoped reads
+  - ✅ **Tools:** Data access for recommendations, resources, providers with Python dict parsing
+  - ✅ **LLM Gateway:** OpenRouter integration with gpt-4o-mini
+  - ✅ **Prompts:** FinOps persona with HTML formatting, Russian language
+  - ✅ **Sanitization:** Basic HTML whitelist (strong, span, em, br)
+- [x] UI feature flag to switch from hardcoded text to agent output; preserve fallback
+  - ✅ **Config:** ENABLE_AI_RECOMMENDATIONS and AGENT_SERVICE_URL flags
+  - ✅ **UI:** Async fetch with caching, replaces short description in collapsed cards
+  - ✅ **Details:** AI detailed description + "Обсудить с FinOps" button in expanded view
+  - ✅ **Fallback:** Graceful degradation to original Пояснения/Метрики if AI fails
+  - ✅ **Tested:** Working with gpt-4o-mini, ~830 tokens/call, correct prices and formatting
+  - ✅ **Commits:** c62094e (API), c419c9f (UI)
 
-Definition of done: flag ON shows agent text (savings/effort/risks); OFF uses current implementation.
+Definition of done: ✅ COMPLETE - flag ON shows agent text with HTML formatting; OFF uses current implementation.
 
 ### Milestone 5 – Recommendation/Resource Chat
 - [ ] WebSocket chat with session scoped to `recommendation_id` + user
