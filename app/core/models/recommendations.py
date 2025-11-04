@@ -24,6 +24,11 @@ class OptimizationRecommendation(BaseModel):
     # Cached resource fields for fast display/filtering
     resource_type = db.Column(db.String(50), index=True)
     resource_name = db.Column(db.String(200))
+    
+    # Provider-specific tracking for cross-provider recommendations
+    target_provider = db.Column(db.String(50), index=True)  # Which provider is being recommended
+    target_sku = db.Column(db.String(200), index=True)      # Specific SKU identifier
+    target_region = db.Column(db.String(100))               # Target region for migration
 
     # Savings and confidence
     potential_savings = db.Column(db.Float, default=0.0)
@@ -48,6 +53,10 @@ class OptimizationRecommendation(BaseModel):
     applied_at = db.Column(db.DateTime)
     dismissed_at = db.Column(db.DateTime)
     dismissed_reason = db.Column(db.Text)
+    
+    # Verification tracking for auto-cleanup of obsolete recommendations
+    last_verified_at = db.Column(db.DateTime, index=True)  # Last time rule regenerated this recommendation
+    verification_fail_count = db.Column(db.Integer, default=0)  # Consecutive scans without regeneration
 
     # Indexes (implicit via index=True on columns). Ensure created_at is indexed via BaseModel is not; add here via composite idx if needed.
 

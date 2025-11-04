@@ -284,18 +284,39 @@ class RecommendationOrchestrator:
 
     # ---- Persistence helpers ----
     def _persist_output(self, out: RecommendationOutput) -> (int, int):
-        """Create or update OptimizationRecommendation based on a simple dedup key.
+        """Create or update OptimizationRecommendation with provider-specific dedup.
 
-        Dedup key: (source, resource_id, recommendation_type). If any are missing, always create.
+        Dedup key: (source, resource_id, recommendation_type, target_provider, target_sku)
+        If target_provider is None, falls back to resource-level dedup.
         Returns (created_count, updated_count).
         """
         try:
+            # Extract target provider info from insights
+            target_provider = None
+            target_sku = None
+            target_region = None
+            
+            if out.insights and isinstance(out.insights, dict):
+                target_provider = out.insights.get('recommended_provider')
+                target_sku = out.insights.get('recommended_sku')
+                target_region = out.insights.get('recommended_region')
+            
+            # Build dedup query
             if out.source and out.resource_id and out.recommendation_type:
                 existing = OptimizationRecommendation.query.filter_by(
                     resource_id=out.resource_id,
                     recommendation_type=out.recommendation_type,
                     source=out.source,
-                ).first()
+                )
+                
+                # Add provider-specific filter for cross-provider recommendations
+                if target_provider and target_sku:
+                    existing = existing.filter_by(
+                        target_provider=target_provider,
+                        target_sku=target_sku
+                    )
+                
+                existing = existing.first()
             else:
                 existing = None
 
@@ -319,10 +340,36 @@ class RecommendationOrchestrator:
                     metrics_snapshot=str(out.metrics_snapshot) if out.metrics_snapshot else None,
                     insights=str(out.insights) if out.insights else None,
                     first_seen_at=datetime.utcnow(),
+                    # Provider-specific tracking
+                    target_provider=target_provider,
+                    target_sku=target_sku,
+                    target_region=target_region,
+                    # Verification tracking
+                    last_verified_at=datetime.utcnow(),
+                    verification_fail_count=0,
                 )
                 db.session.add(rec)
                 return 1, 0
             else:
+                # Auto-dismiss stale "seen" recommendations after 30 days
+                if existing.status == 'seen' and existing.seen_at:
+                    try:
+                        days_seen = (datetime.utcnow() - existing.seen_at).days
+                        if days_seen >= 30:
+                            existing.status = 'auto_dismissed'
+                            existing.dismissed_at = datetime.utcnow()
+                            existing.dismissed_reason = 'Рекомендация устарела: не применена в течение 30 дней'
+                            try:
+                                self.logger.info(
+                                    "auto_dismissed_stale | rec_id=%s resource_id=%s days_seen=%d",
+                                    existing.id, existing.resource_id, days_seen
+                                )
+                            except Exception:
+                                pass
+                            return 0, 0  # Don't update, just auto-dismiss
+                    except Exception:
+                        pass
+                
                 # Suppression logic: avoid spamming dismissed/implemented unless meaningfully changed
                 try:
                     significant_improvement = False
@@ -390,6 +437,19 @@ class RecommendationOrchestrator:
                     existing.provider_id = out.provider_id
                 existing.metrics_snapshot = str(out.metrics_snapshot) if out.metrics_snapshot else existing.metrics_snapshot
                 existing.insights = str(out.insights) if out.insights else existing.insights
+                
+                # Update verification tracking (rule regenerated this recommendation)
+                existing.last_verified_at = datetime.utcnow()
+                existing.verification_fail_count = 0
+                
+                # Update provider tracking if available
+                if target_provider:
+                    existing.target_provider = target_provider
+                if target_sku:
+                    existing.target_sku = target_sku
+                if target_region:
+                    existing.target_region = target_region
+                
                 return 0, 1
         except Exception:
             # Failed to persist this item; skip

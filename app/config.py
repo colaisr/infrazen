@@ -56,9 +56,15 @@ class Config:
     RECOMMENDATIONS_ENABLED = os.environ.get('RECOMMENDATIONS_ENABLED', 'true').lower() == 'true'
     # Deprecated: debug cards removed; use logs instead
     RECOMMENDATIONS_DEBUG_MODE = False
-    # Price check thresholds (defaults disabled)
-    PRICE_CHECK_MIN_SAVINGS_RUB = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_RUB', '0'))
-    PRICE_CHECK_MIN_SAVINGS_PERCENT = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_PERCENT', '0'))
+    
+    # Price check thresholds (sensible defaults to prevent spam)
+    # Only create recommendations if savings are significant enough to matter
+    PRICE_CHECK_MIN_SAVINGS_RUB = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_RUB', '100'))  # Min 100 RUB/month
+    PRICE_CHECK_MIN_SAVINGS_PERCENT = float(os.environ.get('PRICE_CHECK_MIN_SAVINGS_PERCENT', '10'))  # Or 10% improvement
+    
+    # Cleanup recommendation thresholds
+    SNAPSHOT_CLEANUP_AGE_DAYS = int(os.environ.get('SNAPSHOT_CLEANUP_AGE_DAYS', '180'))  # Delete snapshots older than 6 months
+    UNUSED_IP_CLEANUP_AGE_DAYS = int(os.environ.get('UNUSED_IP_CLEANUP_AGE_DAYS', '180'))  # Release unused IPs older than 6 months
 
     # Recommendation rules feature flags (disable by rule id, comma-separated)
     # Example: RECOMMENDATION_RULES_DISABLED="cost.price_check.cross_provider,cost.rightsize.cpu_underuse"

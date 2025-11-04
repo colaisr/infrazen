@@ -56,6 +56,22 @@ class CpuUnderuseDownsizeRule(BaseRule):
             tags = {t.tag_key: t.tag_value for t in getattr(resource, 'tags', [])}
         except Exception:
             tags = {}
+        
+        # Skip resources that are part of aggregated services (e.g., Kubernetes nodes, CSI volumes)
+        # These should be optimized at the cluster/service level, not individually
+        if tags.get('is_kubernetes_node') == 'true' or tags.get('is_kubernetes_node') is True:
+            return []
+        
+        resource_name = getattr(resource, 'resource_name', '') or ''
+        
+        # Skip Kubernetes CSI volumes
+        if resource_name.startswith('k8s-csi-'):
+            return []
+        
+        # Skip any resource with kubernetes cluster tag
+        if tags.get('kubernetes_cluster_id'):
+            return []
+        
         cpu_str = tags.get('cpu_avg_usage')
         cpu_avg = 0.0
         try:

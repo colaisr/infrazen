@@ -41,6 +41,10 @@ def _serialize(rec: OptimizationRecommendation):
         'resource_type': rec.resource_type,
         'provider_id': rec.provider_id,
         'provider_code': provider_code,
+        # Provider-specific tracking
+        'target_provider': rec.target_provider,
+        'target_sku': rec.target_sku,
+        'target_region': rec.target_region,
         'estimated_monthly_savings': rec.estimated_monthly_savings or rec.potential_savings or 0.0,
         'estimated_one_time_savings': rec.estimated_one_time_savings or 0.0,
         'currency': rec.currency,
@@ -54,6 +58,9 @@ def _serialize(rec: OptimizationRecommendation):
         'metrics_snapshot': rec.metrics_snapshot,
         'insights': rec.insights,
         'source': rec.source,
+        # Verification tracking
+        'last_verified_at': rec.last_verified_at.isoformat() if rec.last_verified_at else None,
+        'verification_fail_count': rec.verification_fail_count,
     }
 
 
