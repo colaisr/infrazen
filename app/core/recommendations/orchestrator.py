@@ -350,7 +350,7 @@ class RecommendationOrchestrator:
                     verification_fail_count=0,
                 )
                 db.session.add(rec)
-                db.session.flush()  # Get ID before generating AI text
+                db.session.commit()  # Commit so agent can see the recommendation
                 
                 # Generate AI text for the new recommendation
                 try:
@@ -359,6 +359,7 @@ class RecommendationOrchestrator:
                         rec.ai_short_description = ai_text.get('short_description_html')
                         rec.ai_detailed_description = ai_text.get('detailed_description_html')
                         rec.ai_generated_at = datetime.utcnow()
+                        db.session.commit()  # Commit AI text update
                         self.logger.info(f"✓ AI text generated and stored for recommendation {rec.id}")
                 except Exception as e:
                     self.logger.warning(f"Failed to generate AI text for rec {rec.id}: {e}")

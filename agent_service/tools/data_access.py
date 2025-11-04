@@ -96,6 +96,29 @@ class DataAccessTools:
                     for tag in resource.tags:
                         tags[tag.tag_key] = tag.tag_value
                 
+                # Parse provider_config to extract specs
+                cpu_cores = None
+                ram_gb = None
+                storage_gb = None
+                
+                if resource.provider_config:
+                    try:
+                        config = json.loads(resource.provider_config) if isinstance(resource.provider_config, str) else resource.provider_config
+                        # Extract specs from provider_config
+                        cpu_cores = config.get('vcpus') or config.get('cores')
+                        ram_gb = config.get('ram_gb')
+                        storage_gb = config.get('total_storage_gb') or config.get('storage_gb')
+                    except Exception as e:
+                        logger.warning(f"Could not parse provider_config: {e}")
+                
+                # Fallback to tags if not in provider_config
+                if cpu_cores is None:
+                    cpu_cores = tags.get('cpu_cores')
+                if ram_gb is None:
+                    ram_gb = tags.get('ram_gb')
+                if storage_gb is None:
+                    storage_gb = tags.get('storage_gb')
+                
                 result['resource'] = {
                     'id': resource.id,
                     'name': resource.resource_name,
@@ -104,9 +127,9 @@ class DataAccessTools:
                     'region': resource.region,
                     'monthly_cost': float(resource.effective_cost or resource.list_price or 0),
                     'daily_cost': float(resource.daily_cost or 0),
-                    'cpu_cores': tags.get('cpu_cores'),
-                    'ram_gb': tags.get('ram_gb'),
-                    'storage_gb': tags.get('storage_gb'),
+                    'cpu_cores': cpu_cores,
+                    'ram_gb': ram_gb,
+                    'storage_gb': storage_gb,
                     'storage_type': tags.get('storage_type'),
                     'tags': tags
                 }

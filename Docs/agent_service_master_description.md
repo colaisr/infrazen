@@ -57,11 +57,200 @@ Browser (UI)  ⇄  InfraZen App (Flask)  ⇄  Agent Service (FastAPI + LangGraph
 - **Auditing:** Log each tool call with inputs, outputs (truncated), cost, latency, and user context.
 
 ## 6. Scenarios & Behavior
-### 6.1 Scenario 1 – Recommendation Text Generator (Sync)
-- **Input:** `resource_id` (+ optional `target_provider` or candidate SKUs)
-- **Tools:** get_resource, get_prices_for_candidates, get_latest_snapshot
-- **Output:** Structured JSON + friendly text (title, summary, details, monthly and yearly savings, effort score, risks)
-- **Latency Target:** 2–4 seconds; caching by (resource + candidate set); invalidate on price/snapshot changes.
+### 6.1 Scenario 1 – AI-Generated Recommendation Texts ✅ IMPLEMENTED
+
+**Overview:**
+Replace hardcoded recommendation descriptions with AI-generated, context-aware texts that focus on economics, specs, and actionable insights. Generated once during main sync and stored in database for instant display.
+
+**Business Logic:**
+- **Trigger:** During main sync process, immediately after each recommendation is created and committed
+- **Input:** `recommendation_id`
+- **Output:** Two HTML-formatted texts:
+  - `short_description_html` (~60-80 chars) - for collapsed card view
+  - `detailed_description_html` (~200-300 chars) - replaces "Пояснения" and "Метрики" sections
+- **Storage:** Stored in `optimization_recommendations` table alongside recommendation data
+- **Display:** Pre-generated text rendered instantly in UI (no async loading, no token waste)
+- **Fallback:** If agent fails, recommendation still created without AI text (shows original description)
+
+#### 6.1.1 Implementation Architecture
+
+```
+Main Sync Process:
+   ↓
+Create Recommendation → db.session.commit()
+   ↓
+Call: generate_recommendation_text(rec.id)
+   ↓
+   ├─ HTTP POST → Agent Service (/v1/generate/recommendation-text)
+   │     ↓
+   │  Agent fetches data (within Flask app context):
+   │     ├─ Recommendation (type, savings, target provider/SKU)
+   │     ├─ Resource (specs from provider_config: vcpus, ram_gb, storage_gb)
+   │     ├─ Current Provider (name, region)
+   │     ├─ Parse insights & metrics (Python dict strings → JSON)
+   │     ↓
+   │  Route to appropriate prompt builder:
+   │     ├─ Price comparison → build_recommendation_prompt()
+   │     └─ Cleanup → build_cleanup_prompt()
+   │     ↓
+   │  Call LLM via OpenRouter (gpt-4o-mini)
+   │     ↓
+   │  Return JSON: {short_description_html, detailed_description_html}
+   ↓
+Store AI text in DB:
+   rec.ai_short_description = result['short_description_html']
+   rec.ai_detailed_description = result['detailed_description_html']
+   rec.ai_generated_at = datetime.utcnow()
+   db.session.commit()
+```
+
+#### 6.1.2 Recommendation Types & Prompts
+
+**1. Price Comparison (Cross-Provider Migration)**
+
+Types: `price_compare_cross_provider`, `price_compare_same_provider`
+
+*FinOps Focus:* Economics and comparable configuration
+
+*AI Text Format:*
+- **Short:** `"{target_provider} предлагает аналог за {target_price} ₽/мес вместо текущих {current_price} ₽/мес"`
+- **Detailed:** `"Экономия {savings} ₽/мес при переносе {resource_type} {resource_name} в {target_provider}. Схожая конфигурация (X CPU, Y GB RAM, Z GB HD) там стоит {target_price} ₽/мес"`
+
+*Example:*
+```
+Short: selectel предлагает аналог за 5,349 ₽/мес вместо текущих 5,610 ₽/мес
+Detailed: Экономия 261 ₽/мес при переносе сервера office в selectel. 
+          Схожая конфигурация (4 CPU, 8.0 GB RAM, 92.0 GB HD) там стоит 5,349 ₽/мес
+```
+
+*Key Data Extraction:*
+- Resource specs: `provider_config.vcpus`, `provider_config.ram_gb`, `provider_config.total_storage_gb`
+- Current cost: `resource.effective_cost`
+- Target cost: `insights.top2[0].monthly` or `metrics.target_monthly`
+- Similarity: `metrics.similarity × 100%`
+
+**2. Cleanup Recommendations (Resource Deletion)**
+
+Types: `cleanup_old_snapshot`, `cleanup_unused_ip`, `cleanup_unused_volume`, `cleanup_stopped`
+
+*FinOps Focus:* Cost elimination with delicate mention of wasted budget
+
+*AI Text Format:*
+- **Short:** `"Экономия {savings} ₽/мес при удалении неиспользуемого {resource_type}"`
+
+- **Detailed (Snapshots & IPs with age data):**
+  `"Экономия {savings} ₽/мес при удалении {resource_type} {resource_name}. {Type} не используется уже X дней (размер Y GB), за это время на него уже было потрачено {wasted} ₽."`
+
+- **Detailed (Stopped Servers - no age data):**
+  `"Экономия {savings} ₽/мес при удалении остановленного сервера {resource_name}. Сервер находится в статусе STOPPED и продолжает потреблять средства на хранение."`
+
+*Examples:*
+```
+Snapshot:
+  Short: Экономия 1,709 ₽/мес при удалении неиспользуемого снапшота
+  Detailed: Экономия 1,709 ₽/мес при удалении снапшота gitdisk-1740816592565. 
+            Снапшот не используется уже 248 дней (размер 507 GB), за это время 
+            на него уже было потрачено 14,119 ₽.
+
+IP Address:
+  Short: Экономия 241 ₽/мес при удалении неиспользуемого IP-адреса
+  Detailed: Экономия 241 ₽/мес при удалении IP-адреса gitlab_new. 
+            IP не используется уже 547 дней, за это время на него уже было потрачено 4,394 ₽.
+
+Stopped Server:
+  Short: Экономия 1,289 ₽/мес при удалении неиспользуемого сервера
+  Detailed: Экономия 1,289 ₽/мес при удалении остановленного сервера punch-dev-monitoring-1. 
+            Сервер находится в статусе STOPPED и продолжает потреблять средства на хранение.
+```
+
+*Key Data Extraction:*
+- Age: `insights.age_days` (available for snapshots, IPs, volumes; NOT for stopped servers)
+- Size: `insights.size_gb` (for snapshots, volumes)
+- Wasted amount: calculated as `(monthly_savings × age_days) / 30`
+- Status: `metrics.status` (for stopped servers)
+
+*Special Handling:*
+- Stopped servers: no age/wasted data (we don't know WHEN they were stopped), focus on current status
+- Concrete resource types: "Снапшот" (not "Ресурс"), "IP" (not "IP-адрес" in second sentence)
+- No redundant fluff: removed "Удаление полностью исключит эти расходы" (obvious)
+
+#### 6.1.3 Prompt Engineering Principles
+
+**FinOps Persona:**
+- 10+ years FinOps experience
+- Deep sysadmin understanding
+- Balances savings, implementation effort, and risks
+- Professional, conversational tone (not robotic templates)
+
+**Writing Style:**
+- **Focus on Economics:** Start with savings amount, always highlighted
+- **Natural Language:**
+  - ✅ "при переносе" (when migrating) vs ❌ "при миграции"
+  - ✅ "там стоит" (costs there) vs ❌ "стоимость составит"
+  - ✅ "схожая конфигурация" (similar config) with real values in parentheses
+  - ✅ "не используется" (not used) vs ❌ "существует" (exists)
+- **Concrete, Not Generic:**
+  - ✅ "Снапшот не используется" vs ❌ "Ресурс не используется"
+  - ✅ "(4 CPU, 7 GB RAM, 105 GB HD)" vs ❌ "(CPU/RAM/HD)"
+- **Delicate About Waste:**
+  - ✅ "уже было потрачено" vs ❌ "потрачено впустую"
+  - Only mention if age > 30 days and amount > 0
+- **No Redundancy:**
+  - ❌ "Удаление полностью исключит эти расходы" - removed
+  - ❌ "освободит средства для более нужных задач" - removed
+
+**HTML Formatting:**
+- `<strong>` for prices, savings, wasted amounts
+- `<span class='provider-name'>` for provider names
+- No lists (ul/ol), only inline text
+- Preserve HTML in database and render safely in UI
+
+**Validation:**
+- LLM returns clean JSON (no markdown code blocks)
+- Fallback texts if LLM fails to parse or returns invalid JSON
+- Error logged but sync continues (non-fatal)
+
+#### 6.1.4 Database Schema
+
+```sql
+ALTER TABLE optimization_recommendations
+ADD COLUMN ai_short_description TEXT NULL,
+ADD COLUMN ai_detailed_description TEXT NULL,
+ADD COLUMN ai_generated_at DATETIME NULL;
+```
+
+**Migration:** `b8136224cf9c_add_ai_text_fields_to_recommendations.py`
+
+#### 6.1.5 Files Involved
+
+**Main App:**
+- `app/core/recommendations/orchestrator.py` - calls AI generator after rec creation (line 353-366)
+- `app/core/services/ai_text_generator.py` - HTTP client for agent service
+- `app/core/models/recommendations.py` - added 3 AI text columns
+- `app/web/main.py` - passes `enable_ai_recommendations` and `agent_service_url` to template
+- `app/config.py` - feature flags: `ENABLE_AI_RECOMMENDATIONS`, `AGENT_SERVICE_URL`
+- `app/templates/recommendations.html` - passes config to JS
+- `app/static/js/recommendations.js` - renders `rec.ai_short_description` and `rec.ai_detailed_description`
+
+**Agent Service:**
+- `agent_service/api/recommendations.py` - `POST /v1/generate/recommendation-text` endpoint
+- `agent_service/core/recommendation_generator.py` - orchestrates data fetch + LLM call
+- `agent_service/tools/data_access.py` - fetches recommendation, parses provider_config for specs
+- `agent_service/llm/gateway.py` - LLM abstraction (OpenRouter, with fallback support)
+- `agent_service/llm/prompts.py` - separate prompt builders:
+  - `build_recommendation_prompt()` - for price comparison
+  - `build_cleanup_prompt()` - for cleanup/deletion
+
+**Utilities:**
+- `scripts/generate_ai_text_for_existing.py` - backfill AI text for historical recommendations
+
+#### 6.1.6 Performance & Cost
+
+- **Latency:** ~2-4 seconds per recommendation during sync
+- **Cost:** ~1,700 tokens per recommendation (gpt-4o-mini: ~$0.0003 per rec)
+- **Optimization:** Generated once during sync, stored, reused forever (no repeated calls)
+- **Token Savings vs Live Generation:** 100x+ (no regeneration on every page load)
+- **Model:** `openai/gpt-4o-mini` via OpenRouter (fast, cheap, good quality)
 
 ### 6.2 Scenario 2 – Recommendation Chat (Context-Aware, Multi-Modal)
 - **Session:** `user_id` + `recommendation_id` (+ provider scope)
