@@ -106,12 +106,12 @@ function cardTemplate(rec){
     const sev = `<span class="sev-dot ${sevClass(rec.severity)}"></span>`;
     const id = rec.id;
     
-    // Provider color for subtle indicator (small dot on the right)
-    const providerColor = {
-        'yandex': '#FF3333',
-        'selectel': '#0066FF',
-        'beget': '#8B5CF6'
-    }[rec.provider_code?.toLowerCase()] || '#94a3b8';
+    // Small provider logo/icon for connection badge
+    const providerLogo = {
+        'yandex': '<span class="provider-logo" style="background:#FF3333">Y</span>',
+        'selectel': '<span class="provider-logo" style="background:#0066FF">S</span>',
+        'beget': '<span class="provider-logo" style="background:#8B5CF6">B</span>'
+    }[rec.provider_code?.toLowerCase()] || '<span class="provider-logo" style="background:#94a3b8">?</span>';
     
     // Resource type icon
     const resourceTypeIcon = {
@@ -130,14 +130,13 @@ function cardTemplate(rec){
     // Connection name from provider metadata (most important!)
     const connectionName = rec.connection_name || rec.provider_code || 'Unknown';
     
-    // Clean resource line: Connection > Icon Resource-name [provider-dot]
+    // Clean resource line: [Provider-logo Connection] > Icon Resource-name
     const resourceLine = `
         <div class="resource-line">
-            <span class="connection-badge">${connectionName}</span>
+            <span class="connection-badge">${providerLogo} ${connectionName}</span>
             <span class="separator">›</span>
             <span class="resource-icon-emoji">${resourceTypeIcon}</span>
             <span class="resource-name" title="${rec.resource_name || 'Unknown'}">${rec.resource_name || 'Unknown'}</span>
-            <span class="provider-dot" style="background: ${providerColor}" title="Провайдер: ${rec.provider_code || 'Unknown'}"></span>
         </div>
     `;
     
