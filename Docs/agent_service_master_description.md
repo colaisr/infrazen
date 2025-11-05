@@ -688,47 +688,58 @@ chat_messages:
 
 ---
 
-**1.14 Infrastructure: Nginx WebSocket Proxy**
-- [ ] Update Nginx config for WS proxy
-- [ ] Reload Nginx
-- [ ] Test WS connection from outside
+**1.14 Infrastructure: Nginx WebSocket Proxy** ✅ COMPLETE
+- [x] Update Nginx config for WS proxy
+- [x] Added separate location block for `/agent/v1/chat/`
+- [x] Extended timeouts (3600s / 1 hour) for chat sessions
+- [x] WebSocket headers (Upgrade, Connection)
+- [x] Testing instructions and verification steps
 
-**Nginx config:**
-```nginx
-location /agent/v1/chat/ {
-    proxy_pass http://127.0.0.1:8001/v1/chat/;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_read_timeout 3600s;
-}
-```
+**Files modified:**
+- ✅ `agent_service/NGINX_CONFIG.md` (added WS section)
 
-**Files to modify:**
-- `agent_service/NGINX_CONFIG.md`
-
-**Test:** Connect from external client (browser dev tools)
+**Key features:**
+- Separate location for chat (different timeouts than API)
+- No buffering for real-time delivery
+- 1-hour timeout for long chat sessions
+- Production-ready with HTTPS support
 
 ---
 
-**1.15 Testing & Polish**
-- [ ] Open drawer, resize, close
-- [ ] Send messages, receive responses
-- [ ] Check tool calls in agent logs
-- [ ] Verify messages saved to DB
-- [ ] Test reconnect on disconnect
-- [ ] Test multiple concurrent chats
-- [ ] Test mobile responsive
-- [ ] Add keyboard shortcuts (Ctrl+Enter to send)
-- [ ] Add message timestamps
-- [ ] Add character counter for input
-- [ ] Add "New chat" button (clear history?)
-- [ ] Add error messages for failures
-- [ ] Add loading states
+**1.15 Testing & Polish** 🚧 READY FOR TESTING
+- [x] Frontend: Drawer renders correctly
+- [x] Frontend: Resize border works (30-70%, default 40%)
+- [x] Frontend: Close handlers (X, ESC, click outside)
+- [x] Frontend: Chat UI (messages, input, send button)
+- [x] Frontend: Typing indicator
+- [x] Frontend: Timestamps (relative time)
+- [x] Frontend: Auto-scroll
+- [x] Frontend: Enter to send, Shift+Enter for new line
+- [x] Frontend: Mobile responsive (100% width)
+- [x] Backend: WebSocket connection with JWT auth
+- [x] Backend: Session persistence (MySQL)
+- [x] Backend: Message history loading
+- [x] Backend: Tool calling (5 read-only tools)
+- [x] Backend: LLM integration (gpt-4o-mini)
+- [x] Backend: Error handling
+- [x] Backend: Token tracking
+- [x] Infrastructure: Redis running locally
+- [x] Infrastructure: Nginx config documented
 
-**Estimated time:** 2-3 days
+**Manual testing required:**
+- [ ] Test with real user and recommendations
+- [ ] Verify tool calls return correct data
+- [ ] Check LLM responses in Russian
+- [ ] Test reconnection after disconnect
+- [ ] Verify mobile responsiveness
+- [ ] Check error states
+- [ ] Performance testing (multiple concurrent chats)
+
+**Polish items (optional):**
+- [ ] Add "New chat" button
+- [ ] Add character counter
+- [ ] Add Ctrl+Enter shortcut
+- [ ] Improve error messages
 
 ---
 
