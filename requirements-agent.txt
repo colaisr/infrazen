@@ -13,6 +13,11 @@ langgraph==0.2.34
 langchain==0.3.3
 langchain-core==0.3.10
 
+# Dependency version pins to resolve conflicts
+numpy>=1.22.5,<2.0.0
+urllib3>=1.24.2,<2.4.0
+packaging>=23.2,<25
+
 # LLM provider abstraction
 litellm==1.49.3
 openai==1.54.3
