@@ -22,15 +22,24 @@ def generate_recommendation_text(recommendation_id: int) -> Optional[Dict[str, s
         Dict with short_description_html and detailed_description_html, or None if disabled/failed
     """
     try:
+        # Get config values (with fallback for when called outside request context)
+        try:
+            enabled = current_app.config.get('ENABLE_AI_RECOMMENDATIONS', False)
+            agent_url = current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
+        except RuntimeError:
+            # Called outside Flask app context - use Config class directly
+            from app.config import Config
+            enabled = Config.ENABLE_AI_RECOMMENDATIONS
+            agent_url = Config.AGENT_SERVICE_URL
+        
         # Check if AI recommendations are enabled
-        if not current_app.config.get('ENABLE_AI_RECOMMENDATIONS', False):
-            logger.debug("AI recommendations disabled, skipping text generation")
+        if not enabled:
+            logger.info(f"AI recommendations disabled, skipping text generation for rec {recommendation_id}")
             return None
         
-        agent_url = current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
         endpoint = f"{agent_url}/v1/generate/recommendation-text"
         
-        logger.info(f"Generating AI text for recommendation {recommendation_id}")
+        logger.info(f"Generating AI text for recommendation {recommendation_id} (agent: {agent_url})")
         
         response = requests.post(
             endpoint,
@@ -39,10 +48,14 @@ def generate_recommendation_text(recommendation_id: int) -> Optional[Dict[str, s
         )
         
         if not response.ok:
-            logger.warning(f"Agent returned status {response.status_code} for rec {recommendation_id}")
+            logger.warning(f"Agent returned status {response.status_code} for rec {recommendation_id}: {response.text[:200]}")
             return None
         
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception as e:
+            logger.error(f"Failed to parse agent response as JSON for rec {recommendation_id}: {e}. Response: {response.text[:200]}")
+            return None
         
         # Validate response
         if data.get('error'):
