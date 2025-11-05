@@ -26,6 +26,7 @@ from .business_board import BusinessBoard
 from .board_resource import BoardResource
 from .board_group import BoardGroup
 from .user_provider_preference import UserProviderPreference
+from .chat import ChatSession, ChatMessage
 
 __all__ = [
     'db',
@@ -56,5 +57,7 @@ __all__ = [
     'BusinessBoard',
     'BoardResource',
     'BoardGroup',
-    'UserProviderPreference'
+    'UserProviderPreference',
+    'ChatSession',
+    'ChatMessage'
 ]

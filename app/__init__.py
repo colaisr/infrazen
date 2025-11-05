@@ -44,6 +44,7 @@ def create_app(config_name=None):
     from app.api.analytics import analytics_bp
     from app.api.business_context import business_context_bp
     from app.api.dashboard import dashboard_bp
+    from app.api.chat import chat_api
     from app.providers.beget.routes import beget_bp
     from app.providers.selectel.routes import selectel_bp
     from app.providers.yandex.routes import yandex_bp
@@ -57,6 +58,7 @@ def create_app(config_name=None):
     app.register_blueprint(analytics_bp)
     app.register_blueprint(business_context_bp, url_prefix='/api/business-context')
     app.register_blueprint(dashboard_bp, url_prefix='/api')
+    app.register_blueprint(chat_api, url_prefix='/api/chat')
     app.register_blueprint(beget_bp, url_prefix='/api/providers/beget')
     app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     app.register_blueprint(yandex_bp, url_prefix='/api/providers/yandex')

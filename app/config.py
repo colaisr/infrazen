@@ -47,6 +47,11 @@ class Config:
     ENABLE_AI_RECOMMENDATIONS = os.environ.get('ENABLE_AI_RECOMMENDATIONS', 'true').lower() == 'true'
     AGENT_SERVICE_URL = os.environ.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
     
+    # JWT Configuration (for agent service authentication)
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'dev-jwt-secret-change-in-production'
+    JWT_ALGORITHM = 'HS256'
+    JWT_EXPIRATION_HOURS = 24
+    
     # Email Configuration (Beget SMTP)
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.beget.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', 465))
