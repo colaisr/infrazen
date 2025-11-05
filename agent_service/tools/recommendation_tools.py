@@ -23,7 +23,7 @@ class RecommendationTools:
         """
         self.flask_app = flask_app
         
-    def get_recommendation_details(self, rec_id: int) -> Dict:
+    def get_recommendation_details(self, rec_id: int, user_id: Optional[int] = None) -> Dict:
         """
         Получить полные детали рекомендации по оптимизации.
         
@@ -102,7 +102,7 @@ class RecommendationTools:
             logger.error(f"Error getting recommendation details: {e}", exc_info=True)
             return {'error': f'Ошибка при получении данных: {str(e)}'}
     
-    def get_resource_details(self, resource_id: int) -> Dict:
+    def get_resource_details(self, resource_id: int, user_id: Optional[int] = None) -> Dict:
         """
         Получить детальную информацию о ресурсе (сервер, диск, IP и т.д.).
         
@@ -113,6 +113,7 @@ class RecommendationTools:
         
         Args:
             resource_id: ID ресурса
+            user_id: ID пользователя (опционально, для проверки владения)
             
         Returns:
             Словарь с деталями ресурса:
@@ -129,6 +130,10 @@ class RecommendationTools:
                 resource = Resource.query.filter_by(id=resource_id).first()
                 
                 if not resource:
+                    return {'error': f'Ресурс с ID {resource_id} не найден'}
+                
+                # Verify ownership (supports impersonation via user_id from JWT)
+                if user_id and resource.provider and resource.provider.user_id != user_id:
                     return {'error': f'Ресурс с ID {resource_id} не найден'}
                 
                 # Parse provider_config
@@ -175,7 +180,7 @@ class RecommendationTools:
             logger.error(f"Error getting resource details: {e}", exc_info=True)
             return {'error': f'Ошибка при получении данных: {str(e)}'}
     
-    def get_provider_pricing(self, provider: str, resource_type: str) -> List[Dict]:
+    def get_provider_pricing(self, provider: str, resource_type: str, user_id: Optional[int] = None) -> List[Dict]:
         """
         Получить актуальные цены провайдера для определённого типа ресурса.
         
@@ -234,10 +239,11 @@ class RecommendationTools:
             return []
     
     def calculate_savings(
-        self, 
-        current_cost: float, 
-        new_cost: float, 
-        period: str = "month"
+        self,
+        current_cost: float,
+        new_cost: float,
+        period: str = "month",
+        user_id: Optional[int] = None
     ) -> Dict:
         """
         Рассчитать экономию при переходе на новую конфигурацию или провайдера.
@@ -293,9 +299,10 @@ class RecommendationTools:
             return {'error': f'Ошибка расчёта: {str(e)}'}
     
     def get_migration_risks(
-        self, 
-        resource_id: int, 
-        target_provider: str
+        self,
+        resource_id: int,
+        target_provider: str,
+        user_id: Optional[int] = None
     ) -> Dict:
         """
         Оценить риски и сложность миграции ресурса на другого провайдера.

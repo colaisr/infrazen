@@ -131,10 +131,11 @@ async def websocket_chat_endpoint(
                 'timestamp': datetime.utcnow().isoformat()
             })
             
-            # Process message with chat agent
+            # Process message with chat agent (pass user_id for impersonation support)
             response, tokens = await chat_agent.process_message(
                 user_message=message,
                 recommendation_id=rec_id,
+                user_id=user_id,
                 chat_history=message_history
             )
             

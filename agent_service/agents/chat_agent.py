@@ -165,16 +165,19 @@ class ChatAgent:
             Tool execution result
         """
         try:
+            # Add user_id to all tool calls for ownership verification
+            arguments_with_user = {**arguments, 'user_id': getattr(self, 'current_user_id', None)}
+            
             if tool_name == "get_recommendation_details":
-                return self.tools.get_recommendation_details(**arguments)
+                return self.tools.get_recommendation_details(**arguments_with_user)
             elif tool_name == "get_resource_details":
-                return self.tools.get_resource_details(**arguments)
+                return self.tools.get_resource_details(**arguments_with_user)
             elif tool_name == "get_provider_pricing":
-                return self.tools.get_provider_pricing(**arguments)
+                return self.tools.get_provider_pricing(**arguments_with_user)
             elif tool_name == "calculate_savings":
-                return self.tools.calculate_savings(**arguments)
+                return self.tools.calculate_savings(**arguments_with_user)
             elif tool_name == "get_migration_risks":
-                return self.tools.get_migration_risks(**arguments)
+                return self.tools.get_migration_risks(**arguments_with_user)
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
         except Exception as e:
@@ -185,6 +188,7 @@ class ChatAgent:
         self,
         user_message: str,
         recommendation_id: int,
+        user_id: int,
         chat_history: List[Dict] = None
     ) -> tuple[str, int]:
         """
@@ -193,12 +197,15 @@ class ChatAgent:
         Args:
             user_message: User's message
             recommendation_id: Recommendation ID for context
+            user_id: User ID (supports impersonation - from JWT token)
             chat_history: Previous messages [{role, content}, ...]
             
         Returns:
             Tuple of (assistant_response, tokens_used)
         """
         try:
+            # Store user_id for tool execution context
+            self.current_user_id = user_id
             # Get recommendation details for context
             rec_details = self.tools.get_recommendation_details(recommendation_id)
             
