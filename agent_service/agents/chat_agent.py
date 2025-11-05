@@ -4,6 +4,7 @@ Uses LangGraph for orchestration with tool-calling LLM.
 """
 
 import logging
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -253,7 +254,7 @@ class ChatAgent:
                 
                 for tool_call in assistant_message.tool_calls:
                     tool_name = tool_call.function.name
-                    tool_args = eval(tool_call.function.arguments)  # JSON string to dict
+                    tool_args = json.loads(tool_call.function.arguments)  # JSON string to dict
                     
                     logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
                     

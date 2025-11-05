@@ -147,3 +147,21 @@ class LLMGateway:
         # TODO: Implement when needed
         raise NotImplementedError("Anthropic support coming soon")
 
+
+# Convenience function for getting a configured LLM client
+_llm_client_instance = None
+
+def get_llm_client():
+    """
+    Get or create a singleton OpenAI client configured for OpenRouter.
+    Returns OpenAI-compatible client for use with chat.completions.create().
+    """
+    global _llm_client_instance
+    if _llm_client_instance is None:
+        from openai import OpenAI
+        
+        _llm_client_instance = OpenAI(
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1"
+        )
+    return _llm_client_instance
