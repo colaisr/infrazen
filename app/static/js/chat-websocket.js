@@ -86,7 +86,14 @@ class RealWebSocketClient {
       } else if (data.type === 'assistant') {
         this.chatUI?.receiveMessage(data.content);
       } else if (data.type === 'user') {
-        // Skip user messages (we already show them)
+        // Show user messages from history (when reconnecting to existing session)
+        if (data.content) {
+          this.chatUI?.addMessage({
+            role: 'user',
+            content: data.content,
+            timestamp: data.timestamp ? new Date(data.timestamp) : new Date()
+          });
+        }
       } else if (data.type === 'typing') {
         // Agent is typing - show indicator
         this.chatUI?.showTyping();
