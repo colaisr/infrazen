@@ -167,7 +167,7 @@ function cardTemplate(rec){
         ${resourceLine}
         ${actionButtons}
         <div class="rec-body" id="body-${id}">
-            <span class="rec-description">${rec.ai_short_description || (rec.description||'').slice(0,220)}${(!rec.ai_short_description && (rec.description||'').length>220)?'…':''}</span>
+            <div class="rec-description">${rec.ai_short_description || (rec.description||'').slice(0,220)}${(!rec.ai_short_description && (rec.description||'').length>220)?'…':''}</div>
             <button class="link-btn more" data-id="${id}">Подробнее</button>
         </div>
         <div class="rec-details" id="details-${id}"></div>
