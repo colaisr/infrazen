@@ -76,16 +76,16 @@ class RecommendationTools:
                         pass
                         
                 metrics = {}
-                if rec.metrics:
+                if rec.metrics_snapshot:
                     try:
-                        metrics = json.loads(rec.metrics) if isinstance(rec.metrics, str) else rec.metrics
+                        metrics = json.loads(rec.metrics_snapshot) if isinstance(rec.metrics_snapshot, str) else rec.metrics_snapshot
                     except:
                         pass
                 
                 return {
                     'id': rec.id,
                     'title': rec.title,
-                    'type': rec.type,
+                    'type': rec.recommendation_type,
                     'severity': rec.severity,
                     'status': rec.status,
                     'estimated_monthly_savings': float(rec.estimated_monthly_savings) if rec.estimated_monthly_savings else 0,

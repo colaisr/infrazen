@@ -110,13 +110,11 @@ async def websocket_chat_endpoint(
                 'timestamp': msg['timestamp']
             })
         
-        logger.info(f"WebSocket connected: user={user_id}, rec={rec_id}, session={session_id}, history={len(message_history)}")
+        logger.debug(f"WebSocket connected: user={user_id}, rec={rec_id}, session={session_id}, history={len(message_history)}")
         
         # Handle incoming messages
         while True:
             data = await websocket.receive_json()
-            
-            logger.debug(f"Received message from session {session_id}: {data}")
             
             # Parse message
             message = data.get('content', '')
@@ -154,7 +152,7 @@ async def websocket_chat_endpoint(
             message_history.append({'role': 'assistant', 'content': response, 'timestamp': datetime.utcnow().isoformat(), 'tokens': tokens})
             
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected: session={session_id}")
+        logger.debug(f"WebSocket disconnected: session={session_id}")
         
     except Exception as e:
         logger.error(f"WebSocket error: {e}", exc_info=True)

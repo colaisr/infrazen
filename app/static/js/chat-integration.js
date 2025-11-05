@@ -7,6 +7,12 @@
   let chatUI = null;
   let wsClient = null;
   let currentRecommendationId = null;
+  const _dbg = (...args) => {
+    if (window.INFRAZEN_DATA?.debugAgent) {
+      // eslint-disable-next-line no-console
+      console.log(...args);
+    }
+  };
   
   // Wait for DOM and drawer to be ready
   document.addEventListener('DOMContentLoaded', () => {
@@ -78,9 +84,8 @@
       
       // Connect
       wsClient.connect().then(() => {
-        console.log('Real chat connected for recommendation:', recommendationId);
-      }).catch((error) => {
-        console.error('Failed to connect real chat:', error);
+        _dbg('Real chat connected for recommendation:', recommendationId);
+      }).catch(() => {
         // Fallback to mock if real connection fails
         initializeMockChat(recommendationId);
       });
@@ -100,7 +105,7 @@
     chatUI.setWebSocketClient(wsClient);
     
     wsClient.connect().then(() => {
-      console.log('Mock chat connected for recommendation:', recommendationId);
+      _dbg('Mock chat connected for recommendation:', recommendationId);
     });
   }
   

@@ -13,6 +13,13 @@ class RealWebSocketClient {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 2000; // 2 seconds
     this.token = null;
+    // Local debug helper (disabled by default)
+    this._dbg = (...args) => {
+      if (window.INFRAZEN_DATA?.debugAgent) {
+        // eslint-disable-next-line no-console
+        console.log(...args);
+      }
+    };
   }
   
   async connect() {
@@ -44,7 +51,7 @@ class RealWebSocketClient {
       const wsUrl = agentUrl.replace(/^http/, 'ws');
       const wsEndpoint = `${wsUrl}/v1/chat/rec/${this.recommendationId}?token=${this.token}`;
       
-      console.log('Connecting to WebSocket:', wsEndpoint);
+      this._dbg('Connecting to WebSocket:', wsEndpoint);
       
       this.ws = new WebSocket(wsEndpoint);
       
@@ -55,6 +62,7 @@ class RealWebSocketClient {
       this.ws.onclose = () => this.handleClose();
       
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Connection error:', error);
       this.chatUI?.showStatus('error', `Ошибка подключения: ${error.message}`);
       this.handleReconnect();
@@ -62,7 +70,7 @@ class RealWebSocketClient {
   }
   
   handleOpen() {
-    console.log('WebSocket connected');
+    this._dbg('WebSocket connected');
     this.connected = true;
     this.reconnectAttempts = 0;
     this.chatUI?.showStatus('connected', 'Подключено к FinOps');
@@ -71,7 +79,7 @@ class RealWebSocketClient {
   handleMessage(event) {
     try {
       const data = JSON.parse(event.data);
-      console.log('Received message:', data);
+      this._dbg('Received message:', data);
       
       if (data.type === 'system') {
         this.chatUI?.addSystemMessage(data.content);
@@ -82,21 +90,24 @@ class RealWebSocketClient {
       } else if (data.type === 'typing') {
         // Agent is typing - show indicator
         this.chatUI?.showTyping();
-      } else {
+      } else if (window.INFRAZEN_DATA?.debugAgent) {
+        // eslint-disable-next-line no-console
         console.warn('Unknown message type:', data.type);
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error parsing message:', error);
     }
   }
   
   handleError(error) {
+    // eslint-disable-next-line no-console
     console.error('WebSocket error:', error);
     this.chatUI?.showStatus('error', 'Ошибка соединения');
   }
   
   handleClose() {
-    console.log('WebSocket closed');
+    this._dbg('WebSocket closed');
     this.connected = false;
     
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -119,7 +130,10 @@ class RealWebSocketClient {
   
   send(message) {
     if (!this.connected || !this.ws) {
-      console.warn('WebSocket not connected');
+      if (window.INFRAZEN_DATA?.debugAgent) {
+        // eslint-disable-next-line no-console
+        console.warn('WebSocket not connected');
+      }
       this.chatUI?.showStatus('error', 'Нет соединения');
       return;
     }
@@ -130,8 +144,9 @@ class RealWebSocketClient {
       };
       
       this.ws.send(JSON.stringify(payload));
-      console.log('Sent message:', payload);
+      this._dbg('Sent message:', payload);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Error sending message:', error);
       this.chatUI?.showStatus('error', 'Ошибка отправки');
     }

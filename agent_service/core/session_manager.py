@@ -38,14 +38,16 @@ class SessionManager:
             Tuple of (session_id, message_history)
             message_history is a list of dicts: [{role, content, timestamp}, ...]
         """
+        logger.info(f"DB: Getting session for user_id={user_id}, rec_id={recommendation_id}")
+        
         with self.flask_app.app_context():
-            from app.core.models import ChatSession, ChatMessage, db
+            from app.core.models import ChatSession, ChatMessage, db, ChatSessionStatus
             
-            # Look for existing active session
-            session = ChatSession.query.filter_by(
+            # Use the Enum object for querying, not a raw string
+            session = db.session.query(ChatSession).filter_by(
                 user_id=user_id,
                 recommendation_id=recommendation_id,
-                status='active'
+                status=ChatSessionStatus.ACTIVE
             ).first()
             
             if session:
@@ -80,7 +82,7 @@ class SessionManager:
                     created_at=datetime.utcnow(),
                     last_activity_at=datetime.utcnow(),
                     message_count=0,
-                    status='active'
+                    status=ChatSessionStatus.ACTIVE
                 )
                 
                 db.session.add(new_session)
