@@ -13,13 +13,15 @@ from pydantic import BaseModel
 from agent_service.auth import validate_jwt_token
 from agent_service.core.connection_manager import manager
 from agent_service.core.session_manager import SessionManager
+from agent_service.agents import ChatAgent
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Session manager will be initialized on first use
+# Singletons will be initialized on first use
 _session_manager: Optional[SessionManager] = None
+_chat_agent: Optional[ChatAgent] = None
 
 
 def get_session_manager(app_state) -> SessionManager:
@@ -28,6 +30,14 @@ def get_session_manager(app_state) -> SessionManager:
     if _session_manager is None:
         _session_manager = SessionManager(app_state.flask_app)
     return _session_manager
+
+
+def get_chat_agent(app_state) -> ChatAgent:
+    """Get or create chat agent singleton."""
+    global _chat_agent
+    if _chat_agent is None:
+        _chat_agent = ChatAgent(app_state.flask_app)
+    return _chat_agent
 
 
 class ChatMessage(BaseModel):
@@ -75,8 +85,9 @@ async def websocket_chat_endpoint(
             await websocket.close(code=1008, reason="Recommendation ID mismatch")
             return
         
-        # Get session manager from app state
+        # Get session manager and chat agent from app state
         session_manager = get_session_manager(websocket.app.state)
+        chat_agent = get_chat_agent(websocket.app.state)
         
         # Get or create session and load history
         session_id, message_history = session_manager.get_or_create_session(user_id, rec_id)
@@ -116,8 +127,18 @@ async def websocket_chat_endpoint(
             # Save user message to DB
             session_manager.save_message(session_id, 'user', message)
             
-            # Echo back for now (will be replaced with agent in task 1.10)
-            response = f'Echo: {message}'
+            # Send typing indicator
+            await manager.send_message(session_id, {
+                'type': 'typing',
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            
+            # Process message with chat agent
+            response, tokens = await chat_agent.process_message(
+                user_message=message,
+                recommendation_id=rec_id,
+                chat_history=message_history
+            )
             
             await manager.send_message(session_id, {
                 'type': 'assistant',
@@ -125,8 +146,12 @@ async def websocket_chat_endpoint(
                 'timestamp': datetime.utcnow().isoformat()
             })
             
-            # Save assistant response to DB
-            session_manager.save_message(session_id, 'assistant', response)
+            # Save assistant response to DB with token count
+            session_manager.save_message(session_id, 'assistant', response, tokens=tokens)
+            
+            # Add to message history for next iteration
+            message_history.append({'role': 'user', 'content': message, 'timestamp': datetime.utcnow().isoformat()})
+            message_history.append({'role': 'assistant', 'content': response, 'timestamp': datetime.utcnow().isoformat(), 'tokens': tokens})
             
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: session={session_id}")
