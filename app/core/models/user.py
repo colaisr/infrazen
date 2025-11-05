@@ -3,10 +3,11 @@ User model for authentication and user management
 """
 from app.core.models import db
 from .base import BaseModel
+from flask_login import UserMixin
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 
-class User(BaseModel):
+class User(UserMixin, BaseModel):
     """User model for authentication with Google OAuth integration and roles"""
     __tablename__ = 'users'
     

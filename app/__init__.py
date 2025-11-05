@@ -8,6 +8,7 @@ from flask import Flask
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_migrate import Migrate
+from flask_login import LoginManager
 from app.core.database import db
 
 def create_app(config_name=None):
@@ -21,6 +22,16 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
+    
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth_bp.login'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.core.models import User
+        return User.query.get(int(user_id))
     
     # Add custom Jinja2 filters
     @app.template_filter('from_json')
