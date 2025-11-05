@@ -21,6 +21,12 @@ lsof -ti:5001 | xargs kill -9 2>/dev/null || true
 lsof -ti:8001 | xargs kill -9 2>/dev/null || true
 sleep 1
 
+# Start Redis (Docker)
+echo "🔴 Starting Redis..."
+docker run -d --name infrazen-redis -p 6379:6379 redis:7-alpine 2>/dev/null || docker start infrazen-redis 2>/dev/null || true
+sleep 2
+echo "   Redis running on port 6379"
+
 # Start Agent Service (background)
 echo "🤖 Starting Agent Service on port 8001..."
 nohup "./venv 2/bin/python" -m uvicorn agent_service.main:app --host 0.0.0.0 --port 8001 > agent.log 2>&1 &
@@ -45,13 +51,15 @@ echo "=========================================="
 echo ""
 echo "📊 Main App:      http://127.0.0.1:5001"
 echo "🤖 Agent Service: http://127.0.0.1:8001"
+echo "🔴 Redis:         redis://127.0.0.1:6379"
 echo "🧪 Test Page:     http://127.0.0.1:5001/agent-test"
 echo ""
 echo "📝 Logs:"
 echo "   App:   tail -f app.log"
 echo "   Agent: tail -f agent.log"
+echo "   Redis: docker logs infrazen-redis"
 echo ""
-echo "🛑 To stop both:"
+echo "🛑 To stop all services:"
 echo "   ./stop_both.sh"
 echo ""
 echo "PIDs saved to .infrazen.pids"

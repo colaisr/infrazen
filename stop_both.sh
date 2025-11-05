@@ -22,6 +22,11 @@ echo "Ensuring ports are free..."
 lsof -ti:5001 | xargs kill -9 2>/dev/null && echo "✓ Killed remaining processes on port 5001" || echo "✓ Port 5001 is free"
 lsof -ti:8001 | xargs kill -9 2>/dev/null && echo "✓ Killed remaining processes on port 8001" || echo "✓ Port 8001 is free"
 
+# Stop Redis container
 echo ""
-echo "✅ All services stopped"
+echo "Stopping Redis..."
+docker stop infrazen-redis 2>/dev/null && echo "✓ Redis stopped" || echo "✓ Redis already stopped"
+
+echo ""
+echo "✅ All services stopped (App, Agent, Redis)"
 
