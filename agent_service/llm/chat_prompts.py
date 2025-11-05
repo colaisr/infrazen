@@ -88,7 +88,7 @@ def build_chat_system_prompt(
         System prompt string with context
     """
     context = f"""
-- **Рекомендация ID:** {recommendation_id}
+- **ID рекомендации:** {recommendation_id} (это НЕ resource_id!)
 - **Название:** {recommendation_title}
 - **Потенциальная экономия:** {estimated_savings:,.2f} ₽/мес
 """
@@ -96,9 +96,13 @@ def build_chat_system_prompt(
     if resource_name:
         context += f"- **Ресурс:** {resource_name}\n"
     
-    context += """
+    context += f"""
 У тебя есть доступ к инструментам для получения детальной информации.
-Используй их, чтобы давать точные и полезные ответы."""
+
+**ВАЖНО:** Когда тебе нужна информация о ресурсе:
+1. Сначала используй get_recommendation_details({recommendation_id}) чтобы узнать resource_id
+2. Затем используй get_resource_details(resource_id) с полученным ID
+3. НЕ путай recommendation_id ({recommendation_id}) с resource_id - это РАЗНЫЕ числа!"""
     
     return FINOPS_CHAT_SYSTEM_PROMPT.format(context=context)
 
