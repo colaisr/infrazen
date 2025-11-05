@@ -8,7 +8,7 @@ import jwt
 from datetime import datetime, timedelta
 
 from app.config import Config
-from app.core.models import OptimizationRecommendation, db
+from app.core.models import OptimizationRecommendation, Resource, CloudProvider, db
 
 chat_api = Blueprint('chat_api', __name__)
 
@@ -33,12 +33,27 @@ def generate_chat_token():
     recommendation_id = data['recommendation_id']
     
     # Verify recommendation exists and belongs to user
+    # Recommendation -> Resource -> Provider -> user_id
     recommendation = OptimizationRecommendation.query.filter_by(
-        id=recommendation_id,
-        user_id=current_user.id
+        id=recommendation_id
     ).first()
     
     if not recommendation:
+        return jsonify({'error': 'Recommendation not found'}), 404
+    
+    # Verify ownership through provider
+    if recommendation.provider_id:
+        provider = CloudProvider.query.filter_by(id=recommendation.provider_id).first()
+        if not provider or provider.user_id != current_user.id:
+            return jsonify({'error': 'Recommendation not found'}), 404
+    elif recommendation.resource_id:
+        resource = Resource.query.filter_by(id=recommendation.resource_id).first()
+        if resource and resource.provider:
+            if resource.provider.user_id != current_user.id:
+                return jsonify({'error': 'Recommendation not found'}), 404
+        else:
+            return jsonify({'error': 'Recommendation not found'}), 404
+    else:
         return jsonify({'error': 'Recommendation not found'}), 404
     
     # Create JWT token
