@@ -709,6 +709,7 @@ chat_messages:
 - ✅ Tools: Fixed field names (`metrics_snapshot`, `recommendation_type`, `resource_name`, `provider_type`)
 - ✅ Logging: Silenced frontend debug (behind `INFRAZEN_DATA.debugAgent` flag)
 - ✅ Logging: Reduced backend noise (debug-only for connections, suppressed SQLAlchemy INFO)
+ - ✅ JWT secrets harmonized: app loads `config.prod.env` with `override=True`; agent prefers `AGENT_SERVICE_JWT_SECRET` and falls back to `JWT_SECRET_KEY`. Production envs set both to the same value to avoid drift across deploys/restarts.
 
 **Commit:** `b8c3e18` - M5 Chat: fix enum mapping; tools use metrics_snapshot; silence frontend console debug; reduce websocket log noise; suppress SQLAlchemy engine INFO logs
 

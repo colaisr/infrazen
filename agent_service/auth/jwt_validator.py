@@ -13,7 +13,12 @@ from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
 logger = logging.getLogger(__name__)
 
 # Load JWT configuration from environment
-JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-secret-change-in-production')
+# Prefer AGENT_SERVICE_JWT_SECRET (historical name), fallback to JWT_SECRET_KEY
+JWT_SECRET_KEY = (
+    os.environ.get('AGENT_SERVICE_JWT_SECRET')
+    or os.environ.get('JWT_SECRET_KEY')
+    or 'dev-jwt-secret-change-in-production'
+)
 JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '24'))
 

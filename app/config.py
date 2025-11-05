@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 # Load environment variables
 # Priority: config.prod.env (production) > config.dev.env (development)
 # Both files are git-ignored and maintained separately
+# Use override=True to ensure server env remains consistent across systemd/envfile quirks
 if os.path.exists('config.prod.env'):
-    load_dotenv('config.prod.env')  # Production
+    load_dotenv('config.prod.env', override=True)  # Production
 else:
-    load_dotenv('config.dev.env')  # Development
+    load_dotenv('config.dev.env', override=True)  # Development
 
 class Config:
     """Base configuration"""
