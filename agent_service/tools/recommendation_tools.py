@@ -157,7 +157,8 @@ class RecommendationTools:
                     except:
                         pass
                 
-                return {
+                # Build clear summary for LLM
+                result = {
                     'id': resource.id,
                     'name': resource.resource_name,  # Fixed: field is resource_name, not name
                     'type': resource.resource_type,
@@ -166,15 +167,21 @@ class RecommendationTools:
                     'provider_id': resource.provider_id,
                     'region': resource.region,
                     'effective_cost': float(resource.effective_cost) if resource.effective_cost else 0,
-                    'config': config,
-                    'specs': {
-                        'cpu_cores': cpu_cores,
-                        'ram_gb': ram_gb,
-                        'storage_gb': storage_gb
-                    },
-                    'tags': tags,
                     'created_at': resource.created_at.isoformat() if resource.created_at else None
                 }
+                
+                # Add specs prominently (for LLM to easily see)
+                if cpu_cores or ram_gb or storage_gb:
+                    result['cpu_cores'] = cpu_cores
+                    result['ram_gb'] = ram_gb
+                    result['storage_gb'] = storage_gb
+                    result['configuration_summary'] = f"{cpu_cores or '?'} CPU, {ram_gb or '?'} GB RAM, {storage_gb or '?'} GB Storage"
+                
+                # Add detailed config for advanced queries (but simplified)
+                if config:
+                    result['full_config'] = config
+                    
+                return result
                 
         except Exception as e:
             logger.error(f"Error getting resource details: {e}", exc_info=True)
