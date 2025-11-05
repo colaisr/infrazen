@@ -30,7 +30,11 @@ def generate_chat_token():
     if not data or 'recommendation_id' not in data:
         return jsonify({'error': 'recommendation_id is required'}), 400
     
-    recommendation_id = data['recommendation_id']
+    # Convert to int (may come as string from JavaScript)
+    try:
+        recommendation_id = int(data['recommendation_id'])
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid recommendation_id'}), 400
     
     # Verify recommendation exists and belongs to user
     # Recommendation -> Resource -> Provider -> user_id
