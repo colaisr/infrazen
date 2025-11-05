@@ -123,6 +123,10 @@ def google_auth():
                     pass
             # Update login info and store full session with db_id to make pages use real DB flow
             user.update_login_info()
+            
+            # Flask-Login integration
+            login_user(user)
+            
             session['user'] = {
                 'id': str(user.id),
                 'db_id': user.id,
@@ -187,6 +191,9 @@ def google_auth():
             # Update login information
             user.update_login_info()
             
+            # Flask-Login integration
+            login_user(user)
+            
             # Store user in session with database ID
             session['user'] = {
                 'id': str(user.id),
@@ -228,6 +235,9 @@ def admin_login():
         admin_user = User.query.filter_by(role='admin').first()
     
     if admin_user:
+        # Flask-Login integration
+        login_user(admin_user)
+        
         session['user'] = {
             'id': str(admin_user.id),
             'db_id': admin_user.id,
@@ -271,6 +281,9 @@ def login_password():
         
         # Update login information
         user.update_login_info()
+        
+        # Flask-Login integration
+        login_user(user)
         
         # Store user in session
         session['user'] = {
@@ -491,6 +504,9 @@ def handle_register():
             # Don't fail registration if email sending fails
         
         # Automatically log the user in after successful registration
+        # Flask-Login integration
+        login_user(user)
+        
         session['user'] = {
             'id': str(user.id),
             'db_id': user.id,
