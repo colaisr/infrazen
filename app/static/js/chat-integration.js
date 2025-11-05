@@ -65,16 +65,42 @@
     // Initialize chat UI
     chatUI = new window.ChatUI(drawerBody);
     
-    // Initialize WebSocket client (mock for now)
+    // Check if AI recommendations are enabled
+    const enableAI = window.INFRAZEN_DATA?.enableAIRecommendations;
+    
+    if (enableAI) {
+      // Use real WebSocket client
+      wsClient = new window.RealWebSocketClient(recommendationId);
+      wsClient.setChatUI(chatUI);
+      
+      // Wire chat UI with WebSocket
+      chatUI.setWebSocketClient(wsClient);
+      
+      // Connect
+      wsClient.connect().then(() => {
+        console.log('Real chat connected for recommendation:', recommendationId);
+      }).catch((error) => {
+        console.error('Failed to connect real chat:', error);
+        // Fallback to mock if real connection fails
+        initializeMockChat(recommendationId);
+      });
+    } else {
+      // Use mock WebSocket client (for testing/development)
+      initializeMockChat(recommendationId);
+    }
+  }
+  
+  function initializeMockChat(recommendationId) {
+    const drawer = window.getChatDrawer();
+    const drawerBody = drawer.getBody();
+    
+    chatUI = new window.ChatUI(drawerBody);
     wsClient = new window.MockWebSocketClient(recommendationId);
     wsClient.setChatUI(chatUI);
-    
-    // Wire chat UI with WebSocket
     chatUI.setWebSocketClient(wsClient);
     
-    // Connect
     wsClient.connect().then(() => {
-      console.log('Chat connected for recommendation:', recommendationId);
+      console.log('Mock chat connected for recommendation:', recommendationId);
     });
   }
   
