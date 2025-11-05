@@ -308,26 +308,13 @@ Notes:
 - Own CI job; horizontal scaling; Redis for sessions; Prometheus metrics.
 - Same service-to-service auth and internal API contracts.
 
-## 11. Deployment Strategy
-**Current Approach (Manual):**
-- Monorepo with manual deployment via `deploy.sh` script
-- Supports: `./deploy.sh app`, `./deploy.sh agent`, `./deploy.sh both`
-- Production-tested with zero-downtime deployments
-- Works perfectly for solo/small team workflow
-
-**CI/CD (Deferred):**
-- Automated CI pipelines not implemented (over-engineering for current needs)
-- Can be added later if team grows or automation requirements increase
-- Would include:
+## 11. CI/CD
+- Monorepo with two pipelines:
   - App pipeline (Flask app)
   - Agent pipeline (Agent Service)
-  - Separate secrets and environment configs
-
-**Current Benefits:**
-- Full control over deployment timing
-- Simple, reliable script-based process
-- No CI complexity or maintenance overhead
-- Secrets managed via server environment files
+- Dev convenience: combined “deploy both” path.
+- Version independently; shared changelog sections.
+- Secrets via environment (server), not in repo.
 
 ## 12. Configuration Keys (Initial)
 - `AGENT_PORT=8001`
@@ -396,19 +383,15 @@ This section tracks execution progress. We will update checkboxes as we proceed,
 
 Definition of done: ✅ COMPLETE - health endpoint OK, WebSocket echo works, test page shows "connected to agent", production deployment successful.
 
-### Milestone 2 – Deployment Automation ✅ COMPLETE
+### Milestone 2 – CI/CD for Agent (No Impact to App) ✅ PARTIAL
 - [x] Extend `deploy.sh` to support `app|agent|both` with idempotent steps and rollback
   - ✅ **Production:** Deploy script supports `./deploy.sh app|agent|both`
   - ✅ **Health Checks:** Both services have automated health validation
   - ✅ **Zero-downtime:** App uses systemctl reload, Agent restarts gracefully
-  - ✅ **Tested on production:** Multiple successful deployments
-- [cancelled] Add separate CI job for agent (build, push, restart) independent of app pipeline
-  - **Reason:** Manual deployment via `deploy.sh` works perfectly for current workflow
-  - **Future:** Can be added later if team grows or automation needs increase
-- [cancelled] Wire agent secrets/env in CI without touching existing app secrets
-  - **Reason:** Not needed without CI pipeline
+- [ ] Add separate CI job for agent (build, push, restart) independent of app pipeline
+- [ ] Wire agent secrets/env in CI without touching existing app secrets
 
-Definition of done: ✅ COMPLETE - Manual deployment works perfectly; deploy.sh supports all scenarios; CI/CD deferred as over-engineering for solo/small team.
+Definition of done: pushing an agent-only change deploys agent; app pipeline remains unchanged.
 
 ### Milestone 3 – Joint Deploy Test ✅ COMPLETE
 - [x] Make a trivial change to both app and agent; deploy both
@@ -435,13 +418,404 @@ Definition of done: ✅ COMPLETE - both services reflect changes; clean logs; ze
 
 Definition of done: ✅ COMPLETE - flag ON shows agent text with HTML formatting; OFF uses current implementation.
 
-### Milestone 5 – Recommendation/Resource Chat
-- [ ] WebSocket chat with session scoped to `recommendation_id` + user
-- [ ] Tools: recommendation/resource/snapshot/alternatives/effort/steps (read-only)
-- [ ] Multi-modal upload endpoint and vision model wiring for screenshots
-- [ ] UI: Chat drawer on recommendation card
+### Milestone 5 – Recommendation Chat (Context-Aware, Multi-Modal) 🚧 IN PROGRESS
 
-Definition of done: agent discusses the specific recommendation with user infra context and images.
+**Overview:**
+WebSocket-based chat for discussing specific recommendations. User can ask questions, request analysis, and upload screenshots. Agent has read-only access to recommendation, resource, and pricing data. Chat sessions are persistent (stored in MySQL), allowing users to return and continue discussions.
+
+**UI:** Resizable drawer (default 40%, draggable border, min 30%, max 70%)
+**Auth:** JWT token in WebSocket URL
+**Storage:** MySQL only (no Redis for history)
+**Vision Model:** OpenRouter gpt-4o ($2.5/$10 per 1M tokens)
+
+---
+
+#### Phase 1: Text Chat (WebSocket + Read-only Tools) 🚧 CURRENT
+
+**1.1 Frontend: Resizable Drawer Component** ✅ COMPLETE
+- [x] Create drawer HTML structure (overlay + panel)
+- [x] Implement slide-in animation (CSS transitions)
+- [x] Add draggable border (JS drag handlers)
+- [x] Save/restore width from localStorage
+- [x] Close handlers (X button, ESC key, click outside)
+- [x] Mobile responsive (full width on mobile)
+
+**Files created:**
+- ✅ `app/static/js/chat-drawer.js`
+- ✅ `app/static/css/components/chat-drawer.css`
+
+**Test:** Open/close drawer, resize border, check persistence
+
+---
+
+**1.2 Frontend: Chat UI Components** ✅ COMPLETE
+- [x] Message list container (scrollable)
+- [x] User message bubble (right-aligned, blue)
+- [x] Assistant message bubble (left-aligned, gray)
+- [x] System message (centered, subtle)
+- [x] Timestamps (relative time)
+- [x] Loading indicator ("typing..." dots)
+- [x] Auto-scroll to bottom on new message
+- [x] Input field + Send button (with Enter key support)
+- [x] Empty state ("Задайте вопрос о рекомендации...")
+
+**Files created:**
+- ✅ `app/static/js/chat-ui.js`
+- ✅ `app/static/css/components/chat-messages.css`
+
+**Test:** Render mock messages, scroll behavior, input handling
+
+---
+
+**1.3 Frontend: Mock WebSocket Client** ✅ COMPLETE
+- [x] Mock connection/disconnect
+- [x] Mock send/receive messages
+- [x] Mock delay (1-2 sec for responses)
+- [x] Mock responses database (10-15 examples)
+- [x] Mock error handling
+- [x] Mock reconnect logic
+
+**Files created:**
+- ✅ `app/static/js/chat-mock.js`
+
+**Test:** Send messages, receive responses, check timing
+
+---
+
+**1.4 Frontend: Integration with Recommendations Page** ✅ COMPLETE
+- [x] Update "💬 Обсудить с FinOps" button handler
+- [x] Pass recommendation_id to drawer
+- [x] Show recommendation context in drawer header
+- [x] Load chat scripts dynamically
+- [x] Handle multiple recs (switch chat context)
+
+**Files modified:**
+- ✅ `app/static/js/recommendations.js` (updated button)
+- ✅ `app/templates/recommendations.html` (added CSS/JS includes)
+
+**Files created:**
+- ✅ `app/static/js/chat-integration.js`
+
+**Test:** Click button, drawer opens with correct rec_id
+
+---
+
+**1.5 Backend: Database Schema**
+- [ ] Create Alembic migration
+- [ ] Add ChatSession model
+- [ ] Add ChatMessage model
+- [ ] Test migration (up/down)
+
+**Schema:**
+```sql
+chat_sessions:
+  - id VARCHAR(36) PRIMARY KEY
+  - user_id INT FK
+  - recommendation_id INT FK
+  - created_at DATETIME
+  - last_activity_at DATETIME
+  - message_count INT
+  - status ENUM('active', 'archived')
+  - INDEX (user_id, recommendation_id)
+  - INDEX (last_activity_at)
+
+chat_messages:
+  - id BIGINT AUTO_INCREMENT PRIMARY KEY
+  - session_id VARCHAR(36) FK
+  - role ENUM('user', 'assistant', 'system')
+  - content TEXT
+  - tokens INT
+  - created_at DATETIME
+  - INDEX (session_id, created_at)
+```
+
+**Files to create:**
+- `migrations/versions/xxx_add_chat_tables.py`
+- `app/core/models/chat.py`
+
+**Test:** Run migration locally, check tables
+
+---
+
+**1.6 Backend: JWT Authentication**
+- [ ] Generate shared secret (32 bytes)
+- [ ] Add JWT_SECRET_KEY to configs
+- [ ] Create JWT validation function
+- [ ] Test JWT decode/verify
+
+**Files to modify:**
+- `app/config.py`
+- `config.dev.env`
+- `config.agent.env`
+
+**Files to create:**
+- `agent_service/auth/jwt_validator.py`
+
+**Test:** Generate token in app, validate in agent
+
+---
+
+**1.7 Backend: WebSocket Endpoint**
+- [ ] Create WS endpoint `/v1/chat/rec/{rec_id}`
+- [ ] Validate JWT from query param
+- [ ] Connection manager (track active connections)
+- [ ] Handle connect/disconnect
+- [ ] Parse incoming messages
+- [ ] Send outgoing messages
+- [ ] Error handling & logging
+- [ ] Heartbeat/ping-pong
+
+**Files to create:**
+- `agent_service/api/websocket.py`
+- `agent_service/core/connection_manager.py`
+
+**Test:** Connect via wscat, send/receive test messages
+
+---
+
+**1.8 Backend: Session Management**
+- [ ] Create session (user_id + rec_id → session_id)
+- [ ] Load session history from DB (last 10 messages)
+- [ ] Save message to DB
+- [ ] Update last_activity_at
+- [ ] Archive old sessions (optional background task)
+
+**Files to create:**
+- `agent_service/core/session_manager.py`
+
+**Test:** Create session, load history, save messages
+
+---
+
+**1.9 Backend: Read-only Tools**
+- [ ] Implement `get_recommendation_details(rec_id)` tool
+- [ ] Implement `get_resource_details(resource_id)` tool
+- [ ] Implement `get_provider_pricing(provider, resource_type)` tool
+- [ ] Implement `calculate_savings(current, new, period)` tool
+- [ ] Implement `get_migration_risks(resource_id, target_provider)` tool
+- [ ] Add docstrings for LLM
+- [ ] Test each tool standalone
+- [ ] Register tools in LangGraph
+
+**Files to create:**
+- `agent_service/tools/recommendation_tools.py`
+
+**Test:** Call each tool directly, check responses
+
+---
+
+**1.10 Backend: LangGraph Chat Agent**
+- [ ] Create FinOps chat system prompt
+- [ ] Build LangGraph workflow (tools + LLM)
+- [ ] Add recommendation context to prompt
+- [ ] Add chat history to state
+- [ ] Handle tool calls
+- [ ] Stream responses (optional)
+- [ ] Error handling
+
+**Files to create:**
+- `agent_service/agents/chat_agent.py`
+- `agent_service/llm/chat_prompts.py`
+
+**System Prompt:**
+```
+Ты — FinOps консультант, помогаешь пользователю с рекомендацией #{rec_id}.
+
+Контекст рекомендации:
+- Тип: {type}
+- Ресурс: {resource_name}
+- Экономия: {savings} ₽/мес
+
+У тебя есть инструменты для:
+- Получения деталей рекомендации
+- Просмотра информации о ресурсах
+- Сравнения цен провайдеров
+- Расчёта экономии
+- Оценки рисков миграции
+
+Отвечай кратко, по делу, с конкретными цифрами.
+```
+
+**Test:** Send test messages, check tool usage
+
+---
+
+**1.11 Backend: WS → Agent Integration**
+- [ ] On user message → invoke agent
+- [ ] Pass session history to agent
+- [ ] Stream agent response to WS (or send complete)
+- [ ] Save user + assistant messages to DB
+- [ ] Update token count
+- [ ] Handle agent errors gracefully
+
+**Files to modify:**
+- `agent_service/api/websocket.py`
+
+**Test:** Full flow: user sends → agent responds → saved to DB
+
+---
+
+**1.12 Frontend: Real WebSocket Client**
+- [ ] Replace mock with real WS connection
+- [ ] Get JWT token from backend (new endpoint)
+- [ ] Connect to ws://agent:8001/v1/chat/rec/{rec_id}?token=...
+- [ ] Send/receive JSON messages
+- [ ] Handle connection errors
+- [ ] Auto-reconnect on disconnect
+- [ ] Show connection status in UI
+
+**Files to create:**
+- `app/static/js/chat-websocket.js`
+- `app/api/chat.py` (JWT token endpoint)
+
+**Test:** Connect to real agent, send messages, receive responses
+
+---
+
+**1.13 Infrastructure: Redis Setup**
+- [ ] Add `docker run redis:7-alpine` to run_both.sh
+- [ ] Add `docker stop infrazen-redis` to stop_both.sh
+- [ ] Test locally (start/stop)
+- [ ] Install Redis on production server: `apt install redis-server`
+- [ ] Configure Redis (memory limit, persistence)
+- [ ] Test Redis connection
+
+**Files to modify:**
+- `run_both.sh`
+- `stop_both.sh`
+
+**Test:** Redis running, can connect from agent
+
+---
+
+**1.14 Infrastructure: Nginx WebSocket Proxy**
+- [ ] Update Nginx config for WS proxy
+- [ ] Reload Nginx
+- [ ] Test WS connection from outside
+
+**Nginx config:**
+```nginx
+location /agent/v1/chat/ {
+    proxy_pass http://127.0.0.1:8001/v1/chat/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_read_timeout 3600s;
+}
+```
+
+**Files to modify:**
+- `agent_service/NGINX_CONFIG.md`
+
+**Test:** Connect from external client (browser dev tools)
+
+---
+
+**1.15 Testing & Polish**
+- [ ] Open drawer, resize, close
+- [ ] Send messages, receive responses
+- [ ] Check tool calls in agent logs
+- [ ] Verify messages saved to DB
+- [ ] Test reconnect on disconnect
+- [ ] Test multiple concurrent chats
+- [ ] Test mobile responsive
+- [ ] Add keyboard shortcuts (Ctrl+Enter to send)
+- [ ] Add message timestamps
+- [ ] Add character counter for input
+- [ ] Add "New chat" button (clear history?)
+- [ ] Add error messages for failures
+- [ ] Add loading states
+
+**Estimated time:** 2-3 days
+
+---
+
+#### Phase 2: Vision (Screenshot Upload + Analysis)
+
+**2.1 Backend: Image Upload Endpoint**
+- [ ] Create POST `/v1/chat/upload` endpoint
+- [ ] Accept multipart/form-data (image file)
+- [ ] Validate file type (jpg, png, webp)
+- [ ] Validate file size (max 5MB)
+- [ ] Generate unique image_id (UUID)
+- [ ] Save to `/tmp/infrazen-uploads/{image_id}.{ext}`
+- [ ] Return image_id to frontend
+- [ ] Add cleanup job (delete old images after 1 hour)
+
+**Files to create:**
+- `agent_service/api/upload.py`
+
+**Test:** Upload image via curl, check saved to disk
+
+---
+
+**2.2 Backend: Vision Tool**
+- [ ] Implement `analyze_screenshot(image_id, question)` tool
+- [ ] Load image from disk
+- [ ] Convert to base64 for API
+- [ ] Call OpenRouter gpt-4o with vision
+- [ ] Parse response
+- [ ] Cleanup image after analysis
+- [ ] Add to LangGraph agent tools
+
+**Files to create:**
+- `agent_service/tools/vision_tools.py`
+
+**Test:** Upload image, ask question, get analysis
+
+---
+
+**2.3 Frontend: Image Upload UI**
+- [ ] Add 📎 button next to input field
+- [ ] File picker (image only)
+- [ ] Preview uploaded image in chat
+- [ ] Upload to agent service (POST /v1/chat/upload)
+- [ ] Get image_id from response
+- [ ] Send message with image_id: "Посмотри этот график [image:{image_id}]"
+- [ ] Display images in chat history
+
+**Files to modify:**
+- `app/static/js/chat-ui.js`
+- `app/static/css/components/chat-messages.css`
+
+**Test:** Upload image, send with message, see in chat
+
+---
+
+**2.4 Agent: Image Context in Chat**
+- [ ] Detect [image:{image_id}] in user message
+- [ ] Auto-invoke vision tool
+- [ ] Include vision result in agent context
+- [ ] Return analysis to user
+
+**Files to modify:**
+- `agent_service/agents/chat_agent.py`
+
+**Test:** Send message with image, agent analyzes and responds
+
+---
+
+**2.5 Testing & Polish**
+- [ ] Upload various image types
+- [ ] Test large images (resize?)
+- [ ] Test invalid files
+- [ ] Check cleanup job works
+- [ ] Test vision analysis quality
+- [ ] Image zoom on click
+- [ ] Copy image URL
+- [ ] Delete uploaded image
+- [ ] Show upload progress
+- [ ] Show image in assistant response
+
+**Estimated time:** 1 day
+
+---
+
+**Definition of done (Phase 1):** User clicks "💬 Обсудить с FinOps", drawer opens with chat UI, can send text messages, agent responds with recommendation context and tool usage, messages persist in DB.
+
+**Definition of done (Phase 2):** User can upload screenshots, agent analyzes them using vision model, provides insights about charts/graphs/configs in context of the recommendation.
 
 ### Milestone 6 – Analytics Chat (Global Insights)
 - [ ] Tools for KPIs, trends, breakdowns, anomalies, top recommendations
@@ -462,6 +836,6 @@ Notes:
 - The agent runs as a separate process, port, env, and systemd unit; the app remains untouched.
 - Nginx reloads are zero-downtime; deploy script supports app-only, agent-only, or both.
 - Feature flags ensure we can ship incrementally and revert safely.
-- Manual deployment via `deploy.sh` provides full control without CI/CD complexity.
+- CI/CD adds an isolated path for the agent; the app pipeline remains intact.
 
 

@@ -5,60 +5,13 @@
   .sev-critical { background:#d93025; } .sev-high{ background:#ea4335;} .sev-medium{ background:#f9ab00;} .sev-low{ background:#34a853;} .sev-info{ background:#5f6368;}
   .rec-title { font-weight: 600; color:#1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .kpi { align-self: start; padding: 6px 10px; background:#eff6ff; color:#1a73e8; border:1px solid #dbeafe; border-radius: 999px; font-weight:600; }
-  
-  .rec-body { color:#374151; line-height: 1.4; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-  .rec-description { display: block; }
-  .rec-actions { display:flex; align-items:center; gap:6px; justify-content: flex-end; flex-wrap: wrap; }
-  .rec-footer { grid-column: 1 / -1; display:flex; align-items:center; justify-content: space-between; color:#6b7280; font-size: 12px; margin-top: 6px; }
+  .rec-body { color:#374151; line-height: 1.4; }
+  .rec-actions { display:flex; align-items:center; gap:6px; justify-content: flex-end; }
+  .rec-footer { display:flex; align-items:center; justify-content: space-between; color:#6b7280; font-size: 12px; margin-top: 6px; }
   .link-btn { color:#1a73e8; background:none; border:none; padding:0; cursor:pointer; }
   .btn-icon { padding: 4px 8px; border:1px solid #e5e7eb; border-radius: 8px; background:#fff; }
-  
-  /* Details */
-  .rec-details { display:none; grid-column: 1 / -1; margin-top: 8px; }
+  .rec-details { display:none; padding-top: 8px; border-top:1px dashed #e5e7eb; margin-top: 6px; }
   .rec-split { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  
-  /* Expanded card: 3-column grid (short | detailed | actions) */
-  .rec-card.expanded {
-    grid-template-columns: minmax(180px, 30%) 1fr min-content;
-  }
-  
-  /* Explicit grid positioning for expanded card */
-  
-  /* Row 1: Header (col 1) + KPI (col 2, right-aligned) */
-  .rec-card.expanded .rec-head { grid-column: 1 / 2; grid-row: 1; }
-  .rec-card.expanded .kpi { grid-column: 2 / 4; grid-row: 1; justify-self: end; align-self: start; }
-  
-  /* Row 2: Resource line (col 1-2) */
-  .rec-card.expanded .resource-line { grid-column: 1 / 3; grid-row: 2; }
-  
-  /* Row 3: Body (col 1) + Details (col 2) + Actions (col 3) */
-  .rec-card.expanded .rec-body { 
-    grid-column: 1 / 2;
-    grid-row: 3;
-    padding-right: 12px;
-    border-right: 1px dashed #e5e7eb;
-  }
-  
-  .rec-card.expanded .rec-details { 
-    grid-column: 2 / 3;
-    grid-row: 3;
-    margin-top: 0;
-    padding-left: 12px;
-  }
-  
-  .rec-card.expanded .rec-actions { 
-    grid-column: 3 / 4;
-    grid-row: 3;
-    align-self: start;
-    flex-direction: row;
-    flex-wrap: nowrap;
-  }
-  
-  /* Row 4: Footer */
-  .rec-card.expanded .rec-footer { grid-row: 4; }
-  
-  /* Footer spans all */
-  .rec-card.expanded .rec-footer { grid-column: 1 / -1; }
   
   /* Compact Resource Line Design */
   .resource-line { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
@@ -68,34 +21,4 @@
   .resource-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: #64748b; font-size: 14px; flex-shrink: 0; cursor: help; }
   .resource-name { font-weight: 600; color: #1e293b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
   
-  @media (max-width: 960px) { 
-    .rec-card{ grid-template-columns: 1fr; } 
-    .rec-split{ grid-template-columns:1fr; }
-    .rec-details-wrapper { max-width: 100%; }
-    
-    /* Expanded cards on mobile: stack vertically */
-    .rec-card.expanded {
-      grid-template-columns: 1fr;
-    }
-    .rec-card.expanded .rec-head,
-    .rec-card.expanded .kpi,
-    .rec-card.expanded .resource-line,
-    .rec-card.expanded .rec-body,
-    .rec-card.expanded .rec-details-wrapper,
-    .rec-card.expanded .rec-actions {
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }
-    .rec-card.expanded .rec-body { 
-      border-right: none; 
-      border-bottom: 1px dashed #e5e7eb;
-      padding-right: 0;
-      padding-bottom: 8px;
-    }
-    .rec-card.expanded .rec-details {
-      padding-left: 0;
-    }
-    .rec-card.expanded .kpi {
-      justify-self: start;
-    }
-  }
+  @media (max-width: 960px) { .rec-card{ grid-template-columns: 1fr; } .rec-split{ grid-template-columns:1fr; } }

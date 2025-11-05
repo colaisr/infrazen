@@ -167,7 +167,7 @@ function cardTemplate(rec){
         ${resourceLine}
         ${actionButtons}
         <div class="rec-body" id="body-${id}">
-            <div class="rec-description">${rec.ai_short_description || (rec.description||'').slice(0,220)}${(!rec.ai_short_description && (rec.description||'').length>220)?'…':''}</div>
+            <span class="rec-description">${rec.ai_short_description || (rec.description||'').slice(0,220)}${(!rec.ai_short_description && (rec.description||'').length>220)?'…':''}</span>
             <button class="link-btn more" data-id="${id}">Подробнее</button>
         </div>
         <div class="rec-details" id="details-${id}"></div>
@@ -297,13 +297,10 @@ function enableBulkButtons(){
 
 async function toggleDetails(id){
     const box = qs(`#details-${id}`);
-    const card = qs(`.rec-card[data-id="${id}"]`);
-    if(!box || !card) return;
+    if(!box) return;
     
     if(box.dataset.loaded === '1'){
-        const isVisible = box.style.display !== 'none';
-        box.style.display = isVisible ? 'none' : 'block';
-        card.classList.toggle('expanded', !isVisible);
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
         return;
     }
     
@@ -314,11 +311,11 @@ async function toggleDetails(id){
     // If AI-generated text is available, use it
     if (rec.ai_detailed_description && window.INFRAZEN_DATA?.enableAIRecommendations) {
         box.innerHTML = `
-            <div style="padding: 0.75rem 1rem; background: #f8f9fa; border-radius: 8px;">
-                <div style="font-size: 14px; line-height: 1.6; color: #1f2937; margin-bottom: 0.75rem;">
+            <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-top: 0.5rem;">
+                <div style="font-size: 14px; line-height: 1.6; color: #1f2937; margin-bottom: 1rem;">
                     ${rec.ai_detailed_description}
                 </div>
-                <button class="btn btn-primary" onclick="alert('Чат с FinOps будет доступен в следующей версии')" style="font-size: 14px; padding: 8px 16px; display: inline-flex; align-items: center; gap: 6px;">
+                <button class="btn btn-primary chat-with-finops-btn" style="font-size: 14px; padding: 8px 16px; display: inline-flex; align-items: center; gap: 6px;">
                     💬 Обсудить с FinOps
                 </button>
             </div>
@@ -343,7 +340,6 @@ async function toggleDetails(id){
     
     box.dataset.loaded = '1';
     box.style.display = 'block';
-    card.classList.add('expanded');
 }
 
 // ============================================================================
