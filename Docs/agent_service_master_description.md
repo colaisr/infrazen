@@ -308,13 +308,26 @@ Notes:
 - Own CI job; horizontal scaling; Redis for sessions; Prometheus metrics.
 - Same service-to-service auth and internal API contracts.
 
-## 11. CI/CD
-- Monorepo with two pipelines:
+## 11. Deployment Strategy
+**Current Approach (Manual):**
+- Monorepo with manual deployment via `deploy.sh` script
+- Supports: `./deploy.sh app`, `./deploy.sh agent`, `./deploy.sh both`
+- Production-tested with zero-downtime deployments
+- Works perfectly for solo/small team workflow
+
+**CI/CD (Deferred):**
+- Automated CI pipelines not implemented (over-engineering for current needs)
+- Can be added later if team grows or automation requirements increase
+- Would include:
   - App pipeline (Flask app)
   - Agent pipeline (Agent Service)
-- Dev convenience: combined “deploy both” path.
-- Version independently; shared changelog sections.
-- Secrets via environment (server), not in repo.
+  - Separate secrets and environment configs
+
+**Current Benefits:**
+- Full control over deployment timing
+- Simple, reliable script-based process
+- No CI complexity or maintenance overhead
+- Secrets managed via server environment files
 
 ## 12. Configuration Keys (Initial)
 - `AGENT_PORT=8001`
@@ -383,15 +396,19 @@ This section tracks execution progress. We will update checkboxes as we proceed,
 
 Definition of done: ✅ COMPLETE - health endpoint OK, WebSocket echo works, test page shows "connected to agent", production deployment successful.
 
-### Milestone 2 – CI/CD for Agent (No Impact to App) ✅ PARTIAL
+### Milestone 2 – Deployment Automation ✅ COMPLETE
 - [x] Extend `deploy.sh` to support `app|agent|both` with idempotent steps and rollback
   - ✅ **Production:** Deploy script supports `./deploy.sh app|agent|both`
   - ✅ **Health Checks:** Both services have automated health validation
   - ✅ **Zero-downtime:** App uses systemctl reload, Agent restarts gracefully
-- [ ] Add separate CI job for agent (build, push, restart) independent of app pipeline
-- [ ] Wire agent secrets/env in CI without touching existing app secrets
+  - ✅ **Tested on production:** Multiple successful deployments
+- [cancelled] Add separate CI job for agent (build, push, restart) independent of app pipeline
+  - **Reason:** Manual deployment via `deploy.sh` works perfectly for current workflow
+  - **Future:** Can be added later if team grows or automation needs increase
+- [cancelled] Wire agent secrets/env in CI without touching existing app secrets
+  - **Reason:** Not needed without CI pipeline
 
-Definition of done: pushing an agent-only change deploys agent; app pipeline remains unchanged.
+Definition of done: ✅ COMPLETE - Manual deployment works perfectly; deploy.sh supports all scenarios; CI/CD deferred as over-engineering for solo/small team.
 
 ### Milestone 3 – Joint Deploy Test ✅ COMPLETE
 - [x] Make a trivial change to both app and agent; deploy both
@@ -445,6 +462,6 @@ Notes:
 - The agent runs as a separate process, port, env, and systemd unit; the app remains untouched.
 - Nginx reloads are zero-downtime; deploy script supports app-only, agent-only, or both.
 - Feature flags ensure we can ship incrementally and revert safely.
-- CI/CD adds an isolated path for the agent; the app pipeline remains intact.
+- Manual deployment via `deploy.sh` provides full control without CI/CD complexity.
 
 
