@@ -709,9 +709,17 @@ chat_messages:
 - ✅ Tools: Fixed field names (`metrics_snapshot`, `recommendation_type`, `resource_name`, `provider_type`)
 - ✅ Logging: Silenced frontend debug (behind `INFRAZEN_DATA.debugAgent` flag)
 - ✅ Logging: Reduced backend noise (debug-only for connections, suppressed SQLAlchemy INFO)
- - ✅ JWT secrets harmonized: app loads `config.prod.env` with `override=True`; agent prefers `AGENT_SERVICE_JWT_SECRET` and falls back to `JWT_SECRET_KEY`. Production envs set both to the same value to avoid drift across deploys/restarts.
+- ✅ JWT secrets harmonized: app loads `config.prod.env` with `override=True`; agent prefers `AGENT_SERVICE_JWT_SECRET` and falls back to `JWT_SECRET_KEY`. Production envs set both to the same value to avoid drift across deploys/restarts.
 
-**Commit:** `b8c3e18` - M5 Chat: fix enum mapping; tools use metrics_snapshot; silence frontend console debug; reduce websocket log noise; suppress SQLAlchemy engine INFO logs
+**Polish & Production Hardening:**
+- ✅ Markdown formatting: Frontend renders `**bold**` and line breaks; agent uses proper spacing for readability
+- ✅ Impersonation support: Chat token endpoint uses `session['user']['db_id']` instead of `current_user.id`; agent tools verify ownership against impersonated user; enables admin testing as any user
+- ✅ Chat history: User messages now load when reconnecting to existing session (previously only agent messages shown)
+- ✅ LLM clarity: Prompt explicitly warns not to confuse `recommendation_id` with `resource_id`; tools return specs at top level with `configuration_summary` for better LLM comprehension
+- ✅ Dependency conflicts resolved: Pinned `numpy<2.0`, `urllib3<2.4`, `packaging<25` in both `requirements.txt` and `requirements-agent.txt` (shared venv)
+- ✅ Deployment script: `/root/infrazen-deploy` pulls monorepo, installs both deps, runs migrations, restarts both services with health checks
+
+**Commits:** `b8c3e18` (enum/tools/logging), `c483693` (JWT), `94437cc` (formatting), `d928ecb` (impersonation), `4724124` (history), `59fcc1d` (prompt clarity), `d681410` (specs visibility)
 
 ---
 
