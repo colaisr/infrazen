@@ -125,8 +125,13 @@ class ChatUI {
     
     const timestamp = this.formatTimestamp(message.timestamp);
     
+    // Format content based on role
+    const formattedContent = message.role === 'assistant' 
+      ? this.formatMarkdown(message.content)
+      : this.escapeHtml(message.content);
+    
     messageEl.innerHTML = `
-      <div class="chat-message-content">${this.escapeHtml(message.content)}</div>
+      <div class="chat-message-content">${formattedContent}</div>
       <div class="chat-message-timestamp">${timestamp}</div>
     `;
     
@@ -225,6 +230,26 @@ class ChatUI {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+  
+  formatMarkdown(text) {
+    // Escape HTML first
+    let html = this.escapeHtml(text);
+    
+    // Convert markdown to HTML
+    // Bold: **text** -> <strong>text</strong>
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Numbered lists: preserve line breaks before numbers
+    html = html.replace(/\n(\d+)\./g, '\n\n$1.');
+    
+    // Line breaks: \n -> <br>
+    html = html.replace(/\n/g, '<br>');
+    
+    // Add spacing after list items for readability
+    html = html.replace(/(\d+\.\s.+?)<br>/g, '$1<br><br>');
+    
+    return html;
   }
   
   clear() {
