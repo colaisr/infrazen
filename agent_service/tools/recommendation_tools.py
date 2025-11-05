@@ -59,9 +59,9 @@ class RecommendationTools:
                     if resource:
                         resource_data = {
                             'id': resource.id,
-                            'name': resource.name,
+                            'name': resource.resource_name,  # Fixed: field is resource_name, not name
                             'type': resource.resource_type,
-                            'provider': resource.provider.name if resource.provider else None,
+                            'provider': resource.provider.provider_type if resource.provider else None,  # Fixed: provider_type, not name
                             'effective_cost': float(resource.effective_cost) if resource.effective_cost else 0,
                             'status': resource.status,
                             'region': resource.region
@@ -154,10 +154,10 @@ class RecommendationTools:
                 
                 return {
                     'id': resource.id,
-                    'name': resource.name,
+                    'name': resource.resource_name,  # Fixed: field is resource_name, not name
                     'type': resource.resource_type,
                     'status': resource.status,
-                    'provider': resource.provider.name if resource.provider else None,
+                    'provider': resource.provider.provider_type if resource.provider else None,  # Fixed: provider_type, not name
                     'provider_id': resource.provider_id,
                     'region': resource.region,
                     'effective_cost': float(resource.effective_cost) if resource.effective_cost else 0,
@@ -327,7 +327,7 @@ class RecommendationTools:
                 if not resource:
                     return {'error': f'Ресурс с ID {resource_id} не найден'}
                 
-                current_provider = resource.provider.name if resource.provider else 'unknown'
+                current_provider = resource.provider.provider_type if resource.provider else 'unknown'  # Fixed: provider_type, not name
                 resource_type = resource.resource_type
                 
                 # Base risk assessment
@@ -379,7 +379,7 @@ class RecommendationTools:
                 ]
                 
                 return {
-                    'resource_name': resource.name,
+                    'resource_name': resource.resource_name,  # Fixed: field is resource_name, not name
                     'resource_type': resource_type,
                     'current_provider': current_provider,
                     'target_provider': target_provider,
