@@ -2,7 +2,7 @@
 Chat API endpoints for generating JWT tokens and chat management.
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_login import login_required, current_user
 import jwt
 from datetime import datetime, timedelta
@@ -45,24 +45,30 @@ def generate_chat_token():
     if not recommendation:
         return jsonify({'error': 'Recommendation not found'}), 404
     
+    # Get effective user ID (support impersonation)
+    # When admin impersonates, session['user']['db_id'] contains impersonated user ID
+    # but current_user.id is still the admin's ID
+    user_data = session.get('user', {})
+    effective_user_id = user_data.get('db_id') or current_user.id
+    
     # Verify ownership through provider
     if recommendation.provider_id:
         provider = CloudProvider.query.filter_by(id=recommendation.provider_id).first()
-        if not provider or provider.user_id != current_user.id:
+        if not provider or provider.user_id != effective_user_id:
             return jsonify({'error': 'Recommendation not found'}), 404
     elif recommendation.resource_id:
         resource = Resource.query.filter_by(id=recommendation.resource_id).first()
         if resource and resource.provider:
-            if resource.provider.user_id != current_user.id:
+            if resource.provider.user_id != effective_user_id:
                 return jsonify({'error': 'Recommendation not found'}), 404
         else:
             return jsonify({'error': 'Recommendation not found'}), 404
     else:
         return jsonify({'error': 'Recommendation not found'}), 404
     
-    # Create JWT token
+    # Create JWT token with effective user ID (impersonated user if applicable)
     payload = {
-        'user_id': current_user.id,
+        'user_id': effective_user_id,
         'recommendation_id': recommendation_id,
         'exp': datetime.utcnow() + timedelta(hours=Config.JWT_EXPIRATION_HOURS),
         'iat': datetime.utcnow()
