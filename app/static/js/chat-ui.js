@@ -122,6 +122,11 @@ class ChatUI {
     this.removeImageBtn.addEventListener('click', () => {
       this.clearImage();
     });
+    
+    // Paste event for clipboard images (like Cursor chat)
+    this.input.addEventListener('paste', (e) => {
+      this.handlePaste(e);
+    });
   }
   
   setWebSocketClient(wsClient) {
@@ -203,13 +208,21 @@ class ChatUI {
       return;
     }
     
+    // Generate friendly name for pasted images (if no name or generic blob name)
+    let fileName = file.name;
+    if (!fileName || fileName === 'image.png' || fileName === 'blob') {
+      const ext = file.type.split('/')[1] || 'png';
+      const timestamp = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      fileName = `Скриншот ${timestamp}.${ext}`;
+    }
+    
     // Read file as data URL for preview
     const reader = new FileReader();
     reader.onload = (e) => {
       this.currentImage = {
         file: file,
         dataUrl: e.target.result,
-        name: file.name
+        name: fileName
       };
       
       // Show preview
@@ -253,6 +266,34 @@ class ChatUI {
     
     const data = await response.json();
     return data.image_id;
+  }
+  
+  handlePaste(e) {
+    // Check if clipboard contains image data
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    // Look for image in clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      // Check if item is an image
+      if (item.type.indexOf('image') !== -1) {
+        // Prevent default paste behavior for images
+        e.preventDefault();
+        
+        // Get image file from clipboard
+        const file = item.getAsFile();
+        if (file) {
+          console.log('Image pasted from clipboard:', file.type, file.size);
+          this.handleFileSelect(file);
+        }
+        
+        // Only handle first image
+        break;
+      }
+    }
+    // If no image found, allow default paste behavior (text)
   }
   
   addMessage(message) {
