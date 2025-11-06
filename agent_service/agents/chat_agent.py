@@ -11,6 +11,7 @@ from datetime import datetime
 from agent_service.llm.gateway import get_llm_client
 from agent_service.llm.chat_prompts import build_chat_system_prompt
 from agent_service.tools.recommendation_tools import RecommendationTools
+from agent_service.tools.vision_tools import VisionTools
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class ChatAgent:
         """
         self.flask_app = flask_app
         self.tools = RecommendationTools(flask_app)
+        self.vision_tools = VisionTools()
         self.llm_client = None
         
     def _get_llm_client(self):
@@ -150,6 +152,27 @@ class ChatAgent:
                         "required": ["resource_id", "target_provider"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "analyze_screenshot",
+                    "description": "Анализирует загруженный скриншот, график или изображение. Используй когда пользователь загрузил изображение и задал вопрос, просит проанализировать график метрик, хочет разобрать консольный вывод, прикрепил скриншот интерфейса или прайс-листа.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "image_id": {
+                                "type": "string",
+                                "description": "ID загруженного изображения (UUID)"
+                            },
+                            "question": {
+                                "type": "string",
+                                "description": "Вопрос или контекст для анализа (на русском)"
+                            }
+                        },
+                        "required": ["image_id", "question"]
+                    }
+                }
             }
         ]
         
@@ -178,6 +201,8 @@ class ChatAgent:
                 return self.tools.calculate_savings(**arguments_with_user)
             elif tool_name == "get_migration_risks":
                 return self.tools.get_migration_risks(**arguments_with_user)
+            elif tool_name == "analyze_screenshot":
+                return self.vision_tools.analyze_screenshot(**arguments_with_user)
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
         except Exception as e:
@@ -240,9 +265,14 @@ class ChatAgent:
             # Get tool definitions
             tools = self._get_tool_definitions()
             
+            # Get text model from settings
+            from agent_service.core.config import settings
+            text_model = settings.LLM_MODEL_TEXT
+            logger.info(f"Using text model for chat: {text_model}")
+            
             # Call LLM with tools
             response = client.chat.completions.create(
-                model="openai/gpt-4o-mini",  # Fast and cheap for chat
+                model=text_model,
                 messages=messages,
                 tools=tools,
                 tool_choice="auto",
@@ -278,7 +308,7 @@ class ChatAgent:
                 
                 # Get final response with tool results
                 final_response = client.chat.completions.create(
-                    model="openai/gpt-4o-mini",
+                    model=text_model,  # Use same model as before
                     messages=messages,
                     temperature=0.7,
                     max_tokens=1000

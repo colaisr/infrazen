@@ -9,6 +9,7 @@ class ChatUI {
     this.messages = [];
     this.isTyping = false;
     this.wsClient = null;
+    this.uploadedImages = []; // Track uploaded images for this session
     
     this.init();
   }
@@ -31,7 +32,21 @@ class ChatUI {
           </div>
         </div>
         <div class="chat-input-area">
+          <div id="chat-image-preview" class="chat-image-preview" style="display: none;">
+            <img id="chat-preview-img" alt="Preview">
+            <button class="chat-preview-remove" id="chat-remove-image">✕</button>
+            <div class="chat-preview-name" id="chat-preview-name"></div>
+          </div>
           <div class="chat-input-wrapper">
+            <button class="chat-attach-btn" id="chat-attach-btn" title="Прикрепить изображение">
+              📎
+            </button>
+            <input 
+              type="file" 
+              id="chat-file-input" 
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif" 
+              style="display: none;"
+            >
             <textarea 
               class="chat-input" 
               id="chat-input" 
@@ -55,6 +70,15 @@ class ChatUI {
     this.sendBtn = document.getElementById('chat-send-btn');
     this.statusBar = document.getElementById('chat-status');
     this.statusText = document.getElementById('chat-status-text');
+    this.attachBtn = document.getElementById('chat-attach-btn');
+    this.fileInput = document.getElementById('chat-file-input');
+    this.imagePreview = document.getElementById('chat-image-preview');
+    this.previewImg = document.getElementById('chat-preview-img');
+    this.previewName = document.getElementById('chat-preview-name');
+    this.removeImageBtn = document.getElementById('chat-remove-image');
+    
+    // Current image state
+    this.currentImage = null;
     
     // Bind events
     this.bindEvents();
@@ -78,7 +102,25 @@ class ChatUI {
       this.input.style.height = this.input.scrollHeight + 'px';
       
       // Enable/disable send button
-      this.sendBtn.disabled = !this.input.value.trim();
+      this.sendBtn.disabled = !this.input.value.trim() && !this.currentImage;
+    });
+    
+    // Attach button click
+    this.attachBtn.addEventListener('click', () => {
+      this.fileInput.click();
+    });
+    
+    // File input change
+    this.fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        this.handleFileSelect(file);
+      }
+    });
+    
+    // Remove image button
+    this.removeImageBtn.addEventListener('click', () => {
+      this.clearImage();
     });
   }
   
@@ -86,20 +128,55 @@ class ChatUI {
     this.wsClient = wsClient;
   }
   
-  sendMessage() {
+  async sendMessage() {
     const text = this.input.value.trim();
-    if (!text) return;
+    const hasImage = this.currentImage !== null;
     
-    // Add user message to UI
-    this.addMessage({
-      role: 'user',
-      content: text,
-      timestamp: new Date()
-    });
+    if (!text && !hasImage) return;
     
-    // Send via WebSocket
-    if (this.wsClient) {
-      this.wsClient.send(text);
+    // If there's an image, upload it first
+    if (hasImage) {
+      try {
+        const imageId = await this.uploadImage(this.currentImage.file);
+        
+        // Add image reference to message
+        const messageText = text || 'Проанализируй это изображение';
+        const messageWithImage = `[image:${imageId}] ${messageText}`;
+        
+        // Add user message with image preview to UI
+        this.addMessage({
+          role: 'user',
+          content: messageText,
+          timestamp: new Date(),
+          image: this.currentImage.dataUrl,
+          imageId: imageId
+        });
+        
+        // Send via WebSocket
+        if (this.wsClient) {
+          this.wsClient.send(messageWithImage);
+        }
+        
+        // Clear image
+        this.clearImage();
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+        this.addSystemMessage(`Ошибка загрузки изображения: ${error.message}`);
+        return;
+      }
+    } else {
+      // Text-only message
+      // Add user message to UI
+      this.addMessage({
+        role: 'user',
+        content: text,
+        timestamp: new Date()
+      });
+      
+      // Send via WebSocket
+      if (this.wsClient) {
+        this.wsClient.send(text);
+      }
     }
     
     // Clear input
@@ -109,6 +186,73 @@ class ChatUI {
     
     // Show typing indicator
     this.showTyping();
+  }
+  
+  async handleFileSelect(file) {
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      this.addSystemMessage('Неподдерживаемый формат изображения. Используйте JPG, PNG, WEBP или GIF.');
+      return;
+    }
+    
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      this.addSystemMessage('Изображение слишком большое. Максимальный размер: 5MB.');
+      return;
+    }
+    
+    // Read file as data URL for preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.currentImage = {
+        file: file,
+        dataUrl: e.target.result,
+        name: file.name
+      };
+      
+      // Show preview
+      this.showImagePreview();
+      
+      // Enable send button
+      this.sendBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  showImagePreview() {
+    if (!this.currentImage) return;
+    
+    this.previewImg.src = this.currentImage.dataUrl;
+    this.previewName.textContent = this.currentImage.name;
+    this.imagePreview.style.display = 'flex';
+  }
+  
+  clearImage() {
+    this.currentImage = null;
+    this.imagePreview.style.display = 'none';
+    this.fileInput.value = '';
+    this.sendBtn.disabled = !this.input.value.trim();
+  }
+  
+  async uploadImage(file) {
+    const agentUrl = window.INFRAZEN_DATA?.agentServiceUrl || 'http://127.0.0.1:8001';
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${agentUrl}/v1/chat/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || 'Failed to upload image');
+    }
+    
+    const data = await response.json();
+    return data.image_id;
   }
   
   addMessage(message) {
@@ -130,10 +274,22 @@ class ChatUI {
       ? this.formatMarkdown(message.content)
       : this.escapeHtml(message.content);
     
-    messageEl.innerHTML = `
-      <div class="chat-message-content">${formattedContent}</div>
-      <div class="chat-message-timestamp">${timestamp}</div>
-    `;
+    // Build message HTML
+    let messageHTML = '';
+    
+    // Add image if present (for user messages with uploads)
+    if (message.image) {
+      messageHTML += `
+        <div class="chat-message-image">
+          <img src="${message.image}" alt="Uploaded image" onclick="window.open(this.src, '_blank')">
+        </div>
+      `;
+    }
+    
+    messageHTML += `<div class="chat-message-content">${formattedContent}</div>`;
+    messageHTML += `<div class="chat-message-timestamp">${timestamp}</div>`;
+    
+    messageEl.innerHTML = messageHTML;
     
     this.messagesContainer.appendChild(messageEl);
     this.scrollToBottom();

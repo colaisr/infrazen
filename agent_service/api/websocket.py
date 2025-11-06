@@ -3,9 +3,10 @@ WebSocket API for recommendation chat.
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException
 from pydantic import BaseModel
@@ -44,6 +45,26 @@ class ChatMessage(BaseModel):
     """Chat message model."""
     role: str
     content: str
+
+
+def extract_image_references(message: str) -> Tuple[str, List[str]]:
+    """
+    Extract image references from message.
+    
+    Args:
+        message: User message potentially containing [image:uuid] references
+        
+    Returns:
+        Tuple of (cleaned_message, list_of_image_ids)
+    """
+    # Pattern to match [image:uuid]
+    pattern = r'\[image:([a-f0-9\-]+)\]'
+    image_ids = re.findall(pattern, message)
+    
+    # Remove image references from message (they're handled separately)
+    cleaned_message = re.sub(pattern, '', message).strip()
+    
+    return cleaned_message, image_ids
 
 
 @router.websocket("/v1/chat/rec/{rec_id}")
@@ -122,7 +143,39 @@ async def websocket_chat_endpoint(
             if not message:
                 continue
             
-            # Save user message to DB
+            # Extract image references from message
+            cleaned_message, image_ids = extract_image_references(message)
+            
+            # If images are present, analyze them first
+            image_context = ""
+            if image_ids:
+                logger.info(f"User message contains {len(image_ids)} image(s): {image_ids}")
+                
+                # Analyze each image
+                for image_id in image_ids:
+                    try:
+                        # Call vision tool directly to analyze image
+                        from agent_service.tools.vision_tools import VisionTools
+                        vision_tools = VisionTools()
+                        
+                        # Analyze with context from cleaned message
+                        question = cleaned_message if cleaned_message else "Что на этом изображении? Какую информацию можно извлечь для оптимизации инфраструктуры?"
+                        result = vision_tools.analyze_screenshot(image_id, question, user_id)
+                        
+                        if result.get('success'):
+                            image_context += f"\n\n[Анализ загруженного изображения]:\n{result['analysis']}\n"
+                        else:
+                            image_context += f"\n\n[Ошибка анализа изображения: {result.get('error', 'Unknown error')}]\n"
+                    
+                    except Exception as e:
+                        logger.error(f"Error analyzing image {image_id}: {e}", exc_info=True)
+                        image_context += f"\n\n[Ошибка при обработке изображения]\n"
+                
+                # Prepend image analysis to user message for agent context
+                if image_context:
+                    cleaned_message = f"{image_context}\n\n{cleaned_message if cleaned_message else 'Пользователь загрузил изображение для анализа.'}"
+            
+            # Save original user message to DB (with image refs)
             session_manager.save_message(session_id, 'user', message)
             
             # Send typing indicator
@@ -131,9 +184,9 @@ async def websocket_chat_endpoint(
                 'timestamp': datetime.utcnow().isoformat()
             })
             
-            # Process message with chat agent (pass user_id for impersonation support)
+            # Process message with chat agent (use cleaned message with image context)
             response, tokens = await chat_agent.process_message(
-                user_message=message,
+                user_message=cleaned_message,
                 recommendation_id=rec_id,
                 user_id=user_id,
                 chat_history=message_history
