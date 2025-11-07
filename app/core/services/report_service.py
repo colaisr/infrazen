@@ -1,9 +1,10 @@
 """Service helpers for generated reports (mock scaffolding)."""
 
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from string import Template
 
+import requests
 from flask import current_app
 
 from app.core.database import db
@@ -120,6 +121,33 @@ def _build_mock_html(role_label: str) -> str:
     return template.substitute(role=role_label, generated=generated_at)
 
 
+def _generate_report_payload(user_id: int, role_key: str, context: Optional[Dict] = None) -> Tuple[Optional[Dict], Optional[str]]:
+    try:
+        agent_url = current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
+        endpoint = f"{agent_url}/v1/reports/render"
+        response = requests.post(
+            endpoint,
+            json={
+                "user_id": user_id,
+                "role": role_key,
+                "context": context or {}
+            },
+            timeout=20
+        )
+        if not response.ok:
+            current_app.logger.warning(
+                "Agent report render request failed (%s): %s",
+                response.status_code,
+                response.text[:200]
+            )
+            return None, None
+        payload = response.json()
+        return payload.get('snapshot'), payload.get('html')
+    except Exception as exc:  # pylint: disable=broad-except
+        current_app.logger.warning("Failed to generate report payload: %s", exc)
+        return None, None
+
+
 def create_mock_report(user_id: int, role_key: str) -> GeneratedReport:
     """Create a placeholder report entry for the requested role."""
 
@@ -128,14 +156,18 @@ def create_mock_report(user_id: int, role_key: str) -> GeneratedReport:
 
     role_info = REPORT_ROLE_DEFINITIONS[role_key]
     title = f"Отчет ({role_info['label']})"
+    snapshot, rendered_html = _generate_report_payload(user_id, role_key)
 
     report = GeneratedReport(
         user_id=user_id,
         title=title,
         role=role_key,
-        status=ReportStatus.IN_PROGRESS,
-        content_html=_build_mock_html(role_info['label']),
-        context_json={'role_label': role_info['label']}
+        status=ReportStatus.READY if rendered_html else ReportStatus.IN_PROGRESS,
+        content_html=rendered_html or _build_mock_html(role_info['label']),
+        context_json={
+            'role_label': role_info['label'],
+            'snapshot': snapshot
+        }
     )
     db.session.add(report)
     db.session.commit()

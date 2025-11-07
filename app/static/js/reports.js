@@ -2,6 +2,12 @@
   const roles = window.INFRAZEN_DATA?.reportRoles || [];
   let reports = window.INFRAZEN_DATA?.initialReports || [];
 
+  const STATUS_LABELS = {
+    in_progress: 'В подготовке',
+    ready: 'Готов',
+    failed: 'Ошибка'
+  };
+
   const container = document.getElementById('reports-container');
   const generateBtn = document.getElementById('report-generate-btn');
   const roleSelect = document.getElementById('report-role-select');
@@ -49,12 +55,13 @@
 
       itemsWrapper.innerHTML = roleReports.map((report) => {
         const statusClass = `status-pill ${report.status}`;
+        const statusLabel = STATUS_LABELS[report.status] || report.status;
         return `
           <div class="report-card" data-report-id="${report.id}">
             <div class="report-card__title">${report.title}</div>
             <div class="report-card__meta">
               <span>${formatDate(report.created_at)}</span>
-              <span class="${statusClass}">${report.status === 'in_progress' ? 'В подготовке' : report.status}</span>
+              <span class="${statusClass}">${statusLabel}</span>
             </div>
             <div class="report-card__actions">
               <button data-action="open" data-report-id="${report.id}">Открыть</button>

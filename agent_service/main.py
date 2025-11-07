@@ -10,7 +10,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from agent_service.api import health, chat, recommendations, websocket, upload
+from agent_service.api import health, chat, recommendations, reports, websocket, upload
 from agent_service.core.config import settings
 
 # Configure logging
@@ -66,6 +66,7 @@ app.include_router(chat.router, prefix="/v1/chat", tags=["chat"])
 app.include_router(websocket.router, tags=["websocket"])  # WebSocket routes (no prefix, full path in router)
 app.include_router(recommendations.router, prefix="/v1", tags=["recommendations"])
 app.include_router(upload.router, tags=["upload"])  # Image upload for vision
+app.include_router(reports.router)
 
 
 @app.get("/")

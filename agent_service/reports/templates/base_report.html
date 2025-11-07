@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block page_title %}FinOps отчет{% endblock %}</title>
+    <style>
+      :root {
+        --primary: #1e40af;
+        --primary-light: #e0e7ff;
+        --success: #047857;
+        --warning: #b45309;
+        --danger: #b91c1c;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-900: #111827;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 48px 32px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: var(--gray-900);
+        background: var(--gray-50);
+      }
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 40px 80px rgba(15, 23, 42, 0.12);
+        overflow: hidden;
+      }
+      .header {
+        padding: 40px 48px;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+      }
+      .header h1 {
+        margin: 0 0 12px 0;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+      .header p {
+        margin: 4px 0;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+      .intro-snippet {
+        margin-top: 18px;
+        padding: 16px 20px;
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+      .role-badge {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(255,255,255,0.18);
+        border-radius: 999px;
+        padding: 6px 16px;
+        font-weight: 600;
+        margin-bottom: 18px;
+        font-size: 13px;
+      }
+      main {
+        padding: 40px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 36px;
+      }
+      section {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      h2 {
+        font-size: 24px;
+        margin: 0;
+        color: var(--gray-900);
+      }
+      h3 {
+        font-size: 18px;
+        margin: 0;
+        color: var(--gray-700);
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 18px;
+      }
+      .kpi-card {
+        background: var(--gray-100);
+        border-radius: 14px;
+        padding: 18px;
+      }
+      .kpi-card .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        color: var(--gray-600);
+        letter-spacing: 0.4px;
+      }
+      .kpi-card .value {
+        font-size: 24px;
+        font-weight: 700;
+        margin-top: 6px;
+      }
+      .kpi-card .delta {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--gray-600);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      table th, table td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--gray-200);
+        font-size: 14px;
+      }
+      table th {
+        background: var(--gray-100);
+        color: var(--gray-700);
+        font-weight: 600;
+      }
+      table tr:last-child td {
+        border-bottom: none;
+      }
+      .highlight {
+        background: #ecfdf5;
+        border-left: 4px solid var(--success);
+        padding: 18px;
+        border-radius: 12px;
+        font-size: 14px;
+        color: var(--gray-700);
+      }
+      .callout-danger {
+        background: #fef2f2;
+        border-left-color: var(--danger);
+      }
+      .callout-warning {
+        background: #fffbeb;
+        border-left-color: var(--warning);
+      }
+      .list-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+      .list-card {
+        border: 1px solid var(--gray-200);
+        border-radius: 14px;
+        padding: 18px;
+        background: #ffffff;
+      }
+      .list-card h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+        color: var(--gray-900);
+      }
+      .list-card .meta {
+        font-size: 13px;
+        color: var(--gray-600);
+      }
+      .narrative {
+        background: var(--gray-100);
+        border-radius: 18px;
+        padding: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      .narrative h2 {
+        font-size: 26px;
+        margin: 0;
+        color: var(--gray-900);
+      }
+      .narrative p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--gray-700);
+      }
+      .narrative-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+      }
+      .narrative-item {
+        background: #ffffff;
+        border-radius: 14px;
+        border: 1px solid var(--gray-200);
+        padding: 18px;
+        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
+      }
+      .narrative-item h4 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        color: var(--gray-900);
+      }
+      .narrative-item p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--gray-600);
+      }
+      .narrative-flex {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+      }
+      .narrative-column {
+        background: #ffffff;
+        border-radius: 14px;
+        border: 1px solid var(--gray-200);
+        padding: 18px;
+      }
+      .narrative-column h3 {
+        margin: 0 0 10px;
+        font-size: 16px;
+        color: var(--gray-900);
+      }
+      .narrative-column ul,
+      .narrative-column ol {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--gray-700);
+        font-size: 14px;
+        display: grid;
+        gap: 8px;
+      }
+      footer {
+        padding: 24px 48px 40px;
+        font-size: 13px;
+        color: var(--gray-600);
+        border-top: 1px solid var(--gray-200);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div class="role-badge">{{ role_label }}</div>
+        <h1>{% block header_title %}FinOps отчет{% endblock %}</h1>
+        <p>🎯 Пользователь: {{ user_display }}</p>
+        <p>📅 Сгенерировано: {{ generated_at | default('-') }}</p>
+        <p>⏱ Период анализа: последние {{ time_range_days }} дней</p>
+        {% if persona_snippets and persona_snippets.intros %}
+        <div class="intro-snippet">
+          {{ persona_snippets.intros[0] }}
+        </div>
+        {% endif %}
+      </header>
+      <main>
+        {% if narrative.executive_summary %}
+        <section class="narrative">
+          <h2>Исполнительное резюме</h2>
+          <p>{{ narrative.executive_summary }}</p>
+          {% if narrative.key_highlights %}
+          <div class="narrative-grid">
+            {% for item in narrative.key_highlights %}
+            <div class="narrative-item">
+              <h4>{{ item.title }}</h4>
+              <p>{{ item.detail }}</p>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if narrative.risks or narrative.next_steps %}
+          <div class="narrative-flex">
+            {% if narrative.risks %}
+            <div class="narrative-column">
+              <h3>Риски</h3>
+              <ul>
+                {% for risk in narrative.risks %}
+                <li>{{ risk }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+            {% if narrative.next_steps %}
+            <div class="narrative-column">
+              <h3>Следующие шаги</h3>
+              <ol>
+                {% for step in narrative.next_steps %}
+                <li>{{ step }}</li>
+                {% endfor %}
+              </ol>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </section>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+      <footer>
+        InfraZen FinOps Platform · Автоматически сформированная сводка. Проверено {{ generated_at | default('-') }}.
+      </footer>
+    </div>
+  </body>
+</html>
+

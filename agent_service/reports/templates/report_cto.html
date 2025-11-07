@@ -1,0 +1,132 @@
+{% extends "base_report.html" %}
+
+{% block page_title %}FinOps отчет · CTO{% endblock %}
+{% block header_title %}Технический обзор расходов{% endblock %}
+
+{% block content %}
+<section>
+  <h2>Инфраструктурные метрики</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Расходы / месяц</div>
+      <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
+      {% if kpis.latest_change_percent is not none %}
+      <div class="delta">Δ vs прошлый период: {{ kpis.latest_change_percent | round(2) }}%</div>
+      {% endif %}
+    </div>
+    <div class="kpi-card">
+      <div class="label">Потенциал оптимизации</div>
+      <div class="value">{{ kpis.pending_savings_total | default(0) | round(2) }} ₽</div>
+      <div class="delta">Активные задачи: {{ kpis.pending_recommendations_count | default(0) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Активные ресурсы</div>
+      <div class="value">{{ kpis.active_resources | default(0) }}</div>
+      <div class="delta">Успех синхронизаций: {{ kpis.provider_success_rate | default(0) | round(1) }}%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Расходы / день</div>
+      <div class="value">{{ kpis.total_daily_cost | default(0) | round(2) }} ₽</div>
+      <div class="delta">Используется для планирования и SLO</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Инженерные приоритеты</h2>
+  {% set recs = recommendations.pending or [] %}
+  {% if recs %}
+  <table>
+    <thead>
+      <tr>
+        <th>Работа</th>
+        <th>Тип</th>
+        <th>Компонент</th>
+        <th style="text-align:right;">Экономия / мес</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in recs %}
+      <tr>
+        <td>{{ item.title }}</td>
+        <td>{{ item.recommendation_type }}</td>
+        <td>{{ item.resource_name }}</td>
+        <td style="text-align:right;">{{ item.potential_savings | default(0) | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Новых инженерных задач на оптимизацию нет.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Сегменты нагрузки</h2>
+  <div class="list-grid">
+    <div class="list-card">
+      <h4>Провайдеры</h4>
+      {% set providers = (analytics.provider_breakdown.providers or []) %}
+      {% if providers %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for provider in providers %}
+        <li>{{ provider.name or 'Провайдер' }} — {{ provider.cost | round(2) }} ₽ ({{ provider.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных</div>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h4>Сервисы с наибольшим расходом</h4>
+      {% set services = (analytics.service_breakdown.services or [])[:5] %}
+      {% if services %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for service in services %}
+        <li>{{ service.name }} — {{ service.cost | round(2) }} ₽ ({{ service.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных по сервисам</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Аномалии и инциденты</h2>
+  {% set anomalies = analytics.anomalies.anomalies or [] %}
+  {% if anomalies %}
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Δ%</th>
+        <th style="text-align:right;">Расход</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anomaly in anomalies %}
+      <tr>
+        <td>{{ anomaly.date }}</td>
+        <td>{{ anomaly.change_percent | round(2) }}%</td>
+        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Повышенных расходов не выявлено — система в норме.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Рекомендации CTO</h2>
+  <div class="highlight">
+    <strong>1.</strong> Праворазмерить неэффективные ресурсы (см. таблицу инженерных задач).<br>
+    <strong>2.</strong> Проверить K8s namespace с максимальной стоимостью и провести quota review.<br>
+    <strong>3.</strong> Включить инженерную команду в планы по commitment-покупкам (RI / SP) для стабильных нагрузок.
+  </div>
+</section>
+{% endblock %}
+

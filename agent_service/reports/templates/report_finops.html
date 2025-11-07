@@ -1,0 +1,133 @@
+{% extends "base_report.html" %}
+
+{% block page_title %}FinOps отчет · FinOps Lead{% endblock %}
+{% block header_title %}Операционный статус FinOps{% endblock %}
+
+{% block content %}
+<section>
+  <h2>Сводка по практике</h2>
+  {% if not narrative.executive_summary %}
+  <div class="highlight">
+    Фокус на качестве данных, процессах FinOps и статусе экономии. Используйте этот отчёт для координации c финансовой, технической и продуктовой командами.
+  </div>
+  {% endif %}
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Расходы / месяц</div>
+      <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Потенциальная экономия</div>
+      <div class="value">{{ kpis.pending_savings_total | default(0) | round(2) }} ₽</div>
+      <div class="delta">Инициативы: {{ kpis.pending_recommendations_count | default(0) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Провайдеры синхронизированы</div>
+      <div class="value">{{ kpis.provider_success_rate | default(0) | round(1) }}%</div>
+      <div class="delta">Готовность данных для отчётности</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Активные ресурсы</div>
+      <div class="value">{{ kpis.active_resources | default(0) }}</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>КАП Бакап FinOps</h2>
+  <div class="list-grid">
+    <div class="list-card">
+      <h4>Экономия</h4>
+      {% set recs = recommendations.pending or [] %}
+      {% if recs %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for item in recs %}
+        <li>{{ item.title }} — {{ item.potential_savings | default(0) | round(2) }} ₽/мес</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет открытых рекомендаций</div>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h4>Качество данных</h4>
+      {% if kpis.provider_success_rate %}
+      <p class="meta">Успешные синхронизации: {{ kpis.provider_success_rate | round(1) }}%</p>
+      {% else %}
+      <p class="meta">Необходимо улучшить мониторинг синхронизаций.</p>
+      {% endif %}
+      <p class="meta">Следующий шаг: проверка tag/label coverage (FOCUS).</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Профиль расходов</h2>
+  <div class="list-grid">
+    <div class="list-card">
+      <h4>Провайдеры</h4>
+      {% set providers = (analytics.provider_breakdown.providers or []) %}
+      {% if providers %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for provider in providers %}
+        <li>{{ provider.name or 'Провайдер' }} — {{ provider.cost | round(2) }} ₽ ({{ provider.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных</div>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h4>Сервисы</h4>
+      {% set services = (analytics.service_breakdown.services or [])[:5] %}
+      {% if services %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for service in services %}
+        <li>{{ service.name }} — {{ service.cost | round(2) }} ₽ ({{ service.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных по сервисам</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Аномалии</h2>
+  {% set anomalies = analytics.anomalies.anomalies or [] %}
+  {% if anomalies %}
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Δ%</th>
+        <th style="text-align:right;">Расход</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anomaly in anomalies %}
+      <tr>
+        <td>{{ anomaly.date }}</td>
+        <td>{{ anomaly.change_percent | round(2) }}%</td>
+        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Аномалий не обнаружено. Продолжайте мониторинг.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>FinOps действия</h2>
+  <div class="highlight">
+    <strong>1.</strong> Завершить внедрение chargeback/showback и закрепить владельцев бюджетов.<br>
+    <strong>2.</strong> Настроить автоматические синхронизации и контроль качества данных (FOCUS dataset).<br>
+    <strong>3.</strong> Провести совет по Commitments (RI/SP) — целевая утилизация > 90%.<br>
+    <strong>4.</strong> Запустить playbook реагирования на аномалии (MTTR < 24 часов).
+  </div>
+</section>
+{% endblock %}
+

@@ -873,6 +873,7 @@ Definition of done: agent answers about charts/KPIs and produces concise insight
   - [ ] Shared data snapshot + HTML template pipeline
   - [ ] Persona-specific narrative packs (CFO, CTO/CIO, Product Owner, FinOps Lead) with tailored prompts/snippets based on FinOps best practices
   - [ ] Role targeting built into JWT/context so UI can request the right variant
+- [x] Baseline HTML templates per persona (CFO, CTO/CIO, Product, FinOps Lead) wired to the snapshot data
 - [ ] RAG-lite on approved content; generator for HTML/PDF similar to the sample report
 - [ ] Export & persistence layer (HTML storage + PDF rendering; download history)
 

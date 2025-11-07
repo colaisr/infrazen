@@ -1,0 +1,137 @@
+{% extends "base_report.html" %}
+
+{% block page_title %}FinOps отчет · Product{% endblock %}
+{% block header_title %}Продуктовый обзор стоимости{% endblock %}
+
+{% block content %}
+<section>
+  <h2>Unit-экономика (обзор)</h2>
+  {% if not narrative.executive_summary %}
+  <div class="highlight">
+    Финансовые метрики конвертированы в продуктовый контекст. Используйте их для оценки маржинальности, ценообразования и принятия решений по roadmap.
+  </div>
+  {% endif %}
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Общая стоимость / мес</div>
+      <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
+      {% if kpis.latest_change_percent is not none %}
+      <div class="delta">Δ vs прошлый период: {{ kpis.latest_change_percent | round(2) }}%</div>
+      {% endif %}
+    </div>
+    <div class="kpi-card">
+      <div class="label">Потенциал улучшения маржи</div>
+      <div class="value">{{ kpis.pending_savings_total | default(0) | round(2) }} ₽</div>
+      <div class="delta">Активные инициативы: {{ kpis.pending_recommendations_count | default(0) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Ежедневные расходы</div>
+      <div class="value">{{ kpis.total_daily_cost | default(0) | round(2) }} ₽</div>
+      <div class="delta">Контраргумент при переговорах / ценообразовании</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Активные ресурсы</div>
+      <div class="value">{{ kpis.active_resources | default(0) }}</div>
+      <div class="delta">Управление портфелем услуг</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Статьи расходов</h2>
+  <div class="list-grid">
+    <div class="list-card">
+      <h4>Провайдеры / площадки</h4>
+      {% set providers = (analytics.provider_breakdown.providers or []) %}
+      {% if providers %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for provider in providers %}
+        <li>{{ provider.name or 'Провайдер' }} — {{ provider.cost | round(2) }} ₽ ({{ provider.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных по провайдерам</div>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h4>Топ сервисов</h4>
+      {% set services = (analytics.service_breakdown.services or [])[:5] %}
+      {% if services %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for service in services %}
+        <li>{{ service.name }} — {{ service.cost | round(2) }} ₽ ({{ service.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных по сервисам</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>План оптимизации</h2>
+  {% set recs = recommendations.pending or [] %}
+  {% if recs %}
+  <table>
+    <thead>
+      <tr>
+        <th>Инициатива</th>
+        <th>Тип</th>
+        <th>Ключевой сервис</th>
+        <th style="text-align:right;">Влияние на маржу</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in recs %}
+      <tr>
+        <td>{{ item.title }}</td>
+        <td>{{ item.recommendation_type }}</td>
+        <td>{{ item.resource_name }}</td>
+        <td style="text-align:right;">{{ item.potential_savings | default(0) | round(2) }} ₽/мес</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Активных инициатив по улучшению unit-экономики нет.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>События и аномалии</h2>
+  {% set anomalies = analytics.anomalies.anomalies or [] %}
+  {% if anomalies %}
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Δ%</th>
+        <th style="text-align:right;">Расход</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anomaly in anomalies %}
+      <tr>
+        <td>{{ anomaly.date }}</td>
+        <td>{{ anomaly.change_percent | round(2) }}%</td>
+        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Отклонений в расходах не зафиксировано.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Рекомендации Product-команде</h2>
+  <div class="highlight">
+    <strong>1.</strong> Провести ревизию тарифов/ценообразования для функций с наибольшим расходом (см. таблицу «Статьи расходов»).<br>
+    <strong>2.</strong> Согласовать запуск новых фич только при достижении целевой стоимости / транзакцию.<br>
+    <strong>3.</strong> Применить chargeback/showback к продуктовым группам для повышения прозрачности.
+  </div>
+</section>
+{% endblock %}
+

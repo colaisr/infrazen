@@ -1,0 +1,132 @@
+{% extends "base_report.html" %}
+
+{% block page_title %}FinOps отчет · CFO{% endblock %}
+{% block header_title %}Финансовый обзор инфраструктуры{% endblock %}
+
+{% block content %}
+<section>
+  <h2>Ключевые показатели</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="label">Текущие расходы / мес</div>
+      <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
+      {% if kpis.latest_change_percent is not none %}
+      <div class="delta">Δ vs прошлый период: {{ kpis.latest_change_percent | round(2) }}%</div>
+      {% endif %}
+    </div>
+    <div class="kpi-card">
+      <div class="label">Потенциальная экономия</div>
+      <div class="value">{{ kpis.pending_savings_total | default(0) | round(2) }} ₽</div>
+      <div class="delta">Открытых инициатив: {{ kpis.pending_recommendations_count | default(0) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Активные ресурсы</div>
+      <div class="value">{{ kpis.active_resources | default(0) }}</div>
+      <div class="delta">Успешных синхронизаций: {{ kpis.provider_success_rate | default(0) | round(1) }}%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Расходы / день</div>
+      <div class="value">{{ kpis.total_daily_cost | default(0) | round(2) }} ₽</div>
+      <div class="delta">Инфраструктурная база для прогноза</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Экономия и инициативы</h2>
+  {% set recs = recommendations.pending or [] %}
+  {% if recs %}
+  <table>
+    <thead>
+      <tr>
+        <th>Рекомендация</th>
+        <th>Тип</th>
+        <th>Ресурс</th>
+        <th style="text-align:right;">Экономия / мес</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in recs %}
+      <tr>
+        <td>{{ item.title }}</td>
+        <td>{{ item.recommendation_type }}</td>
+        <td>{{ item.resource_name }}</td>
+        <td style="text-align:right;">{{ item.potential_savings | default(0) | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Все рекомендации выполнены — новых инициатив нет.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Аналитика расходов</h2>
+  <div class="list-grid">
+    <div class="list-card">
+      <h4>Разбивка по провайдерам</h4>
+      {% set providers = (analytics.provider_breakdown.providers or []) %}
+      {% if providers %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for provider in providers %}
+        <li>{{ provider.name or 'Провайдер' }} — {{ provider.cost | round(2) }} ₽ ({{ provider.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Данные отсутствуют</div>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h4>Топ сервисов по стоимости</h4>
+      {% set services = (analytics.service_breakdown.services or [])[:5] %}
+      {% if services %}
+      <ul style="padding-left:18px; margin:0;">
+        {% for service in services %}
+        <li>{{ service.name }} — {{ service.cost | round(2) }} ₽ ({{ service.percentage | round(1) }}%)</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="meta">Нет данных по сервисам</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Аномалии</h2>
+  {% set anomalies = analytics.anomalies.anomalies or [] %}
+  {% if anomalies %}
+  <table>
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Изменение</th>
+        <th style="text-align:right;">Расход</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anomaly in anomalies %}
+      <tr>
+        <td>{{ anomaly.date }}</td>
+        <td>{{ anomaly.change_percent | round(2) }}%</td>
+        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="highlight">Аномалий за период не обнаружено.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Следующие шаги</h2>
+  <div class="highlight callout-warning">
+    <strong>1.</strong> Утвердить закупку экономии по активным рекомендациям ({{ kpis.pending_savings_total | default(0) | round(2) }} ₽/мес).<br>
+    <strong>2.</strong> Обновить бюджет vs. фактическое исполнение на основе новых KPI.<br>
+    <strong>3.</strong> Обеспечить покрытие chargeback/showback для 100% продуктовых линий.
+  </div>
+</section>
+{% endblock %}
+
