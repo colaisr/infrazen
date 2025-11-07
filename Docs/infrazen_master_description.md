@@ -1099,6 +1099,27 @@ A Miro-inspired interactive canvas for mapping cloud resources to business conte
 - Cloud provider integration wizard (provider selection, connection naming, API key, organization ID, credential storage checkbox).
 - Tag governance tooling, billing profile management, localization support (Rubles primary currency).
 
+### 7.7 Conversational Agent (FinOps Consultant) ✅ IMPLEMENTED
+- **Service Architecture:** Independent FastAPI service backed by LangGraph. Communicates with the Flask app using JWT-secured REST/WebSocket calls, persists chat sessions in MySQL, and runs Anthropic Claude Sonnet (via OpenRouter) for both text and multimodal flows.
+- **Session Lifecycle:** `chat_sessions` now include `scenario` (`recommendation`, `analytics`) and optional JSON `context`. Each LLM call receives the system prompt plus the 10 most recent turns; history is restored automatically on reconnect.
+- **Recommendation Chat:**
+  - JWT issued per recommendation (impersonation aware) → WebSocket `/v1/chat/rec/{id}`.
+  - Toolset: `get_recommendation_details`, `get_resource_details`, `get_provider_pricing`, `calculate_savings`, `get_migration_risks`, `analyze_screenshot`.
+  - Prompt enforces Russian-language FinOps persona, suppresses tool reasoning in responses, and steers the LLM toward concrete savings guidance.
+- **Analytics Chat:**
+  - Triggered from the analytics KPI header via “💬 Обсудить показатели” chip; drawer shows time-range aware subtitles and placeholders.
+  - JWT payload carries scenario + context (time range, filters) → WebSocket `/v1/chat/analytics`.
+  - `AnalyticsTools` module exposes executive summary, cost trends, service/provider breakdowns, anomalies, and top pending savings for the user.
+- **Vision & Attachments:**
+  - `/v1/chat/upload` accepts JPG/PNG/WEBP/GIF (<5 MB), stores in `/tmp/infrazen-uploads`, and schedules auto-cleanup after 1 hour.
+  - Chat UI supports both file picker and clipboard paste; images appear inline and are analyzed automatically (Claude Sonnet vision) before the LLM response.
+- **Frontend Integration:**
+  - Shared drawer component with scenario-aware titles/subtitles, status badges, typing indicator, and message history loader.
+  - WebSocket client generalized for scenarios; reconnect logic, error handling, and message persistence aligned across recommendation/analytics chats.
+- **Operations:**
+  - Alembic migration `7c93d2b6a9e3` adds `scenario`/`context` columns and allows `recommendation_id` to be nullable for non-rec chats.
+  - Unified `run_both.sh` / `stop_both.sh` scripts manage Flask app, agent service, and Redis locally; production deploy script restarts both services with health checks.
+
 ## 8. Functional Scenarios & Value Proof (Pitch Deck Cases)
 - **Product Team in Multi-cloud:** Highlighted experiment costs, automated off-hours shutdown → 18% monthly savings.
 - **Finance Team:** Enabled plan-vs-actual budgeting and live variance alerts → prevented overruns on three projects.
