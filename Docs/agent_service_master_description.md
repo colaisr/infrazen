@@ -869,13 +869,17 @@ chat_messages:
 Definition of done: agent answers about charts/KPIs and produces concise insights.
 
 ### Milestone 7 – AI-Generated Report
-- [ ] Report architecture & persona packs
-  - [ ] Shared data snapshot + HTML template pipeline
-  - [ ] Persona-specific narrative packs (CFO, CTO/CIO, Product Owner, FinOps Lead) with tailored prompts/snippets based on FinOps best practices
-  - [ ] Role targeting built into JWT/context so UI can request the right variant
+- [x] Report architecture & persona packs
+  - [x] Shared data snapshot + HTML template pipeline
+  - [x] Persona-specific narrative packs (CFO, CTO/CIO, Product Owner, FinOps Lead) with tailored prompts/snippets based on FinOps best practices
+  - [x] Role targeting built into JWT/context so UI can request the right variant
 - [x] Baseline HTML templates per persona (CFO, CTO/CIO, Product, FinOps Lead) wired to the snapshot data
 - [ ] RAG-lite on approved content; generator for HTML/PDF similar to the sample report
 - [ ] Export & persistence layer (HTML storage + PDF rendering; download history)
+
+**Next focus:**
+- ✅ Narrative snippets + fallback logic now render at template level; reports display one executive summary per persona.
+- 🔄 Regenerate stored reports per persona to refresh HTML with the new narrative engine, then refine wording report-by-report based on stakeholder feedback.
 
 Persona narrative cheat-sheet for snippet library:
 - **CFO:** P&L impact, forecast confidence, allocation coverage, unit economics, savings program utilization. Tone: executive, accountability-driven. Actions framed as approvals/targets (e.g., commit purchases, showback adoption).
