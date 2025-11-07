@@ -881,6 +881,22 @@ Definition of done: agent answers about charts/KPIs and produces concise insight
 - ✅ Narrative snippets + fallback logic now render at template level; reports display one executive summary per persona.
 - 🔄 Regenerate stored reports per persona to refresh HTML with the new narrative engine, then refine wording report-by-report based on stakeholder feedback.
 
+#### Phase 3 – Narrative Engine (Business & Technical Detail)
+- **Business outcomes:**
+  - Persona-tailored executive summaries reinforce the FinOps storyline each stakeholder expects (CFO → P&L guardrails, CTO → efficiency backlog, Product → cost-to-serve, FinOps Lead → operational cadence).
+  - Every report now opens with a single, polished “one-page” narrative (summary → highlights → risks → recommended actions) aligned to best-practice prompts captured in the cheat-sheet.
+  - Snippet packs ensure rapid iteration: we can fine-tune wording per persona or per customer without re-training prompts, and AI fallbacks stay on-message even if the LLM call fails.
+  - Structure keeps stakeholders in sync: exec summaries flag anomalies, quantifies savings programs, and assign next steps so downstream workshops can proceed without extra prep.
+- **Technical implementation:**
+  - `ReportDataBuilder` collects KPI, trend, anomaly, and recommendation snapshots once, ensuring deterministic data for all personas.
+  - `SnippetLibrary` + `snippets.json` host curated role snippets; values (costs, percentages, provider shares) are pre-formatted for the LLM and render-time fallbacks.
+  - `ReportNarrativeBuilder` orchestrates narrative generation via the LLM gateway with snippet-enhanced prompts and a deterministic fallback when models are unavailable.
+  - FastAPI adds `/v1/reports/data` + `/v1/reports/render`; Flask’s `ReportService` consumes them, persisting both the structured snapshot and rendered HTML in `generated_reports`.
+  - Base + persona templates (`report_*.html`) now inject a single narrative block at the header level, avoiding duplication and keeping KPI grids purely quantitative.
+  - JWT payloads carry `scenario`, `role`, and `context`, so the same infrastructure supports future roles or scheduled reports without schema changes.
+  - Front-end updates (`reports.js`) surface status pills (“Готов”), pull rendered HTML on demand, and keep UX consistent across personas.
+- **Operational follow-up:** regenerate historical reports so their stored HTML reflects the new template, then run stakeholder review sessions to capture per-persona wording tweaks, which we can feed back into the snippet library.
+
 Persona narrative cheat-sheet for snippet library:
 - **CFO:** P&L impact, forecast confidence, allocation coverage, unit economics, savings program utilization. Tone: executive, accountability-driven. Actions framed as approvals/targets (e.g., commit purchases, showback adoption).
 - **CTO/CIO:** Efficiency hotspots, commitment coverage, anomaly backlog, engineering action queue. Tone: pragmatic, performance-aware. Actions tied to sprints (rightsizing, architecture pilots, K8s policies).
