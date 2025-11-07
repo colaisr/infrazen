@@ -27,7 +27,9 @@ class ChatSession(db.Model):
 	
 	id = db.Column(db.String(36), primary_key=True)
 	user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
-	recommendation_id = db.Column(db.Integer, db.ForeignKey('optimization_recommendations.id', ondelete='CASCADE'), nullable=False)
+	recommendation_id = db.Column(db.Integer, db.ForeignKey('optimization_recommendations.id', ondelete='CASCADE'), nullable=True)
+	scenario = db.Column(db.String(32), nullable=False, default='recommendation')
+	context = db.Column(db.Text, nullable=True)
 	created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 	last_activity_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 	message_count = db.Column(db.Integer, nullable=False, default=0)
@@ -46,7 +48,7 @@ class ChatSession(db.Model):
 	messages = db.relationship('ChatMessage', backref='session', lazy='dynamic', cascade='all, delete-orphan', order_by='ChatMessage.created_at')
 	
 	def __repr__(self):
-		return f'<ChatSession {self.id} user={self.user_id} rec={self.recommendation_id}>'
+		return f'<ChatSession {self.id} user={self.user_id} scenario={self.scenario} rec={self.recommendation_id}>'
 	
 	def to_dict(self):
 		"""Convert to dictionary."""
@@ -54,6 +56,8 @@ class ChatSession(db.Model):
 			'id': self.id,
 			'user_id': self.user_id,
 			'recommendation_id': self.recommendation_id,
+			'scenario': self.scenario,
+			'context': self.context,
 			'created_at': self.created_at.isoformat() if self.created_at else None,
 			'last_activity_at': self.last_activity_at.isoformat() if self.last_activity_at else None,
 			'message_count': self.message_count,

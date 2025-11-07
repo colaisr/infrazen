@@ -1,129 +1,132 @@
 /**
  * Chat Integration
- * Wires chat drawer with recommendations page
+ * Manages chat drawer wiring for different scenarios (recommendations, analytics, ...)
  */
 
 (function() {
   let chatUI = null;
   let wsClient = null;
-  let currentRecommendationId = null;
+  let currentConfig = null;
+
   const _dbg = (...args) => {
     if (window.INFRAZEN_DATA?.debugAgent) {
       // eslint-disable-next-line no-console
       console.log(...args);
     }
   };
-  
-  // Wait for DOM and drawer to be ready
+
   document.addEventListener('DOMContentLoaded', () => {
-    // Initialize chat when drawer opens
-    document.addEventListener('chat-drawer-opened', (e) => {
-      const { recommendationId } = e.detail;
-      currentRecommendationId = recommendationId;
-      
-      initializeChat(recommendationId);
+    document.addEventListener('chat-drawer-opened', (event) => {
+      const detail = event.detail || {};
+      currentConfig = {
+        scenario: detail.scenario || 'recommendation',
+        recommendationId: detail.recommendationId,
+        context: detail.context || {},
+        title: detail.title,
+        subtitle: detail.subtitle
+      };
+
+      initializeChat(currentConfig);
     });
-    
-    // Cleanup when drawer closes
+
     document.addEventListener('chat-drawer-closed', () => {
       cleanupChat();
     });
-    
-    // Wire "Обсудить с FinOps" buttons
+
     wireRecommendationButtons();
   });
-  
+
   function wireRecommendationButtons() {
-    // Use event delegation for dynamically added buttons
-    document.addEventListener('click', (e) => {
-      // Check if clicked element is the chat button
-      const button = e.target.closest('.chat-with-finops-btn');
-      
-      if (button) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Extract recommendation ID from the button's context
-        const recCard = button.closest('.rec-card');
-        if (recCard) {
-          const recId = recCard.dataset.id;
-          const recTitle = recCard.querySelector('.rec-title')?.textContent || 'Рекомендация';
-          
-          openChat(recId, recTitle);
-        }
-      }
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('.chat-with-finops-btn');
+      if (!button) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const recCard = button.closest('.rec-card');
+      if (!recCard) return;
+
+      const recId = recCard.dataset.id;
+      const recTitle = recCard.querySelector('.rec-title')?.textContent || 'Рекомендация';
+
+      openChat({
+        scenario: 'recommendation',
+        recommendationId: recId,
+        subtitle: recTitle
+      });
     });
   }
-  
-  function openChat(recommendationId, recommendationTitle) {
-    const drawer = window.getChatDrawer();
-    if (drawer) {
-      drawer.open(recommendationId, recommendationTitle);
-    }
-  }
-  
-  function initializeChat(recommendationId) {
+
+  function openChat(config) {
     const drawer = window.getChatDrawer();
     if (!drawer) return;
-    
+    drawer.open(config);
+  }
+
+  function initializeChat(config) {
+    const drawer = window.getChatDrawer();
+    if (!drawer) return;
+
     const drawerBody = drawer.getBody();
-    
-    // Initialize chat UI
     chatUI = new window.ChatUI(drawerBody);
-    
-    // Check if AI recommendations are enabled
-    const enableAI = window.INFRAZEN_DATA?.enableAIRecommendations;
-    
-    if (enableAI) {
-      // Use real WebSocket client
-      wsClient = new window.RealWebSocketClient(recommendationId);
+
+    if (config.scenario === 'analytics') {
+      const emptyText = drawerBody.querySelector('.chat-empty-text');
+      if (emptyText) {
+        emptyText.innerHTML = 'Задайте вопрос об аналитике<br>Помогу разобрать тренды, KPI и аномалии';
+      }
+      const input = drawerBody.querySelector('#chat-input');
+      if (input) {
+        input.setAttribute('placeholder', 'Спросите про расходы, тренды и аномалии...');
+      }
+    }
+
+    const enableAgent = window.INFRAZEN_DATA?.enableAgentChat ?? window.INFRAZEN_DATA?.enableAIRecommendations;
+
+    if (enableAgent) {
+      wsClient = new window.RealWebSocketClient(config);
       wsClient.setChatUI(chatUI);
-      
-      // Wire chat UI with WebSocket
       chatUI.setWebSocketClient(wsClient);
-      
-      // Connect
+
       wsClient.connect().then(() => {
-        _dbg('Real chat connected for recommendation:', recommendationId);
+        _dbg('Real chat connected:', config);
       }).catch(() => {
-        // Fallback to mock if real connection fails
-        initializeMockChat(recommendationId);
+        initializeMockChat(config);
       });
     } else {
-      // Use mock WebSocket client (for testing/development)
-      initializeMockChat(recommendationId);
+      initializeMockChat(config);
     }
   }
-  
-  function initializeMockChat(recommendationId) {
+
+  function initializeMockChat(config) {
     const drawer = window.getChatDrawer();
     const drawerBody = drawer.getBody();
-    
+
     chatUI = new window.ChatUI(drawerBody);
-    wsClient = new window.MockWebSocketClient(recommendationId);
+    wsClient = new window.MockWebSocketClient(config?.recommendationId);
     wsClient.setChatUI(chatUI);
     chatUI.setWebSocketClient(wsClient);
-    
+
     wsClient.connect().then(() => {
-      _dbg('Mock chat connected for recommendation:', recommendationId);
+      _dbg('Mock chat connected:', config);
     });
   }
-  
+
   function cleanupChat() {
     if (wsClient) {
       wsClient.disconnect();
       wsClient = null;
     }
-    
+
     chatUI = null;
-    currentRecommendationId = null;
+    currentConfig = null;
   }
-  
-  // Export for debugging
+
   window.chatDebug = {
     getChatUI: () => chatUI,
     getWSClient: () => wsClient,
-    getCurrentRecId: () => currentRecommendationId
+    getCurrentConfig: () => currentConfig
   };
 })();
 

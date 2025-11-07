@@ -857,8 +857,14 @@ chat_messages:
 **Definition of done (Phase 2):** ✅ User can upload screenshots (JPG, PNG, WEBP, GIF), agent automatically analyzes them using Claude Sonnet vision model via OpenRouter, provides insights about charts/graphs/configs in context of the recommendation. Images display inline in chat with click-to-zoom. Users can ask follow-up questions about uploaded images with full tool support.
 
 ### Milestone 6 – Analytics Chat (Global Insights)
-- [ ] Tools for KPIs, trends, breakdowns, anomalies, top recommendations
-- [ ] WebSocket streaming; UI entry on analytics page
+- [x] Tools for KPIs, trends, breakdowns, anomalies, top recommendations
+  - ✅ `AnalyticsTools` module (executive summary, cost trends, anomalies, provider/service breakdowns, top recs)
+  - ✅ Scenario-aware prompts (`build_chat_system_prompt_for_analytics`) with KPI snapshot
+  - ✅ JWT/context plumbing (`scenario`, `context`) plus dedicated `/v1/chat/analytics` WebSocket endpoint
+- [x] WebSocket streaming; UI entry on analytics page
+  - ✅ Drawer trigger chip “💬 Обсудить показатели” on analytics header (time-range aware subtitle)
+  - ✅ Reused chat drawer/WS client with scenario-specific placeholder + status copy
+  - ✅ Vision + image uploads revalidated for analytics flow (same pipeline)
 
 Definition of done: agent answers about charts/KPIs and produces concise insights.
 

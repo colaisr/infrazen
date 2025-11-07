@@ -4,8 +4,9 @@ Chat session management for loading and saving chat history.
 
 import logging
 import uuid
+import json
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 
 logger = logging.getLogger(__name__)
 
@@ -23,32 +24,58 @@ class SessionManager:
         self.flask_app = flask_app
         
     def get_or_create_session(
-        self, 
-        user_id: int, 
-        recommendation_id: int
+        self,
+        user_id: int,
+        recommendation_id: Optional[int],
+        scenario: str = 'recommendation',
+        context: Optional[Union[Dict, str]] = None
     ) -> tuple[str, List[Dict]]:
         """
         Get existing session or create a new one.
         
         Args:
             user_id: User ID
-            recommendation_id: Recommendation ID
+            recommendation_id: Recommendation ID (required for recommendation scenario)
+            scenario: Chat scenario identifier ('recommendation', 'analytics', ...)
+            context: Optional context payload for non-recommendation scenarios
             
         Returns:
             Tuple of (session_id, message_history)
             message_history is a list of dicts: [{role, content, timestamp}, ...]
         """
-        logger.info(f"DB: Getting session for user_id={user_id}, rec_id={recommendation_id}")
+        logger.info(
+            "DB: Getting session for user_id=%s, scenario=%s, rec_id=%s",
+            user_id,
+            scenario,
+            recommendation_id,
+        )
         
         with self.flask_app.app_context():
             from app.core.models import ChatSession, ChatMessage, db, ChatSessionStatus
             
-            # Use the Enum object for querying, not a raw string
-            session = db.session.query(ChatSession).filter_by(
+            # Normalize context to string for persistence
+            normalized_context = None
+            if isinstance(context, dict):
+                normalized_context = json.dumps(context, ensure_ascii=False, sort_keys=True)
+            elif context is not None:
+                normalized_context = str(context)
+
+            query = db.session.query(ChatSession).filter_by(
                 user_id=user_id,
-                recommendation_id=recommendation_id,
+                scenario=scenario,
                 status=ChatSessionStatus.ACTIVE
-            ).first()
+            )
+
+            if scenario == 'recommendation':
+                query = query.filter_by(recommendation_id=recommendation_id)
+            else:
+                query = query.filter(ChatSession.recommendation_id.is_(None))
+                if normalized_context is None:
+                    query = query.filter(ChatSession.context.is_(None))
+                else:
+                    query = query.filter(ChatSession.context == normalized_context)
+
+            session = query.first()
             
             if session:
                 # Load message history (last 10 messages)
@@ -69,7 +96,14 @@ class SessionManager:
                     for msg in messages
                 ]
                 
-                logger.info(f"Loaded existing session: {session.id} (user={user_id}, rec={recommendation_id}, messages={len(message_history)})")
+                logger.info(
+                    "Loaded existing session: %s (user=%s, scenario=%s, rec=%s, messages=%s)",
+                    session.id,
+                    user_id,
+                    scenario,
+                    recommendation_id,
+                    len(message_history)
+                )
                 return session.id, message_history
             else:
                 # Create new session
@@ -78,7 +112,9 @@ class SessionManager:
                 new_session = ChatSession(
                     id=session_id,
                     user_id=user_id,
-                    recommendation_id=recommendation_id,
+                    recommendation_id=recommendation_id if scenario == 'recommendation' else None,
+                    scenario=scenario,
+                    context=normalized_context,
                     created_at=datetime.utcnow(),
                     last_activity_at=datetime.utcnow(),
                     message_count=0,
@@ -88,7 +124,13 @@ class SessionManager:
                 db.session.add(new_session)
                 db.session.commit()
                 
-                logger.info(f"Created new session: {session_id} (user={user_id}, rec={recommendation_id})")
+                logger.info(
+                    "Created new session: %s (user=%s, scenario=%s, rec=%s)",
+                    session_id,
+                    user_id,
+                    scenario,
+                    recommendation_id
+                )
                 return session_id, []
                 
     def save_message(

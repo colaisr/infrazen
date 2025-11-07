@@ -71,6 +71,28 @@ FINOPS_CHAT_SYSTEM_PROMPT = """Ты — опытный FinOps-консульта
 """
 
 
+ANALYTICS_CHAT_SYSTEM_PROMPT = """Ты — опытный FinOps-аналитик. Помогаешь пользователю интерпретировать метрики и тенденции расходов.
+
+**Контекст:**
+{context}
+
+**Правила общения:**
+
+1. Отвечай на русском, структурированно и по делу.
+2. Всегда опирайся на факты: расходы, проценты, сервисы, провайдеры.
+3. Если требуется уточнение или дополнительные данные — прямо попроси пользователя уточнить диапазон или детали.
+4. При аномалиях объясняй масштабы изменения и возможные причины.
+5. Предлагай конкретные следующие шаги: что проверить, какие рекомендации закрыть, где искать экономию.
+6. Не придумывай данные и не ссылайся на несуществующие метрики.
+
+**Формат ответов:**
+- Краткое резюме (1-2 предложения).
+- Детали с цифрами и сравнениями.
+- Завершай actionable выводом (что сделать дальше).
+- Используй нумерованные списки только при необходимости.
+"""
+
+
 def build_chat_system_prompt(
     recommendation_id: int,
     recommendation_title: str,
@@ -107,4 +129,65 @@ def build_chat_system_prompt(
 3. НЕ путай recommendation_id ({recommendation_id}) с resource_id - это РАЗНЫЕ числа!"""
     
     return FINOPS_CHAT_SYSTEM_PROMPT.format(context=context)
+
+
+def build_chat_system_prompt_for_analytics(snapshot: dict) -> str:
+    """Build system prompt for analytics scenario using snapshot context."""
+    time_range = snapshot.get('time_range_days', 30)
+    summary = snapshot.get('summary', {}) or {}
+
+    context_lines = [f"- **Период анализа:** последние {time_range} дней"]
+
+    monthly_cost = summary.get('total_monthly_cost')
+    daily_cost = summary.get('total_daily_cost')
+    if monthly_cost is not None:
+        context_lines.append(f"- **Текущие расходы:** {monthly_cost:,.2f} ₽/месяц")
+    if daily_cost is not None:
+        context_lines.append(f"- **Средние расходы в день:** {daily_cost:,.2f} ₽")
+
+    if summary.get('total_savings'):
+        context_lines.append(f"- **Экономия от внедрённых рекомендаций:** {summary['total_savings']:,.2f} ₽/месяц")
+
+    if snapshot.get('latest_change_percent') is not None:
+        context_lines.append(
+            f"- **Изменение расходов к предыдущему дню:** {snapshot['latest_change_percent']:+.2f}%"
+        )
+
+    top_services = snapshot.get('top_services', [])
+    if top_services:
+        service_lines = []
+        for item in top_services[:5]:
+            cost = float(item.get('cost', 0) or 0)
+            service_lines.append(
+                f"  • {item.get('name', 'Неизвестный сервис')}: {cost:,.2f} ₽/день"
+            )
+        context_lines.append("- **Топ сервисов по расходам:**\n" + "\n".join(service_lines))
+
+    provider_breakdown = snapshot.get('provider_breakdown', [])
+    if provider_breakdown:
+        provider_lines = []
+        for item in provider_breakdown[:5]:
+            monthly_cost = float(item.get('monthly_cost', 0) or 0)
+            provider_lines.append(
+                f"  • {item.get('name', 'Провайдер')}: {monthly_cost:,.2f} ₽/мес ({item.get('percentage', 0):.1f}%)"
+            )
+        context_lines.append("- **Разбивка по провайдерам:**\n" + "\n".join(provider_lines))
+
+    anomalies = snapshot.get('anomalies', [])
+    if anomalies:
+        anomaly_lines = []
+        for anomaly in anomalies:
+            anomaly_lines.append(
+                f"  • {anomaly['date']}: изменение {anomaly['change_percent']:+.2f}% (с {anomaly['previous_cost']:,.2f} ₽ до {anomaly['current_cost']:,.2f} ₽)"
+            )
+        context_lines.append("- **Обнаруженные аномалии:**\n" + "\n".join(anomaly_lines))
+
+    pending = snapshot.get('pending_recommendations', [])
+    if pending:
+        total_potential = sum(item.get('potential_savings', 0) for item in pending)
+        context_lines.append(
+            f"- **Потенциал экономии по открытым рекомендациям:** {total_potential:,.2f} ₽/мес (топ {len(pending)} шт.)"
+        )
+
+    return ANALYTICS_CHAT_SYSTEM_PROMPT.format(context="\n".join(context_lines))
 

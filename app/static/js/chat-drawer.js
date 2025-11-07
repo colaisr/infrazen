@@ -14,6 +14,8 @@ class ChatDrawer {
     this.maxWidth = 70; // 70% of viewport
     this.defaultWidth = 40; // 40% of viewport
     this.recommendationId = null;
+    this.scenario = 'recommendation';
+    this.context = {};
     
     this.init();
   }
@@ -48,9 +50,7 @@ class ChatDrawer {
       <div class="chat-drawer-resize-handle"></div>
       <div class="chat-drawer-header">
         <div>
-          <div class="chat-drawer-title">
-            💬 FinOps консультант
-          </div>
+          <div class="chat-drawer-title" id="chat-drawer-title">💬 FinOps консультант</div>
           <div class="chat-drawer-subtitle" id="chat-drawer-subtitle">
             Обсуждаем рекомендацию
           </div>
@@ -71,6 +71,7 @@ class ChatDrawer {
     this.closeBtn = this.drawer.querySelector('.chat-drawer-close');
     this.body = this.drawer.querySelector('.chat-drawer-body');
     this.subtitle = this.drawer.querySelector('#chat-drawer-subtitle');
+    this.titleEl = this.drawer.querySelector('#chat-drawer-title');
   }
   
   bindEvents() {
@@ -96,13 +97,30 @@ class ChatDrawer {
     this.resizeHandle.addEventListener('dragstart', (e) => e.preventDefault());
   }
   
-  open(recommendationId, recommendationTitle) {
-    this.recommendationId = recommendationId;
-    
-    // Update subtitle with recommendation title
-    if (recommendationTitle) {
-      this.subtitle.textContent = recommendationTitle;
+  open(configOrId, recommendationTitle) {
+    const options = typeof configOrId === 'object' && configOrId !== null
+      ? configOrId
+      : {
+          scenario: 'recommendation',
+          recommendationId: configOrId,
+          title: '💬 FinOps консультант',
+          subtitle: recommendationTitle,
+          context: {}
+        };
+
+    this.scenario = options.scenario || 'recommendation';
+    this.recommendationId = options.recommendationId || null;
+    this.context = options.context || {};
+
+    if (options.title) {
+      this.titleEl.textContent = options.title;
+    } else {
+      this.titleEl.textContent = '💬 FinOps консультант';
     }
+
+    const subtitleText = options.subtitle
+      || (this.scenario === 'analytics' ? 'Анализируем показатели' : recommendationTitle || 'Обсуждаем рекомендацию');
+    this.subtitle.textContent = subtitleText;
     
     // Show drawer
     this.overlay.classList.add('active');
@@ -110,7 +128,13 @@ class ChatDrawer {
     
     // Dispatch custom event for chat UI to initialize
     document.dispatchEvent(new CustomEvent('chat-drawer-opened', {
-      detail: { recommendationId }
+      detail: {
+        scenario: this.scenario,
+        recommendationId: this.recommendationId,
+        title: options.title,
+        subtitle: subtitleText,
+        context: this.context
+      }
     }));
   }
   
@@ -170,6 +194,14 @@ class ChatDrawer {
   
   getRecommendationId() {
     return this.recommendationId;
+  }
+
+  getScenario() {
+    return this.scenario;
+  }
+
+  getContext() {
+    return this.context;
   }
 }
 

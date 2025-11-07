@@ -23,7 +23,7 @@ JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '24'))
 
 
-def create_jwt_token(user_id: int, recommendation_id: int) -> str:
+def create_jwt_token(user_id: int, recommendation_id: int, scenario: str = 'recommendation', context: Optional[dict] = None) -> str:
     """
     Create a JWT token for chat authentication.
     
@@ -36,7 +36,9 @@ def create_jwt_token(user_id: int, recommendation_id: int) -> str:
     """
     payload = {
         'user_id': user_id,
+        'scenario': scenario,
         'recommendation_id': recommendation_id,
+        'context': context,
         'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
         'iat': datetime.utcnow()
     }
@@ -58,10 +60,19 @@ def validate_jwt_token(token: str) -> Optional[Dict]:
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         
+        # Determine scenario (default to recommendation for backward compatibility)
+        scenario = payload.get('scenario', 'recommendation')
+
         # Verify required fields
-        if 'user_id' not in payload or 'recommendation_id' not in payload:
+        if 'user_id' not in payload:
+            logger.warning("JWT token missing user_id")
+            return None
+
+        if scenario == 'recommendation' and 'recommendation_id' not in payload:
             logger.warning("JWT token missing required fields")
             return None
+
+        payload['scenario'] = scenario
             
         return payload
         

@@ -408,6 +408,8 @@ def analytics():
     
     # Get user's providers for individual charts (exclude soft-deleted)
     providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True, is_deleted=False).all()
+    enable_ai = current_app.config.get('ENABLE_AI_RECOMMENDATIONS', False)
+    agent_service_url = current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
     
     return render_template('analytics.html', 
                         user=user,
@@ -415,7 +417,9 @@ def analytics():
                         latest_complete_sync=latest_complete_sync,
                         implemented_recommendations=implemented_recommendations,
                         active_resources_count=active_resources_count,
-                        providers=providers)
+                        providers=providers,
+                        enable_ai_recommendations=enable_ai,
+                        agent_service_url=agent_service_url)
 
 @main_bp.route('/recommendations')
 def recommendations():

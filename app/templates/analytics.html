@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/analytics.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/features/analytics-charts.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/analytics-cards.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/chat-drawer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/chat-messages.css') }}">
 <style>
 /* Force light theme for analytics page - override any dark mode */
 .analytics-page {
@@ -74,14 +76,57 @@ body {
 .analytics-chart-subtitle {
     color: #6b7280 !important;
 }
+
+.analytics-chat-trigger {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.analytics-chat-chip {
+    border: none;
+    background: #eef2ff;
+    color: #1f2937;
+    padding: 0.5rem 1.1rem;
+    border-radius: 999px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.12);
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.analytics-chat-chip:hover {
+    background: #e0e7ff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.16);
+}
+
+.analytics-chat-chip:focus {
+    outline: 2px solid #4338ca;
+    outline-offset: 2px;
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="analytics-page">
+    <script>
+    window.INFRAZEN_DATA = window.INFRAZEN_DATA || {};
+    window.INFRAZEN_DATA.agentServiceUrl = '{{ agent_service_url }}';
+    window.INFRAZEN_DATA.enableAgentChat = {{ 'true' if enable_ai_recommendations else 'false' }};
+    </script>
 
     <!-- Executive Summary - 4 KPI Cards -->
     <div class="analytics-summary">
+        <div class="analytics-chat-trigger">
+            <button type="button" id="analyticsChatTrigger" class="analytics-chat-chip">
+                <span>💬</span>
+                <span>Обсудить показатели</span>
+            </button>
+        </div>
         <div class="analytics-kpi-grid">
             <div class="analytics-kpi-card">
                 <div class="analytics-kpi-header">
@@ -268,4 +313,10 @@ body {
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-drawer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-mock.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-websocket.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-integration.js') }}"></script>
+<script src="{{ url_for('static', filename='js/analytics-chat.js') }}"></script>
 {% endblock %}
