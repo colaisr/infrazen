@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Отчеты - InfraZen{% endblock %}
+
+{% block page_title %}FinOps отчеты{% endblock %}
+{% block page_subtitle %}Генерируйте и просматривайте отчеты для разных ролей{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/reports.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="reports-page" id="reports-root">
+    <section class="report-generate">
+        <div class="report-generate__body">
+            <div>
+                <h2>Создать отчет</h2>
+                <p>Выберите целевую роль. Пока отчет в разработке — откроется макет «In Progress».</p>
+            </div>
+            <div class="report-generate__form">
+                <label for="report-role-select">Роль</label>
+                <select id="report-role-select" class="report-select">
+                    {% for role in report_roles %}
+                    <option value="{{ role.key }}">{{ role.label }}</option>
+                    {% endfor %}
+                </select>
+                <button id="report-generate-btn" class="btn btn-primary">Сгенерировать</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="reports-listing" id="reports-container">
+        {% for role in report_roles %}
+        <div class="reports-group" data-role="{{ role.key }}">
+            <div class="reports-group__header">
+                <h3>{{ role.label }}</h3>
+                <p>{{ role.description }}</p>
+            </div>
+            <div class="reports-group__items" data-role-items></div>
+        </div>
+        {% endfor %}
+    </section>
+</div>
+
+<script>
+window.INFRAZEN_DATA = window.INFRAZEN_DATA || {};
+window.INFRAZEN_DATA.reportRoles = {{ report_roles|tojson }};
+window.INFRAZEN_DATA.initialReports = {{ initial_reports|tojson }};
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}
+

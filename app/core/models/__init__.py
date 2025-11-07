@@ -27,6 +27,7 @@ from .board_resource import BoardResource
 from .board_group import BoardGroup
 from .user_provider_preference import UserProviderPreference
 from .chat import ChatSession, ChatMessage, ChatSessionStatus, ChatMessageRole
+from .report import GeneratedReport, ReportStatus
 
 __all__ = [
     'db',
@@ -61,5 +62,7 @@ __all__ = [
     'ChatSession',
     'ChatMessage',
     'ChatSessionStatus',
-    'ChatMessageRole'
+    'ChatMessageRole',
+    'GeneratedReport',
+    'ReportStatus'
 ]

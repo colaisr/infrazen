@@ -869,7 +869,20 @@ chat_messages:
 Definition of done: agent answers about charts/KPIs and produces concise insights.
 
 ### Milestone 7 – AI-Generated Report
+- [ ] Report architecture & persona packs
+  - [ ] Shared data snapshot + HTML template pipeline
+  - [ ] Persona-specific narrative packs (CFO, CTO/CIO, Product Owner, FinOps Lead) with tailored prompts/snippets based on FinOps best practices
+  - [ ] Role targeting built into JWT/context so UI can request the right variant
 - [ ] RAG-lite on approved content; generator for HTML/PDF similar to the sample report
+- [ ] Export & persistence layer (HTML storage + PDF rendering; download history)
+
+Persona narrative cheat-sheet for snippet library:
+- **CFO:** P&L impact, forecast confidence, allocation coverage, unit economics, savings program utilization. Tone: executive, accountability-driven. Actions framed as approvals/targets (e.g., commit purchases, showback adoption).
+- **CTO/CIO:** Efficiency hotspots, commitment coverage, anomaly backlog, engineering action queue. Tone: pragmatic, performance-aware. Actions tied to sprints (rightsizing, architecture pilots, K8s policies).
+- **Product / Business Owner:** Cost-to-serve metrics, margin versus price, cohort-level variance. Tone: business storytelling. Actions = gating launches, pricing moves, shared-cost chargeback.
+- **FinOps Lead:** Data hygiene KPIs (FOCUS adoption, tag/label coverage), cadence health, savings scoreboard vs. target. Tone: transparent enablement. Actions = data cleanup, anomaly MTTR targets, commitment councils.
+
+Cross-report guardrails: always link technical metrics to business outcomes, lead with one-page exec summary (trend → drivers → actions/owners/dates), align cadences (weekly ops, monthly exec, quarterly planning), enforce a FOCUS-aligned dataset with documented allocation rules, keep AI-generated narratives under human QA before delivery.
 
 Definition of done: one-click report reflects current data with citations and metrics.
 

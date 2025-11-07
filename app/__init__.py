@@ -50,7 +50,7 @@ def create_app(config_name=None):
     from app.api.admin import admin_bp
     from app.api.providers import providers_bp
     from app.api.resources import resources_bp
-    from app.api import recommendations_bp
+    from app.api import recommendations_bp, reports_bp
     from app.api.complete_sync import complete_sync_bp
     from app.api.analytics import analytics_bp
     from app.api.business_context import business_context_bp
@@ -74,6 +74,7 @@ def create_app(config_name=None):
     app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     app.register_blueprint(yandex_bp, url_prefix='/api/providers/yandex')
     app.register_blueprint(recommendations_bp, url_prefix='/api')
+    app.register_blueprint(reports_bp, url_prefix='/api')
     
     # All routes are now in the new structure
 

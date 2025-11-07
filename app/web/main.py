@@ -2,6 +2,7 @@
 Main web interface routes
 """
 from flask import Blueprint, render_template, session, redirect, url_for, jsonify, request, flash, current_app
+from flask_login import current_user
 from datetime import datetime
 import json
 import sys
@@ -15,6 +16,7 @@ from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot
 from app.core.models.user import User
 from app.core.models.provider_catalog import ProviderCatalog
+from app.core.services import report_service
 
 main_bp = Blueprint('main', __name__)
 
@@ -467,19 +469,23 @@ def reports():
     
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
-    
-    if is_demo_user:
-        overview = get_overview()
-    else:
-        overview = get_real_user_overview(user['id'])
-    
-    return render_template('page.html', 
-                        user=user,
-                        active_page='reports',
-                        page_title='Отчеты',
-                        page_subtitle='Детальные отчеты по расходам',
-                        overview=overview,
-                        is_demo_user=is_demo_user)
+
+    user_data = session.get('user', {})
+    effective_user_id = user_data.get('db_id') or user.get('db_id') or user.get('id')
+    try:
+        effective_user_id = int(float(effective_user_id))
+    except (TypeError, ValueError):
+        current_app.logger.warning('Unable to parse user_id for reports', extra={'user_id': effective_user_id})
+        effective_user_id = int(current_user.id)
+
+    report_roles = report_service.get_report_roles()
+    initial_reports = report_service.list_reports_for_user(effective_user_id)
+
+    return render_template('reports.html',
+                           user=user,
+                           active_page='reports',
+                           report_roles=report_roles,
+                           initial_reports=initial_reports)
 
 @main_bp.route('/settings')
 def settings():
