@@ -106,6 +106,8 @@
         display: flex;
         flex-direction: column;
         gap: 18px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       h2 {
         font-size: 24px;
@@ -149,6 +151,8 @@
         background: #fff;
         border-radius: 12px;
         overflow: hidden;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       table th,
       table td {
@@ -208,6 +212,8 @@
         display: flex;
         flex-direction: column;
         gap: 22px;
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
       .narrative h2 {
         font-size: 26px;
@@ -294,7 +300,7 @@
       </div>
       <main>
         {% if narrative.executive_summary %}
-        <section class="narrative">
+        <section class="narrative avoid-break">
           <h2>Исполнительное резюме</h2>
           <p>{{ narrative.executive_summary }}</p>
           {% if narrative.key_highlights %}
@@ -355,13 +361,17 @@
         if (downloadBtn && window.html2pdf && reportRoot) {
           downloadBtn.addEventListener('click', function () {
             downloadBtn.disabled = true;
+            var computedWidth = reportRoot.offsetWidth;
+            var pageWidth = computedWidth || 920;
+            var pageHeight = Math.ceil(pageWidth * Math.SQRT2);
             var filename = document.querySelector('.header h1')?.textContent?.trim().replace(/\s+/g, '_') || 'FinOps_Report';
             var options = {
-              margin:       [12, 12, 12, 12],
+              margin:       [0, 0, 0, 0],
               filename:     filename + '_' + Date.now() + '.pdf',
               image:        { type: 'jpeg', quality: 0.98 },
-              html2canvas:  { scale: 2, useCORS: true },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              html2canvas:  { scale: window.devicePixelRatio || 2, useCORS: true },
+              jsPDF:        { unit: 'px', format: [pageWidth, pageHeight], orientation: 'portrait' },
+              pagebreak:    { mode: ['css', 'legacy'], avoid: ['section', 'table', '.narrative'] }
             };
             window.html2pdf().set(options).from(reportRoot).save().finally(function () {
               downloadBtn.disabled = false;
