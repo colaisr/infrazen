@@ -23,7 +23,10 @@
                     <span class="logo-subtitle">FinOps Platform</span>
                 </div>
             </a>
-            <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Войти в систему</a>
+            <div class="header-actions">
+                <button onclick="demoLogin()" class="btn btn-secondary">Посмотреть демо</button>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Войти в систему</a>
+            </div>
         </header>
 
         <!-- Hero Section -->
@@ -38,8 +41,32 @@
             </p>
             
             <div class="hero-actions">
-                <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Начать работу</a>
-                <button onclick="demoLogin()" class="btn btn-secondary">Посмотреть демо</button>
+                <div class="hero-video-grid">
+                    <article class="hero-video-card" data-video="hero-quick">
+                        <div class="hero-video-pane">
+                            <button class="hero-video-play" aria-label="У меня есть одна минута">
+                                <span>▶</span>
+                            </button>
+                        </div>
+                        <div class="hero-video-content">
+                            <h3>У меня есть 1 минута</h3>
+                            <p>Смотрите, как InfraZen подключается и показывает экономию всего за минуту.</p>
+                            <span class="duration">1:00</span>
+                        </div>
+                    </article>
+                    <article class="hero-video-card" data-video="hero-detailed">
+                        <div class="hero-video-pane">
+                            <button class="hero-video-play" aria-label="Взглянуть подробнее">
+                                <span>▶</span>
+                            </button>
+                        </div>
+                        <div class="hero-video-content">
+                            <h3>Взглянуть подробнее</h3>
+                            <p>Развернутый walkthrough FinOps-команды с чат-ассистентом и рекомендациями.</p>
+                            <span class="duration">3:00</span>
+                        </div>
+                    </article>
+                </div>
             </div>
 
             <div class="hero-stats">
