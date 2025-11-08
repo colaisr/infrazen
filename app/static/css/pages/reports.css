@@ -38,6 +38,28 @@
   gap: 16px;
 }
 
+.report-generate__form .btn--loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: wait;
+}
+
+.report-generate__form .btn--loading .btn-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  animation: report-btn-spin 0.6s linear infinite;
+}
+
+@keyframes report-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .report-generate__form label {
   font-weight: 600;
   color: #1f2937;
@@ -147,6 +169,7 @@
 .report-card__actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .report-card__actions button {
@@ -162,6 +185,11 @@
 
 .report-card__actions button:hover {
   background: #1e40af;
+  color: #fff;
+}
+
+.report-card__delete:hover {
+  background: #b91c1c;
   color: #fff;
 }
 

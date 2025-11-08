@@ -3,7 +3,7 @@
 {% block page_title %}FinOps отчет · Product{% endblock %}
 {% block header_title %}Продуктовый обзор стоимости{% endblock %}
 
-{% block content %}
+{% block report_content %}
 <section>
   <h2>Unit-экономика (обзор)</h2>
   {% if not narrative.executive_summary %}
@@ -15,9 +15,6 @@
     <div class="kpi-card">
       <div class="label">Общая стоимость / мес</div>
       <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
-      {% if kpis.latest_change_percent is not none %}
-      <div class="delta">Δ vs прошлый период: {{ kpis.latest_change_percent | round(2) }}%</div>
-      {% endif %}
     </div>
     <div class="kpi-card">
       <div class="label">Потенциал улучшения маржи</div>
@@ -95,33 +92,6 @@
   </table>
   {% else %}
   <div class="highlight">Активных инициатив по улучшению unit-экономики нет.</div>
-  {% endif %}
-</section>
-
-<section>
-  <h2>События и аномалии</h2>
-  {% set anomalies = analytics.anomalies.anomalies or [] %}
-  {% if anomalies %}
-  <table>
-    <thead>
-      <tr>
-        <th>Дата</th>
-        <th>Δ%</th>
-        <th style="text-align:right;">Расход</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for anomaly in anomalies %}
-      <tr>
-        <td>{{ anomaly.date }}</td>
-        <td>{{ anomaly.change_percent | round(2) }}%</td>
-        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="highlight">Отклонений в расходах не зафиксировано.</div>
   {% endif %}
 </section>
 

@@ -206,3 +206,13 @@ def get_report_for_user(report_id: int, user_id: int) -> GeneratedReport:
     return report
 
 
+def delete_report_for_user(report_id: int, user_id: int) -> None:
+    """Delete a generated report belonging to the given user."""
+
+    report = GeneratedReport.query.filter_by(id=report_id, user_id=user_id).first()
+    if not report:
+        raise ValueError('Report not found')
+    db.session.delete(report)
+    db.session.commit()
+
+

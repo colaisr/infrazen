@@ -39,12 +39,6 @@ class ReportDataBuilder:
             time_range_days=time_range_days
         )
 
-        cost_trends = self.analytics_tools.get_cost_trends(
-            user_id=user_id,
-            time_range_days=time_range_days,
-            include_provider_breakdown=False
-        )
-
         service_breakdown = self.analytics_tools.get_service_breakdown(
             user_id=user_id,
             top_n=10
@@ -52,11 +46,6 @@ class ReportDataBuilder:
 
         provider_breakdown = self.analytics_tools.get_provider_breakdown(
             user_id=user_id
-        )
-
-        anomalies = self.analytics_tools.get_anomalies(
-            user_id=user_id,
-            time_range_days=time_range_days
         )
 
         recommendations_summary = self.analytics_tools.summarize_top_recommendations(
@@ -68,15 +57,14 @@ class ReportDataBuilder:
             "generated_at": datetime.utcnow().isoformat(),
             "role": role,
             "time_range_days": time_range_days,
+            "snapshot_mode": "current_state",
             "user": user_profile,
             "kpis": self._build_kpi_block(overview, recommendations_summary),
             "recommendations": recommendations_summary,
             "analytics": {
                 "overview": overview,
-                "cost_trends": cost_trends,
                 "service_breakdown": service_breakdown,
-                "provider_breakdown": provider_breakdown,
-                "anomalies": anomalies
+                "provider_breakdown": provider_breakdown
             }
         }
         snapshot["persona_snippets"] = self.snippet_library.render_for_role(role, snapshot)
@@ -102,8 +90,6 @@ class ReportDataBuilder:
             "total_daily_cost": exec_summary.get("total_daily_cost"),
             "active_resources": exec_summary.get("active_resources"),
             "provider_success_rate": exec_summary.get("provider_success_rate"),
-            "latest_monthly_cost": latest_cost,
-            "latest_change_percent": change_percent,
             "pending_savings_total": recommendations_summary.get("total_potential_savings"),
             "pending_recommendations_count": len(recommendations_summary.get("pending", [])),
         }

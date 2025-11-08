@@ -77,3 +77,13 @@ def get_report(report_id: int):
     })
 
 
+@reports_bp.route('/reports/<int:report_id>', methods=['DELETE'])
+@login_required
+def delete_report(report_id: int):
+    try:
+        report_service.delete_report_for_user(report_id, _get_effective_user_id())
+        return jsonify({'success': True})
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Report not found'}), 404
+
+

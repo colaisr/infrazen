@@ -3,7 +3,7 @@
 {% block page_title %}FinOps отчет · FinOps Lead{% endblock %}
 {% block header_title %}Операционный статус FinOps{% endblock %}
 
-{% block content %}
+{% block report_content %}
 <section>
   <h2>Сводка по практике</h2>
   {% if not narrative.executive_summary %}
@@ -91,33 +91,6 @@
       {% endif %}
     </div>
   </div>
-</section>
-
-<section>
-  <h2>Аномалии</h2>
-  {% set anomalies = analytics.anomalies.anomalies or [] %}
-  {% if anomalies %}
-  <table>
-    <thead>
-      <tr>
-        <th>Дата</th>
-        <th>Δ%</th>
-        <th style="text-align:right;">Расход</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for anomaly in anomalies %}
-      <tr>
-        <td>{{ anomaly.date }}</td>
-        <td>{{ anomaly.change_percent | round(2) }}%</td>
-        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="highlight">Аномалий не обнаружено. Продолжайте мониторинг.</div>
-  {% endif %}
 </section>
 
 <section>

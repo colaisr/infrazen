@@ -884,18 +884,19 @@ Definition of done: agent answers about charts/KPIs and produces concise insight
 #### Phase 3 – Narrative Engine (Business & Technical Detail)
 - **Business outcomes:**
   - Persona-tailored executive summaries reinforce the FinOps storyline each stakeholder expects (CFO → P&L guardrails, CTO → efficiency backlog, Product → cost-to-serve, FinOps Lead → operational cadence).
+  - Reports are explicitly framed as “оперативный снимок”: no period-over-period claims, so new tenants or freshly connected providers never see misleading growth deltas caused by onboarding.
   - Every report now opens with a single, polished “one-page” narrative (summary → highlights → risks → recommended actions) aligned to best-practice prompts captured in the cheat-sheet.
   - Snippet packs ensure rapid iteration: we can fine-tune wording per persona or per customer without re-training prompts, and AI fallbacks stay on-message even if the LLM call fails.
   - Structure keeps stakeholders in sync: exec summaries flag anomalies, quantifies savings programs, and assign next steps so downstream workshops can proceed without extra prep.
 - **Technical implementation:**
-  - `ReportDataBuilder` collects KPI, trend, anomaly, and recommendation snapshots once, ensuring deterministic data for all personas.
-  - `SnippetLibrary` + `snippets.json` host curated role snippets; values (costs, percentages, provider shares) are pre-formatted for the LLM and render-time fallbacks.
-  - `ReportNarrativeBuilder` orchestrates narrative generation via the LLM gateway with snippet-enhanced prompts and a deterministic fallback when models are unavailable.
+  - `ReportDataBuilder` now emits `snapshot_mode=current_state`, focusing on current KPIs, provider/service breakdowns, and pending recommendations, deliberately omitting trend/anomaly series to avoid pseudo-growth caused by recent integrations.
+  - `SnippetLibrary` intros and fallback copy were rewritten around snapshot phrasing, so rendered HTML and AI narratives never leak `{placeholder}` syntax or time-period verбиage.
+  - `SnippetLibrary` + `snippets.json` now ship snapshot-first intros and fallbacks, so rendered HTML never leaks `{placeholder}` syntax while staying pre-formatted for both LLM prompts and deterministic HTML.
+  - `ReportNarrativeBuilder` orchestrates narrative generation via the LLM gateway with snapshot-first prompts and a deterministic fallback when models are unavailable.
   - FastAPI adds `/v1/reports/data` + `/v1/reports/render`; Flask’s `ReportService` consumes them, persisting both the structured snapshot and rendered HTML in `generated_reports`.
-  - Base + persona templates (`report_*.html`) now inject a single narrative block at the header level, avoiding duplication and keeping KPI grids purely quantitative.
+  - Base + persona templates (`report_*.html`) inject a single narrative block at the header level, avoiding duplication and keeping KPI grids purely quantitative.
   - JWT payloads carry `scenario`, `role`, and `context`, so the same infrastructure supports future roles or scheduled reports without schema changes.
   - Front-end updates (`reports.js`) surface status pills (“Готов”), pull rendered HTML on demand, and keep UX consistent across personas.
-- **Operational follow-up:** regenerate historical reports so their stored HTML reflects the new template, then run stakeholder review sessions to capture per-persona wording tweaks, which we can feed back into the snippet library.
 
 Persona narrative cheat-sheet for snippet library:
 - **CFO:** P&L impact, forecast confidence, allocation coverage, unit economics, savings program utilization. Tone: executive, accountability-driven. Actions framed as approvals/targets (e.g., commit purchases, showback adoption).
@@ -916,5 +917,3 @@ Notes:
 - Nginx reloads are zero-downtime; deploy script supports app-only, agent-only, or both.
 - Feature flags ensure we can ship incrementally and revert safely.
 - CI/CD adds an isolated path for the agent; the app pipeline remains intact.
-
-

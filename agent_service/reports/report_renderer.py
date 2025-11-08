@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import datetime
 from typing import Any, Dict
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNotFound
@@ -20,6 +21,8 @@ class ReportRenderer:
             loader=FileSystemLoader(templates_path),
             autoescape=select_autoescape(['html', 'xml'])
         )
+        self.env.filters['strftime'] = self._format_datetime
+        self.env.globals['now'] = datetime.utcnow
         self.role_template_map = {
             'cfo': 'report_cfo.html',
             'cto': 'report_cto.html',
@@ -74,6 +77,18 @@ class ReportRenderer:
         if first or last:
             return " ".join(filter(None, [first, last]))
         return user.get('email', 'Пользователь')
+
+    @staticmethod
+    def _format_datetime(value: Any, fmt: str = '%d.%m.%Y %H:%M') -> str:
+        if not value:
+            return ''
+        if isinstance(value, datetime):
+            return value.strftime(fmt)
+        try:
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            return parsed.strftime(fmt)
+        except Exception:  # pylint: disable=broad-except
+            return str(value)
 
 
 _renderer = ReportRenderer()

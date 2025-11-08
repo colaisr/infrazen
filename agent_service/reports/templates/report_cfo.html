@@ -3,16 +3,13 @@
 {% block page_title %}FinOps отчет · CFO{% endblock %}
 {% block header_title %}Финансовый обзор инфраструктуры{% endblock %}
 
-{% block content %}
+{% block report_content %}
 <section>
   <h2>Ключевые показатели</h2>
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="label">Текущие расходы / мес</div>
       <div class="value">{{ kpis.total_monthly_cost | default(0) | round(2) }} ₽</div>
-      {% if kpis.latest_change_percent is not none %}
-      <div class="delta">Δ vs прошлый период: {{ kpis.latest_change_percent | round(2) }}%</div>
-      {% endif %}
     </div>
     <div class="kpi-card">
       <div class="label">Потенциальная экономия</div>
@@ -91,33 +88,6 @@
       {% endif %}
     </div>
   </div>
-</section>
-
-<section>
-  <h2>Аномалии</h2>
-  {% set anomalies = analytics.anomalies.anomalies or [] %}
-  {% if anomalies %}
-  <table>
-    <thead>
-      <tr>
-        <th>Дата</th>
-        <th>Изменение</th>
-        <th style="text-align:right;">Расход</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for anomaly in anomalies %}
-      <tr>
-        <td>{{ anomaly.date }}</td>
-        <td>{{ anomaly.change_percent | round(2) }}%</td>
-        <td style="text-align:right;">{{ anomaly.current_cost | round(2) }} ₽</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div class="highlight">Аномалий за период не обнаружено.</div>
-  {% endif %}
 </section>
 
 <section>

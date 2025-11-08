@@ -65,6 +65,7 @@ class ReportNarrativeBuilder:
             f"Тон: {tone}\n"
             "Всегда объясняй цифры через влияние на бизнес.\n"
             "Избегай жаргона, пиши уверенно, короткими абзацами, на русском языке.\n"
+            "Отчет отражает оперативный снимок, поэтому не делай выводов о динамике или трендах без явных данных.\n"
             "Фокус-гайды:\n"
             f"{focus_list}"
         )
@@ -88,7 +89,8 @@ class ReportNarrativeBuilder:
 
         return (
             "Сформируй краткий набор текстов для отчета.\n"
-            "Данные периода (JSON):\n"
+            "Это оперативный снимок: избегай сравнений с прошлыми периодами и выводов о трендах, если они явно не указаны.\n"
+            "Текущие данные (JSON):\n"
             f"{metrics_json}\n\n"
             "Форматированные значения:\n"
             f"{formatted_json}\n\n"
@@ -119,24 +121,19 @@ class ReportNarrativeBuilder:
 
         services = analytics.get("service_breakdown", {}).get("services", []) or []
         providers = analytics.get("provider_breakdown", {}).get("providers", []) or []
-        anomalies = analytics.get("anomalies", {}).get("anomalies", []) or []
-        trends = analytics.get("cost_trends", {}).get("points", []) or []
-
-        trimmed_trends = trends[-6:]
+        anomalies: List[Dict[str, Any]] = []
+        trimmed_trends: List[Dict[str, Any]] = []
 
         return {
-            "time_range_days": snapshot.get("time_range_days"),
             "kpis": {
                 "monthly_cost": kpis.get("total_monthly_cost"),
                 "daily_cost": kpis.get("total_daily_cost"),
                 "pending_savings": kpis.get("pending_savings_total"),
-                "change_percent": kpis.get("latest_change_percent"),
                 "active_resources": kpis.get("active_resources"),
+                "provider_data_quality": kpis.get("provider_success_rate"),
             },
             "top_services": services[:5],
             "top_providers": providers[:5],
-            "recent_trends": trimmed_trends,
-            "anomalies": anomalies[:5],
             "pending_recommendations": recommendations.get("pending", [])[:5],
         }
 
@@ -188,21 +185,15 @@ class ReportNarrativeBuilder:
                 }
             )
 
-        metrics = self._extract_relevant_metrics(snapshot)
-        anomalies = metrics.get("anomalies", [])
         risks: List[str] = []
-        if anomalies:
-            first = anomalies[0]
-            risks.append(
-                f"Проверьте всплеск расходов {first.get('date', '')} ({first.get('change_percent', 0)}%)."
-            )
-        elif snippet_context.get("anomalies_summary") not in (None, "не обнаружено"):
-            risks.append(f"Аномалии: {snippet_context.get('anomalies_summary')}.")
-        else:
-            # Use risk templates if available
-            risk_templates = structured_snippets.get("risk_templates", []) or []
-            if risk_templates:
-                risks.append(risk_templates[0])
+        risk_templates = structured_snippets.get("risk_templates", []) or []
+        if risk_templates:
+            risks.extend(risk_templates[:2])
+        top_provider_info = snippet_context.get("top_provider_share")
+        if not risks and top_provider_info and top_provider_info != "нет данных":
+            risks.append(f"Контроль концентрации расходов: {top_provider_info}.")
+        if not risks:
+            risks.append("Поддерживать прозрачность распределения расходов и ответственность команд.")
 
         if actions:
             next_steps = actions[:3]
@@ -226,10 +217,8 @@ class ReportNarrativeBuilder:
     def _default_summary(snippet_context: Dict[str, Any]) -> str:
         total = snippet_context.get("total_monthly_cost", "0")
         savings = snippet_context.get("pending_savings_total", "0")
-        change = snippet_context.get("latest_change_percent", "0")
         return (
-            f"Облачные расходы составляют {total} ₽/мес, изменение {change}%, "
-            f"потенциал экономии {savings} ₽."
+            f"Оперативный снимок: расходы {total} ₽/мес, потенциал экономии {savings} ₽."
         )
 
     @staticmethod

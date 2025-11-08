@@ -68,12 +68,12 @@ class SnippetLibrary:
         context = {
             "total_monthly_cost": _format_currency(kpis.get("total_monthly_cost")),
             "pending_savings_total": _format_currency(kpis.get("pending_savings_total")),
-            "latest_change_percent": _format_percent(kpis.get("latest_change_percent")),
             "recommendation_count": len(pending),
             "anomalies_summary": self._summarize_anomalies(anomalies),
             "top_services": self._summarize_services(services),
             "top_provider_share": self._summarize_providers(providers),
             "provider_success_rate": _format_percent(kpis.get("provider_success_rate")),
+            "data_quality": _format_percent(kpis.get("provider_success_rate")),
             "top_savings_item": self._top_savings_item(pending),
         }
         return context
@@ -81,7 +81,7 @@ class SnippetLibrary:
     @staticmethod
     def _summarize_anomalies(anomalies: List[Dict[str, Any]]) -> str:
         if not anomalies:
-            return "не обнаружено"
+            return "не анализируется в оперативном снимке"
         chunks = []
         for anomaly in anomalies[:3]:
             date = anomaly.get("date", "—")

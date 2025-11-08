@@ -10,6 +10,7 @@
 
   const container = document.getElementById('reports-container');
   const generateBtn = document.getElementById('report-generate-btn');
+  const defaultGenerateContent = generateBtn?.innerHTML;
   const roleSelect = document.getElementById('report-role-select');
 
   function groupReportsByRole() {
@@ -65,6 +66,7 @@
             </div>
             <div class="report-card__actions">
               <button data-action="open" data-report-id="${report.id}">Открыть</button>
+              <button data-action="delete" data-report-id="${report.id}" class="report-card__delete">Удалить</button>
             </div>
           </div>
         `;
@@ -85,9 +87,24 @@
     }
   }
 
+  function setGenerateLoading(isLoading) {
+    if (!generateBtn) return;
+    if (isLoading) {
+      generateBtn.disabled = true;
+      generateBtn.classList.add('btn--loading');
+      generateBtn.innerHTML = `
+        <span class="btn-spinner" aria-hidden="true"></span>
+        <span>Создание...</span>
+      `;
+    } else {
+      generateBtn.disabled = false;
+      generateBtn.classList.remove('btn--loading');
+      generateBtn.innerHTML = defaultGenerateContent || 'Сгенерировать';
+    }
+  }
+
   async function createReport(roleKey) {
-    generateBtn.disabled = true;
-    generateBtn.textContent = 'Создание...';
+    setGenerateLoading(true);
     try {
       const response = await fetch('/api/reports', {
         method: 'POST',
@@ -105,8 +122,7 @@
     } catch (error) {
       console.error('Failed to create report', error);
     } finally {
-      generateBtn.disabled = false;
-      generateBtn.textContent = 'Сгенерировать';
+      setGenerateLoading(false);
     }
   }
 
@@ -126,6 +142,35 @@
     }
   }
 
+  async function deleteReport(reportId, button) {
+    if (!reportId) return;
+    const confirmed = window.confirm('Удалить этот отчет?');
+    if (!confirmed) return;
+
+    if (button) {
+      button.disabled = true;
+      button.classList.add('report-card__delete--loading');
+    }
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, {
+        method: 'DELETE',
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (data?.success) {
+        reports = reports.filter((report) => String(report.id) !== String(reportId));
+        render();
+      }
+    } catch (error) {
+      console.error('Failed to delete report', error);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.classList.remove('report-card__delete--loading');
+      }
+    }
+  }
+
   function bindEvents() {
     generateBtn?.addEventListener('click', () => {
       const roleKey = roleSelect?.value;
@@ -140,6 +185,12 @@
         const reportId = target.dataset.reportId;
         if (reportId) {
           openReport(reportId);
+        }
+      }
+      if (target.dataset.action === 'delete') {
+        const reportId = target.dataset.reportId;
+        if (reportId) {
+          deleteReport(reportId, target);
         }
       }
     });

@@ -21,10 +21,38 @@
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 48px 32px;
+        padding: 48px 32px 64px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         color: var(--gray-900);
         background: var(--gray-50);
+      }
+      .report-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin: 0 auto 16px;
+        max-width: 980px;
+      }
+      .report-toolbar button {
+        padding: 10px 18px;
+        border-radius: 999px;
+        border: 1px solid var(--primary);
+        background: var(--primary);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .report-toolbar button.secondary {
+        background: #fff;
+        color: var(--primary);
+      }
+      .report-toolbar button:disabled {
+        opacity: 0.6;
+        cursor: wait;
       }
       .container {
         max-width: 980px;
@@ -122,9 +150,9 @@
         border-radius: 12px;
         overflow: hidden;
       }
-      table th, table td {
-        padding: 12px 16px;
-        text-align: left;
+      table th,
+      table td {
+        padding: 14px;
         border-bottom: 1px solid var(--gray-200);
         font-size: 14px;
       }
@@ -132,6 +160,7 @@
         background: var(--gray-100);
         color: var(--gray-700);
         font-weight: 600;
+        text-align: left;
       }
       table tr:last-child td {
         border-bottom: none;
@@ -185,23 +214,16 @@
         margin: 0;
         color: var(--gray-900);
       }
-      .narrative p {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.65;
-        color: var(--gray-700);
-      }
       .narrative-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 18px;
       }
       .narrative-item {
-        background: #ffffff;
+        background: #fff;
         border-radius: 14px;
-        border: 1px solid var(--gray-200);
         padding: 18px;
-        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07);
+        border: 1px solid var(--gray-200);
       }
       .narrative-item h4 {
         margin: 0 0 8px;
@@ -244,22 +266,32 @@
         color: var(--gray-600);
         border-top: 1px solid var(--gray-200);
       }
+      @media print {
+        body { background: #fff; padding: 0; }
+        .report-toolbar { display: none; }
+        .container { box-shadow: none; border-radius: 0; }
+      }
     </style>
+    <script defer src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
   </head>
   <body>
-    <div class="container">
-      <header class="header">
+    <div class="report-toolbar">
+      <button id="download-pdf-btn">Скачать PDF</button>
+      <button id="print-report-btn" class="secondary">Печать</button>
+    </div>
+    <div class="container" id="report-root">
+      <div class="header">
         <div class="role-badge">{{ role_label }}</div>
         <h1>{% block header_title %}FinOps отчет{% endblock %}</h1>
         <p>🎯 Пользователь: {{ user_display }}</p>
-        <p>📅 Сгенерировано: {{ generated_at | default('-') }}</p>
-        <p>⏱ Период анализа: последние {{ time_range_days }} дней</p>
-        {% if persona_snippets and persona_snippets.intros %}
+        <p>📅 Сгенерировано: {{ generated_at | default(now(), true) | strftime('%d.%m.%Y %H:%M') }}</p>
+        <p>📡 Оперативный снимок инфраструктуры на момент генерации отчета.</p>
+      {% if persona_snippets and persona_snippets.intros %}
         <div class="intro-snippet">
           {{ persona_snippets.intros[0] }}
         </div>
-        {% endif %}
-      </header>
+      {% endif %}
+      </div>
       <main>
         {% if narrative.executive_summary %}
         <section class="narrative">
@@ -301,12 +333,43 @@
           {% endif %}
         </section>
         {% endif %}
-        {% block content %}{% endblock %}
+
+        {% block report_content %}{% endblock %}
       </main>
       <footer>
-        InfraZen FinOps Platform · Автоматически сформированная сводка. Проверено {{ generated_at | default('-') }}.
+        InfraZen FinOps Platform — {{ generated_at | default(now(), true) | strftime('%d.%m.%Y %H:%M') }}
       </footer>
     </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var downloadBtn = document.getElementById('download-pdf-btn');
+        var printBtn = document.getElementById('print-report-btn');
+        var reportRoot = document.getElementById('report-root');
+
+        if (printBtn) {
+          printBtn.addEventListener('click', function () {
+            window.print();
+          });
+        }
+
+        if (downloadBtn && window.html2pdf && reportRoot) {
+          downloadBtn.addEventListener('click', function () {
+            downloadBtn.disabled = true;
+            var filename = document.querySelector('.header h1')?.textContent?.trim().replace(/\s+/g, '_') || 'FinOps_Report';
+            var options = {
+              margin:       [12, 12, 12, 12],
+              filename:     filename + '_' + Date.now() + '.pdf',
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            window.html2pdf().set(options).from(reportRoot).save().finally(function () {
+              downloadBtn.disabled = false;
+            });
+          });
+        }
+      });
+    </script>
   </body>
 </html>
 
