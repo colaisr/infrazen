@@ -1132,8 +1132,9 @@ body {
 
 .hero-metrics {
     display: grid;
-    gap: 1.1rem;
+    gap: 1rem;
     align-content: start;
+    grid-template-rows: repeat(4, auto);
 }
 
 .hero-stat {
@@ -2635,6 +2636,14 @@ body {
 @media (max-width: 768px) {
     .feature-grid.feature-grid--six {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1024px) {
+    .hero-metrics {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        grid-template-rows: none;
+        gap: 1.25rem;
     }
 }
 
