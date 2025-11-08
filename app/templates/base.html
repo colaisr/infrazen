@@ -117,7 +117,8 @@
                             {% endif %}
                         </div>
                         <div class="user-info">
-                            <div class="user-email">{{ user.email if user.email else "user@example.com" }}</div>
+                            {% set display_email = user.email if user.email else "user@example.com" %}
+                            <div class="user-email" title="{{ display_email }}">{{ display_email }}</div>
                             {% if user.impersonated %}
                             <button class="impersonation-warning" onclick="stopImpersonation(event)" title="Click to return to admin account">
                                 <i class="fa-solid fa-user-secret"></i>
