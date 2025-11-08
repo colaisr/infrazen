@@ -5,16 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InfraZen - FinOps Platform</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}">
 </head>
 <body>
     <div class="landing-page">
         <!-- Header -->
         <header class="landing-header">
             <a href="{{ url_for('main.index') }}" class="logo">
-                <div class="logo-icon">☁</div>
+                <div class="logo-icon">
+                    <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+                </div>
                 <div class="logo-text">
-                    <span>InfraZen</span>
+                    <span class="logo-word">
+                        <span class="logo-word-infra">Infra</span>
+                        <span class="logo-word-zen">Zen</span>
+                    </span>
                     <span class="logo-subtitle">FinOps Platform</span>
                 </div>
             </a>
@@ -129,9 +134,14 @@
         <!-- Footer -->
         <footer style="padding: 2rem; background: var(--background-white); border-top: 1px solid var(--border-light); text-align: center;">
             <div class="logo" style="justify-content: center; margin-bottom: 1rem;">
-                <div class="logo-icon">☁</div>
+                <div class="logo-icon">
+                    <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+                </div>
                 <div class="logo-text">
-                    <span>InfraZen</span>
+                    <span class="logo-word">
+                        <span class="logo-word-infra">Infra</span>
+                        <span class="logo-word-zen">Zen</span>
+                    </span>
                     <span class="logo-subtitle">FinOps Platform</span>
                 </div>
             </div>
