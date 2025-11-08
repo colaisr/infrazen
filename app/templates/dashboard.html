@@ -24,11 +24,14 @@
                 <div class="kpi-icon icon-expense"><i class="fa-solid fa-ruble-sign"></i></div>
             </div>
             <div class="kpi-value">
-                {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
-                    {{ "{:,.0f}".format((last_complete_sync.total_monthly_cost or 0)) }} ₽/мес
-                {% else %}
-                    {{ "{:,.0f}".format(overview.kpis.total_expenses_rub | default(0)) }} ₽/мес
-                {% endif %}
+                <span class="kpi-amount">
+                    {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
+                        {{ "{:,.0f}".format((last_complete_sync.total_monthly_cost or 0)) }}
+                    {% else %}
+                        {{ "{:,.0f}".format(overview.kpis.total_expenses_rub | default(0)) }}
+                    {% endif %}
+                </span>
+                <span class="kpi-unit">₽/мес</span>
             </div>
             <div class="kpi-secondary">
                 {% if last_complete_sync and last_complete_sync.sync_status == 'success' %}
@@ -58,7 +61,10 @@
                 </div>
                 <div class="kpi-icon icon-savings"><i class="fa-solid fa-piggy-bank"></i></div>
             </div>
-            <div class="kpi-value">{{ "{:,.0f}".format(overview.kpis.potential_savings_rub | default(0)) }} ₽/мес</div>
+            <div class="kpi-value">
+                <span class="kpi-amount">{{ "{:,.0f}".format(overview.kpis.potential_savings_rub | default(0)) }}</span>
+                <span class="kpi-unit">₽/мес</span>
+            </div>
             <div class="kpi-secondary">
                 <span class="kpi-secondary-text">{{ overview.kpis.savings_percentage | default(0) }}% от общих расходов</span>
             </div>

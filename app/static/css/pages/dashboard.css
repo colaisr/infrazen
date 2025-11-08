@@ -52,12 +52,23 @@
     color: #111827;
     text-align: center;
     margin: 1rem 0;
-    line-height: 1;
+    line-height: 1.1;
     min-height: 3rem;
     display: flex;
-    align-items: flex-end;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    white-space: nowrap;
+    gap: 0.35rem;
+}
+
+.kpi-value .kpi-amount {
+    display: block;
+}
+
+.kpi-value .kpi-unit {
+    font-size: clamp(0.95rem, 2.5vw, 1.125rem);
+    font-weight: 500;
+    color: #6b7280;
 }
 
 .kpi-secondary {
