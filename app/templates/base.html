@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>{% block title %}InfraZen - FinOps Platform{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for("static", filename="css/main.css") }}?v={{ range(1000, 9999) | random }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for("static", filename="favicon.ico") }}">
+    <link rel="icon" type="image/png" href="{{ url_for("static", filename="infrazen_logo_no_bg.png") }}">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     {% block extra_css %}{% endblock %}
@@ -25,11 +25,16 @@
             <div class="sidebar-header">
                 <div class="logo-container">
                     <button class="logo-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
-                        <div class="logo-icon"><i class="fa-solid fa-cloud"></i></div>
+                        <div class="logo-icon">
+                            <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+                        </div>
                     </button>
                     <a href="{{ url_for("main.dashboard") }}" class="logo-link">
                         <div class="logo-text">
-                            <span>InfraZen</span>
+                            <span class="logo-word">
+                                <span class="logo-word-infra">Infra</span>
+                                <span class="logo-word-zen">Zen</span>
+                            </span>
                             <span class="logo-subtitle">FinOps Platform</span>
                         </div>
                     </a>
