@@ -11,171 +11,229 @@
     <div class="landing-page">
         <!-- Header -->
         <header class="landing-header">
-            <a href="{{ url_for('main.index') }}" class="logo">
-                <div class="logo-icon">
-                    <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+            <div class="container">
+                <a href="{{ url_for('main.index') }}" class="logo">
+                    <div class="logo-icon">
+                        <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-word">
+                            <span class="logo-word-infra">Infra</span>
+                            <span class="logo-word-zen">Zen</span>
+                        </span>
+                        <span class="logo-subtitle">FinOps Platform</span>
+                    </div>
+                </a>
+                <div class="header-actions">
+                    <button onclick="demoLogin()" class="btn btn-secondary">Посмотреть демо</button>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Войти в систему</a>
                 </div>
-                <div class="logo-text">
-                    <span class="logo-word">
-                        <span class="logo-word-infra">Infra</span>
-                        <span class="logo-word-zen">Zen</span>
-                    </span>
-                    <span class="logo-subtitle">FinOps Platform</span>
-                </div>
-            </a>
-            <div class="header-actions">
-                <button onclick="demoLogin()" class="btn btn-secondary">Посмотреть демо</button>
-                <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Войти в систему</a>
             </div>
         </header>
 
-        <!-- Hero Section -->
-        <section class="landing-hero">
-            <h1 class="hero-title">
-                Мультиоблачный <span class="highlight">FinOps</span><br>
-                для российского рынка
-            </h1>
-            <p class="hero-subtitle">
-                Платформа оптимизации облачных расходов. Централизованный контроль, 
-                аналитика и рекомендации для принятия решений по нескольким облачным провайдерам.
-            </p>
-            
-            <div class="hero-actions">
-                <div class="hero-video-grid">
-                    <article class="hero-video-card" data-video="hero-quick">
-                        <div class="hero-video-pane">
-                            <button class="hero-video-play" aria-label="У меня есть одна минута">
-                                <span>▶</span>
-                            </button>
+        <main>
+            <section class="landing-hero">
+                <div class="container hero-layout">
+                    <div class="hero-copy">
+                        <span class="hero-eyebrow">FinOps для предприятий</span>
+                        <h1>
+                            Мультиоблачный <span class="hero-highlight">FinOps</span><br>
+                            для российского рынка
+                        </h1>
+                        <p>
+                            Платформа оптимизации облачных расходов. Централизованный контроль,
+                            аналитика и рекомендации для принятия решений по нескольким облачным провайдерам.
+                        </p>
+                        <div class="hero-video-grid">
+                            <article class="hero-video-card" data-video="hero-quick">
+                                <div class="hero-video-pane">
+                                    <button class="hero-video-play" aria-label="У меня есть одна минута">
+                                        <span>▶</span>
+                                    </button>
+                                </div>
+                                <div class="hero-video-content">
+                                    <span class="hero-video-tag">1 минута</span>
+                                    <h3>У меня есть 1 минута</h3>
+                                    <p>Смотрите, как InfraZen подключается и показывает экономию за минуту.</p>
+                                </div>
+                            </article>
+                            <article class="hero-video-card" data-video="hero-detailed">
+                                <div class="hero-video-pane">
+                                    <button class="hero-video-play" aria-label="Взглянуть подробнее">
+                                        <span>▶</span>
+                                    </button>
+                                </div>
+                                <div class="hero-video-content">
+                                    <span class="hero-video-tag">3 минуты</span>
+                                    <h3>Взглянуть подробнее</h3>
+                                    <p>Развернутый walkthrough FinOps-команды с чат-ассистентом и рекомендациями.</p>
+                                </div>
+                            </article>
                         </div>
-                        <div class="hero-video-content">
-                            <h3>У меня есть 1 минута</h3>
-                            <p>Смотрите, как InfraZen подключается и показывает экономию всего за минуту.</p>
-                            <span class="duration">1:00</span>
+                        <div class="hero-cta">
+                            <a href="#feature-section" class="btn btn-primary ghost-primary">Познакомиться ближе</a>
                         </div>
-                    </article>
-                    <article class="hero-video-card" data-video="hero-detailed">
-                        <div class="hero-video-pane">
-                            <button class="hero-video-play" aria-label="Взглянуть подробнее">
-                                <span>▶</span>
-                            </button>
+                    </div>
+                    <div class="hero-metrics">
+                        <div class="hero-stat">
+                            <span class="hero-stat-value">30–70%</span>
+                            <span class="hero-stat-label">потенциальной экономии</span>
                         </div>
-                        <div class="hero-video-content">
-                            <h3>Взглянуть подробнее</h3>
-                            <p>Развернутый walkthrough FinOps-команды с чат-ассистентом и рекомендациями.</p>
-                            <span class="duration">3:00</span>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value">5+</span>
+                            <span class="hero-stat-label">облачных провайдеров</span>
                         </div>
-                    </article>
+                        <div class="hero-stat">
+                            <span class="hero-stat-value">1 день</span>
+                            <span class="hero-stat-label">быстрый запуск</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="hero-stats">
-                <div class="stat">
-                    <div class="stat-value">30-70%</div>
-                    <div class="stat-label">потенциальной экономии</div>
+            <section id="feature-section" class="feature-section">
+                <div class="container">
+                    <div class="section-heading">
+                        <span class="section-tag">Функциональность</span>
+                        <h2>Все необходимые инструменты в одном месте</h2>
+                        <p>Контролируйте расходы, оптимизируйте ресурсы и принимайте обоснованные решения
+                           с помощью единой платформы FinOps.</p>
+                    </div>
+                    <div class="feature-grid feature-grid--six">
+                        <article class="feature-card">
+                            <div class="feature-icon icon-cloud"></div>
+                            <h3>Мультиоблачность</h3>
+                            <p>Yandex.Cloud, VK Cloud, Selectel, AWS, Azure, GCP — единый дашборд без переключения между интерфейсами.</p>
+                        </article>
+                        <article class="feature-card">
+                            <div class="feature-icon icon-analytics"></div>
+                            <h3>Умная аналитика</h3>
+                            <p>Детальные отчёты по расходам и использованию ресурсов для DevOps и CFO с настройкой бюджетов и прогнозов.</p>
+                        </article>
+                        <article class="feature-card">
+                            <div class="feature-icon icon-optimization"></div>
+                            <h3>Оптимизация</h3>
+                            <p>Автоматические рекомендации по снижению расходов, обнаружение неиспользуемых ресурсов и переразмеривание инстансов.</p>
+                        </article>
+                        <article class="feature-card">
+                            <div class="feature-icon icon-security"></div>
+                            <h3>Безопасность</h3>
+                            <p>Безопасное хранение данных, шифрование ключей и соблюдение стандартов безопасности.</p>
+                        </article>
+                        <article class="feature-card">
+                            <div class="feature-icon icon-speed"></div>
+                            <h3>Быстрый старт</h3>
+                            <p>Подключение за 1 день, SaaS и on-prem варианты, простая интеграция через API без сложного внедрения.</p>
+                        </article>
+                        <article class="feature-card">
+                            <div class="feature-icon icon-context"></div>
+                            <h3>Бизнес-контекст</h3>
+                            <p>Unit-экономика и привязка к бизнес-целям: ресурсы связываются с отделами, проектами и функциями.</p>
+                        </article>
+                    </div>
                 </div>
-                <div class="stat">
-                    <div class="stat-value">5+</div>
-                    <div class="stat-label">облачных провайдеров</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value">1 день</div>
-                    <div class="stat-label">быстрый запуск</div>
-                </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Features Section -->
-        <section class="features-section" style="padding: 4rem 2rem; background: white;">
-            <div style="max-width: 1200px; margin: 0 auto; text-align: center;">
-                <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary);">
-                    Все необходимые инструменты в одном месте
-                </h2>
-                <p style="font-size: 1.125rem; color: var(--text-secondary); margin-bottom: 3rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-                    Контролируйте расходы, оптимизируйте ресурсы и принимайте 
-                    обоснованные решения с помощью единой платформы FinOps.
-                </p>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 3rem;">
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--primary-blue); font-size: 1.5rem;">☁</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Мультиоблачность</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Yandex.Cloud, VK Cloud, Selectel, AWS, Azure, GCP</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Единый дашборд для всех ваших облачных провайдеров без переключения между интерфейсами.</p>
-                    </div>
-                    
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--success-green); font-size: 1.5rem;">📊</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Умная аналитика</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Детальная аналитика расходов и использования ресурсов</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Прозрачные отчёты для DevOps и CFO с возможностью настройки бюджетов и прогнозов.</p>
-                    </div>
-                    
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--warning-orange); font-size: 1.5rem;">⚡</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Оптимизация</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Автоматические рекомендации по снижению расходов</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Обнаружение неиспользуемых ресурсов, переразмеривание инстансов и возможности экономии.</p>
-                    </div>
-                    
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--error-red); font-size: 1.5rem;">🔒</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Безопасность</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Безопасное хранение учетных данных</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Все API ключи и учетные данные хранятся в зашифрованном виде с соблюдением стандартов безопасности.</p>
-                    </div>
-                    
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--primary-blue); font-size: 1.5rem;">⚡</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Быстрый старт</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Подключение за 1 день, SaaS и on-prem варианты</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Простая интеграция через API без необходимости сложного внедрения с нуля.</p>
-                    </div>
-                    
-                    <div style="padding: 2rem; border: 1px solid var(--border-light); border-radius: 12px;">
-                        <div style="width: 48px; height: 48px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; color: var(--success-green); font-size: 1.5rem;">🏢</div>
-                        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Бизнес-контекст</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">Unit-экономика и привязка к бизнес-целям</p>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Связывайте ресурсы с отделами, проектами и бизнес-функциями для полной прозрачности затрат.</p>
+            <section class="value-section">
+                <div class="container">
+                    <div class="value-grid">
+                        <div class="value-card">
+                            <span class="section-tag">Почему InfraZen</span>
+                            <h2>Сфокусированы на бизнес-результате</h2>
+                            <ul>
+                                <li>FinOps-чат с AI объясняет причины отклонений и формирует рекомендации.</li>
+                                <li>Быстрые интеграции и готовые сценарии для FinOps, DevOps и CFO.</li>
+                                <li>Встроенный план внедрения по модели crawl / walk / run.</li>
+                            </ul>
+                        </div>
+                        <div class="value-card trust-card">
+                            <span class="section-tag">Доверие и поддержка</span>
+                            <h2>Работает вместе с вашей командой</h2>
+                            <p>InfraZen внедрён в компаниях с распределёнными командами и жёсткими требованиями к безопасности.</p>
+                            <div class="trust-grid">
+                                <span class="trust-pill">Поддержка 24/7</span>
+                                <span class="trust-pill">Enterprise SLA</span>
+                                <span class="trust-pill">Сертификация ФСТЭК</span>
+                                <span class="trust-pill">Экспорт аналитики</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- CTA Section -->
-        <section style="padding: 4rem 2rem; background: var(--background-light); text-align: center;">
-            <div style="max-width: 800px; margin: 0 auto;">
-                <h2 style="font-size: 2rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary);">
-                    Готовы оптимизировать облачные расходы?
-                </h2>
-                <p style="font-size: 1.125rem; color: var(--text-secondary); margin-bottom: 2rem;">
-                    Начните экономить до 70% на облачной инфраструктуре уже сегодня
-                </p>
-                <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Начать бесплатно</a>
-                    <a href="#contact" class="btn btn-secondary">Связаться с нами</a>
+            <section class="cta-section">
+                <div class="container cta-card">
+                    <div class="cta-copy">
+                        <span class="section-tag">Следующий шаг</span>
+                        <h2>Запустите InfraZen и покажите лидерство в FinOps</h2>
+                        <p>Оставьте заявку на консультацию или посмотрите демо прямо сейчас, чтобы увидеть потенциал экономии.</p>
+                    </div>
+                    <div class="cta-actions">
+                        <button onclick="demoLogin()" class="btn btn-primary">Посмотреть демо</button>
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-secondary">Связаться с нами</a>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </main>
 
-        <!-- Footer -->
-        <footer style="padding: 2rem; background: var(--background-white); border-top: 1px solid var(--border-light); text-align: center;">
-            <div class="logo" style="justify-content: center; margin-bottom: 1rem;">
-                <div class="logo-icon">
-                    <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+        <footer class="landing-footer">
+            <div class="container footer-layout">
+                <div class="footer-brand">
+                    <a href="{{ url_for('main.index') }}" class="logo">
+                        <div class="logo-icon">
+                            <img src="{{ url_for('static', filename='infrazen_logo_no_bg.png') }}" alt="InfraZen logo">
+                        </div>
+                        <div class="logo-text">
+                            <span class="logo-word">
+                                <span class="logo-word-infra">Infra</span>
+                                <span class="logo-word-zen">Zen</span>
+                            </span>
+                            <span class="logo-subtitle">FinOps Platform</span>
+                        </div>
+                    </a>
+                    <p>Мультиоблачная платформа FinOps для контроля и оптимизации расходов. Работаем с распределёнными командами и сложными ландшафтами.</p>
                 </div>
-                <div class="logo-text">
-                    <span class="logo-word">
-                        <span class="logo-word-infra">Infra</span>
-                        <span class="logo-word-zen">Zen</span>
-                    </span>
-                    <span class="logo-subtitle">FinOps Platform</span>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>Продукт</h4>
+                        <a href="#feature-section">Функции</a>
+                        <a href="#">Дорожная карта</a>
+                        <a href="#">Безопасность</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Ресурсы</h4>
+                        <a href="#">Документация</a>
+                        <a href="#">Блог FinOps</a>
+                        <a href="#">Поддержка</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>Связаться</h4>
+                        <a href="mailto:support@infrazen.com">support@infrazen.com</a>
+                        <a href="tel:+78001234567">+7 800 123 45 67</a>
+                        <span class="footer-hint">Москва · Санкт-Петербург · Онлайн</span>
+                    </div>
                 </div>
             </div>
-            <p style="color: var(--text-secondary); font-size: 0.875rem;">
-                © 2025 InfraZen. Все права защищены.
-            </p>
+            <div class="footer-bottom">
+                <div class="container footer-bottom-layout">
+                    <span>© 2025 InfraZen. Все права защищены.</span>
+                    <div class="footer-bottom-links">
+                        <a href="#">Политика конфиденциальности</a>
+                        <a href="#">Условия использования</a>
+                    </div>
+                </div>
+            </div>
         </footer>
+    </div>
+
+    <div id="videoModal" class="video-modal" aria-hidden="true">
+        <div class="video-modal-backdrop" data-close="true"></div>
+        <div class="video-modal-content" role="dialog" aria-modal="true">
+            <button class="video-modal-close" data-close="true">×</button>
+            <div class="video-modal-body">
+                <p>Здесь будет видеоплеер с обзором InfraZen.</p>
+            </div>
+        </div>
     </div>
 
     <script>
