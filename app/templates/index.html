@@ -45,7 +45,7 @@
                             аналитика и рекомендации для принятия решений по нескольким облачным провайдерам.
                         </p>
                         <div class="hero-video-grid">
-                            <article class="hero-video-card" data-video="hero-quick">
+                            <article class="hero-video-card" data-video="hero-quick" data-video-title="У меня есть 1 минута" data-video-length="1 минута" data-video-src="{{ url_for('static', filename='landing videos/infrazen_short_final.mp4') }}">
                                 <div class="hero-video-pane">
                                     <button class="hero-video-play" aria-label="У меня есть одна минута">
                                         <span>▶</span>
@@ -57,7 +57,7 @@
                                     <p>Смотрите, как InfraZen подключается и показывает экономию за минуту.</p>
                                 </div>
                             </article>
-                            <article class="hero-video-card" data-video="hero-detailed">
+                            <article class="hero-video-card" data-video="hero-detailed" data-video-title="Взглянуть подробнее" data-video-length="3 минуты" data-video-src="{{ url_for('static', filename='landing videos/Infrazen_detailed_final.mp4') }}">
                                 <div class="hero-video-pane">
                                     <button class="hero-video-play" aria-label="Взглянуть подробнее">
                                         <span>▶</span>
@@ -235,7 +235,11 @@
         <div class="video-modal-content" role="dialog" aria-modal="true">
             <button class="video-modal-close" data-close="true">×</button>
             <div class="video-modal-body">
-                <p>Здесь будет видеоплеер с обзором InfraZen.</p>
+                <div class="video-modal-player">
+                    <video id="landingVideoPlayer" class="video-player" controls preload="metadata" playsinline aria-label="">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
             </div>
         </div>
     </div>
@@ -279,6 +283,75 @@
                 window.location.href = '/dashboard';
             });
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('videoModal');
+            const videoElement = document.getElementById('landingVideoPlayer');
+            const closeElements = modal.querySelectorAll('[data-close="true"]');
+            const videoCards = document.querySelectorAll('.hero-video-card');
+
+            function openModal(card) {
+                const title = card.dataset.videoTitle || '';
+                const source = card.dataset.videoSrc || '';
+
+                if (!source) {
+                    return;
+                }
+
+                videoElement.setAttribute('aria-label', title);
+                if (videoElement.src !== source) {
+                    videoElement.src = source;
+                }
+
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('modal-open');
+
+                videoElement.currentTime = 0;
+                const playPromise = videoElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        /* Autoplay blocked - controls remain available */
+                    });
+                }
+            }
+
+            function closeModal() {
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open');
+                videoElement.pause();
+                videoElement.currentTime = 0;
+                videoElement.removeAttribute('src');
+                videoElement.load();
+            }
+
+            videoCards.forEach(card => {
+                card.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    openModal(card);
+                });
+
+                const playButton = card.querySelector('.hero-video-play');
+                if (playButton) {
+                    playButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        openModal(card);
+                    });
+                }
+            });
+
+            closeElements.forEach(element => {
+                element.addEventListener('click', () => {
+                    closeModal();
+                });
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                    closeModal();
+                }
+            });
+        });
     </script>
 </body>
 </html>
