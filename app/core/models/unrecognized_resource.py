@@ -23,6 +23,7 @@ class UnrecognizedResource(db.Model):
     
     # User and sync context
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
     sync_snapshot_id = db.Column(db.Integer, db.ForeignKey('sync_snapshots.id'), nullable=True)
     discovered_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
@@ -38,6 +39,7 @@ class UnrecognizedResource(db.Model):
 
     # Relationships
     provider = db.relationship('CloudProvider', backref=db.backref('unrecognized_resources', cascade='all, delete-orphan'))
+    organization = db.relationship('Organization', backref='unrecognized_resources')
     user = db.relationship('User', foreign_keys=[user_id], backref='discovered_unrecognized_resources')
     resolver = db.relationship('User', foreign_keys=[resolved_by], backref='resolved_unrecognized_resources')
     sync_snapshot = db.relationship('SyncSnapshot', backref='unrecognized_resources')

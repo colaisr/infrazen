@@ -12,6 +12,9 @@ class CloudProvider(BaseModel):
     # User relationship
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     
+    # Organization relationship
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
+    
     # Provider identification
     provider_type = db.Column(db.String(50), nullable=False, index=True)  # e.g., 'beget', 'yandex', 'aws'
     connection_name = db.Column(db.String(100), nullable=False)
@@ -37,6 +40,7 @@ class CloudProvider(BaseModel):
     provider_metadata = db.Column(db.Text)  # JSON-encoded provider-specific data
     
     # Relationships with cascade delete to prevent orphaned records
+    organization = db.relationship('Organization', backref='providers')
     resources = db.relationship('Resource', backref='provider', lazy=True, cascade='all, delete-orphan')
     sync_snapshots = db.relationship('SyncSnapshot', backref='cloud_provider', lazy=True, cascade='all, delete-orphan')
     provider_sync_references = db.relationship('ProviderSyncReference', backref='cloud_provider', lazy=True, cascade='all, delete-orphan')

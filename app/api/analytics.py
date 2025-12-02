@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta
 
 from app.core.services.analytics_service import AnalyticsService
+from app.core.organization_context import get_current_organization_id
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -16,8 +17,16 @@ def get_executive_summary():
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         summary = analytics_service.get_executive_summary()
         
@@ -39,8 +48,16 @@ def get_main_trends():
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         # Get parameters
         days = request.args.get('days', 30, type=int)
@@ -77,8 +94,16 @@ def get_main_trends():
 def get_service_breakdown():
     """Get service analysis for bar chart"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         service_data = analytics_service.get_service_analysis()
         
@@ -107,8 +132,16 @@ def get_service_breakdown():
 def get_provider_breakdown():
     """Get provider breakdown for pie chart"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         provider_data = analytics_service.get_provider_breakdown()
         
@@ -137,8 +170,16 @@ def get_provider_breakdown():
 def get_provider_trends(provider_id):
     """Get individual provider spending trends"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         # Get parameters
         days = request.args.get('days', 30, type=int)
@@ -173,8 +214,16 @@ def get_provider_trends(provider_id):
 def get_implemented_recommendations():
     """Get implemented recommendations"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         recommendations = analytics_service.get_implemented_recommendations()
         
@@ -193,8 +242,16 @@ def get_implemented_recommendations():
 def get_optimization_opportunities():
     """Get pending optimization opportunities"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         opportunities = analytics_service.get_optimization_opportunities()
         
@@ -213,8 +270,16 @@ def get_optimization_opportunities():
 def export_analytics_report():
     """Export analytics report"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         # Get export parameters
         data = request.get_json()
@@ -242,8 +307,16 @@ def export_analytics_report():
 def download_report(format_type):
     """Download generated report"""
     try:
-        user_id = int(float(session['user']['id']))
-        analytics_service = AnalyticsService(user_id)
+        user_id = session.get('user', {}).get('db_id') or int(float(session.get('user', {}).get('id', 0)))
+        org_id = get_current_organization_id()
+        
+        if not org_id:
+            return jsonify({
+                'success': False,
+                'error': 'No active organization'
+            }), 400
+        
+        analytics_service = AnalyticsService(user_id, org_id)
         
         # Generate and return report
         report_data = analytics_service.export_analytics_report(format_type)

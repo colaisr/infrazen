@@ -13,6 +13,9 @@ class SyncSnapshot(BaseModel):
     # Provider relationship
     provider_id = db.Column(db.Integer, db.ForeignKey('cloud_providers.id'), nullable=False, index=True)
     
+    # Organization relationship
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
+    
     # Sync metadata
     sync_type = db.Column(db.String(20), nullable=False, default='full')  # full, incremental, manual
     sync_status = db.Column(db.String(20), nullable=False, default='running')  # running, success, error, cancelled
@@ -40,6 +43,7 @@ class SyncSnapshot(BaseModel):
     sync_config = db.Column(db.Text)  # JSON with sync parameters
     
     # Relationships
+    organization = db.relationship('Organization', backref='sync_snapshots')
     resource_states = db.relationship('ResourceState', backref='sync_snapshot', lazy=True, cascade='all, delete-orphan')
     
     def get_total_resources_by_type(self):

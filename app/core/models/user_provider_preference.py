@@ -12,11 +12,13 @@ class UserProviderPreference(BaseModel):
     __tablename__ = 'user_provider_preferences'
     
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
     provider_type = db.Column(db.String(50), nullable=False, index=True)  # 'beget', 'selectel', 'yandex', etc.
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)  # Whether to include this provider in recommendations
     
     # Relationships
     user = db.relationship('User', backref='provider_preferences', lazy=True)
+    organization = db.relationship('Organization', backref='user_provider_preferences')
     
     # Composite unique constraint (one preference per user per provider)
     __table_args__ = (

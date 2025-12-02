@@ -6,6 +6,7 @@ from app.core.models.provider import CloudProvider
 from app.core.models.user import User
 from app.providers.yandex.service import YandexService
 from app.core.database import db
+from app.core.organization_context import get_current_organization_id, require_organization_access
 import json
 import logging
 
@@ -106,6 +107,19 @@ def add_yandex_connection():
             flash('Invalid JSON format for service account key', 'error')
             return redirect(url_for('main.connections'))
         
+        # Get current organization
+        org_id = get_current_organization_id()
+        if not org_id:
+            flash('No active organization', 'error')
+            return redirect(url_for('main.connections'))
+        
+        # Verify user has access to organization
+        try:
+            require_organization_access(org_id, user.id)
+        except Exception:
+            flash('Access denied to organization', 'error')
+            return redirect(url_for('main.connections'))
+        
         # Extract cloud_id if available (for account_id)
         cloud_id = service_account_key.get('cloud_id', service_account_key.get('service_account_id', 'yandex_cloud'))
         
@@ -117,6 +131,7 @@ def add_yandex_connection():
         # Create provider entry
         provider = CloudProvider(
             user_id=user.id,
+            organization_id=org_id,
             provider_type='yandex',
             connection_name=connection_name,
             account_id=cloud_id,
@@ -149,7 +164,19 @@ def add_yandex_connection():
 def update_yandex_connection(provider_id):
     """Update existing Yandex Cloud connection"""
     try:
-        provider = CloudProvider.query.get(provider_id)
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
+        
+        user_id = session.get('user', {}).get('db_id') or session.get('user', {}).get('id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id,
+            organization_id=org_id,
+            user_id=user_id
+        ).first()
         
         if not provider:
             return jsonify({
@@ -251,7 +278,19 @@ def delete_yandex_connection(provider_id):
 def edit_yandex_connection(provider_id):
     """Get Yandex Cloud connection for editing"""
     try:
-        provider = CloudProvider.query.get(provider_id)
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
+        
+        user_id = session.get('user', {}).get('db_id') or session.get('user', {}).get('id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id,
+            organization_id=org_id,
+            user_id=user_id
+        ).first()
         
         if not provider:
             return jsonify({

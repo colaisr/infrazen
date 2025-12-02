@@ -5,17 +5,23 @@ from flask import Blueprint, jsonify, request
 from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
 from app.core.models.user import User
+from app.core.organization_context import get_current_organization_id
 
 resources_bp = Blueprint('resources', __name__)
 
 @resources_bp.route('/')
 def list_resources():
-    """List all resources, excluding demo user resources by default"""
+    """List all resources for current organization, excluding demo user resources by default"""
     # Check if we should include demo user data
     include_demo = request.args.get('include_demo', 'false').lower() == 'true'
     
-    # Build query to get resources
-    query = Resource.query
+    # Get current organization
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Build query to get resources for current organization
+    query = Resource.query.filter_by(organization_id=org_id)
     
     # Exclude demo user resources unless explicitly requested
     if not include_demo:

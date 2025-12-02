@@ -12,6 +12,7 @@ class OptimizationRecommendation(BaseModel):
     # Relations
     resource_id = db.Column(db.Integer, db.ForeignKey('resources.id'), nullable=False, index=True)
     provider_id = db.Column(db.Integer, db.ForeignKey('cloud_providers.id'), index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
 
     # Core identification
     recommendation_type = db.Column(db.String(50), nullable=False, index=True)  # resize, shutdown, migrate, etc.

@@ -2,6 +2,10 @@
 // Chart.js integration and interactive features
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if this is an organization switch reload
+    const urlParams = new URLSearchParams(window.location.search);
+    const orgSwitched = urlParams.get('org_switched');
+    
     // Wait a bit for all elements to be ready
     setTimeout(function() {
         // Check if Chart.js is loaded
@@ -24,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeProviderToggles();
         initializeTimeRangeSelectors();
         initializeExportButton();
-    }, 100);
+    }, orgSwitched ? 300 : 100); // Wait a bit longer if org was switched to ensure session is updated
 });
 
 // Load Main Spending Chart with Real Data

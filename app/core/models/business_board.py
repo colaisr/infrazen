@@ -11,6 +11,9 @@ class BusinessBoard(BaseModel):
     # Owner relationship
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     
+    # Organization relationship
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
+    
     # Board properties
     name = db.Column(db.String(255), nullable=False)
     is_default = db.Column(db.Boolean, default=False, nullable=False)
@@ -23,6 +26,7 @@ class BusinessBoard(BaseModel):
     
     # Relationships
     user = db.relationship('User', backref=db.backref('business_boards', lazy='dynamic', cascade='all, delete-orphan'))
+    organization = db.relationship('Organization', backref='business_boards')
     resources = db.relationship('BoardResource', backref='board', lazy='dynamic', cascade='all, delete-orphan')
     groups = db.relationship('BoardGroup', backref='board', lazy='dynamic', cascade='all, delete-orphan')
     
@@ -46,22 +50,34 @@ class BusinessBoard(BaseModel):
         return data
     
     @classmethod
-    def get_user_boards(cls, user_id):
-        """Get all boards for a user"""
-        return cls.query.filter_by(user_id=user_id).order_by(cls.updated_at.desc()).all()
+    def get_user_boards(cls, user_id, organization_id=None):
+        """Get all boards for a user in an organization"""
+        query = cls.query.filter_by(user_id=user_id)
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        return query.order_by(cls.updated_at.desc()).all()
     
     @classmethod
-    def get_default_board(cls, user_id):
-        """Get user's default board"""
-        return cls.query.filter_by(user_id=user_id, is_default=True).first()
+    def get_default_board(cls, user_id, organization_id=None):
+        """Get user's default board in an organization"""
+        query = cls.query.filter_by(user_id=user_id, is_default=True)
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        return query.first()
     
     @classmethod
-    def set_default_board(cls, user_id, board_id):
-        """Set a board as default (unset others)"""
-        # Unset all defaults for this user
-        cls.query.filter_by(user_id=user_id).update({'is_default': False})
+    def set_default_board(cls, user_id, board_id, organization_id=None):
+        """Set a board as default (unset others in the same organization)"""
+        # Unset all defaults for this user in this organization
+        query = cls.query.filter_by(user_id=user_id)
+        if organization_id:
+            query = query.filter_by(organization_id=organization_id)
+        query.update({'is_default': False})
         # Set the new default
-        board = cls.query.filter_by(id=board_id, user_id=user_id).first()
+        board_query = cls.query.filter_by(id=board_id, user_id=user_id)
+        if organization_id:
+            board_query = board_query.filter_by(organization_id=organization_id)
+        board = board_query.first()
         if board:
             board.is_default = True
             db.session.commit()

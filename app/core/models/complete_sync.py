@@ -13,6 +13,9 @@ class CompleteSync(BaseModel):
     # User relationship
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     
+    # Organization relationship
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
+    
     # Sync metadata
     sync_type = db.Column(db.String(20), nullable=False, default='manual')  # manual, scheduled, api
     sync_status = db.Column(db.String(20), nullable=False, default='running')  # running, success, error, partial

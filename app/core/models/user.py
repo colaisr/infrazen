@@ -52,8 +52,16 @@ class User(UserMixin, BaseModel):
     currency = db.Column(db.String(3), default='RUB')
     language = db.Column(db.String(5), default='ru')
     
+    # Organization fields
+    personal_organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=True, index=True)
+    last_active_organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=True, index=True)
+    
     # Relationships
     providers = db.relationship('CloudProvider', backref='user', lazy=True, cascade='all, delete-orphan')
+    # Organization relationships
+    organizations = db.relationship('OrganizationMember', back_populates='user', lazy=True, cascade='all, delete-orphan', foreign_keys='OrganizationMember.user_id')
+    personal_organization = db.relationship('Organization', foreign_keys=[personal_organization_id], post_update=True)
+    last_active_organization = db.relationship('Organization', foreign_keys=[last_active_organization_id], post_update=True)
     
     def to_dict(self):
         """Convert user to dictionary (excluding sensitive data)"""
@@ -253,6 +261,44 @@ class User(UserMixin, BaseModel):
             return self.email.split('@')[0][0].upper()
         else:
             return "U"
+    
+    def get_organizations(self):
+        """Get all organizations this user belongs to"""
+        from .organization_member import OrganizationMember
+        from .organization import Organization
+        return Organization.query.join(OrganizationMember).filter(
+            OrganizationMember.user_id == self.id,
+            OrganizationMember.is_active == True
+        ).all()
+    
+    def get_personal_organization(self):
+        """Get user's personal organization (where they are owner)"""
+        from .organization import Organization
+        return Organization.get_user_personal_organization(self.id)
+    
+    def get_current_organization(self):
+        """Get user's current active organization (from session/preferences)"""
+        # This will be implemented with session context helper
+        # For now, return personal org as fallback
+        return self.get_personal_organization()
+    
+    def get_organization_role(self, organization_id):
+        """Get user's role in a specific organization"""
+        from .organization_member import OrganizationMember
+        member = OrganizationMember.query.filter_by(
+            user_id=self.id,
+            organization_id=organization_id,
+            is_active=True
+        ).first()
+        return member.role if member else None
+    
+    def is_organization_owner(self, organization_id):
+        """Check if user is owner of an organization"""
+        return self.get_organization_role(organization_id) == 'owner'
+    
+    def is_organization_member(self, organization_id):
+        """Check if user is a member of an organization"""
+        return self.get_organization_role(organization_id) is not None
     
     def __repr__(self):
         return f'<User {self.email}>'

@@ -148,7 +148,7 @@ def _generate_report_payload(user_id: int, role_key: str, context: Optional[Dict
         return None, None
 
 
-def create_mock_report(user_id: int, role_key: str) -> GeneratedReport:
+def create_mock_report(user_id: int, role_key: str, organization_id: Optional[int] = None) -> GeneratedReport:
     """Create a placeholder report entry for the requested role."""
 
     if role_key not in REPORT_ROLE_DEFINITIONS:
@@ -156,10 +156,17 @@ def create_mock_report(user_id: int, role_key: str) -> GeneratedReport:
 
     role_info = REPORT_ROLE_DEFINITIONS[role_key]
     title = f"Отчет ({role_info['label']})"
-    snapshot, rendered_html = _generate_report_payload(user_id, role_key)
+    
+    # Pass organization_id in context so agent service can filter data correctly
+    context = {}
+    if organization_id:
+        context['organization_id'] = organization_id
+    
+    snapshot, rendered_html = _generate_report_payload(user_id, role_key, context)
 
     report = GeneratedReport(
         user_id=user_id,
+        organization_id=organization_id,
         title=title,
         role=role_key,
         status=ReportStatus.READY if rendered_html else ReportStatus.IN_PROGRESS,
@@ -171,19 +178,23 @@ def create_mock_report(user_id: int, role_key: str) -> GeneratedReport:
     )
     db.session.add(report)
     db.session.commit()
-    current_app.logger.info('Mock report created', extra={'user_id': user_id, 'role': role_key, 'report_id': report.id})
+    current_app.logger.info('Mock report created', extra={'user_id': user_id, 'organization_id': organization_id, 'role': role_key, 'report_id': report.id})
     return report
 
 
-def list_reports_for_user(user_id: int) -> List[Dict]:
-    """Return reports ordered by newest first for a given user."""
+def list_reports_for_user(user_id: int, organization_id: Optional[int] = None) -> List[Dict]:
+    """Return reports ordered by newest first for a given user/organization."""
 
-    reports = (
-        GeneratedReport.query
-        .filter_by(user_id=user_id)
-        .order_by(GeneratedReport.created_at.desc())
-        .all()
-    )
+    query = GeneratedReport.query
+    if organization_id:
+        # Filter by organization - viewers see all reports in the organization
+        query = query.filter_by(organization_id=organization_id)
+    else:
+        # Fallback: filter by user_id if no org context
+        query = query.filter_by(user_id=user_id)
+    
+    reports = query.order_by(GeneratedReport.created_at.desc()).all()
+    
     results = []
     for report in reports:
         results.append({
@@ -197,19 +208,35 @@ def list_reports_for_user(user_id: int) -> List[Dict]:
     return results
 
 
-def get_report_for_user(report_id: int, user_id: int) -> GeneratedReport:
-    """Fetch a report ensuring it belongs to the given user."""
+def get_report_for_user(report_id: int, user_id: int, organization_id: Optional[int] = None) -> GeneratedReport:
+    """Fetch a report ensuring it belongs to the given user/organization."""
 
-    report = GeneratedReport.query.filter_by(id=report_id, user_id=user_id).first()
+    query = GeneratedReport.query.filter_by(id=report_id)
+    if organization_id:
+        # Filter by organization - viewers can view all reports in the organization
+        query = query.filter_by(organization_id=organization_id)
+    else:
+        # Fallback: filter by user_id if no org context
+        query = query.filter_by(user_id=user_id)
+    
+    report = query.first()
     if not report:
         raise ValueError('Report not found')
     return report
 
 
-def delete_report_for_user(report_id: int, user_id: int) -> None:
-    """Delete a generated report belonging to the given user."""
+def delete_report_for_user(report_id: int, user_id: int, organization_id: Optional[int] = None) -> None:
+    """Delete a generated report belonging to the given user/organization."""
 
-    report = GeneratedReport.query.filter_by(id=report_id, user_id=user_id).first()
+    query = GeneratedReport.query.filter_by(id=report_id)
+    if organization_id:
+        # Filter by organization
+        query = query.filter_by(organization_id=organization_id)
+    else:
+        # Fallback: filter by user_id if no org context
+        query = query.filter_by(user_id=user_id)
+    
+    report = query.first()
     if not report:
         raise ValueError('Report not found')
     db.session.delete(report)

@@ -140,6 +140,22 @@
                         <i class="fa-solid fa-sign-out-alt"></i>
                     </a>
                 </div>
+                
+                <!-- Organization Switcher -->
+                <div class="organization-switcher" id="organizationSwitcher">
+                    <div class="org-switcher-label">Организация:</div>
+                    <div class="org-switcher-dropdown" id="orgDropdown">
+                        <button class="org-switcher-button" id="orgSwitcherButton" onclick="toggleOrgDropdown(event)">
+                            <span class="org-switcher-current" id="orgSwitcherCurrent">Загрузка...</span>
+                            <i class="fa-solid fa-chevron-down org-switcher-icon"></i>
+                        </button>
+                        <div class="org-switcher-menu" id="orgSwitcherMenu" style="display: none;">
+                            <div class="org-switcher-list" id="orgSwitcherList">
+                                <!-- Organizations will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
         
@@ -321,6 +337,7 @@
         });
     </script>
     
+    <script src="{{ url_for('static', filename='js/organizations.js') }}?v={{ range(1000, 9999) | random }}"></script>
     {% block scripts %}{% endblock %}
     {% block extra_js %}{% endblock %}
 </body>

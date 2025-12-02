@@ -50,7 +50,8 @@ class AnalyticsTools:
         self,
         user_id: int,
         time_range_days: int = 30,
-        top_items: int = 5
+        top_items: int = 5,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for analytics context snapshot")
@@ -58,7 +59,7 @@ class AnalyticsTools:
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
 
             summary = service.get_executive_summary()
             trends = service.get_main_spending_trends(days=time_range_days)
@@ -66,7 +67,7 @@ class AnalyticsTools:
             providers = service.get_provider_breakdown().get('providers', [])
 
             # Pending recommendations (sorted by potential savings)
-            pending = self.get_pending_recommendations(user_id=user_id, limit=top_items)
+            pending = self.get_pending_recommendations(user_id=user_id, limit=top_items, organization_id=organization_id)
 
             top_services = sorted(
                 services,
@@ -116,14 +117,15 @@ class AnalyticsTools:
     def get_analytics_overview(
         self,
         time_range_days: int = 30,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for analytics overview")
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
             summary = service.get_executive_summary()
             trends = service.get_main_spending_trends(days=time_range_days)
 
@@ -142,14 +144,15 @@ class AnalyticsTools:
         self,
         time_range_days: int = 30,
         include_provider_breakdown: bool = False,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for cost trends")
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
             trends = service.get_main_spending_trends(days=time_range_days)
 
             if not include_provider_breakdown:
@@ -172,14 +175,15 @@ class AnalyticsTools:
     def get_service_breakdown(
         self,
         top_n: int = 10,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for service breakdown")
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
             breakdown = service.get_service_analysis()
             services = sorted(
                 breakdown.get('services', []),
@@ -195,14 +199,15 @@ class AnalyticsTools:
 
     def get_provider_breakdown(
         self,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for provider breakdown")
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
             breakdown = service.get_provider_breakdown()
             providers = breakdown.get('providers', [])
 
@@ -222,14 +227,15 @@ class AnalyticsTools:
         self,
         time_range_days: int = 30,
         sensitivity: float = 0.15,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for anomalies analysis")
         with self.flask_app.app_context():
             from app.core.services.analytics_service import AnalyticsService
 
-            service = AnalyticsService(user_id)
+            service = AnalyticsService(user_id, organization_id)
             trends = service.get_main_spending_trends(days=time_range_days)
             anomalies = self._detect_anomalies(trends, sensitivity=sensitivity)
 
@@ -242,37 +248,51 @@ class AnalyticsTools:
     def get_pending_recommendations(
         self,
         user_id: int,
-        limit: int = 5
+        limit: int = 5,
+        organization_id: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         with self.flask_app.app_context():
             from app.core.models import OptimizationRecommendation, CloudProvider, Resource
 
-            recommendations = OptimizationRecommendation.query.filter_by(status='pending').all()
+            # Filter by organization_id if provided, otherwise filter by user_id
+            query = OptimizationRecommendation.query.filter_by(status='pending')
+            if organization_id:
+                # Filter by organization - viewers see all recommendations in the organization
+                query = query.filter_by(organization_id=organization_id)
+            else:
+                # Fallback: filter by user_id through provider/resource relationships
+                # This is less efficient but maintains backward compatibility
+                pass
+            
+            recommendations = query.all()
 
             filtered: List[Dict[str, Any]] = []
             provider_cache: Dict[int, Optional[CloudProvider]] = {}
             resource_cache: Dict[int, Optional[Resource]] = {}
 
             for rec in recommendations:
-                owner_id = None
-                if getattr(rec, 'cloud_provider', None):
-                    owner_id = rec.cloud_provider.user_id
-                elif getattr(rec, 'resource', None) and getattr(rec.resource, 'provider', None):
-                    owner_id = rec.resource.provider.user_id
-                elif rec.provider_id:
-                    if rec.provider_id not in provider_cache:
-                        provider_cache[rec.provider_id] = CloudProvider.query.get(rec.provider_id)
-                    provider = provider_cache.get(rec.provider_id)
-                    owner_id = provider.user_id if provider else None
-                elif rec.resource_id:
-                    if rec.resource_id not in resource_cache:
-                        resource_cache[rec.resource_id] = Resource.query.get(rec.resource_id)
-                    resource = resource_cache.get(rec.resource_id)
-                    if resource and getattr(resource, 'provider', None):
-                        owner_id = resource.provider.user_id
+                # If organization_id is provided, we already filtered by it, so include all
+                # Otherwise, check user_id ownership
+                if not organization_id:
+                    owner_id = None
+                    if getattr(rec, 'cloud_provider', None):
+                        owner_id = rec.cloud_provider.user_id
+                    elif getattr(rec, 'resource', None) and getattr(rec.resource, 'provider', None):
+                        owner_id = rec.resource.provider.user_id
+                    elif rec.provider_id:
+                        if rec.provider_id not in provider_cache:
+                            provider_cache[rec.provider_id] = CloudProvider.query.get(rec.provider_id)
+                        provider = provider_cache.get(rec.provider_id)
+                        owner_id = provider.user_id if provider else None
+                    elif rec.resource_id:
+                        if rec.resource_id not in resource_cache:
+                            resource_cache[rec.resource_id] = Resource.query.get(rec.resource_id)
+                        resource = resource_cache.get(rec.resource_id)
+                        if resource and getattr(resource, 'provider', None):
+                            owner_id = resource.provider.user_id
 
-                if owner_id != user_id:
-                    continue
+                    if owner_id != user_id:
+                        continue
 
                 filtered.append({
                     'id': rec.id,
@@ -291,11 +311,12 @@ class AnalyticsTools:
     def summarize_top_recommendations(
         self,
         limit: int = 5,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         if user_id is None:
             raise ValueError("user_id is required for recommendation summary")
-        pending = self.get_pending_recommendations(user_id=user_id, limit=limit)
+        pending = self.get_pending_recommendations(user_id=user_id, limit=limit, organization_id=organization_id)
         total_savings = sum(item['potential_savings'] for item in pending)
 
         return {

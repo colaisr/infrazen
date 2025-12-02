@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request, session
 from flask_login import login_required, current_user
 
 from app.core.services import report_service
+from app.core.organization_context import get_current_organization_id
 
 
 reports_bp = Blueprint('reports_api', __name__)
@@ -12,6 +13,11 @@ reports_bp = Blueprint('reports_api', __name__)
 def _get_effective_user_id() -> int:
     user_data = session.get('user', {})
     return user_data.get('db_id') or current_user.id
+
+
+def _get_organization_id():
+    """Get current organization ID from session."""
+    return get_current_organization_id()
 
 
 @reports_bp.route('/reports/roles', methods=['GET'])
@@ -25,7 +31,8 @@ def list_roles():
 @login_required
 def list_reports():
     user_id = _get_effective_user_id()
-    reports = report_service.list_reports_for_user(user_id)
+    organization_id = _get_organization_id()
+    reports = report_service.list_reports_for_user(user_id, organization_id)
     return jsonify({'success': True, 'reports': reports})
 
 
@@ -38,7 +45,8 @@ def create_report():
         return jsonify({'success': False, 'error': 'role is required'}), 400
 
     try:
-        report = report_service.create_mock_report(_get_effective_user_id(), role_key)
+        organization_id = _get_organization_id()
+        report = report_service.create_mock_report(_get_effective_user_id(), role_key, organization_id)
     except ValueError as exc:
         return jsonify({'success': False, 'error': str(exc)}), 400
 
@@ -59,7 +67,8 @@ def create_report():
 @login_required
 def get_report(report_id: int):
     try:
-        report = report_service.get_report_for_user(report_id, _get_effective_user_id())
+        organization_id = _get_organization_id()
+        report = report_service.get_report_for_user(report_id, _get_effective_user_id(), organization_id)
     except ValueError:
         return jsonify({'success': False, 'error': 'Report not found'}), 404
 
@@ -81,7 +90,8 @@ def get_report(report_id: int):
 @login_required
 def delete_report(report_id: int):
     try:
-        report_service.delete_report_for_user(report_id, _get_effective_user_id())
+        organization_id = _get_organization_id()
+        report_service.delete_report_for_user(report_id, _get_effective_user_id(), organization_id)
         return jsonify({'success': True})
     except ValueError:
         return jsonify({'success': False, 'error': 'Report not found'}), 404

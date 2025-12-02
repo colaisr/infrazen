@@ -5,10 +5,12 @@
 {% block page_title %}Бизнес-контекст{% endblock %}
 {% block page_subtitle %}Визуальное распределение ресурсов по бизнес-контекстам{% endblock %}
 {% block header_actions %}
+{% if user_role in ['editor', 'owner'] %}
 <button class="btn btn-primary" id="createBoardBtnHeader">
     <i class="fa-solid fa-plus"></i>
     Создать доску
 </button>
+{% endif %}
 {% endblock %}
 {% block header %}{% endblock %}
 
@@ -35,10 +37,12 @@
             </div>
             <h2>У вас пока нет досок</h2>
             <p>Создайте первую доску для визуализации распределения ресурсов</p>
+            {% if user_role in ['editor', 'owner'] %}
             <button class="btn btn-primary" onclick="document.getElementById('createBoardBtnHeader').click()">
                 <i class="fa-solid fa-plus"></i>
                 Создать первую доску
             </button>
+            {% endif %}
         </div>
     </div>
     
@@ -55,7 +59,7 @@
                     <i class="fa-solid fa-arrow-left"></i>
                 </button>
                 <div class="board-name-container">
-                    <h2 id="currentBoardName" contenteditable="true">Board Name</h2>
+                    <h2 id="currentBoardName" contenteditable="{{ 'true' if user_role in ['editor', 'owner'] else 'false' }}">Board Name</h2>
                     <span class="save-indicator" id="saveIndicator">Сохранено</span>
                     <div class="undo-redo-controls">
                         <button class="btn btn-icon" id="undoBtn" title="Отменить (Ctrl+Z)" disabled>
@@ -103,12 +107,14 @@
                             <span>Группы</span>
                         </div>
                         <div class="toolbox-section-content" id="groupsToolbox">
+                            {% if user_role in ['editor', 'owner'] %}
                             <div class="toolbox-item" data-tool="group" draggable="true">
                                 <div class="tool-icon">
                                     <i class="fa-solid fa-object-group"></i>
                                 </div>
                                 <span class="tool-name">Группа</span>
                             </div>
+                            {% endif %}
                         </div>                    </div>
                     
                     <!-- Resources Section -->
@@ -142,6 +148,7 @@
                             <span>Объекты</span>
                         </div>
                         <div class="toolbox-section-content" id="objectsToolbox">
+                            {% if user_role in ['editor', 'owner'] %}
                             <div class="toolbox-item" data-tool="text" draggable="true">
                                 <div class="tool-icon">
                                     <i class="fa-solid fa-font"></i>
@@ -154,6 +161,7 @@
                                 </div>
                                 <span class="tool-name">Прямоугольник</span>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -424,8 +432,9 @@
 <!-- User role detection for client-side logic -->
 <script>
     // Expose user role for client-side logic (before main script loads)
-    window.userRole = '{{ user.role if user else 'guest' }}';
-    window.isDemoUser = window.userRole === 'demouser';
+    window.userRole = '{{ user_role or 'viewer' }}';
+    window.isDemoUser = {{ 'true' if is_demo_user else 'false' }};
+    window.canEditBoards = window.userRole === 'editor' || window.userRole === 'owner';
 </script>
 
 <!-- Business Context JavaScript -->

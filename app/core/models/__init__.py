@@ -28,6 +28,9 @@ from .board_group import BoardGroup
 from .user_provider_preference import UserProviderPreference
 from .chat import ChatSession, ChatMessage, ChatSessionStatus, ChatMessageRole
 from .report import GeneratedReport, ReportStatus
+from .organization import Organization
+from .organization_member import OrganizationMember
+from .organization_invitation import OrganizationInvitation
 
 __all__ = [
     'db',
@@ -64,5 +67,8 @@ __all__ = [
     'ChatSessionStatus',
     'ChatMessageRole',
     'GeneratedReport',
-    'ReportStatus'
+    'ReportStatus',
+    'Organization',
+    'OrganizationMember',
+    'OrganizationInvitation'
 ]

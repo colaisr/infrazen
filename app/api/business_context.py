@@ -9,8 +9,30 @@ from app.core.models.board_group import BoardGroup
 from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
 from app.api.auth import validate_session, check_demo_user_write_access
+from app.core.organization_context import get_current_organization_id, get_user_role_in_organization
 
 business_context_bp = Blueprint('business_context', __name__)
+
+
+def require_editor_or_owner():
+    """Helper to check if user is editor or owner in current organization
+    
+    Returns:
+        tuple: (user_id, org_id) if authorized, or (None, error_response) if not
+    """
+    user_id = session.get('user', {}).get('db_id')
+    if not user_id:
+        return None, jsonify({'success': False, 'error': 'User not authenticated'}), 401
+    
+    org_id = get_current_organization_id()
+    if not org_id:
+        return None, jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return None, jsonify({'success': False, 'error': 'Только редакторы и владельцы могут выполнять это действие'}), 403
+    
+    return user_id, org_id
 
 
 # ============================================================================
@@ -20,13 +42,19 @@ business_context_bp = Blueprint('business_context', __name__)
 @business_context_bp.route('/boards', methods=['GET'])
 @validate_session
 def list_boards():
-    """Get all boards for current user"""
+    """Get all boards for current organization (viewers see all boards in org)"""
     user_id = session.get('user', {}).get('db_id')
     
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    boards = BusinessBoard.get_user_boards(user_id)
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Filter boards by organization only - viewers should see all boards in the organization
+    boards = BusinessBoard.query.filter_by(organization_id=org_id).order_by(BusinessBoard.updated_at.desc()).all()
     
     return jsonify({
         'success': True,
@@ -38,13 +66,19 @@ def list_boards():
 @business_context_bp.route('/boards/<int:board_id>', methods=['GET'])
 @validate_session
 def get_board(board_id):
-    """Get specific board with full canvas state"""
+    """Get specific board with full canvas state - viewers can view all boards in org"""
     user_id = session.get('user', {}).get('db_id')
     
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    board = BusinessBoard.query.filter_by(id=board_id, user_id=user_id).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Filter by organization only - viewers should be able to view all boards in the organization
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
     
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
@@ -65,7 +99,7 @@ def get_board(board_id):
 @business_context_bp.route('/boards', methods=['POST'])
 @validate_session
 def create_board():
-    """Create new board"""
+    """Create new board - only editors and owners can create"""
     # Check if demo user
     demo_check = check_demo_user_write_access()
     if demo_check:
@@ -76,12 +110,23 @@ def create_board():
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can create boards
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут создавать доски'}), 403
+    
     data = request.get_json()
     name = data.get('name', 'Untitled Board')
     
     # Create board
     board = BusinessBoard(
         user_id=user_id,
+        organization_id=org_id,
         name=name,
         is_default=False,
         canvas_state=None,
@@ -90,8 +135,8 @@ def create_board():
     
     board.save()
     
-    # If this is the user's first board, make it default
-    if BusinessBoard.query.filter_by(user_id=user_id).count() == 1:
+    # If this is the user's first board in this organization, make it default
+    if BusinessBoard.query.filter_by(user_id=user_id, organization_id=org_id).count() == 1:
         board.is_default = True
         db.session.commit()
     
@@ -104,7 +149,7 @@ def create_board():
 @business_context_bp.route('/boards/<int:board_id>', methods=['PUT'])
 @validate_session
 def update_board(board_id):
-    """Update board (name, canvas_state, viewport)"""
+    """Update board (name, canvas_state, viewport) - only editors and owners can edit"""
     # Check if demo user
     demo_check = check_demo_user_write_access()
     if demo_check:
@@ -115,7 +160,17 @@ def update_board(board_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    board = BusinessBoard.query.filter_by(id=board_id, user_id=user_id).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can edit boards
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут редактировать доски'}), 403
+    
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
     
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
@@ -154,7 +209,17 @@ def delete_board(board_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    board = BusinessBoard.query.filter_by(id=board_id, user_id=user_id).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can delete boards
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут удалять доски'}), 403
+    
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
     
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
@@ -181,7 +246,17 @@ def set_default_board(board_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    board = BusinessBoard.set_default_board(user_id, board_id)
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can set default board
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут устанавливать доску по умолчанию'}), 403
+    
+    board = BusinessBoard.set_default_board(user_id, board_id, org_id)
     
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
@@ -199,20 +274,24 @@ def set_default_board(board_id):
 @business_context_bp.route('/available-resources', methods=['GET'])
 @validate_session
 def get_available_resources():
-    """Get all user resources with placement status for a specific board"""
+    """Get all organization resources with placement status for a specific board"""
     user_id = session.get('user', {}).get('db_id')
     
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
     # Get board_id from query parameter (optional for backward compatibility)
     board_id = request.args.get('board_id', type=int)
     
-    # Get all user's resources via their providers
-    resources = Resource.query.join(
-        CloudProvider, Resource.provider_id == CloudProvider.id
-    ).filter(
-        CloudProvider.user_id == user_id,
+    # Get all resources in the organization (not just user's own)
+    # Editors and viewers should see all resources in the organization
+    resources = Resource.query.filter(
+        Resource.organization_id == org_id,
         Resource.is_active == True
     ).all()
     
@@ -226,7 +305,13 @@ def get_available_resources():
         placed_resource_ids = {br.resource_id for br in placed_resources}
     else:
         # Legacy behavior: check all boards
-        board_ids = [b.id for b in BusinessBoard.query.filter_by(user_id=user_id).all()]
+        # Get current organization ID
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
+        
+        # Get all boards in the organization (not just user's own)
+        board_ids = [b.id for b in BusinessBoard.query.filter_by(organization_id=org_id).all()]
         if board_ids:
             placed_resources = BoardResource.query.filter(
                 BoardResource.board_id.in_(board_ids)
@@ -289,8 +374,18 @@ def place_resource_on_board(board_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Verify board belongs to user
-    board = BusinessBoard.query.filter_by(id=board_id, user_id=user_id).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can place resources
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут размещать ресурсы на досках'}), 403
+    
+    # Verify board belongs to organization
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
     
@@ -303,12 +398,12 @@ def place_resource_on_board(board_id):
     if not resource_id:
         return jsonify({'success': False, 'error': 'resource_id is required'}), 400
     
-    # Verify resource exists and belongs to user
+    # Verify resource exists and belongs to organization
     resource = Resource.query.join(
         CloudProvider, Resource.provider_id == CloudProvider.id
     ).filter(
         Resource.id == resource_id,
-        CloudProvider.user_id == user_id
+        Resource.organization_id == org_id
     ).first()
     
     if not resource:
@@ -419,7 +514,7 @@ def update_board_resource(board_resource_id):
 @business_context_bp.route('/board-resources/<int:board_resource_id>', methods=['DELETE'])
 @validate_session
 def remove_resource_from_board(board_resource_id):
-    """Remove resource from board"""
+    """Remove resource from board - only editors and owners can remove"""
     # Check if demo user
     demo_check = check_demo_user_write_access()
     if demo_check:
@@ -430,12 +525,22 @@ def remove_resource_from_board(board_resource_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Get board resource and verify ownership
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can remove resources
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут удалять ресурсы с досок'}), 403
+    
+    # Get board resource and verify it belongs to organization
     board_resource = BoardResource.query.join(
         BusinessBoard, BoardResource.board_id == BusinessBoard.id
     ).filter(
         BoardResource.id == board_resource_id,
-        BusinessBoard.user_id == user_id
+        BusinessBoard.organization_id == org_id
     ).first()
     
     if not board_resource:
@@ -459,7 +564,7 @@ def remove_resource_from_board(board_resource_id):
 @business_context_bp.route('/board-resources/<int:board_resource_id>/notes', methods=['PUT'])
 @validate_session
 def update_resource_notes(board_resource_id):
-    """Update resource notes"""
+    """Update resource notes - only editors and owners can update"""
     # Check if demo user
     demo_check = check_demo_user_write_access()
     if demo_check:
@@ -470,12 +575,22 @@ def update_resource_notes(board_resource_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Get board resource and verify ownership
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can update notes
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут редактировать заметки'}), 403
+    
+    # Get board resource and verify it belongs to organization
     board_resource = BoardResource.query.join(
         BusinessBoard, BoardResource.board_id == BusinessBoard.id
     ).filter(
         BoardResource.id == board_resource_id,
-        BusinessBoard.user_id == user_id
+        BusinessBoard.organization_id == org_id
     ).first()
     
     if not board_resource:
@@ -497,7 +612,7 @@ def update_resource_notes(board_resource_id):
 @business_context_bp.route('/resources/<int:resource_id>/notes', methods=['PUT'])
 @validate_session
 def update_resource_system_notes(resource_id):
-    """Update system-wide resource notes (not board-specific)"""
+    """Update system-wide resource notes (not board-specific) - only editors and owners"""
     # Check if demo user
     demo_check = check_demo_user_write_access()
     if demo_check:
@@ -508,12 +623,20 @@ def update_resource_system_notes(resource_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Get resource and verify ownership (user must own the provider)
-    resource = Resource.query.join(
-        CloudProvider, Resource.provider_id == CloudProvider.id
-    ).filter(
-        Resource.id == resource_id,
-        CloudProvider.user_id == user_id
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can update system notes
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут редактировать системные заметки'}), 403
+    
+    # Get resource and verify it belongs to organization
+    resource = Resource.query.filter_by(
+        id=resource_id,
+        organization_id=org_id
     ).first()
     
     if not resource:
@@ -550,8 +673,18 @@ def create_group(board_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Verify board belongs to user
-    board = BusinessBoard.query.filter_by(id=board_id, user_id=user_id).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can create groups
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут создавать группы'}), 403
+    
+    # Verify board belongs to organization
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
     if not board:
         return jsonify({'success': False, 'error': 'Board not found'}), 404
     
@@ -597,12 +730,22 @@ def update_group(group_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Get group and verify ownership
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can update groups
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут редактировать группы'}), 403
+    
+    # Get group and verify it belongs to organization
     group = BoardGroup.query.join(
         BusinessBoard, BoardGroup.board_id == BusinessBoard.id
     ).filter(
         BoardGroup.id == group_id,
-        BusinessBoard.user_id == user_id
+        BusinessBoard.organization_id == org_id
     ).first()
     
     if not group:
@@ -651,12 +794,22 @@ def delete_group(group_id):
     if not user_id:
         return jsonify({'success': False, 'error': 'User not authenticated'}), 401
     
-    # Get group and verify ownership
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Check user role - only editors and owners can delete groups
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут удалять группы'}), 403
+    
+    # Get group and verify it belongs to organization
     group = BoardGroup.query.join(
         BusinessBoard, BoardGroup.board_id == BusinessBoard.id
     ).filter(
         BoardGroup.id == group_id,
-        BusinessBoard.user_id == user_id
+        BusinessBoard.organization_id == org_id
     ).first()
     
     if not group:

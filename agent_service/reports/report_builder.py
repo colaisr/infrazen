@@ -31,26 +31,31 @@ class ReportDataBuilder:
         role = role or "cfo"
         context = context or {}
         time_range_days = context.get("time_range_days") or 30
+        organization_id = context.get("organization_id")  # Extract organization_id from context
 
         user_profile = self._get_user_profile(user_id)
 
         overview = self.analytics_tools.get_analytics_overview(
             user_id=user_id,
-            time_range_days=time_range_days
+            time_range_days=time_range_days,
+            organization_id=organization_id
         )
 
         service_breakdown = self.analytics_tools.get_service_breakdown(
             user_id=user_id,
-            top_n=10
+            top_n=10,
+            organization_id=organization_id
         )
 
         provider_breakdown = self.analytics_tools.get_provider_breakdown(
-            user_id=user_id
+            user_id=user_id,
+            organization_id=organization_id
         )
 
         recommendations_summary = self.analytics_tools.summarize_top_recommendations(
             user_id=user_id,
-            limit=5
+            limit=5,
+            organization_id=organization_id
         )
 
         snapshot = {
@@ -72,7 +77,7 @@ class ReportDataBuilder:
 
         logger.info(
             "Report snapshot generated",
-            extra={"user_id": user_id, "role": role, "time_range": time_range_days}
+            extra={"user_id": user_id, "role": role, "time_range": time_range_days, "organization_id": organization_id}
         )
         return snapshot
 

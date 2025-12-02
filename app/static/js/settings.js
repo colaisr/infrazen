@@ -36,6 +36,7 @@ function loadUserDetails() {
                 updateLoginMethods(userDetails);
                 updatePasswordManagement(userDetails);
                 updatePreferences(userDetails);
+                loadOrganizationManagement(); // Load organization management
             } else if (data && data.redirect) {
                 // Server requested redirect (e.g., user account no longer exists)
                 showMessage(data.error || 'Session expired', 'error');
@@ -662,6 +663,473 @@ function sendConfirmationEmail() {
     });
 }
 
+// ============================================================================
+// Organization Management
+// ============================================================================
+
+let currentOrganization = null;
+let organizationMembers = [];
+let organizationInvitations = [];
+
+function loadOrganizationManagement() {
+    // Get current organization ID from session or API
+    fetch('/api/organizations')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.organizations && data.organizations.length > 0) {
+                // Find current organization
+                const currentOrg = data.organizations.find(org => org.is_current) || data.organizations[0];
+                if (currentOrg) {
+                    loadOrganizationDetails(currentOrg.id);
+                } else {
+                    showOrganizationError('Не найдена активная организация');
+                }
+            } else {
+                showOrganizationError('Не найдено организаций');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading organizations:', error);
+            showOrganizationError('Ошибка при загрузке организаций');
+        });
+}
+
+function loadOrganizationDetails(orgId) {
+    fetch(`/api/organizations/${orgId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentOrganization = data.organization;
+                organizationMembers = data.organization.members || [];
+                displayOrganizationManagement(data.organization);
+                loadOrganizationInvitations(orgId);
+            } else {
+                showOrganizationError(data.error || 'Не удалось загрузить информацию об организации');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading organization details:', error);
+            showOrganizationError('Ошибка при загрузке информации об организации');
+        });
+}
+
+function loadOrganizationInvitations(orgId) {
+    fetch(`/api/organizations/${orgId}/invitations`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                organizationInvitations = data.invitations || [];
+                displayInvitations(organizationInvitations);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading invitations:', error);
+        });
+}
+
+function displayOrganizationManagement(org) {
+    const container = document.getElementById('organizationManagementContent');
+    if (!container) return;
+    
+    const isOwner = org.role === 'owner';
+    
+    let html = `
+        <div class="organization-info">
+            <div class="org-details-section">
+                <h4>Информация об организации</h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Название организации</label>
+                        <div class="info-value">
+                            ${isOwner ? `
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="text" id="orgNameInput" value="${escapeHtml(org.name)}" class="form-input" style="flex: 1;">
+                                    <button id="saveOrgNameBtn" class="btn btn-primary" onclick="saveOrganizationName()">
+                                        <i class="fa-solid fa-save"></i> Сохранить
+                                    </button>
+                                </div>
+                            ` : `
+                                <span>${escapeHtml(org.name)}</span>
+                            `}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <label>Ваша роль</label>
+                        <div class="info-value">
+                            <span class="role-badge role-${org.role}">${getRoleLabel(org.role)}</span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <label>Участников</label>
+                        <div class="info-value">${org.member_count || 0}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="org-members-section" style="margin-top: 2rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4>Участники</h4>
+                    ${isOwner ? `
+                        <button class="btn btn-primary" onclick="showInviteMemberModal()">
+                            <i class="fa-solid fa-user-plus"></i> Пригласить участника
+                        </button>
+                    ` : ''}
+                </div>
+                <div id="membersList">
+                    ${renderMembersList(org.members || [])}
+                </div>
+            </div>
+            
+            <div class="org-invitations-section" style="margin-top: 2rem;">
+                <h4>Приглашения</h4>
+                <div id="invitationsList">
+                    ${renderInvitationsList(organizationInvitations)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function renderMembersList(members) {
+    if (members.length === 0) {
+        return '<p style="color: var(--text-secondary);">Нет участников</p>';
+    }
+    
+    const isOwner = currentOrganization && currentOrganization.role === 'owner';
+    
+    return `
+        <div class="members-table">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-light);">
+                        <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Участник</th>
+                        <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Роль</th>
+                        <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Дата присоединения</th>
+                        ${isOwner ? '<th style="text-align: right; padding: 0.75rem; font-weight: 600;">Действия</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${members.map(member => `
+                        <tr style="border-bottom: 1px solid var(--border-light);">
+                            <td style="padding: 0.75rem;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div class="user-avatar-small" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-blue); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem;">
+                                        ${member.picture ? `<img src="${escapeHtml(member.picture)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">` : (member.name ? member.name.charAt(0).toUpperCase() : member.email.charAt(0).toUpperCase())}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 500;">${escapeHtml(member.name || member.email)}</div>
+                                        <div style="font-size: 0.875rem; color: var(--text-secondary);">${escapeHtml(member.email)}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding: 0.75rem;">
+                                ${isOwner && !member.is_owner ? `
+                                    <select class="form-select" onchange="changeMemberRole(${member.user_id}, this.value)" style="padding: 0.25rem 0.5rem;">
+                                        <option value="viewer" ${member.role === 'viewer' ? 'selected' : ''}>Наблюдатель</option>
+                                        <option value="editor" ${member.role === 'editor' ? 'selected' : ''}>Редактор</option>
+                                        <option value="owner" ${member.role === 'owner' ? 'selected' : ''} disabled>Владелец</option>
+                                    </select>
+                                ` : `
+                                    <span class="role-badge role-${member.role}">${getRoleLabel(member.role)}</span>
+                                `}
+                            </td>
+                            <td style="padding: 0.75rem; color: var(--text-secondary);">
+                                ${member.joined_at ? new Date(member.joined_at).toLocaleDateString('ru-RU') : '-'}
+                            </td>
+                            ${isOwner ? `
+                                <td style="padding: 0.75rem; text-align: right;">
+                                    ${!member.is_owner ? `
+                                        <button class="btn btn-danger btn-sm" onclick="removeMember(${member.user_id}, '${escapeHtml(member.name || member.email)}')" style="padding: 0.25rem 0.75rem; font-size: 0.875rem;">
+                                            <i class="fa-solid fa-user-minus"></i> Удалить
+                                        </button>
+                                    ` : '<span style="color: var(--text-secondary);">-</span>'}
+                                </td>
+                            ` : ''}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderInvitationsList(invitations) {
+    if (!invitations || invitations.length === 0) {
+        return '<p style="color: var(--text-secondary);">Нет активных приглашений</p>';
+    }
+    
+    const isOwner = currentOrganization && currentOrganization.role === 'owner';
+    
+    return `
+        <div class="invitations-list">
+            ${invitations.map(inv => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 6px; margin-bottom: 0.5rem;">
+                    <div>
+                        <div style="font-weight: 500;">${escapeHtml(inv.email)}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            Роль: ${getRoleLabel(inv.role)} • Статус: ${getInvitationStatusLabel(inv.status)}
+                        </div>
+                    </div>
+                    ${isOwner && inv.status === 'sent' ? `
+                        <button class="btn btn-danger btn-sm" onclick="revokeInvitation(${inv.id})" style="padding: 0.25rem 0.75rem;">
+                            Отозвать
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function displayInvitations(invitations) {
+    const container = document.getElementById('invitationsList');
+    if (container) {
+        container.innerHTML = renderInvitationsList(invitations);
+    }
+}
+
+function getRoleLabel(role) {
+    const labels = {
+        'owner': 'Владелец',
+        'editor': 'Редактор',
+        'viewer': 'Наблюдатель'
+    };
+    return labels[role] || role;
+}
+
+function getInvitationStatusLabel(status) {
+    const labels = {
+        'sent': 'Отправлено',
+        'accepted': 'Принято',
+        'revoked': 'Отозвано',
+        'failed': 'Ошибка'
+    };
+    return labels[status] || status;
+}
+
+function saveOrganizationName() {
+    const nameInput = document.getElementById('orgNameInput');
+    const saveBtn = document.getElementById('saveOrgNameBtn');
+    
+    if (!nameInput || !currentOrganization) return;
+    
+    const newName = nameInput.value.trim();
+    if (!newName) {
+        showMessage('Название организации не может быть пустым', 'error');
+        return;
+    }
+    
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Сохранение...';
+    
+    fetch(`/api/organizations/${currentOrganization.id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: newName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Название организации успешно обновлено', 'success');
+            currentOrganization.name = newName;
+            loadOrganizationDetails(currentOrganization.id);
+        } else {
+            showMessage(data.error || 'Не удалось обновить название организации', 'error');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Сохранить';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Ошибка при обновлении названия организации', 'error');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-save"></i> Сохранить';
+    });
+}
+
+function showInviteMemberModal() {
+    const modal = document.getElementById('inviteMemberModal');
+    if (modal) {
+        modal.classList.add('active');
+        document.body.classList.add('modal-open');
+        // Reset form
+        const form = document.getElementById('inviteMemberForm');
+        if (form) {
+            form.reset();
+        }
+        // Focus on email input
+        const emailInput = document.getElementById('inviteEmail');
+        if (emailInput) {
+            setTimeout(() => emailInput.focus(), 100);
+        }
+    }
+}
+
+function closeInviteMemberModal() {
+    const modal = document.getElementById('inviteMemberModal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function handleInviteMemberSubmit(event) {
+    event.preventDefault();
+    
+    const emailInput = document.getElementById('inviteEmail');
+    const roleSelect = document.getElementById('inviteRole');
+    const submitBtn = document.getElementById('inviteMemberSubmitBtn');
+    
+    if (!emailInput || !roleSelect || !currentOrganization) return;
+    
+    const email = emailInput.value.trim();
+    const role = roleSelect.value;
+    
+    if (!email) {
+        showMessage('Введите email пользователя', 'error');
+        return;
+    }
+    
+    if (!role || !['viewer', 'editor'].includes(role)) {
+        showMessage('Выберите роль', 'error');
+        return;
+    }
+    
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Отправка...';
+    
+    inviteMember(email, role);
+}
+
+function inviteMember(email, role) {
+    const submitBtn = document.getElementById('inviteMemberSubmitBtn');
+    
+    fetch(`/api/organizations/${currentOrganization.id}/members`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email, role: role })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage(`Пользователь ${email} успешно приглашён`, 'success');
+            closeInviteMemberModal();
+            loadOrganizationDetails(currentOrganization.id);
+        } else {
+            showMessage(data.error || 'Не удалось пригласить пользователя', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Отправить приглашение';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Ошибка при приглашении пользователя', 'error');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Отправить приглашение';
+        }
+    });
+}
+
+function changeMemberRole(userId, newRole) {
+    if (!confirm('Изменить роль участника?')) {
+        // Reload to reset dropdown
+        loadOrganizationDetails(currentOrganization.id);
+        return;
+    }
+    
+    fetch(`/api/organizations/${currentOrganization.id}/members/${userId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ role: newRole })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Роль участника успешно изменена', 'success');
+            loadOrganizationDetails(currentOrganization.id);
+        } else {
+            showMessage(data.error || 'Не удалось изменить роль участника', 'error');
+            loadOrganizationDetails(currentOrganization.id);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Ошибка при изменении роли участника', 'error');
+        loadOrganizationDetails(currentOrganization.id);
+    });
+}
+
+function removeMember(userId, userName) {
+    if (!confirm(`Вы уверены, что хотите удалить участника ${userName} из организации?`)) {
+        return;
+    }
+    
+    fetch(`/api/organizations/${currentOrganization.id}/members/${userId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Участник успешно удалён из организации', 'success');
+            loadOrganizationDetails(currentOrganization.id);
+        } else {
+            showMessage(data.error || 'Не удалось удалить участника', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Ошибка при удалении участника', 'error');
+    });
+}
+
+function revokeInvitation(invitationId) {
+    if (!confirm('Отозвать приглашение?')) {
+        return;
+    }
+    
+    fetch(`/api/organizations/${currentOrganization.id}/invitations/${invitationId}/revoke`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Приглашение успешно отозвано', 'success');
+            loadOrganizationInvitations(currentOrganization.id);
+        } else {
+            showMessage(data.error || 'Не удалось отозвать приглашение', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showMessage('Ошибка при отзыве приглашения', 'error');
+    });
+}
+
+function showOrganizationError(message) {
+    const container = document.getElementById('organizationManagementContent');
+    if (container) {
+        container.innerHTML = `<div style="color: var(--error-red); padding: 1rem;">${escapeHtml(message)}</div>`;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Make functions globally available for onclick handlers
 window.handleGoogleConnect = handleGoogleConnect;
 window.handleGoogleConnectResponse = handleGoogleConnectResponse;
@@ -672,4 +1140,11 @@ window.checkPasswordStrength = checkPasswordStrength;
 window.checkPasswordMatch = checkPasswordMatch;
 window.sendConfirmationEmail = sendConfirmationEmail;
 window.toggleProviderPreference = toggleProviderPreference;
+window.saveOrganizationName = saveOrganizationName;
+window.showInviteMemberModal = showInviteMemberModal;
+window.closeInviteMemberModal = closeInviteMemberModal;
+window.handleInviteMemberSubmit = handleInviteMemberSubmit;
+window.changeMemberRole = changeMemberRole;
+window.removeMember = removeMember;
+window.revokeInvitation = revokeInvitation;
 

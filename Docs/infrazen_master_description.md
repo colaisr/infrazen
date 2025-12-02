@@ -373,6 +373,307 @@ The platform includes a comprehensive database initialization script that bootst
 - **Role-Based Start**: Establishes hierarchical user management from day one
 - **Audit Trail**: Maintains creation timestamps and admin notes
 
+### 6.1.9. Multi-Organization System ✅ COMPLETED
+
+#### **Overview**
+InfraZen implements a comprehensive multi-organization (multi-tenant) system that enables users to work within organizational contexts, invite team members, and collaborate on cloud resource management. All platform data (connections, resources, dashboards, boards, recommendations, reports) is scoped to organizations, providing complete data isolation and enabling true team collaboration.
+
+#### **Key Features**
+- **Personal Organizations**: Each user automatically receives a personal organization upon account creation
+- **Team Collaboration**: Users can invite other users to their organizations with role-based permissions
+- **Organization Switching**: Seamless switching between organizations via sidebar switcher
+- **Complete Data Isolation**: All data is scoped to organizations with no cross-organization access
+- **Role-Based Access Control**: Three roles (Viewer, Editor, Owner) with granular permissions
+- **Automatic Data Migration**: Existing users automatically receive personal organizations with all their data migrated
+
+#### **Database Schema**
+
+**Organizations Table:**
+```sql
+CREATE TABLE organizations (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX idx_organizations_name (name)
+);
+```
+
+**Organization Members Table:**
+```sql
+CREATE TABLE organization_members (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    organization_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'viewer', -- viewer, editor, owner
+    invited_by_user_id INTEGER,
+    invited_at DATETIME,
+    joined_at DATETIME,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY unique_org_user (organization_id, user_id),
+    INDEX idx_org_members_user (user_id),
+    INDEX idx_org_members_org (organization_id),
+    INDEX idx_org_members_role (role)
+);
+```
+
+**Organization Invitations Table (Audit Trail):**
+```sql
+CREATE TABLE organization_invitations (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    organization_id INTEGER NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'viewer',
+    invited_by_user_id INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, accepted, revoked
+    accepted_at DATETIME,
+    revoked_at DATETIME,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+    FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_invitations_email (email),
+    INDEX idx_invitations_org (organization_id),
+    INDEX idx_invitations_status (status)
+);
+```
+
+**User Model Extensions:**
+- `personal_organization_id`: Reference to user's personal organization
+- `last_active_organization_id`: Last organization user was active in (for default on login)
+
+**Organization-Scoped Tables:**
+All major tables include `organization_id` column:
+- `cloud_providers` - Provider connections scoped to organizations
+- `resources` - Cloud resources scoped to organizations
+- `business_boards` - Business context boards scoped to organizations
+- `optimization_recommendations` - Recommendations scoped to organizations
+- `generated_reports` - Reports scoped to organizations
+- `complete_syncs` - Sync history scoped to organizations
+- `sync_snapshots` - Sync snapshots scoped to organizations
+- `chat_sessions` - Chat sessions scoped to organizations
+
+#### **Role-Based Permissions**
+
+**Viewer Role (Read-Only):**
+- ✅ View all connections, resources, dashboards, boards, recommendations, reports, analytics
+- ✅ Export data (CSV, reports)
+- ❌ Add/edit/delete connections, boards, resources
+- ❌ Modify resource notes/tags
+- ❌ Accept/reject recommendations
+- ❌ Create/edit reports
+- ❌ Invite users or manage organization settings
+
+**Editor Role (Content Management):**
+- ✅ All viewer permissions +
+- ✅ Add/edit/delete connections
+- ✅ Add/edit/delete boards
+- ✅ Modify resources (notes, tags, cost centers)
+- ✅ Accept/reject recommendations
+- ✅ Create/edit/delete reports
+- ✅ Trigger syncs
+- ❌ Invite users
+- ❌ Manage organization settings
+- ❌ Change member roles or remove members
+
+**Owner Role (Full Control):**
+- ✅ All editor permissions +
+- ✅ Manage organization settings (name)
+- ✅ Invite users (viewer or editor role only)
+- ✅ Change member roles
+- ✅ Remove members
+- ❌ Transfer ownership (owner cannot transfer)
+- ❌ Delete organization (organizations cannot be deleted)
+
+#### **Organization Context Management**
+
+**Session Storage:**
+```python
+session['user'] = {
+    'id': user.id,
+    'current_organization_id': org.id,
+    'organizations': [
+        {'id': 1, 'name': 'My Org', 'role': 'owner'},
+        {'id': 2, 'name': 'Team Org', 'role': 'editor'}
+    ]
+}
+```
+
+**Context Helper Functions (`app/core/organization_context.py`):**
+- `get_current_organization_id()`: Get active organization ID from session
+- `set_current_organization_id(org_id)`: Set active organization and update user preferences
+- `get_current_organization()`: Get Organization object for current context
+- `require_organization_access(org_id, user_id)`: Verify user has access to organization
+- `get_user_organizations(user_id)`: Get all organizations user belongs to
+- `initialize_user_organization_context(user_id)`: Initialize context on login
+
+**Default Organization Behavior:**
+- On first login: Defaults to user's personal organization
+- On subsequent logins: Uses `last_active_organization_id` from user preferences
+- If last active org is invalid: Falls back to personal organization
+
+#### **Invitation System**
+
+**Automatic Invitation Flow:**
+1. Owner invites user by email (must be existing user)
+2. User is automatically added to organization (no confirmation step)
+3. Email notification sent to inform user
+4. Invitation record created for audit trail
+
+**Invitation Features:**
+- **Email-Based**: Invitations sent via email to existing users only
+- **Role Assignment**: Role (viewer/editor) assigned at invite time
+- **Idempotent**: Re-inviting existing members is silently ignored
+- **Audit Trail**: All invitations tracked in `organization_invitations` table
+- **Revocation**: Owners can revoke pending invitations
+
+**Invitation Endpoints:**
+- `POST /api/organizations/<org_id>/members`: Invite user (automatic addition)
+- `GET /api/organizations/<org_id>/invitations`: List invitation history
+- `POST /api/organizations/<org_id>/invitations/<id>/revoke`: Revoke invitation
+
+#### **Organization Management API**
+
+**Organization Endpoints (`app/api/organizations.py`):**
+- `GET /api/organizations`: List user's organizations with roles
+- `GET /api/organizations/<id>`: Get organization details with members
+- `PUT /api/organizations/<id>`: Update organization name (owner only)
+- `POST /api/organizations/<id>/switch`: Switch active organization
+- `GET /api/organizations/current`: Get current active organization
+
+**Member Management Endpoints:**
+- `GET /api/organizations/<id>/members`: List organization members
+- `POST /api/organizations/<id>/members`: Invite/add member (owner only)
+- `PUT /api/organizations/<id>/members/<user_id>`: Update member role (owner only)
+- `DELETE /api/organizations/<id>/members/<user_id>`: Remove member (owner only)
+
+**Permission Enforcement:**
+- All endpoints verify organization access via `require_organization_access()`
+- Owner-only operations use `require_owner()` helper
+- Editor operations use `require_owner_or_editor()` helper
+
+#### **Frontend Implementation**
+
+**Organization Switcher (`app/static/js/organizations.js`):**
+- Located below user card in sidebar footer
+- Dropdown showing all user's organizations with role badges
+- Current organization highlighted with checkmark
+- Click to switch organization (triggers page reload with cache busting)
+- Shows "Personal" badge for personal organizations
+
+**Organization Settings (`app/templates/settings.html`):**
+- Dedicated "Управление организацией" (Organization Management) section
+- Organization name editing (owner only)
+- Member list with roles, join dates, and actions
+- Invite member modal with email and role selection
+- Member role change dropdown (owner only)
+- Remove member functionality (owner only)
+- Invitation history display
+
+**UI Integration:**
+- All pages pass `user_role` to templates for permission-based UI
+- Viewers see read-only interfaces (no edit buttons, disabled forms)
+- Editors see full editing capabilities except user management
+- Organization context automatically included in all API calls
+
+#### **Data Migration**
+
+**Migration Script (`scripts/migrate_to_organizations.py`):**
+1. Creates personal organization for each existing user
+2. Assigns user as owner of their personal organization
+3. Migrates all user-scoped data to personal organization:
+   - Cloud providers → `organization_id`
+   - Resources → `organization_id`
+   - Business boards → `organization_id`
+   - Recommendations → `organization_id`
+   - Reports → `organization_id`
+   - Sync snapshots → `organization_id`
+   - Complete syncs → `organization_id`
+4. Sets `personal_organization_id` and `last_active_organization_id` for each user
+5. Verifies data integrity and reports migration statistics
+
+**Migration Safety:**
+- Additive migration (adds `organization_id`, doesn't remove `user_id`)
+- Can rollback by ignoring `organization_id` columns
+- All existing data preserved and correctly scoped
+
+#### **Data Isolation & Security**
+
+**Complete Isolation:**
+- All queries filter by `organization_id` from session context
+- No cross-organization data access possible
+- Organization membership verified on every request
+- Session-based context ensures consistent filtering
+
+**Security Features:**
+- Organization access verified via `require_organization_access()` decorator
+- Role-based permission checks on all write operations
+- Owner-only operations protected (invite, settings, member management)
+- Soft delete preserves organization context for audit trails
+
+**Query Filtering Pattern:**
+```python
+# All queries automatically filter by organization
+org_id = get_current_organization_id()
+resources = Resource.query.filter_by(
+    organization_id=org_id,
+    is_active=True
+).all()
+```
+
+#### **Implementation Files**
+
+**Backend:**
+- `app/core/models/organization.py`: Organization model
+- `app/core/models/organization_member.py`: Member model with roles
+- `app/core/models/organization_invitation.py`: Invitation audit trail
+- `app/core/organization_context.py`: Context management helpers
+- `app/api/organizations.py`: Organization management API
+- `app/api/auth.py`: Organization context initialization on login
+- `app/__init__.py`: Organization context middleware
+
+**Frontend:**
+- `app/static/js/organizations.js`: Organization switcher logic
+- `app/static/js/settings.js`: Organization management UI
+- `app/templates/base.html`: Organization switcher UI in sidebar
+- `app/templates/settings.html`: Organization management section
+- `app/static/css/components/navigation.css`: Switcher styling
+- `app/static/css/pages/settings.css`: Settings page styling
+
+**Database:**
+- `migrations/versions/*_add_organizations_tables.py`: Schema creation
+- `migrations/versions/*_add_organization_id_to_tables.py`: Add org_id columns
+- `migrations/versions/*_make_organization_id_not_null.py`: Enforce NOT NULL
+- `migrations/versions/*_add_personal_organization_id_to_users.py`: User extensions
+- `scripts/migrate_to_organizations.py`: Data migration script
+
+#### **Key Design Decisions**
+
+1. **Single Owner Model**: Only one owner per organization, owner cannot leave
+2. **Personal Organizations**: Each user has a personal org that remains separate
+3. **No Deletion**: Organizations cannot be deleted (data retention)
+4. **Automatic Invitations**: Users added immediately, email is notification only
+5. **Existing Users Only**: Can only invite users who already have accounts
+6. **Session-Based Context**: `current_organization_id` stored in Flask session
+7. **Last Active Default**: Remembers last active organization for next login
+8. **Complete Isolation**: No cross-organization data access
+9. **No Limits**: Unlimited organizations and members per user
+10. **Name Only**: Organization settings limited to name (can extend later)
+
+#### **Benefits**
+
+✅ **Team Collaboration**: Multiple users can collaborate on shared cloud resources  
+✅ **Data Isolation**: Complete separation between organizations prevents data leakage  
+✅ **Role-Based Access**: Granular permissions enable secure team management  
+✅ **Seamless Switching**: Easy switching between personal and team organizations  
+✅ **Backward Compatible**: Existing users automatically migrated with no disruption  
+✅ **Scalable**: Supports unlimited organizations and members  
+✅ **Secure**: Organization access verified on every request with role checks  
+
 ## 6.2. Complete System Architecture Overview
 
 ### 6.2.1. Core Architecture Principles
@@ -380,27 +681,36 @@ The platform includes a comprehensive database initialization script that bootst
 InfraZen implements a **scalable, plugin-based multi-cloud FinOps platform** designed for enterprise-grade cloud resource management. The architecture follows these key principles:
 
 - **🔌 Plugin-Based Extensibility**: Clean separation of provider-specific logic into independent plugins
-- **👥 Multi-Tenant Isolation**: Complete user data isolation with provider-level granularity
+- **👥 Multi-Tenant Isolation**: Complete organization-scoped data isolation with role-based access control
 - **📊 FinOps-First Design**: Cost tracking, optimization, and analytics built into every component
 - **🔄 Event-Driven Synchronization**: Real-time sync with historical change tracking
 - **🏗️ Database-Normalized Storage**: Unified schema supporting unlimited provider types
 
 ### 6.2.2. Database Architecture & Relationships
 
-The system implements a hierarchical data model ensuring complete audit trails and multi-provider support:
+The system implements a hierarchical data model ensuring complete audit trails, multi-provider support, and organization-scoped multi-tenancy:
 
 ```
-Users (user_id)
-├── Cloud Providers (provider_id, user_id, provider_type)
-│   ├── Sync Snapshots (snapshot_id, provider_id)
+Organizations (organization_id)
+├── Organization Members (organization_id, user_id, role)
+│   └── Users (user_id, personal_organization_id, last_active_organization_id)
+├── Cloud Providers (provider_id, organization_id, user_id, provider_type)
+│   ├── Sync Snapshots (snapshot_id, provider_id, organization_id)
 │   │   └── Resource States (state_id, snapshot_id, resource_id)
-│   └── Resources (resource_id, provider_id)
+│   └── Resources (resource_id, provider_id, organization_id)
 │       └── Resource Tags (tag_id, resource_id)
-└── Recommendations (user_id)
+├── Business Boards (board_id, organization_id, user_id)
+├── Optimization Recommendations (recommendation_id, organization_id)
+├── Generated Reports (report_id, organization_id)
+├── Complete Syncs (sync_id, organization_id)
+└── Chat Sessions (session_id, organization_id)
 ```
 
 **Key Relationships:**
-- **Users ↔ Providers**: One-to-many (users can have unlimited providers)
+- **Organizations ↔ Users**: Many-to-many via OrganizationMembers (users can belong to multiple orgs)
+- **Organizations ↔ Providers**: One-to-many (all providers scoped to organizations)
+- **Organizations ↔ Resources**: One-to-many (all resources scoped to organizations)
+- **Users ↔ Personal Organizations**: One-to-one (each user has one personal org)
 - **Providers ↔ Snapshots**: One-to-many (each provider has independent sync history)
 - **Snapshots ↔ Resources**: Many-to-many via Resource States (change tracking)
 - **Resources ↔ Tags**: One-to-many (metadata and categorization)
@@ -506,6 +816,15 @@ User "cola" (user_id: 4)
 - **Memory Efficient**: Streaming processing for large resource sets
 
 ### 6.2.8. Security & Data Isolation
+
+**Organization-Scoped Multi-Tenancy:**
+- **Complete Data Isolation**: All data queries filter by `organization_id` from session context
+- **Role-Based Access Control**: Viewer, Editor, and Owner roles with granular permissions
+- **Access Verification**: Organization membership verified on every request via `require_organization_access()`
+- **Session Context**: Active organization stored in Flask session, automatically included in all queries
+- **Cross-Organization Prevention**: No data leakage between organizations, complete isolation enforced
+
+**Multi-Tenant Architecture:**
 
 **Multi-Tenant Architecture:**
 - **User-Level Isolation**: Complete data separation between users

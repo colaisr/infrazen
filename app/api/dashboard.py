@@ -6,6 +6,7 @@ from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
 from app.core.models.sync import SyncSnapshot, ResourceState
 from app.core.models.user import User
+from app.core.organization_context import get_current_organization_id, filter_by_organization
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -30,12 +31,17 @@ def get_dashboard_resources():
         if not current_user_id:
             return jsonify({'success': False, 'error': 'Unauthorized'}), 401
 
-        # Get latest successful complete sync for this user
+        # Get latest successful complete sync for this user and organization
         from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
         
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
+        
+        # Show all syncs for the organization, not just current user's
         latest_complete_sync = (
             CompleteSync.query
-            .filter_by(user_id=current_user_id, sync_status='success')
+            .filter_by(organization_id=org_id, sync_status='success')
             .order_by(CompleteSync.sync_completed_at.desc())
             .first()
         )
@@ -65,13 +71,17 @@ def get_dashboard_resources():
                 # Use ResourceState (preferred)
                 resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id]
                 if resource_ids:
-                    provider_resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
+                    provider_resources = Resource.query.filter(
+                        Resource.id.in_(resource_ids),
+                        Resource.organization_id == org_id
+                    ).all()
                     all_resources.extend(provider_resources)
             else:
                 # Fallback: get active resources for this provider
                 # This happens when ResourceState entries weren't created during sync
                 provider_resources = Resource.query.filter_by(
                     provider_id=ref.provider_id,
+                    organization_id=org_id,
                     is_active=True
                 ).all()
                 all_resources.extend(provider_resources)

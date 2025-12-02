@@ -11,6 +11,7 @@ from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
 from app.core.models.user import User
 from app.core.models.complete_sync import CompleteSync
+from app.core.organization_context import get_current_organization_id
 
 recommendations_bp = Blueprint('recommendations', __name__)
 
@@ -76,22 +77,13 @@ def _serialize(rec: OptimizationRecommendation):
 def list_recommendations():
     query = OptimizationRecommendation.query
 
-    # Scope by current user (including demo session mapped to seeded demo user)
-    current_user_id = None
-    try:
-        user_data = session.get('user') or {}
-        if user_data.get('email') == 'demo@infrazen.com':
-            demo_user = User.find_by_email('demo@infrazen.com')
-            if demo_user:
-                current_user_id = demo_user.id
-        else:
-            current_user_id = user_data.get('db_id')
-    except Exception:
-        current_user_id = None
-
-    if current_user_id:
-        query = query.join(CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id)
-        query = query.filter(CloudProvider.user_id == current_user_id)
+    # Scope by current organization
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    # Filter by organization_id
+    query = query.filter(OptimizationRecommendation.organization_id == org_id)
 
     # Filters
     provider = request.args.get('provider')
@@ -266,7 +258,11 @@ def recommendations_summary():
         return jsonify({'error': 'Unauthorized'}), 401
 
     # Find last sync
-    cs = CompleteSync.query.filter_by(user_id=current_user_id).order_by(CompleteSync.sync_started_at.desc()).first()
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+    
+    cs = CompleteSync.query.filter_by(user_id=current_user_id, organization_id=org_id).order_by(CompleteSync.sync_started_at.desc()).first()
     if not cs:
         return jsonify({'error': 'No syncs found'}), 404
 

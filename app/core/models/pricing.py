@@ -170,6 +170,7 @@ class PriceComparisonRecommendation(BaseModel):
     
     # User and resource references
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
     current_resource_id = db.Column(db.Integer, db.ForeignKey('resources.id'), nullable=False, index=True)
     recommended_price_id = db.Column(db.Integer, db.ForeignKey('provider_prices.id'), nullable=False, index=True)
     

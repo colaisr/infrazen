@@ -199,7 +199,16 @@
   function init() {
     render();
     bindEvents();
-    fetchReports();
+    
+    // Check if organization was switched (via URL parameter)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('org_switched')) {
+      // Small delay to ensure session is updated on server
+      setTimeout(fetchReports, 300);
+    } else {
+      // Normal page load
+      fetchReports();
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

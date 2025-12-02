@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify, session, redirect, url_for, flash
 from app.core.database import db
 from app.core.models.provider import CloudProvider
 from app.providers.beget.client import BegetAPIClient
+from app.core.organization_context import get_current_organization_id, require_organization_access
 import json
 
 beget_bp = Blueprint('beget', __name__)
@@ -49,9 +50,19 @@ def add_connection():
             flash(f'Connection test failed: {test_result["message"]}', 'error')
             return redirect(url_for('main.connections'))
         
+        # Get current organization
+        org_id = get_current_organization_id()
+        if not org_id:
+            flash('No active organization', 'error')
+            return redirect(url_for('main.connections'))
+        
+        # Verify user has access to organization
+        require_organization_access(org_id, user_id)
+        
         # Create new provider connection
         provider = CloudProvider(
             user_id=user_id,
+            organization_id=org_id,
             provider_type='beget',
             connection_name=connection_name,
             account_id=username,
@@ -122,7 +133,16 @@ def edit_connection(provider_id):
                 return demo_check
         
         user_id = session['user']['id']
-        provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id, 
+            user_id=user_id, 
+            organization_id=org_id,
+            provider_type='beget'
+        ).first()
         
         if not provider:
             return jsonify({'success': False, 'message': 'Provider not found'}), 404
@@ -197,7 +217,16 @@ def sync_connection(provider_id):
             return demo_check
         
         user_id = session['user']['id']
-        provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget').first()
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id, 
+            user_id=user_id, 
+            organization_id=org_id,
+            provider_type='beget'
+        ).first()
         
         if not provider:
             return jsonify({'success': False, 'error': 'Connection not found'}), 404
@@ -246,7 +275,17 @@ def delete_connection(provider_id):
         
         from datetime import datetime
         user_id = session['user']['id']
-        provider = CloudProvider.query.filter_by(id=provider_id, user_id=user_id, provider_type='beget', is_deleted=False).first()
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
+        
+        provider = CloudProvider.query.filter_by(
+            id=provider_id, 
+            user_id=user_id, 
+            organization_id=org_id,
+            provider_type='beget', 
+            is_deleted=False
+        ).first()
         
         if not provider:
             return jsonify({'success': False, 'error': 'Connection not found'}), 404

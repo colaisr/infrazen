@@ -6,6 +6,7 @@ from app.core.database import db
 from app.core.models.provider import CloudProvider
 from app.providers.selectel.service import SelectelService
 from app.providers.selectel.client import SelectelClient
+from app.core.organization_context import get_current_organization_id, require_organization_access
 import json
 import logging
 
@@ -104,6 +105,19 @@ def add_connection():
             flash(f'Connection test failed: {test_result.get("message", "Unknown error")}', 'error')
             return redirect(url_for('main.connections'))
         
+        # Get current organization
+        org_id = get_current_organization_id()
+        if not org_id:
+            flash('No active organization', 'error')
+            return redirect(url_for('main.connections'))
+        
+        # Verify user has access to organization
+        try:
+            require_organization_access(org_id, user_id)
+        except Exception:
+            flash('Access denied to organization', 'error')
+            return redirect(url_for('main.connections'))
+        
         # Extract account_id from API response
         account_id = test_result.get('account_info', {}).get('name', '')
         
@@ -114,6 +128,7 @@ def add_connection():
         # Create provider record
         provider = CloudProvider(
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel',
             connection_name=connection_name,
             account_id=account_id,
@@ -155,14 +170,16 @@ def sync_resources(provider_id):
             return demo_check
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
-        # Handle user ID comparison
-        all_providers = CloudProvider.query.filter_by(provider_type='selectel').all()
-        provider = None
-        for p in all_providers:
-            if p.id == provider_id and int(float(p.user_id)) == int(float(user_id)):
-                provider = p
-                break
+        provider = CloudProvider.query.filter_by(
+            id=provider_id,
+            user_id=user_id,
+            organization_id=org_id,
+            provider_type='selectel'
+        ).first()
         
         if not provider:
             return jsonify({'success': False, 'message': 'Provider not found'}), 404
@@ -206,10 +223,14 @@ def edit_connection(provider_id):
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel'
         ).first()
         
@@ -263,10 +284,14 @@ def update_connection(provider_id):
             return demo_check
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel'
         ).first()
         
@@ -406,10 +431,14 @@ def get_projects(provider_id):
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel'
         ).first()
         
@@ -438,10 +467,14 @@ def get_account_info(provider_id):
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel'
         ).first()
         
@@ -473,10 +506,14 @@ def get_resource_summary(provider_id):
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
         
         user_id = session['user']['id']
+        org_id = get_current_organization_id()
+        if not org_id:
+            return jsonify({'success': False, 'message': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
             user_id=user_id,
+            organization_id=org_id,
             provider_type='selectel'
         ).first()
         

@@ -27,6 +27,7 @@ class ChatSession(db.Model):
 	
 	id = db.Column(db.String(36), primary_key=True)
 	user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+	organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
 	recommendation_id = db.Column(db.Integer, db.ForeignKey('optimization_recommendations.id', ondelete='CASCADE'), nullable=True)
 	scenario = db.Column(db.String(32), nullable=False, default='recommendation')
 	context = db.Column(db.Text, nullable=True)
@@ -44,6 +45,7 @@ class ChatSession(db.Model):
 	
 	# Relationships
 	user = db.relationship('User', backref='chat_sessions')
+	organization = db.relationship('Organization', backref='chat_sessions')
 	recommendation = db.relationship('OptimizationRecommendation', backref='chat_sessions')
 	messages = db.relationship('ChatMessage', backref='session', lazy='dynamic', cascade='all, delete-orphan', order_by='ChatMessage.created_at')
 	

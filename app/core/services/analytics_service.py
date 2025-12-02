@@ -16,17 +16,25 @@ from app.core.models.provider import CloudProvider
 class AnalyticsService:
     """Service for analytics data operations"""
     
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, organization_id: Optional[int] = None):
         self.user_id = user_id
+        self.organization_id = organization_id
     
     def get_executive_summary(self) -> Dict[str, Any]:
         """Get executive summary KPIs"""
-        # Get latest complete sync
-        latest_sync = CompleteSync.query.filter_by(user_id=self.user_id)\
-            .order_by(desc(CompleteSync.sync_completed_at)).first()
+        # Get latest complete sync (filtered by organization only - viewers see all syncs)
+        if self.organization_id:
+            query = CompleteSync.query.filter_by(organization_id=self.organization_id)
+        else:
+            # Fallback: filter by user_id if no org context
+            query = CompleteSync.query.filter_by(user_id=self.user_id)
+        latest_sync = query.order_by(desc(CompleteSync.sync_completed_at)).first()
         
-        # Get active resources count
-        active_resources = Resource.query.filter_by(is_active=True).count()
+        # Get active resources count (filtered by organization)
+        query = Resource.query.filter_by(is_active=True)
+        if self.organization_id:
+            query = query.filter_by(organization_id=self.organization_id)
+        active_resources = query.count()
         
         # Get implemented recommendations
         implemented_recs = OptimizationRecommendation.query.filter_by(status='implemented').all()
@@ -53,15 +61,19 @@ class AnalyticsService:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Get complete syncs within date range
-        syncs = CompleteSync.query.filter(
-            and_(
-                CompleteSync.user_id == self.user_id,
-                CompleteSync.sync_completed_at >= start_date,
-                CompleteSync.sync_completed_at <= end_date,
-                CompleteSync.sync_status == 'success'
-            )
-        ).order_by(CompleteSync.sync_completed_at).all()
+        # Get complete syncs within date range (filtered by organization only - viewers see all syncs)
+        filters = [
+            CompleteSync.sync_completed_at >= start_date,
+            CompleteSync.sync_completed_at <= end_date,
+            CompleteSync.sync_status == 'success'
+        ]
+        if self.organization_id:
+            filters.append(CompleteSync.organization_id == self.organization_id)
+        else:
+            # Fallback: filter by user_id if no org context
+            filters.append(CompleteSync.user_id == self.user_id)
+        
+        syncs = CompleteSync.query.filter(and_(*filters)).order_by(CompleteSync.sync_completed_at).all()
         
         trends = []
         for sync in syncs:
@@ -93,20 +105,20 @@ class AnalyticsService:
         This aggregates costs using `ResourceState` rows tied to the provider
         snapshots that participated in the latest `CompleteSync` for this user.
         """
-        # Get latest successful complete sync for the user
-        latest_sync = (
-            CompleteSync.query
-            .filter_by(user_id=self.user_id, sync_status='success')
-            .order_by(desc(CompleteSync.sync_completed_at))
-            .first()
-        )
+        # Get latest successful complete sync (filtered by organization only - viewers see all syncs)
+        if self.organization_id:
+            query = CompleteSync.query.filter_by(organization_id=self.organization_id, sync_status='success')
+        else:
+            # Fallback: filter by user_id if no org context
+            query = CompleteSync.query.filter_by(user_id=self.user_id, sync_status='success')
+        latest_sync = query.order_by(desc(CompleteSync.sync_completed_at)).first()
 
         if not latest_sync:
             return {'services': [], 'total_cost': 0, 'total_resources': 0}
 
         # Collect snapshot IDs that were part of this complete sync
         from app.core.models.complete_sync import ProviderSyncReference
-        from app.core.models.sync import ResourceState
+        from app.core.models.sync import ResourceState, SyncSnapshot
 
         snapshot_ids = [ref.sync_snapshot_id for ref in latest_sync.provider_syncs or [] if ref.sync_status == 'success']
 
@@ -114,11 +126,16 @@ class AnalyticsService:
             return {'services': [], 'total_cost': 0, 'total_resources': 0}
 
         # Aggregate ResourceState by service_name for the snapshots
+        # Filter by organization_id through SyncSnapshot join for extra safety
         service_breakdown: Dict[str, Dict[str, Any]] = {}
         total_cost: float = 0.0
         total_resources: int = 0
 
-        states_query = ResourceState.query.filter(ResourceState.sync_snapshot_id.in_(snapshot_ids))
+        states_query = ResourceState.query.join(SyncSnapshot).filter(
+            ResourceState.sync_snapshot_id.in_(snapshot_ids)
+        )
+        if self.organization_id:
+            states_query = states_query.filter(SyncSnapshot.organization_id == self.organization_id)
 
         for state in states_query.all():
             service_name = state.service_name or 'Unknown Service'
@@ -165,9 +182,13 @@ class AnalyticsService:
     
     def get_provider_breakdown(self) -> Dict[str, Any]:
         """Get provider cost breakdown for pie chart"""
-        # Get latest complete sync
-        latest_sync = CompleteSync.query.filter_by(user_id=self.user_id)\
-            .order_by(desc(CompleteSync.sync_completed_at)).first()
+        # Get latest complete sync (filtered by organization only - viewers see all syncs)
+        if self.organization_id:
+            query = CompleteSync.query.filter_by(organization_id=self.organization_id)
+        else:
+            # Fallback: filter by user_id if no org context
+            query = CompleteSync.query.filter_by(user_id=self.user_id)
+        latest_sync = query.order_by(desc(CompleteSync.sync_completed_at)).first()
         
         if not latest_sync or not latest_sync.cost_by_provider:
             return {'providers': [], 'total_cost': 0}
@@ -177,9 +198,12 @@ class AnalyticsService:
             cost_by_provider = json.loads(latest_sync.cost_by_provider) if isinstance(latest_sync.cost_by_provider, str) else latest_sync.cost_by_provider
             
             # The cost_by_provider uses provider names as keys, not IDs
-            # We need to find providers by connection_name
+            # We need to find providers by connection_name (filtered by organization)
             provider_names = list(cost_by_provider.keys())
-            providers = CloudProvider.query.filter(CloudProvider.connection_name.in_(provider_names)).all()
+            query = CloudProvider.query.filter(CloudProvider.connection_name.in_(provider_names))
+            if self.organization_id:
+                query = query.filter_by(organization_id=self.organization_id)
+            providers = query.all()
             provider_name_to_id = {p.connection_name: p.id for p in providers}
             
             total_cost = sum(cost_by_provider.values())
@@ -211,15 +235,19 @@ class AnalyticsService:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
         
-        # Get sync snapshots for the provider, filtered by user
-        query = SyncSnapshot.query.join(CloudProvider).filter(
-            and_(
-                CloudProvider.user_id == self.user_id,
-                SyncSnapshot.sync_completed_at >= start_date,
-                SyncSnapshot.sync_completed_at <= end_date,
-                SyncSnapshot.sync_status == 'success'
-            )
-        )
+        # Get sync snapshots for the provider, filtered by organization (viewers see all providers)
+        filters = [
+            SyncSnapshot.sync_completed_at >= start_date,
+            SyncSnapshot.sync_completed_at <= end_date,
+            SyncSnapshot.sync_status == 'success'
+        ]
+        if self.organization_id:
+            filters.append(CloudProvider.organization_id == self.organization_id)
+        else:
+            # Fallback: filter by user_id if no org context
+            filters.append(CloudProvider.user_id == self.user_id)
+        
+        query = SyncSnapshot.query.join(CloudProvider).filter(and_(*filters))
         
         if provider_id:
             query = query.filter(SyncSnapshot.provider_id == provider_id)
@@ -244,7 +272,10 @@ class AnalyticsService:
     
     def get_implemented_recommendations(self) -> List[Dict[str, Any]]:
         """Get implemented recommendations with savings"""
-        recommendations = OptimizationRecommendation.query.filter_by(status='implemented').all()
+        query = OptimizationRecommendation.query.filter_by(status='implemented')
+        if self.organization_id:
+            query = query.filter_by(organization_id=self.organization_id)
+        recommendations = query.all()
         
         rec_data = []
         for rec in recommendations:
@@ -264,7 +295,10 @@ class AnalyticsService:
     
     def get_optimization_opportunities(self) -> List[Dict[str, Any]]:
         """Get pending optimization opportunities"""
-        recommendations = OptimizationRecommendation.query.filter_by(status='pending').all()
+        query = OptimizationRecommendation.query.filter_by(status='pending')
+        if self.organization_id:
+            query = query.filter_by(organization_id=self.organization_id)
+        recommendations = query.all()
         
         opp_data = []
         for rec in recommendations:

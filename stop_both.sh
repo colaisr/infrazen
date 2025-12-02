@@ -1,7 +1,7 @@
 #!/bin/bash
 # Stop both InfraZen App and Agent Service
 
-PROJECT_DIR="/Users/colakamornik/Desktop/InfraZen"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 echo "🛑 Stopping InfraZen services..."

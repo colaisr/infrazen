@@ -12,6 +12,7 @@ import logging
 from datetime import datetime
 from app.core.database import db
 from app.core.models.user import User
+from app.core.organization_context import initialize_user_organization_context, get_user_organizations
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,9 @@ def google_auth():
             # Flask-Login integration
             login_user(user)
             
+            # Initialize organization context
+            org_id = initialize_user_organization_context(user.id)
+            
             session['user'] = {
                 'id': str(user.id),
                 'db_id': user.id,
@@ -143,7 +147,8 @@ def google_auth():
                     'view_all_data': user.has_permission('view_all_data'),
                     'manage_providers': user.has_permission('manage_providers'),
                     'manage_resources': True
-                }
+                },
+                'current_organization_id': org_id
             }
             return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
         
@@ -194,6 +199,9 @@ def google_auth():
             # Flask-Login integration
             login_user(user)
             
+            # Initialize organization context
+            org_id = initialize_user_organization_context(user.id)
+            
             # Store user in session with database ID
             session['user'] = {
                 'id': str(user.id),
@@ -205,7 +213,8 @@ def google_auth():
                 'picture': user.google_picture or '',
                 'role': user.role,
                 'is_admin': user.is_admin(),
-                'permissions': user.get_permissions()
+                'permissions': user.get_permissions(),
+                'current_organization_id': org_id
             }
             
             return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
@@ -238,6 +247,9 @@ def admin_login():
         # Flask-Login integration
         login_user(admin_user)
         
+        # Initialize organization context
+        org_id = initialize_user_organization_context(admin_user.id)
+        
         session['user'] = {
             'id': str(admin_user.id),
             'db_id': admin_user.id,
@@ -248,7 +260,8 @@ def admin_login():
             'picture': admin_user.google_picture or '',
             'role': admin_user.role,
             'is_admin': admin_user.is_admin(),
-            'permissions': admin_user.get_permissions()
+            'permissions': admin_user.get_permissions(),
+            'current_organization_id': org_id
         }
         return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
     else:
@@ -285,6 +298,9 @@ def login_password():
         # Flask-Login integration
         login_user(user)
         
+        # Initialize organization context
+        org_id = initialize_user_organization_context(user.id)
+        
         # Store user in session
         session['user'] = {
             'id': str(user.id),
@@ -297,7 +313,8 @@ def login_password():
             'role': user.role,
             'is_admin': user.is_admin(),
             'permissions': user.get_permissions(),
-            'login_method': 'password'
+            'login_method': 'password',
+            'current_organization_id': org_id
         }
         
         return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
@@ -507,6 +524,9 @@ def handle_register():
         # Flask-Login integration
         login_user(user)
         
+        # Initialize organization context (will create personal org if needed)
+        org_id = initialize_user_organization_context(user.id)
+        
         session['user'] = {
             'id': str(user.id),
             'db_id': user.id,
@@ -514,6 +534,7 @@ def handle_register():
             'name': f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0],
             'initials': user.get_initials(),
             'picture': '',
+            'current_organization_id': org_id,
             'role': user.role,
             'is_admin': user.is_admin(),
             'permissions': user.get_permissions(),

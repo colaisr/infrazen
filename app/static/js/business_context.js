@@ -135,11 +135,13 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         this.callSuper('initialize', elements, {
             ...options,
             subTargetCheck: true,
-            interactive: true,
+            interactive: window.canEditBoards !== false, // Disable interactions for viewers
             lockRotation: true,
             hasRotate: false,
             hasControls: false,
-            hasBorders: true
+            hasBorders: window.canEditBoards !== false, // Disable borders for viewers
+            selectable: window.canEditBoards !== false, // Disable selection for viewers
+            evented: window.canEditBoards !== false // Disable events for viewers
         });
         
         // Store custom properties
@@ -224,6 +226,15 @@ let gridSize = 50; // Grid cell size in pixels
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if this is an organization switch reload
+    const urlParams = new URLSearchParams(window.location.search);
+    const orgSwitched = urlParams.get('org_switched');
+    
+    // Clear localStorage board cache if organization was switched
+    if (orgSwitched) {
+        localStorage.removeItem('business_context_last_board');
+    }
+    
     initializeBusinessContext();
 });
 
@@ -309,16 +320,26 @@ function setupEventListeners() {
     // Save board button
     // Manual save button removed - autosave only
     
-    // Board name editing
+    // Board name editing (only for editors and owners)
     const boardNameEl = document.getElementById('currentBoardName');
     if (boardNameEl) {
+        // Disable editing for viewers
+        if (!window.canEditBoards) {
+            boardNameEl.setAttribute('contenteditable', 'false');
+            boardNameEl.style.cursor = 'default';
+        }
+        
         boardNameEl.addEventListener('blur', function() {
-            if (currentBoard && boardNameEl.textContent.trim() !== currentBoard.name) {
+            if (window.canEditBoards && currentBoard && boardNameEl.textContent.trim() !== currentBoard.name) {
                 updateBoardName(boardNameEl.textContent.trim());
             }
         });
         
         boardNameEl.addEventListener('keydown', function(e) {
+            if (!window.canEditBoards) {
+                e.preventDefault();
+                return;
+            }
             if (e.key === 'Enter') {
                 e.preventDefault();
                 boardNameEl.blur();
@@ -1595,12 +1616,14 @@ function displayBoards(boards) {
                     <span>${board.group_count} групп</span>
                 </div>
             </div>
+            ${window.canEditBoards ? `
             <div class="board-card-actions" onclick="event.stopPropagation()">
                 <button class="board-card-btn btn-delete" onclick="deleteBoard(${board.id})">
                     <i class="fa-solid fa-trash"></i>
                     Удалить
                 </button>
             </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -1779,7 +1802,7 @@ function initializeCanvas() {
     // Initialize Fabric canvas
     fabricCanvas = new fabric.Canvas('canvas', {
         backgroundColor: '#FFFFFF',
-        selection: true,
+        selection: window.canEditBoards, // Disable selection for viewers
         preserveObjectStacking: true,
         width: initialWidth,
         height: initialHeight,
@@ -1788,6 +1811,19 @@ function initializeCanvas() {
         selectionLineWidth: 3,
         selectionColor: 'rgba(245, 158, 11, 0.1)'
     });
+    
+    // Disable editing for viewers
+    if (!window.canEditBoards) {
+        // Make all objects non-selectable and non-editable
+        fabric.Object.prototype.set({
+            selectable: false,
+            evented: false // Disable all interactions
+        });
+        
+        // Disable drop zone for viewers
+        const canvasElement = fabricCanvas.wrapperEl;
+        canvasElement.style.cursor = 'default';
+    }
     
     // Set global selection styling for all objects
     fabric.Object.prototype.set({
@@ -1858,6 +1894,18 @@ function initializeCanvas() {
     
     // Set up canvas as drop zone for resources
     setupCanvasDropZone();
+    
+    // Disable editing for viewers after all objects are loaded
+    if (!window.canEditBoards) {
+        disableCanvasEditing();
+        
+        // Update save indicator for viewers
+        const indicator = document.getElementById('saveIndicator');
+        if (indicator) {
+            indicator.textContent = 'Только просмотр';
+            indicator.className = 'save-indicator read-only';
+        }
+    }
     
     // Initial resize to ensure proper dimensions - wait for DOM to settle
     requestAnimationFrame(function() {
@@ -2030,8 +2078,9 @@ function setupCanvasEvents() {
         }
     });
     
-    // Mouse down on object - save state BEFORE modification
+    // Mouse down on object - save state BEFORE modification (only for editors/owners)
     fabricCanvas.on('mouse:down', function(opt) {
+        if (!window.canEditBoards) return; // Skip for viewers
         const target = opt.target;
         if (target && target.selectable) {
             // Save state before any modification starts
@@ -2039,8 +2088,10 @@ function setupCanvasEvents() {
         }
     });
     
-    // Object modified - update database and trigger autosave
+    // Object modified - update database and trigger autosave (only for editors/owners)
     fabricCanvas.on('object:modified', function(e) {
+        if (!window.canEditBoards) return; // Skip for viewers
+        
         const obj = e.target;
         
         // If it's an ActiveSelection (multiple objects), update each group in database
@@ -2060,11 +2111,13 @@ function setupCanvasEvents() {
     });
     
     fabricCanvas.on('object:added', function(opt) {
+        if (!window.canEditBoards) return; // Skip for viewers
         saveToUndoStack();
         scheduleAutoSave();
     });
     
     fabricCanvas.on('object:removed', function() {
+        if (!window.canEditBoards) return; // Skip for viewers
         saveToUndoStack();
         scheduleAutoSave();
     });
@@ -2079,6 +2132,11 @@ function setupCanvasEvents() {
 function setupContextMenu() {
     const contextMenu = document.getElementById('contextMenu');
     let contextTarget = null;
+    
+    // Disable context menu for viewers
+    if (!window.canEditBoards) {
+        return;
+    }
     
     // Prevent default browser context menu and show custom one
     fabricCanvas.wrapperEl.addEventListener('contextmenu', function(e) {
@@ -2714,6 +2772,11 @@ document.addEventListener('scroll', hideResourceContextMenu, true);
 function setupCanvasDropZone() {
     if (!fabricCanvas) return;
     
+    // Disable drop zone for viewers
+    if (!window.canEditBoards) {
+        return;
+    }
+    
     const canvasElement = fabricCanvas.wrapperEl;
     
     // Prevent default drag behavior
@@ -2917,8 +2980,9 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         });
     }
     
-    // Modified event - check group assignment and save position
+    // Modified event - check group assignment and save position (only for editors/owners)
     resourceCard.on('modified', function() {
+        if (!window.canEditBoards) return; // Skip for viewers
         checkResourceGroupAssignment(this);
         updateResourcePosition(this);
     });
@@ -2927,6 +2991,25 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
     fabricCanvas.renderAll();
 }
 
+
+/**
+ * Disable editing for all objects on canvas (for viewers)
+ */
+function disableCanvasEditing() {
+    if (!fabricCanvas) return;
+    
+    fabricCanvas.forEachObject(function(obj) {
+        obj.set({
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: false
+        });
+    });
+    
+    fabricCanvas.selection = false;
+    fabricCanvas.renderAll();
+}
 
 /**
  * Get group at specific position (for drop detection)
@@ -3599,11 +3682,18 @@ async function updateBoardName(newName) {
  * Schedule auto-save
  */
 function scheduleAutoSave() {
-    // Skip autosave for demo users
-    if (window.isDemoUser) {
+    // Skip autosave for demo users and viewers
+    if (window.isDemoUser || !window.canEditBoards) {
         const indicator = document.getElementById('saveIndicator');
-        indicator.textContent = 'Демо режим';
-        indicator.className = 'save-indicator demo-mode';
+        if (indicator) {
+            if (window.isDemoUser) {
+                indicator.textContent = 'Демо режим';
+                indicator.className = 'save-indicator demo-mode';
+            } else {
+                indicator.textContent = 'Только просмотр';
+                indicator.className = 'save-indicator read-only';
+            }
+        }
         return;
     }
     
@@ -3626,13 +3716,24 @@ function scheduleAutoSave() {
 async function saveBoard(isAutoSave = false) {
     if (!currentBoard || !fabricCanvas) return;
     
-    // Prevent demo users from saving
-    if (window.isDemoUser) {
+    // Prevent demo users and viewers from saving
+    if (window.isDemoUser || !window.canEditBoards) {
         const indicator = document.getElementById('saveIndicator');
-        indicator.textContent = 'Демо режим';
-        indicator.className = 'save-indicator demo-mode';
+        if (indicator) {
+            if (window.isDemoUser) {
+                indicator.textContent = 'Демо режим';
+                indicator.className = 'save-indicator demo-mode';
+            } else {
+                indicator.textContent = 'Только просмотр';
+                indicator.className = 'save-indicator read-only';
+            }
+        }
         if (!isAutoSave) {
-            showFlashMessage('info', 'В демо режиме изменения не сохраняются');
+            if (window.isDemoUser) {
+                showFlashMessage('info', 'В демо режиме изменения не сохраняются');
+            } else {
+                showFlashMessage('info', 'Только просмотр: изменения не сохраняются');
+            }
         }
         return;
     }
@@ -3944,9 +4045,10 @@ async function createGroupOnCanvas(x, y) {
     const businessGroup = new fabric.Group([groupRect, groupText, costBadge], {
         left: adjustedPosition.left,
         top: adjustedPosition.top,
-        selectable: true,
-        hasControls: true,
-        hasBorders: true,
+        selectable: window.canEditBoards, // Disable selection for viewers
+        hasControls: window.canEditBoards, // Disable controls for viewers
+        hasBorders: window.canEditBoards, // Disable borders for viewers
+        evented: window.canEditBoards, // Disable interactions for viewers
         lockRotation: true,
         hasRotate: false,
         subTargetCheck: true, // Allow clicking on children for double-click edit
@@ -4116,8 +4218,9 @@ function createTextOnCanvas(x, y) {
         fontFamily: 'Arial, sans-serif',
         fill: '#1F2937',
         objectType: 'freeText',
-        selectable: true,
-        editable: true,
+        selectable: window.canEditBoards, // Disable selection for viewers
+        editable: window.canEditBoards, // Disable editing for viewers
+        evented: window.canEditBoards, // Disable interactions for viewers
         lockRotation: true,
         hasRotate: false
     });
@@ -4179,9 +4282,10 @@ function createRectangleOnCanvas(x, y) {
         rx: 4,
         ry: 4,
         objectType: 'freeRect',
-        selectable: true,
-        hasControls: true,
-        hasBorders: true,
+        selectable: window.canEditBoards, // Disable selection for viewers
+        hasControls: window.canEditBoards, // Disable controls for viewers
+        hasBorders: window.canEditBoards, // Disable borders for viewers
+        evented: window.canEditBoards, // Disable interactions for viewers
         lockRotation: true,
         hasRotate: false
     });
@@ -4249,9 +4353,10 @@ function loadGroupsOnCanvas(groups) {
             const businessGroup = new fabric.Group([groupRect, groupText, costBadge], {
                 left: group.position.x,
                 top: group.position.y,
-                selectable: true,
-                hasControls: true,
-                hasBorders: true,
+                selectable: window.canEditBoards, // Disable selection for viewers
+                hasControls: window.canEditBoards, // Disable controls for viewers
+                hasBorders: window.canEditBoards, // Disable borders for viewers
+                evented: window.canEditBoards, // Disable interactions for viewers
                 lockRotation: true,
                 hasRotate: false,
                 subTargetCheck: true,
@@ -4373,7 +4478,9 @@ function loadGroupsOnCanvas(groups) {
             });
             
             businessGroup.on('mousedblclick', function() {
-                editGroupName(this);
+                if (window.canEditBoards) {
+                    editGroupName(this);
+                }
             });
         } catch (error) {
             console.error('Error loading group:', error);
@@ -4381,6 +4488,11 @@ function loadGroupsOnCanvas(groups) {
     });
     
     fabricCanvas.renderAll();
+    
+    // Disable editing for viewers after groups are loaded
+    if (!window.canEditBoards) {
+        disableCanvasEditing();
+    }
 }
 
 /**
@@ -4436,6 +4548,11 @@ function loadResourcesOnCanvas(boardResources) {
     });
     
     fabricCanvas.renderAll();
+    
+    // Disable editing for viewers after resources are loaded
+    if (!window.canEditBoards) {
+        disableCanvasEditing();
+    }
 }
 
 /**

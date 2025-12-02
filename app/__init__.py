@@ -4,7 +4,7 @@ Flask Application Factory
 """
 import os
 import json
-from flask import Flask
+from flask import Flask, session
 import logging
 from logging.handlers import RotatingFileHandler
 from flask_migrate import Migrate
@@ -56,6 +56,7 @@ def create_app(config_name=None):
     from app.api.business_context import business_context_bp
     from app.api.dashboard import dashboard_bp
     from app.api.chat import chat_api
+    from app.api.organizations import organizations_bp
     from app.providers.beget.routes import beget_bp
     from app.providers.selectel.routes import selectel_bp
     from app.providers.yandex.routes import yandex_bp
@@ -70,6 +71,7 @@ def create_app(config_name=None):
     app.register_blueprint(business_context_bp, url_prefix='/api/business-context')
     app.register_blueprint(dashboard_bp, url_prefix='/api')
     app.register_blueprint(chat_api, url_prefix='/api/chat')
+    app.register_blueprint(organizations_bp, url_prefix='/api')
     app.register_blueprint(beget_bp, url_prefix='/api/providers/beget')
     app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     app.register_blueprint(yandex_bp, url_prefix='/api/providers/yandex')
@@ -77,6 +79,47 @@ def create_app(config_name=None):
     app.register_blueprint(reports_bp, url_prefix='/api')
     
     # All routes are now in the new structure
+    
+    # -------------------------
+    # Organization Context Initialization
+    # -------------------------
+    @app.before_request
+    def ensure_organization_context():
+        """Ensure organization context is set from session on each request"""
+        from app.core.organization_context import get_current_organization_id, set_current_organization_id, initialize_user_organization_context
+        
+        # Only for authenticated users
+        user_data = session.get('user')
+        if not user_data:
+            return
+        
+        # Skip for demo user
+        if user_data.get('id') == 'demo-user-123':
+            return
+        
+        user_id = user_data.get('db_id') or user_data.get('id')
+        if not user_id:
+            return
+        
+        # Convert user_id to int if needed
+        try:
+            user_id = int(user_id) if isinstance(user_id, (str, float)) else user_id
+        except (ValueError, TypeError):
+            return
+        
+        # Check if organization context is set in session
+        current_org_id = get_current_organization_id()
+        
+        # If not set, restore from user's last_active_organization_id or initialize
+        if not current_org_id:
+            from app.core.models.user import User
+            user = User.query.get(user_id)
+            if user and user.last_active_organization_id:
+                set_current_organization_id(user.last_active_organization_id, user_id)
+                session.modified = True
+            else:
+                # Initialize organization context (creates personal org if needed)
+                initialize_user_organization_context(user_id)
 
     # -------------------------
     # Development file logging

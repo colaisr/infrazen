@@ -165,11 +165,73 @@
             </div>
         </div>
     </div>
+
+    <!-- Organization Management Section -->
+    <div class="settings-card">
+        <div class="settings-card-header">
+            <h3><i class="fa-solid fa-building"></i> Управление организацией</h3>
+        </div>
+        <div class="settings-card-body">
+            <div id="organizationManagementContent">
+                <div class="loading-spinner">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Загрузка информации об организации...
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Success/Error Messages -->
 <div id="messageContainer"></div>
 
+<!-- Invite Member Modal -->
+<div id="inviteMemberModal" class="modal">
+    <div class="modal-backdrop" onclick="closeInviteMemberModal()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-user-plus"></i> Пригласить участника</h3>
+            <button class="modal-close" onclick="closeInviteMemberModal()" type="button">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="inviteMemberForm" onsubmit="handleInviteMemberSubmit(event)">
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="inviteEmail" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Email пользователя</label>
+                    <input 
+                        type="email" 
+                        id="inviteEmail" 
+                        class="form-input" 
+                        placeholder="user@example.com" 
+                        required
+                        autocomplete="off"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 6px; font-size: 1rem;"
+                    >
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">Введите email существующего пользователя</small>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="inviteRole" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Роль</label>
+                    <select id="inviteRole" class="form-select" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-light); border-radius: 6px; font-size: 1rem; background: white;">
+                        <option value="">Выберите роль</option>
+                        <option value="viewer">Наблюдатель - может только просматривать данные</option>
+                        <option value="editor">Редактор - может добавлять подключения и редактировать доски</option>
+                    </select>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">Владелец может приглашать только с ролями "Наблюдатель" или "Редактор"</small>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeInviteMemberModal()">
+                        Отмена
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="inviteMemberSubmitBtn">
+                        <i class="fa-solid fa-paper-plane"></i> Отправить приглашение
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Pass template variables to JavaScript -->
 <script>

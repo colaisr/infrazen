@@ -59,6 +59,8 @@ def index():
 @main_bp.route('/dashboard')
 def dashboard():
     """Main dashboard page"""
+    from app.core.organization_context import get_current_organization_id
+    
     # Allow demo session fallback without forcing login
     if 'user' not in session:
         # Check if demo user exists in database and use that instead of mock data
@@ -84,20 +86,29 @@ def dashboard():
     user = session['user']
     is_demo_user = user.get('email') == 'demo@infrazen.com'
     
+    # Use db_id (integer) instead of id (string) for database queries
+    user_id_for_query = user.get('db_id') or int(float(user.get('id', 0)))
+    
     if is_demo_user:
         # Demo user: show real database data (seeded data)
-        overview = get_real_user_overview(user['id'])
+        overview = get_real_user_overview(user_id_for_query)
     else:
         # Real user: show real database data
-        overview = get_real_user_overview(user['id'])
+        overview = get_real_user_overview(user_id_for_query)
     
     # Get expense dynamics data for the "Динамика расходов" card
-    expense_dynamics = get_expense_dynamics_data(user.get('id', 'demo-user-123'))
+    expense_dynamics = get_expense_dynamics_data(user_id_for_query)
     
-    # Get last complete sync data for dashboard display
+    # Get last complete sync data for dashboard display (filtered by organization)
     from app.core.models.complete_sync import CompleteSync
-    user_id_int = int(float(user['id']))
-    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    org_id = get_current_organization_id()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        last_complete_sync = CompleteSync.query.filter_by(organization_id=org_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        user_id_int = user_id_for_query
+        last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
 
     return render_template(
         'dashboard.html',
@@ -112,6 +123,8 @@ def dashboard():
 @main_bp.route('/connections')
 def connections():
     """Cloud connections page"""
+    from app.core.organization_context import get_current_organization_id
+    
     if 'user' not in session:
         # Check if demo user exists in database and use that instead of mock data
         demo_user = User.query.filter_by(email='demo@infrazen.com').first()
@@ -136,12 +149,19 @@ def connections():
     user = session['user']
     is_demo_user = user.get('email') == 'demo@infrazen.com'
     
+    # Get current organization
+    org_id = get_current_organization_id()
+    
     if is_demo_user:
         # Demo user: show real database data (seeded data)
         # Get real providers from database (exclude soft-deleted)
-        all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
-        user_id_int = int(float(user['id']))
-        cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
+        # Filter by organization only - viewers should see all providers in org
+        if org_id:
+            cloud_providers = CloudProvider.query.filter_by(is_deleted=False, organization_id=org_id).all()
+        else:
+            # Fallback: filter by user_id if no org context
+            user_id_int = int(float(user['id']))
+            cloud_providers = CloudProvider.query.filter_by(is_deleted=False, user_id=user_id_int).all()
         
         # Convert to provider format
         providers = []
@@ -206,9 +226,13 @@ def connections():
         # Real user: show only real database connections using unified models
         
         # Get real providers from database (exclude soft-deleted)
-        all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
-        user_id_int = int(float(user['id']))
-        cloud_providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
+        # Filter by organization only - viewers should see all providers in org
+        if org_id:
+            cloud_providers = CloudProvider.query.filter_by(is_deleted=False, organization_id=org_id).all()
+        else:
+            # Fallback: filter by user_id if no org context
+            user_id_int = int(float(user['id']))
+            cloud_providers = CloudProvider.query.filter_by(is_deleted=False, user_id=user_id_int).all()
         
         # Convert to provider format
         providers = []
@@ -272,7 +296,13 @@ def connections():
     
     # Get last complete sync data for accurate statistics
     from app.core.models.complete_sync import CompleteSync
-    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    # Show all syncs for the organization, not just current user's
+    if org_id:
+        last_complete_sync = CompleteSync.query.filter_by(organization_id=org_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        user_id_int = int(float(user['id']))
+        last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
     
     # Note: We don't flash warnings on page load - the card UI shows them clearly
     # This prevents annoying toast popups on every page refresh
@@ -363,10 +393,17 @@ def resources():
             snapshot_metadata = {}
             resources_by_provider = {}
     
-    # Get last complete sync data for accurate statistics
+    # Get last complete sync data (filtered by organization)
     from app.core.models.complete_sync import CompleteSync
-    user_id_int = int(float(user['id']))
-    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    from app.core.organization_context import get_current_organization_id
+    org_id = get_current_organization_id()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        last_complete_sync = CompleteSync.query.filter_by(organization_id=org_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        user_id_int = int(float(user['id']))
+        last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
     
     return render_template('resources.html', 
                         user=user,
@@ -395,9 +432,18 @@ def analytics():
     from app.core.models.resource import Resource
     from app.core.models.recommendations import OptimizationRecommendation
     from app.core.models.provider import CloudProvider
+    from app.core.organization_context import get_current_organization_id
     
-    # Get latest complete sync
-    latest_complete_sync = CompleteSync.query.filter_by(user_id=user_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    
+    # Get latest complete sync (filtered by organization)
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        latest_complete_sync = CompleteSync.query.filter_by(organization_id=org_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        latest_complete_sync = CompleteSync.query.filter_by(user_id=user_id).order_by(CompleteSync.sync_completed_at.desc()).first()
     
     # Get implemented recommendations
     implemented_recommendations = OptimizationRecommendation.query.filter_by(status='implemented').all()
@@ -408,8 +454,13 @@ def analytics():
     else:
         active_resources_count = 0
     
-    # Get user's providers for individual charts (exclude soft-deleted)
-    providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True, is_deleted=False).all()
+    # Get all providers for the organization (not just user's own)
+    # Viewers should see all providers in the organization
+    if org_id:
+        providers = CloudProvider.query.filter_by(organization_id=org_id, is_active=True, is_deleted=False).all()
+    else:
+        # Fallback: filter by user_id if no org context
+        providers = CloudProvider.query.filter_by(user_id=user_id, is_active=True, is_deleted=False).all()
     enable_ai = current_app.config.get('ENABLE_AI_RECOMMENDATIONS', False)
     agent_service_url = current_app.config.get('AGENT_SERVICE_URL', 'http://127.0.0.1:8001')
     
@@ -453,12 +504,25 @@ def business_context():
     user = session['user']
     is_demo_user = user.get('id') == 'demo-user-123'
     
+    # Get user's role in current organization
+    from app.core.organization_context import get_current_organization_id, get_user_role_in_organization
+    user_id = user.get('db_id') or user.get('id')
+    org_id = get_current_organization_id()
+    user_role = None
+    if user_id and org_id:
+        try:
+            user_id_int = int(float(user_id)) if isinstance(user_id, (str, float)) else user_id
+            user_role = get_user_role_in_organization(user_id_int, org_id)
+        except (ValueError, TypeError):
+            pass
+    
     return render_template('business_context.html', 
                         user=user,
                         active_page='business-context',
                         page_title='Бизнес-контекст',
                         page_subtitle='Визуальное распределение ресурсов',
-                        is_demo_user=is_demo_user)
+                        is_demo_user=is_demo_user,
+                        user_role=user_role)
 
 @main_bp.route('/reports')
 def reports():
@@ -478,8 +542,12 @@ def reports():
         current_app.logger.warning('Unable to parse user_id for reports', extra={'user_id': effective_user_id})
         effective_user_id = int(current_user.id)
 
+    # Get current organization ID
+    from app.core.organization_context import get_current_organization_id
+    org_id = get_current_organization_id()
+    
     report_roles = report_service.get_report_roles()
-    initial_reports = report_service.list_reports_for_user(effective_user_id)
+    initial_reports = report_service.list_reports_for_user(effective_user_id, org_id)
 
     return render_template('reports.html',
                            user=user,
@@ -524,18 +592,46 @@ def agent_test():
 # Helper functions for real user data
 def get_real_user_overview(user_id):
     """Get overview data for a real user from database using unified models"""
+    from app.core.organization_context import get_current_organization_id
     
-    # Get user's unified cloud providers (exclude soft-deleted)
-    providers = CloudProvider.query.filter_by(user_id=user_id, is_deleted=False).all()
+    # Convert user_id to int if it's a string
+    try:
+        user_id_int = int(float(user_id)) if isinstance(user_id, (str, float)) else user_id
+    except (ValueError, TypeError):
+        return {
+            'kpis': {
+                'total_expenses_rub': 0,
+                'potential_savings_rub': 0,
+                'savings_percentage': 0,
+                'active_resources': 0,
+                'connected_providers': 0
+            },
+            'providers': []
+        }
+    
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    
+    # Get all cloud providers for the organization (not just user's own)
+    # Viewers should see all providers in the organization
+    if org_id:
+        providers = CloudProvider.query.filter_by(organization_id=org_id, is_deleted=False).all()
+    else:
+        # Fallback: if no org context, filter by user_id (shouldn't happen in normal flow)
+        providers = CloudProvider.query.filter_by(user_id=user_id_int, is_deleted=False).all()
     
     # Calculate totals
     total_connections = len(providers)
     active_connections = len([p for p in providers if p.is_active])
     
-    # Get last complete sync data for accurate cost information
+    # Get last complete sync data for accurate cost information (filtered by organization)
     from app.core.models.complete_sync import CompleteSync
-    user_id_int = int(float(user_id))
-    last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        last_complete_sync = CompleteSync.query.filter_by(organization_id=org_id).order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        last_complete_sync = CompleteSync.query.filter_by(user_id=user_id_int).order_by(CompleteSync.sync_completed_at.desc()).first()
     
     # Use complete sync data if available, otherwise fall back to provider metadata
     if last_complete_sync and last_complete_sync.sync_status == 'success':
@@ -552,8 +648,11 @@ def get_real_user_overview(user_id):
                 metadata = json.loads(provider.provider_metadata)
                 total_expenses_rub += metadata.get('total_monthly_cost', 0)
             
-            # Count active resources for this provider
-            active_resources += Resource.query.filter_by(provider_id=provider.id, status='active').count()
+            # Count active resources for this provider (filtered by organization)
+            if org_id:
+                active_resources += Resource.query.filter_by(provider_id=provider.id, organization_id=org_id, status='active').count()
+            else:
+                active_resources += Resource.query.filter_by(provider_id=provider.id, status='active').count()
     
     # Calculate potential savings from optimization recommendations
     from app.core.models.recommendations import OptimizationRecommendation
@@ -602,8 +701,11 @@ def get_real_user_overview(user_id):
             if latest_snapshot.total_monthly_cost and latest_snapshot.total_monthly_cost > 0:
                 monthly_cost = float(latest_snapshot.total_monthly_cost) * 30.0
             else:
-                # Fallback: sum resource daily costs and convert to monthly
-                provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
+                # Fallback: sum resource daily costs and convert to monthly (filtered by organization)
+                if org_id:
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id, organization_id=org_id, is_active=True).all()
+                else:
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id, is_active=True).all()
                 monthly_cost = sum((r.daily_cost or 0) * 30 for r in provider_resources)
         elif provider.provider_metadata:
             try:
@@ -646,12 +748,19 @@ def get_real_user_overview(user_id):
 def get_real_user_resources(user_id):
     """Get resources for a real user from database - show resources from latest snapshot for each provider"""
     from app.core.models.sync import SyncSnapshot, ResourceState
+    from app.core.organization_context import get_current_organization_id
     
-    # Get all providers and filter by user_id in Python to avoid floating point precision issues (exclude soft-deleted)
-    all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
-    # Convert scientific notation to integer string for comparison
-    user_id_int = int(float(user_id))
-    providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    
+    # Get all providers for the organization (not just user's own)
+    # Viewers should see all providers in the organization
+    if org_id:
+        providers = CloudProvider.query.filter_by(is_deleted=False, organization_id=org_id).all()
+    else:
+        # Fallback: if no org context, filter by user_id (shouldn't happen in normal flow)
+        user_id_int = int(float(user_id))
+        providers = CloudProvider.query.filter_by(is_deleted=False, user_id=user_id_int).all()
     all_resources = []
     
     for provider in providers:
@@ -696,7 +805,14 @@ def get_real_user_resources(user_id):
             # Get the actual Resource objects
             resource_ids = [rs.resource_id for rs in resource_states if rs.resource_id]
             if resource_ids:
-                provider_resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
+                # Filter resources by organization_id
+                if org_id:
+                    provider_resources = Resource.query.filter(
+                        Resource.id.in_(resource_ids),
+                        Resource.organization_id == org_id
+                    ).all()
+                else:
+                    provider_resources = Resource.query.filter(Resource.id.in_(resource_ids)).all()
                 
                 # Separate resources with and without performance data
                 resources_with_performance = []
@@ -715,8 +831,11 @@ def get_real_user_resources(user_id):
                 all_resources.extend(resources_with_performance)
                 all_resources.extend(resources_without_performance)
             else:
-                # Snapshot exists but has no resource states - fall back to direct resources
-                provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+                # Snapshot exists but has no resource states - fall back to direct resources (filtered by organization)
+                if org_id:
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id, organization_id=org_id).all()
+                else:
+                    provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
                 
                 # Separate resources with and without performance data
                 resources_with_performance = []
@@ -735,8 +854,11 @@ def get_real_user_resources(user_id):
                 all_resources.extend(resources_with_performance)
                 all_resources.extend(resources_without_performance)
         else:
-            # Fallback: if no snapshots, show all resources (for backward compatibility)
-            provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
+            # Fallback: if no snapshots, show all resources (for backward compatibility, filtered by organization)
+            if org_id:
+                provider_resources = Resource.query.filter_by(provider_id=provider.id, organization_id=org_id).all()
+            else:
+                provider_resources = Resource.query.filter_by(provider_id=provider.id).all()
             
             # Separate resources with and without performance data
             resources_with_performance = []
@@ -759,12 +881,19 @@ def get_real_user_resources(user_id):
 
 def get_real_user_providers(user_id):
     """Get providers for a real user from database using unified models"""
+    from app.core.organization_context import get_current_organization_id
     
-    # Get all providers and filter by user_id in Python to avoid floating point precision issues (exclude soft-deleted)
-    all_providers = CloudProvider.query.filter_by(is_deleted=False).all()
-    # Convert scientific notation to integer string for comparison
-    user_id_int = int(float(user_id))
-    providers = [p for p in all_providers if int(float(p.user_id)) == user_id_int]
+    # Get current organization ID
+    org_id = get_current_organization_id()
+    
+    # Get all providers for the organization (not just user's own)
+    # Viewers should see all providers in the organization
+    if org_id:
+        providers = CloudProvider.query.filter_by(is_deleted=False, organization_id=org_id).all()
+    else:
+        # Fallback: filter by user_id if no org context
+        user_id_int = int(float(user_id))
+        providers = CloudProvider.query.filter_by(is_deleted=False, user_id=user_id_int).all()
     
     return [{
         'id': provider.id,  # Use the actual database ID
@@ -819,7 +948,11 @@ def get_expense_dynamics_data(user_id):
     """Get expense dynamics data for the dashboard card"""
     from app.core.models.complete_sync import CompleteSync
     from app.core.models.recommendations import OptimizationRecommendation
+    from app.core.organization_context import get_current_organization_id
     from datetime import datetime, timedelta
+    
+    # Get current organization ID
+    org_id = get_current_organization_id()
     
     # Handle demo user
     if user_id == 'demo-user-123':
@@ -846,13 +979,20 @@ def get_expense_dynamics_data(user_id):
             'trend_data': []
         }
     
-    # Get latest complete sync for current month
+    # Get latest complete sync for current month (filtered by organization)
     now = datetime.now()
     current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    latest_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
-        .filter(CompleteSync.sync_completed_at >= current_month_start)\
-        .order_by(CompleteSync.sync_completed_at.desc()).first()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        latest_sync = CompleteSync.query.filter_by(organization_id=org_id)\
+            .filter(CompleteSync.sync_completed_at >= current_month_start)\
+            .order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        latest_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
+            .filter(CompleteSync.sync_completed_at >= current_month_start)\
+            .order_by(CompleteSync.sync_completed_at.desc()).first()
     
     # Get last sync from previous month
     if current_month_start.month == 1:
@@ -860,27 +1000,54 @@ def get_expense_dynamics_data(user_id):
     else:
         last_month_start = current_month_start.replace(month=current_month_start.month - 1)
     
-    last_month_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
-        .filter(CompleteSync.sync_completed_at >= last_month_start)\
-        .filter(CompleteSync.sync_completed_at < current_month_start)\
-        .order_by(CompleteSync.sync_completed_at.desc()).first()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        last_month_sync = CompleteSync.query.filter_by(organization_id=org_id)\
+            .filter(CompleteSync.sync_completed_at >= last_month_start)\
+            .filter(CompleteSync.sync_completed_at < current_month_start)\
+            .order_by(CompleteSync.sync_completed_at.desc()).first()
+    else:
+        # Fallback: filter by user_id if no org context
+        last_month_sync = CompleteSync.query.filter_by(user_id=user_id_int)\
+            .filter(CompleteSync.sync_completed_at >= last_month_start)\
+            .filter(CompleteSync.sync_completed_at < current_month_start)\
+            .order_by(CompleteSync.sync_completed_at.desc()).first()
     
-    # Get implemented recommendations savings
+    # Get implemented recommendations savings (filtered by organization)
     # Join through CloudProvider to get recommendations for this user
-    implemented_savings = db.session.query(
-        db.func.sum(OptimizationRecommendation.estimated_monthly_savings)
-    ).join(
-        CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id
-    ).filter(
-        CloudProvider.user_id == user_id_int,
-        OptimizationRecommendation.status == 'implemented'
-    ).scalar() or 0
+    if org_id:
+        implemented_savings = db.session.query(
+            db.func.sum(OptimizationRecommendation.estimated_monthly_savings)
+        ).join(
+            CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id
+        ).filter(
+            CloudProvider.user_id == user_id_int,
+            CloudProvider.organization_id == org_id,
+            OptimizationRecommendation.organization_id == org_id,
+            OptimizationRecommendation.status == 'implemented'
+        ).scalar() or 0
+    else:
+        implemented_savings = db.session.query(
+            db.func.sum(OptimizationRecommendation.estimated_monthly_savings)
+        ).join(
+            CloudProvider, OptimizationRecommendation.provider_id == CloudProvider.id
+        ).filter(
+            CloudProvider.user_id == user_id_int,
+            OptimizationRecommendation.status == 'implemented'
+        ).scalar() or 0
     
-    # Get trend data for the last 30 days
+    # Get trend data for the last 30 days (filtered by organization)
     thirty_days_ago = now - timedelta(days=30)
-    trend_syncs = CompleteSync.query.filter_by(user_id=user_id_int)\
-        .filter(CompleteSync.sync_completed_at >= thirty_days_ago)\
-        .order_by(CompleteSync.sync_completed_at.asc()).all()
+    if org_id:
+        # Show all syncs for the organization, not just current user's
+        trend_syncs = CompleteSync.query.filter_by(organization_id=org_id)\
+            .filter(CompleteSync.sync_completed_at >= thirty_days_ago)\
+            .order_by(CompleteSync.sync_completed_at.asc()).all()
+    else:
+        # Fallback: filter by user_id if no org context
+        trend_syncs = CompleteSync.query.filter_by(user_id=user_id_int)\
+            .filter(CompleteSync.sync_completed_at >= thirty_days_ago)\
+            .order_by(CompleteSync.sync_completed_at.asc()).all()
     
     trend_data = []
     for sync in trend_syncs:

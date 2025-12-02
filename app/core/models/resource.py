@@ -13,6 +13,9 @@ class Resource(BaseModel):
     # Provider relationship
     provider_id = db.Column(db.Integer, db.ForeignKey('cloud_providers.id'), nullable=False, index=True)
     
+    # Organization relationship
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
+    
     # Resource identification
     resource_id = db.Column(db.String(100), nullable=False)  # Provider's resource ID
     resource_name = db.Column(db.String(255), nullable=False)
@@ -51,6 +54,7 @@ class Resource(BaseModel):
     notes = db.Column(db.Text)  # User notes about this resource (system-wide, persists across syncs)
     
     # Relationships
+    organization = db.relationship('Organization', backref='resources')
     tags = db.relationship('ResourceTag', backref='resource', lazy=True, cascade='all, delete-orphan')
     metrics = db.relationship('ResourceMetric', backref='resource', lazy=True, cascade='all, delete-orphan')
     usage_summary = db.relationship('ResourceUsageSummary', backref='resource', lazy=True, cascade='all, delete-orphan')

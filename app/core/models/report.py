@@ -20,6 +20,7 @@ class GeneratedReport(BaseModel):
     __tablename__ = 'generated_reports'
 
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id', ondelete='CASCADE'), nullable=True, index=True)
     title = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), nullable=False, index=True)
     status = db.Column(
@@ -32,6 +33,7 @@ class GeneratedReport(BaseModel):
     context_json = db.Column(db.JSON, nullable=True)
 
     user = db.relationship('User', backref='generated_reports')
+    organization = db.relationship('Organization', backref='generated_reports')
 
     def to_dict(self):
         base = super().to_dict()
