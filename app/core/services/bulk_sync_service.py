@@ -47,7 +47,10 @@ class BulkSyncService:
         eligible_orgs = []
         for org in organizations:
             # Check if organization has any non-demo members
-            has_non_demo_member = OrganizationMember.query.join(User).filter(
+            # Use explicit join condition to avoid ambiguity
+            has_non_demo_member = OrganizationMember.query.join(
+                User, OrganizationMember.user_id == User.id
+            ).filter(
                 OrganizationMember.organization_id == org.id,
                 OrganizationMember.is_active == True,
                 User.role != 'demouser'
