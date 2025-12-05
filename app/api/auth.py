@@ -558,14 +558,15 @@ def handle_register():
         # Flask-Login integration
         login_user(user)
         
-        # Initialize organization context
-        # If user was invited, use the invitation org, otherwise create personal org
+        # Always initialize organization context (creates personal org if needed)
+        # This ensures every user has a personal organization they can switch to
+        org_id = initialize_user_organization_context(user.id)
+        
+        # If user was invited, set the invited org as current (but personal org still exists)
         if invitation_org_id:
-            org_id = invitation_org_id
             from app.core.organization_context import set_current_organization_id
-            set_current_organization_id(org_id, user.id)
-        else:
-            org_id = initialize_user_organization_context(user.id)
+            set_current_organization_id(invitation_org_id, user.id)
+            org_id = invitation_org_id  # Use invited org for provider preferences
         
         # Initialize provider preferences for new user (all providers enabled by default)
         # Must be done AFTER organization is set up
