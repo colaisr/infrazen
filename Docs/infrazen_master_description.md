@@ -908,6 +908,7 @@ The platform now supports **two-level synchronization**:
 - **Provider Breakdown**: Stores cost and resource counts per provider
 - **Success Tracking**: Records successful vs failed provider syncs
 - **Reference Linking**: Links to individual provider SyncSnapshot records
+- **Demo Organization Exclusion**: Demo organizations are automatically excluded from bulk sync operations to prevent authentication failures from invalid demo credentials
 
 #### **Complete Sync Data Model**
 ```python
