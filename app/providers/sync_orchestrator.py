@@ -48,9 +48,10 @@ class SyncOrchestrator:
 
             self.logger.info(f"Starting {sync_type} sync for provider {provider_id} ({provider.provider_type})")
 
-            # Create sync snapshot
+            # Create sync snapshot with organization_id from provider
             sync_snapshot = SyncSnapshot(
                 provider_id=provider_id,
+                organization_id=provider.organization_id,
                 sync_type=sync_type,
                 sync_status='running',
                 sync_started_at=datetime.now()

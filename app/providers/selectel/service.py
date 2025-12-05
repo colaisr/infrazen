@@ -81,9 +81,10 @@ class SelectelService:
             Dict containing sync results
         """
         try:
-            # Create sync snapshot entry
+            # Create sync snapshot entry with organization_id from provider
             sync_snapshot = SyncSnapshot(
                 provider_id=self.provider.id,
+                organization_id=self.provider.organization_id,
                 sync_type='billing_first',
                 sync_status='running',
                 sync_started_at=datetime.now()
