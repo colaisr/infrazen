@@ -156,7 +156,7 @@ def update_user(user_id):
 
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
-    """Delete user (admin only)"""
+    """Delete user (admin only) - handles all related records in correct order"""
     admin_check = require_admin()
     if admin_check:
         return admin_check
@@ -179,11 +179,117 @@ def delete_user(user_id):
         if user.id == current_user_id:
             return jsonify({'success': False, 'error': 'Cannot delete your own account'})
         
-        user.delete()
+        # Import all necessary models
+        from app.core.models.organization_invitation import OrganizationInvitation
+        from app.core.models.organization_member import OrganizationMember
+        from app.core.models.organization import Organization
+        from app.core.models.resource import Resource
+        from app.core.models.provider import CloudProvider
+        from app.core.models.sync import SyncSnapshot, ResourceState
+        from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
+        from app.core.models.recommendations import OptimizationRecommendation, PriceComparisonRecommendation
+        from app.core.models.user_provider_preference import UserProviderPreference
+        from app.core.models.resource_tag import ResourceTag
+        from app.core.models.resource_metric import ResourceMetric
+        from app.core.models.business_context import BusinessBoard, BoardResource
+        
+        email = user.email.lower()
+        user_id_val = user.id
+        
+        # Delete in correct order to avoid foreign key constraint violations
+        
+        # 1. Organization Invitations (by email)
+        OrganizationInvitation.query.filter_by(email=email).delete(synchronize_session=False)
+        db.session.commit()
+        
+        # 2. User Provider Preferences (MUST be deleted before user)
+        UserProviderPreference.query.filter_by(user_id=user_id_val).delete(synchronize_session=False)
+        db.session.commit()
+        
+        # 3. Organization Memberships
+        memberships = OrganizationMember.query.filter_by(user_id=user_id_val).all()
+        for membership in memberships:
+            db.session.delete(membership)
+        db.session.commit()
+        
+        # 4. Get user's providers
+        providers = CloudProvider.query.filter_by(user_id=user_id_val).all()
+        provider_ids = [p.id for p in providers]
+        
+        if provider_ids:
+            # 4a. Complete syncs and references
+            complete_syncs = CompleteSync.query.filter_by(user_id=user_id_val).all()
+            if complete_syncs:
+                sync_ids = [cs.id for cs in complete_syncs]
+                ProviderSyncReference.query.filter(ProviderSyncReference.complete_sync_id.in_(sync_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                CompleteSync.query.filter(CompleteSync.id.in_(sync_ids)).delete(synchronize_session=False)
+                db.session.commit()
+            
+            # 4b. Snapshots and resource states
+            snapshots = SyncSnapshot.query.filter(SyncSnapshot.provider_id.in_(provider_ids)).all()
+            if snapshots:
+                snapshot_ids = [s.id for s in snapshots]
+                ResourceState.query.filter(ResourceState.sync_snapshot_id.in_(snapshot_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                SyncSnapshot.query.filter(SyncSnapshot.id.in_(snapshot_ids)).delete(synchronize_session=False)
+                db.session.commit()
+            
+            # 4c. Resources
+            resources = Resource.query.filter(Resource.provider_id.in_(provider_ids)).all()
+            if resources:
+                resource_ids = [r.id for r in resources]
+                
+                # Delete resource-related data
+                ResourceTag.query.filter(ResourceTag.resource_id.in_(resource_ids)).delete(synchronize_session=False)
+                ResourceMetric.query.filter(ResourceMetric.resource_id.in_(resource_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                
+                # Delete recommendations
+                OptimizationRecommendation.query.filter(OptimizationRecommendation.resource_id.in_(resource_ids)).delete(synchronize_session=False)
+                PriceComparisonRecommendation.query.filter(PriceComparisonRecommendation.resource_id.in_(resource_ids)).delete(synchronize_session=False)
+                db.session.commit()
+                
+                # Delete resources
+                Resource.query.filter(Resource.id.in_(resource_ids)).delete(synchronize_session=False)
+                db.session.commit()
+            
+            # 4d. Provider recommendations
+            OptimizationRecommendation.query.filter(OptimizationRecommendation.provider_id.in_(provider_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            
+            # 4e. Delete providers
+            CloudProvider.query.filter(CloudProvider.id.in_(provider_ids)).delete(synchronize_session=False)
+            db.session.commit()
+        
+        # 5. Business context data
+        boards = BusinessBoard.query.filter_by(user_id=user_id_val).all()
+        if boards:
+            board_ids = [b.id for b in boards]
+            BoardResource.query.filter(BoardResource.board_id.in_(board_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            BusinessBoard.query.filter(BusinessBoard.id.in_(board_ids)).delete(synchronize_session=False)
+            db.session.commit()
+        
+        # 6. Delete personal organization if it exists and is truly personal
+        if user.personal_organization_id:
+            personal_org = Organization.query.get(user.personal_organization_id)
+            if personal_org:
+                # Check if org has no other active members (user's memberships already deleted)
+                active_members = OrganizationMember.query.filter_by(organization_id=personal_org.id, is_active=True).count()
+                if active_members == 0:
+                    db.session.delete(personal_org)
+                    db.session.commit()
+        
+        # 7. Finally, delete the user
+        db.session.delete(user)
+        db.session.commit()
         
         return jsonify({'success': True})
         
     except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting user {user_id}: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @admin_bp.route('/users', methods=['POST'])
