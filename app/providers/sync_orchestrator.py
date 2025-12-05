@@ -651,9 +651,10 @@ class SyncOrchestrator:
                 resource.last_sync = datetime.now()
                 resource.is_active = True
             else:
-                # Create new base resource record
+                # Create new base resource record with organization_id from provider
                 resource = Resource(
                     provider_id=provider.id,
+                    organization_id=provider.organization_id,
                     resource_id=resource_id,
                     resource_name=resource_name,
                     resource_type=resource_type,

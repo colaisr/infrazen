@@ -1578,9 +1578,10 @@ class YandexService:
                 db.session.commit()
                 return existing_resource
             else:
-                # Create new resource
+                # Create new resource with organization_id from provider
                 new_resource = Resource(
                     provider_id=self.provider.id,
+                    organization_id=self.provider.organization_id,
                     resource_type=resource_type,
                     resource_id=resource_id,
                     resource_name=name,
