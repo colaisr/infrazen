@@ -22,20 +22,44 @@ class BulkSyncService:
     def get_eligible_organizations(self) -> List[Organization]:
         """
         Get all organizations that have auto-sync enabled providers
+        Excludes demo organizations (organizations with demo users or demo in name)
         
         Returns:
             List of Organization instances
         """
+        from app.core.models.organization_member import OrganizationMember
+        from app.core.models.user import User
+        
         # Get organizations that have at least one auto-sync enabled provider
+        # Exclude demo organizations (ID 3 or organizations with demo users)
         organizations = Organization.query.join(CloudProvider).filter(
             CloudProvider.organization_id == Organization.id,
             CloudProvider.auto_sync == True,
             CloudProvider.is_active == True,
-            CloudProvider.is_deleted == False
+            CloudProvider.is_deleted == False,
+            # Exclude demo organization (ID 3) and organizations with "Demo" in name
+            Organization.id != 3,
+            ~Organization.name.like('%Demo%'),
+            ~Organization.name.like('%demo%')
         ).distinct().order_by(Organization.id).all()
         
-        self.logger.info(f"Found {len(organizations)} organizations with auto-sync enabled providers")
-        return organizations
+        # Additional filter: exclude organizations where all members are demo users
+        eligible_orgs = []
+        for org in organizations:
+            # Check if organization has any non-demo members
+            has_non_demo_member = OrganizationMember.query.join(User).filter(
+                OrganizationMember.organization_id == org.id,
+                OrganizationMember.is_active == True,
+                User.role != 'demouser'
+            ).first() is not None
+            
+            if has_non_demo_member:
+                eligible_orgs.append(org)
+            else:
+                self.logger.info(f"Excluding organization {org.id} ({org.name}) - all members are demo users")
+        
+        self.logger.info(f"Found {len(eligible_orgs)} eligible organizations with auto-sync enabled providers (excluded demo organizations)")
+        return eligible_orgs
     
     def get_eligible_users(self) -> List:
         """
