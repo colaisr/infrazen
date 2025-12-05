@@ -3,6 +3,7 @@ Complete Sync API endpoints
 """
 from flask import Blueprint, request, jsonify, session
 from app.core.services.complete_sync_service import CompleteSyncService
+from app.core.organization_context import get_current_organization_id
 from app.api.auth import check_demo_user_write_access
 
 # Create blueprint
@@ -10,7 +11,7 @@ complete_sync_bp = Blueprint('complete_sync', __name__)
 
 @complete_sync_bp.route('/api/complete-sync', methods=['POST'])
 def start_complete_sync():
-    """Start a complete sync operation for all auto-sync enabled providers"""
+    """Start a complete sync operation for all auto-sync enabled providers in the current organization"""
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
@@ -20,11 +21,20 @@ def start_complete_sync():
         if demo_check:
             return demo_check
         
+        # Get organization_id from session (set by organization context middleware)
+        organization_id = get_current_organization_id()
+        if not organization_id:
+            return jsonify({
+                'success': False,
+                'error': 'Organization context required',
+                'message': 'No active organization found. Please select an organization.'
+            }), 400
+        
         user_id = int(float(session['user']['id']))
         sync_type = request.json.get('sync_type', 'manual') if request.is_json else 'manual'
         
-        # Create complete sync service
-        complete_sync_service = CompleteSyncService(user_id)
+        # Create complete sync service for organization
+        complete_sync_service = CompleteSyncService(organization_id, user_id=user_id)
         
         # Start complete sync
         result = complete_sync_service.start_complete_sync(sync_type)
@@ -66,10 +76,19 @@ def get_complete_sync_status(complete_sync_id):
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
+        # Get organization_id from session
+        organization_id = get_current_organization_id()
+        if not organization_id:
+            return jsonify({
+                'success': False,
+                'error': 'Organization context required',
+                'message': 'No active organization found. Please select an organization.'
+            }), 400
+        
         user_id = int(float(session['user']['id']))
         
-        # Create complete sync service
-        complete_sync_service = CompleteSyncService(user_id)
+        # Create complete sync service for organization
+        complete_sync_service = CompleteSyncService(organization_id, user_id=user_id)
         
         # Get sync status
         result = complete_sync_service.get_complete_sync_status(complete_sync_id)
@@ -109,16 +128,25 @@ def get_complete_sync_status(complete_sync_id):
 
 @complete_sync_bp.route('/api/complete-sync/history', methods=['GET'])
 def get_complete_sync_history():
-    """Get complete sync history for the user"""
+    """Get complete sync history for the current organization"""
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
+        # Get organization_id from session
+        organization_id = get_current_organization_id()
+        if not organization_id:
+            return jsonify({
+                'success': False,
+                'error': 'Organization context required',
+                'message': 'No active organization found. Please select an organization.'
+            }), 400
+        
         user_id = int(float(session['user']['id']))
         limit = request.args.get('limit', 30, type=int)
         
-        # Create complete sync service
-        complete_sync_service = CompleteSyncService(user_id)
+        # Create complete sync service for organization
+        complete_sync_service = CompleteSyncService(organization_id, user_id=user_id)
         
         # Get sync history
         history = complete_sync_service.get_complete_sync_history(limit)

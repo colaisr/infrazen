@@ -1,11 +1,11 @@
 """
-Complete Sync Service for orchestrating synchronization across all user providers
+Complete Sync Service for orchestrating synchronization across all organization providers
 """
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from app.core.models import db
-from app.core.models.user import User
+from app.core.models.organization import Organization
 from app.core.models.provider import CloudProvider
 from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
 from app.providers import sync_orchestrator
@@ -16,20 +16,39 @@ logger = logging.getLogger(__name__)
 
 class CompleteSyncService:
     """
-    Service for managing complete sync operations across all user providers
+    Service for managing complete sync operations across all organization providers
     """
     
-    def __init__(self, user_id: int):
-        self.user_id = user_id
-        self.user = User.query.get(user_id)
-        if not self.user:
-            raise ValueError(f"User with ID {user_id} not found")
+    def __init__(self, organization_id: int, user_id: Optional[int] = None):
+        """
+        Initialize sync service for an organization
+        
+        Args:
+            organization_id: Organization ID to sync
+            user_id: Optional user ID for backward compatibility (will be determined from org if not provided)
+        """
+        self.organization_id = organization_id
+        self.organization = Organization.query.get(organization_id)
+        if not self.organization:
+            raise ValueError(f"Organization with ID {organization_id} not found")
+        
+        # Get user_id from organization owner if not provided (for backward compatibility)
+        if user_id is None:
+            owner = self.organization.get_owner()
+            if owner:
+                self.user_id = owner.user_id
+            else:
+                # Fallback: get first active member
+                member = self.organization.members.filter_by(is_active=True).first()
+                self.user_id = member.user_id if member else None
+        else:
+            self.user_id = user_id
         
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     def start_complete_sync(self, sync_type: str = 'manual') -> Dict[str, any]:
         """
-        Start a complete sync operation for all auto-sync enabled providers
+        Start a complete sync operation for all auto-sync enabled providers in the organization
         
         Args:
             sync_type: Type of sync (manual, scheduled, api)
@@ -38,10 +57,10 @@ class CompleteSyncService:
             Dict containing sync results
         """
         try:
-            self.logger.info(f"Starting complete sync for user {self.user_id}")
+            self.logger.info(f"Starting complete sync for organization {self.organization_id} ({self.organization.name})")
             
-            # Get all auto-sync enabled providers for this user
-            providers = self.get_user_providers()
+            # Get all auto-sync enabled providers for this organization
+            providers = self.get_organization_providers()
             
             if not providers:
                 return {
@@ -52,7 +71,8 @@ class CompleteSyncService:
             
             # Create complete sync record
             complete_sync = CompleteSync(
-                user_id=self.user_id,
+                organization_id=self.organization_id,
+                user_id=self.user_id,  # Keep for backward compatibility
                 sync_type=sync_type,
                 sync_status='running',
                 sync_started_at=datetime.now()
@@ -61,6 +81,8 @@ class CompleteSyncService:
             # Set sync configuration
             sync_config = {
                 'sync_type': sync_type,
+                'organization_id': self.organization_id,
+                'organization_name': self.organization.name,
                 'user_id': self.user_id,
                 'providers_count': len(providers),
                 'sync_timestamp': datetime.now().isoformat(),
@@ -77,26 +99,33 @@ class CompleteSyncService:
             return self._execute_sequential_sync(complete_sync, providers)
             
         except Exception as e:
-            self.logger.error(f"Complete sync failed for user {self.user_id}: {e}")
+            self.logger.error(f"Complete sync failed for organization {self.organization_id}: {e}")
             return {
                 'success': False,
                 'error': str(e),
                 'message': 'Complete sync failed due to system error'
             }
     
-    def get_user_providers(self) -> List[CloudProvider]:
+    def get_organization_providers(self) -> List[CloudProvider]:
         """
-        Get all auto-sync enabled providers for the user (excluding soft-deleted)
+        Get all auto-sync enabled providers for the organization (excluding soft-deleted)
         
         Returns:
             List of CloudProvider instances
         """
         return CloudProvider.query.filter_by(
-            user_id=self.user_id,
+            organization_id=self.organization_id,
             auto_sync=True,
             is_active=True,
             is_deleted=False  # Exclude soft-deleted providers from sync
         ).order_by('created_at').all()
+    
+    def get_user_providers(self) -> List[CloudProvider]:
+        """
+        DEPRECATED: Use get_organization_providers() instead.
+        Kept for backward compatibility.
+        """
+        return self.get_organization_providers()
     
     def _execute_sequential_sync(self, complete_sync: CompleteSync, providers: List[CloudProvider]) -> Dict[str, any]:
         """
@@ -294,14 +323,14 @@ class CompleteSyncService:
         """
         complete_sync = CompleteSync.query.filter_by(
             id=complete_sync_id,
-            user_id=self.user_id
+            organization_id=self.organization_id
         ).first()
         
         if not complete_sync:
             return {
                 'success': False,
                 'error': 'Complete sync not found',
-                'message': 'Complete sync does not exist or does not belong to user'
+                'message': 'Complete sync does not exist or does not belong to organization'
             }
         
         return {
@@ -325,7 +354,7 @@ class CompleteSyncService:
     
     def get_complete_sync_history(self, limit: int = 30) -> List[Dict[str, any]]:
         """
-        Get complete sync history for the user
+        Get complete sync history for the organization
         
         Args:
             limit: Maximum number of syncs to return
@@ -334,7 +363,7 @@ class CompleteSyncService:
             List of complete sync records
         """
         complete_syncs = CompleteSync.query.filter_by(
-            user_id=self.user_id
+            organization_id=self.organization_id
         ).order_by(CompleteSync.sync_started_at.desc()).limit(limit).all()
         
         return [sync.to_dict() for sync in complete_syncs]

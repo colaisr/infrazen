@@ -885,7 +885,8 @@ The InfraZen platform implements a comprehensive multi-cloud synchronization sys
 
 #### **Sync Service Architecture**
 - **`SyncService`**: Core orchestration service that manages individual provider sync processes
-- **`CompleteSyncService`**: NEW - Orchestrates complete sync operations across all auto-sync enabled providers
+- **`CompleteSyncService`**: NEW - Orchestrates complete sync operations across all auto-sync enabled providers for an organization
+- **`BulkSyncService`**: NEW - Manages bulk synchronization across all organizations with auto-sync enabled providers
 - **Provider Clients**: Specialized API clients for each cloud provider (Beget, Yandex.Cloud, Selectel, AWS, Azure, GCP)
 - **Change Detection**: Automated comparison between current and previous resource states
 - **State Management**: Tracks resource lifecycle (created, updated, deleted, unchanged)
@@ -899,6 +900,7 @@ The platform now supports **two-level synchronization**:
 2. **Complete Sync**: NEW - Orchestrated sync across all auto-sync enabled providers with aggregated results
 
 #### **Complete Sync Features**
+- **Organization-Scoped**: Syncs all providers belonging to an organization (prevents duplicate syncs when multiple users share an organization)
 - **Auto-Sync Filtering**: Only syncs providers with `auto_sync=True` flag
 - **Sequential Execution**: Syncs providers one after another to avoid API rate limits
 - **Cost Aggregation**: Sums daily/monthly costs from all successful provider syncs
@@ -910,9 +912,10 @@ The platform now supports **two-level synchronization**:
 #### **Complete Sync Data Model**
 ```python
 CompleteSync:
-- user_id: User who initiated the sync
-- sync_type: 'manual' or 'scheduled'
-- sync_status: 'running', 'success', 'error'
+- organization_id: Organization being synced (required, NOT NULL)
+- user_id: User who initiated the sync (for backward compatibility)
+- sync_type: 'manual', 'scheduled', or 'api'
+- sync_status: 'running', 'success', 'error', 'partial'
 - total_providers_synced: Number of providers included
 - successful_providers: Number of successful syncs
 - failed_providers: Number of failed syncs
@@ -937,7 +940,7 @@ ProviderSyncReference:
 - **Aggregated Statistics**: Shows total resources and costs from complete sync
 - **Individual Provider Views**: Still shows data from individual provider snapshots
 - **Dashboard Integration**: Main spending view uses complete sync data
-- **Analytics Foundation**: Complete sync data enables user spending trends over time
+- **Analytics Foundation**: Complete sync data enables organization spending trends over time
 
 ### 6.3.4. Billing-First Sync Process Flow
 
@@ -1187,10 +1190,12 @@ CREATE TABLE resource_states (
 ### 6.3.10. Future Enhancements
 
 #### **Scheduled Syncs**
-- Cron-based automatic synchronization
+- **Organization-Based Bulk Sync**: Daily cron job syncs all organizations with auto-sync enabled providers (prevents duplicate syncs)
+- **BulkSyncService**: Orchestrates synchronization across all organizations sequentially
+- **CompleteSyncService**: Handles per-organization sync with cost aggregation
 - Configurable sync intervals per provider
-- Background job processing with Celery/Redis
-- Sync queue management and prioritization
+- Background job processing with Celery/Redis (future enhancement)
+- Sync queue management and prioritization (future enhancement)
 
 #### **Advanced Analytics**
 - Cost trend analysis across multiple snapshots
