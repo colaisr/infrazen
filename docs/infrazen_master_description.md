@@ -422,7 +422,7 @@ CREATE TABLE organization_members (
 );
 ```
 
-**Organization Invitations Table (Audit Trail):**
+**Organization Invitations Table (Audit Trail & Pending Invitations):**
 ```sql
 CREATE TABLE organization_invitations (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -430,15 +430,19 @@ CREATE TABLE organization_invitations (
     email VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'viewer',
     invited_by_user_id INTEGER NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, accepted, revoked
+    status VARCHAR(20) NOT NULL DEFAULT 'sent', -- sent, accepted, revoked, failed
     accepted_at DATETIME,
     revoked_at DATETIME,
     created_at DATETIME NOT NULL,
+    invitation_token VARCHAR(255) UNIQUE, -- Token for unregistered users
+    expires_at DATETIME, -- Token expiration (7 days from creation)
     FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
     FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_invitations_email (email),
     INDEX idx_invitations_org (organization_id),
-    INDEX idx_invitations_status (status)
+    INDEX idx_invitations_status (status),
+    INDEX idx_invitations_token (invitation_token),
+    INDEX idx_invitations_expires (expires_at)
 );
 ```
 
@@ -518,23 +522,68 @@ session['user'] = {
 
 #### **Invitation System**
 
-**Automatic Invitation Flow:**
-1. Owner invites user by email (must be existing user)
-2. User is automatically added to organization (no confirmation step)
-3. Email notification sent to inform user
-4. Invitation record created for audit trail
+**Dual Invitation Flow (Registered & Unregistered Users):**
+
+**For Registered Users (Existing Flow):**
+1. Owner invites user by email
+2. System checks if user exists in database
+3. If user exists, they are automatically added to organization immediately
+4. Email notification sent to inform user they've been added
+5. Invitation record created with status 'accepted' for audit trail
+
+**For Unregistered Users (New Pending Invitation Flow):**
+1. Owner invites user by email
+2. System checks if user exists in database
+3. If user doesn't exist:
+   - Pending invitation record created with status 'sent'
+   - Unique invitation token generated (32-byte URL-safe token)
+   - Token expires after 7 days
+   - Email sent with registration link containing the token
+4. User clicks registration link: `https://www.infrazen.ru/register?invitation=<token>`
+5. User completes registration form
+6. During registration:
+   - System validates invitation token and checks expiration
+   - Verifies email matches invitation email
+   - User account created
+   - User automatically added to invited organization
+   - Invited organization set as current organization
+   - Personal organization also created (user can switch to it)
+   - Invitation status updated to 'accepted'
+   - Token cleared from database
+7. UserProviderPreference initialized for the invited organization
 
 **Invitation Features:**
-- **Email-Based**: Invitations sent via email to existing users only
+- **Dual Support**: Supports both registered and unregistered users
+- **Email-Based**: Invitations sent via email with personalized messages
+- **Token-Based Security**: Unregistered users receive secure, time-limited tokens (7 days)
 - **Role Assignment**: Role (viewer/editor) assigned at invite time
-- **Idempotent**: Re-inviting existing members is silently ignored
+- **Idempotent**: Re-inviting existing members or pending invitations is silently ignored
 - **Audit Trail**: All invitations tracked in `organization_invitations` table
+- **Auto-Join**: Invited users automatically join organization upon registration
+- **Personal Org Preserved**: Even invited users get a personal organization they can switch to
 - **Revocation**: Owners can revoke pending invitations
 
+**Invitation Token Security:**
+- Tokens are 32-byte URL-safe random strings (secrets.token_urlsafe)
+- Tokens are unique and indexed in database
+- Tokens expire after 7 days
+- Tokens are cleared after successful registration
+- Email validation ensures token can only be used by the invited email address
+
+**Email Notifications:**
+- **Unregistered Users**: Receive invitation email with registration link containing token
+- **Registered Users**: Receive notification email when added to organization
+- Both emails include organization name, inviter name, and assigned role
+
 **Invitation Endpoints:**
-- `POST /api/organizations/<org_id>/members`: Invite user (automatic addition)
+- `POST /api/organizations/<org_id>/members`: Invite user (handles both registered and unregistered)
 - `GET /api/organizations/<org_id>/invitations`: List invitation history
-- `POST /api/organizations/<org_id>/invitations/<id>/revoke`: Revoke invitation
+- `POST /api/organizations/<org_id>/invitations/<id>/revoke`: Revoke pending invitation
+
+**Registration Integration:**
+- `GET /register?invitation=<token>`: Registration page with invitation token
+- `POST /api/auth/register`: Accepts `invitation_token` in request body
+- Registration form automatically includes invitation token from URL parameter
 
 #### **Organization Management API**
 
@@ -630,10 +679,22 @@ resources = Resource.query.filter_by(
 **Backend:**
 - `app/core/models/organization.py`: Organization model
 - `app/core/models/organization_member.py`: Member model with roles
-- `app/core/models/organization_invitation.py`: Invitation audit trail
+- `app/core/models/organization_invitation.py`: Invitation model with token support
+  - `generate_invitation_token()`: Creates unique token for unregistered users
+  - `find_by_token(token)`: Retrieves valid invitation by token
+  - `find_pending_by_email(email)`: Finds pending invitations for email
 - `app/core/organization_context.py`: Context management helpers
 - `app/api/organizations.py`: Organization management API
-- `app/api/auth.py`: Organization context initialization on login
+  - `invite_member()`: Handles both registered and unregistered user invitations
+- `app/api/auth.py`: Registration and authentication
+  - `handle_register()`: Processes invitation tokens during registration
+  - Auto-joins invited users to organization
+  - Ensures personal organization is always created
+- `app/core/services/email_service.py`: Email notifications
+  - `send_organization_invitation()`: Sends invitation email to unregistered users
+  - `send_organization_invitation_accepted()`: Notifies existing users when added
+- `app/web/main.py`: Web routes
+  - `/register` route: Handles invitation token in URL parameter
 - `app/__init__.py`: Organization context middleware
 
 **Frontend:**
@@ -641,6 +702,9 @@ resources = Resource.query.filter_by(
 - `app/static/js/settings.js`: Organization management UI
 - `app/templates/base.html`: Organization switcher UI in sidebar
 - `app/templates/settings.html`: Organization management section
+- `app/templates/register.html`: Registration page with invitation token support
+  - Reads `invitation` query parameter from URL
+  - Includes invitation token in registration POST request
 - `app/static/css/components/navigation.css`: Switcher styling
 - `app/static/css/pages/settings.css`: Settings page styling
 
@@ -649,20 +713,24 @@ resources = Resource.query.filter_by(
 - `migrations/versions/*_add_organization_id_to_tables.py`: Add org_id columns
 - `migrations/versions/*_make_organization_id_not_null.py`: Enforce NOT NULL
 - `migrations/versions/*_add_personal_organization_id_to_users.py`: User extensions
+- `migrations/versions/*_add_invitation_token_to_organization_invitations.py`: Add invitation token support
+  - Adds `invitation_token` column (VARCHAR(255), UNIQUE, indexed)
+  - Adds `expires_at` column (DATETIME, indexed)
 - `scripts/migrate_to_organizations.py`: Data migration script
 
 #### **Key Design Decisions**
 
 1. **Single Owner Model**: Only one owner per organization, owner cannot leave
-2. **Personal Organizations**: Each user has a personal org that remains separate
+2. **Personal Organizations**: Each user has a personal org that remains separate (always created, even for invited users)
 3. **No Deletion**: Organizations cannot be deleted (data retention)
-4. **Automatic Invitations**: Users added immediately, email is notification only
-5. **Existing Users Only**: Can only invite users who already have accounts
-6. **Session-Based Context**: `current_organization_id` stored in Flask session
-7. **Last Active Default**: Remembers last active organization for next login
-8. **Complete Isolation**: No cross-organization data access
-9. **No Limits**: Unlimited organizations and members per user
-10. **Name Only**: Organization settings limited to name (can extend later)
+4. **Dual Invitation System**: Supports both registered users (immediate addition) and unregistered users (pending invitations with tokens)
+5. **Token-Based Invitations**: Unregistered users receive secure, time-limited registration links (7-day expiration)
+6. **Auto-Join on Registration**: Invited users automatically join organization and have it set as current upon registration
+7. **Session-Based Context**: `current_organization_id` stored in Flask session
+8. **Last Active Default**: Remembers last active organization for next login
+9. **Complete Isolation**: No cross-organization data access
+10. **No Limits**: Unlimited organizations and members per user
+11. **Name Only**: Organization settings limited to name (can extend later)
 
 #### **Benefits**
 
@@ -885,7 +953,8 @@ The InfraZen platform implements a comprehensive multi-cloud synchronization sys
 
 #### **Sync Service Architecture**
 - **`SyncService`**: Core orchestration service that manages individual provider sync processes
-- **`CompleteSyncService`**: NEW - Orchestrates complete sync operations across all auto-sync enabled providers
+- **`CompleteSyncService`**: NEW - Orchestrates complete sync operations across all auto-sync enabled providers for an organization
+- **`BulkSyncService`**: NEW - Manages bulk synchronization across all organizations with auto-sync enabled providers
 - **Provider Clients**: Specialized API clients for each cloud provider (Beget, Yandex.Cloud, Selectel, AWS, Azure, GCP)
 - **Change Detection**: Automated comparison between current and previous resource states
 - **State Management**: Tracks resource lifecycle (created, updated, deleted, unchanged)
@@ -899,6 +968,7 @@ The platform now supports **two-level synchronization**:
 2. **Complete Sync**: NEW - Orchestrated sync across all auto-sync enabled providers with aggregated results
 
 #### **Complete Sync Features**
+- **Organization-Scoped**: Syncs all providers belonging to an organization (prevents duplicate syncs when multiple users share an organization)
 - **Auto-Sync Filtering**: Only syncs providers with `auto_sync=True` flag
 - **Sequential Execution**: Syncs providers one after another to avoid API rate limits
 - **Cost Aggregation**: Sums daily/monthly costs from all successful provider syncs
@@ -906,13 +976,15 @@ The platform now supports **two-level synchronization**:
 - **Provider Breakdown**: Stores cost and resource counts per provider
 - **Success Tracking**: Records successful vs failed provider syncs
 - **Reference Linking**: Links to individual provider SyncSnapshot records
+- **Demo Organization Exclusion**: Demo organizations are automatically excluded from bulk sync operations to prevent authentication failures from invalid demo credentials
 
 #### **Complete Sync Data Model**
 ```python
 CompleteSync:
-- user_id: User who initiated the sync
-- sync_type: 'manual' or 'scheduled'
-- sync_status: 'running', 'success', 'error'
+- organization_id: Organization being synced (required, NOT NULL)
+- user_id: User who initiated the sync (for backward compatibility)
+- sync_type: 'manual', 'scheduled', or 'api'
+- sync_status: 'running', 'success', 'error', 'partial'
 - total_providers_synced: Number of providers included
 - successful_providers: Number of successful syncs
 - failed_providers: Number of failed syncs
@@ -937,7 +1009,7 @@ ProviderSyncReference:
 - **Aggregated Statistics**: Shows total resources and costs from complete sync
 - **Individual Provider Views**: Still shows data from individual provider snapshots
 - **Dashboard Integration**: Main spending view uses complete sync data
-- **Analytics Foundation**: Complete sync data enables user spending trends over time
+- **Analytics Foundation**: Complete sync data enables organization spending trends over time
 
 ### 6.3.4. Billing-First Sync Process Flow
 
@@ -1187,10 +1259,13 @@ CREATE TABLE resource_states (
 ### 6.3.10. Future Enhancements
 
 #### **Scheduled Syncs**
-- Cron-based automatic synchronization
+- **Organization-Based Bulk Sync**: Daily cron job syncs all organizations with auto-sync enabled providers (prevents duplicate syncs)
+- **BulkSyncService**: Orchestrates synchronization across all organizations sequentially
+- **CompleteSyncService**: Handles per-organization sync with cost aggregation
+- **Demo Organization Exclusion**: Demo organizations (ID 3, organizations with "Demo" in name, or all-demo-member organizations) are automatically excluded from bulk syncs to prevent authentication failures
 - Configurable sync intervals per provider
-- Background job processing with Celery/Redis
-- Sync queue management and prioritization
+- Background job processing with Celery/Redis (future enhancement)
+- Sync queue management and prioritization (future enhancement)
 
 #### **Advanced Analytics**
 - Cost trend analysis across multiple snapshots
@@ -5937,9 +6012,16 @@ INFO app.core.recommendations.plugins.price_check_rule:
 **Fields**:
 ```python
 user_id = db.Column(db.Integer, ForeignKey('users.id'))
+organization_id = db.Column(db.Integer, ForeignKey('organizations.id'), nullable=True)  # Optional org-scoped preferences
 provider_type = db.Column(db.String(50))  # 'yandex', 'selectel', 'beget'
 is_enabled = db.Column(db.Boolean, default=True)  # Show in recommendations
 ```
+
+**Initialization**:
+- `UserProviderPreference.initialize_for_user(user_id, organization_id=None)`: Creates default preferences for a new user
+- When `organization_id` is provided, preferences are scoped to that organization
+- During registration via invitation, preferences are initialized for the invited organization
+- All providers are enabled by default for new users
 
 **Integration in Price Check Rule**:
 ```python
