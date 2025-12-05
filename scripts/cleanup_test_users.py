@@ -15,9 +15,10 @@ from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
 from app.core.models.recommendations import OptimizationRecommendation
 from app.core.models.pricing import PriceComparisonRecommendation
 from app.core.models.user_provider_preference import UserProviderPreference
-from app.core.models.resource_tag import ResourceTag
-from app.core.models.resource_metric import ResourceMetric
-from app.core.models.business_context import BusinessBoard, BoardResource
+from app.core.models.tags import ResourceTag
+from app.core.models.metrics import ResourceMetric
+from app.core.models.business_board import BusinessBoard
+from app.core.models.board_resource import BoardResource
 import sys
 
 def cleanup_user(email):
