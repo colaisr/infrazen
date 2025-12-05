@@ -322,7 +322,7 @@ def list_members(org_id):
 @organizations_bp.route('/organizations/<int:org_id>/members', methods=['POST'])
 @login_required
 def invite_member(org_id):
-    """Invite a user to the organization (automatic addition)"""
+    """Invite a user to the organization (supports both registered and unregistered users)"""
     try:
         user_id = get_current_user_id()
         if not user_id:
@@ -341,68 +341,137 @@ def invite_member(org_id):
         if role not in ['viewer', 'editor']:
             return jsonify({'success': False, 'error': 'Invalid role. Must be viewer or editor'}), 400
         
+        # Get organization
+        organization = Organization.query.get(org_id)
+        if not organization:
+            return jsonify({'success': False, 'error': 'Organization not found'}), 404
+        
         # Find user by email (case-insensitive)
         user = User.query.filter(func.lower(User.email) == email.lower()).first()
-        if not user:
-            return jsonify({'success': False, 'error': f'Пользователь с email {email} не найден. Убедитесь, что пользователь зарегистрирован в системе.'}), 404
         
-        # Check if user is already a member
-        existing_member = OrganizationMember.query.filter_by(
-            organization_id=org_id,
-            user_id=user.id,
-            is_active=True
-        ).first()
-        
-        if existing_member:
-            # Idempotent - silently ignore if already a member
+        if user:
+            # User exists - add them immediately
+            # Check if user is already a member
+            existing_member = OrganizationMember.query.filter_by(
+                organization_id=org_id,
+                user_id=user.id,
+                is_active=True
+            ).first()
+            
+            if existing_member:
+                # Idempotent - silently ignore if already a member
+                return jsonify({
+                    'success': True,
+                    'message': 'User is already a member',
+                    'member': {
+                        'id': existing_member.id,
+                        'user_id': user.id,
+                        'email': user.email,
+                        'role': existing_member.role
+                    }
+                })
+            
+            # Add user to organization automatically
+            member = OrganizationMember(
+                organization_id=org_id,
+                user_id=user.id,
+                role=role,
+                invited_by_user_id=user_id,
+                invited_at=datetime.utcnow(),
+                joined_at=datetime.utcnow(),
+                is_active=True
+            )
+            db.session.add(member)
+            
+            # Create invitation record for audit trail
+            invitation = OrganizationInvitation(
+                organization_id=org_id,
+                email=email,
+                role=role,
+                invited_by_user_id=user_id,
+                status='accepted',
+                accepted_at=datetime.utcnow()
+            )
+            db.session.add(invitation)
+            
+            db.session.commit()
+            
+            # Send email notification to existing user
+            try:
+                from app.core.services.email_service import EmailService
+                inviter = User.query.get(user_id)
+                inviter_name = f"{inviter.first_name or ''} {inviter.last_name or ''}".strip() or inviter.email.split('@')[0]
+                EmailService.send_organization_invitation_accepted(
+                    to_email=email,
+                    username=f"{user.first_name or ''} {user.last_name or ''}".strip() or email.split('@')[0],
+                    organization_name=organization.name,
+                    inviter_name=inviter_name,
+                    role=role
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send invitation email to existing user: {str(e)}")
+            
             return jsonify({
                 'success': True,
-                'message': 'User is already a member',
+                'message': f'User {email} has been added to the organization',
                 'member': {
-                    'id': existing_member.id,
+                    'id': member.id,
                     'user_id': user.id,
                     'email': user.email,
-                    'role': existing_member.role
+                    'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
+                    'role': role,
+                    'joined_at': member.joined_at.isoformat() if member.joined_at else None
                 }
-            })
-        
-        # Add user to organization automatically
-        member = OrganizationMember(
-            organization_id=org_id,
-            user_id=user.id,
-            role=role,
-            invited_by_user_id=user_id,
-            invited_at=datetime.utcnow(),
-            joined_at=datetime.utcnow(),
-            is_active=True
-        )
-        db.session.add(member)
-        
-        # Create invitation record for audit trail
-        invitation = OrganizationInvitation(
-            organization_id=org_id,
-            email=email,
-            role=role,
-            invited_by_user_id=user_id
-        )
-        db.session.add(invitation)
-        
-        db.session.commit()
-        
-        # TODO: Send email notification to user
-        
-        return jsonify({
-            'success': True,
-            'message': f'User {email} has been added to the organization',
-            'member': {
-                'id': member.id,
-                'user_id': user.id,
-                'email': user.email,
-                'name': f"{user.first_name or ''} {user.last_name or ''}".strip(),
-                'role': role,
-                'joined_at': member.joined_at.isoformat() if member.joined_at else None
-            }
-        }), 201
+            }), 201
+        else:
+            # User doesn't exist - create pending invitation
+            # Check if there's already a pending invitation for this email
+            existing_invitation = OrganizationInvitation.find_pending_by_email(email)
+            if existing_invitation and existing_invitation.organization_id == org_id:
+                return jsonify({
+                    'success': True,
+                    'message': f'Invitation already sent to {email}',
+                    'pending': True
+                })
+            
+            # Create pending invitation with token
+            invitation = OrganizationInvitation(
+                organization_id=org_id,
+                email=email,
+                role=role,
+                invited_by_user_id=user_id,
+                status='sent'
+            )
+            db.session.add(invitation)
+            db.session.flush()  # Flush to get invitation ID
+            
+            # Generate invitation token
+            token = invitation.generate_invitation_token()
+            
+            db.session.commit()
+            
+            # Send invitation email with registration link
+            try:
+                from app.core.services.email_service import EmailService
+                inviter = User.query.get(user_id)
+                inviter_name = f"{inviter.first_name or ''} {inviter.last_name or ''}".strip() or inviter.email.split('@')[0]
+                registration_link = f"{request.url_root}register?invitation={token}"
+                EmailService.send_organization_invitation(
+                    to_email=email,
+                    organization_name=organization.name,
+                    inviter_name=inviter_name,
+                    role=role,
+                    registration_link=registration_link
+                )
+            except Exception as e:
+                logger.error(f"Failed to send invitation email: {str(e)}")
+                # Don't fail the invitation if email fails
+            
+            return jsonify({
+                'success': True,
+                'message': f'Invitation sent to {email}. They will be added to the organization when they register.',
+                'pending': True
+            }), 201
     
     except PermissionError as e:
         return jsonify({'success': False, 'error': str(e)}), 403

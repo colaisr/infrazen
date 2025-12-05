@@ -1,9 +1,10 @@
 """
 OrganizationInvitation model for tracking invitation history
-Note: Since invitations are automatic (no tokens/expiration), this table is primarily for audit trail
+Supports both registered and unregistered users with invitation tokens
 """
 from app.core.models import db
 from .base import BaseModel
+import secrets
 
 
 class OrganizationInvitation(BaseModel):
@@ -23,6 +24,9 @@ class OrganizationInvitation(BaseModel):
     accepted_at = db.Column(db.DateTime, nullable=True)
     revoked_at = db.Column(db.DateTime, nullable=True)
     
+    # Invitation token for unregistered users
+    invitation_token = db.Column(db.String(255), nullable=True, unique=True, index=True)
+    
     # Relationships
     organization = db.relationship('Organization', backref='invitations')
     invited_by = db.relationship('User', foreign_keys=[invited_by_user_id])
@@ -40,6 +44,25 @@ class OrganizationInvitation(BaseModel):
             'revoked_at': self.revoked_at.isoformat() if self.revoked_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+    
+    def generate_invitation_token(self):
+        """Generate a unique token for invitation (for unregistered users)"""
+        self.invitation_token = secrets.token_urlsafe(32)
+        db.session.commit()
+        return self.invitation_token
+    
+    @classmethod
+    def find_by_token(cls, token):
+        """Find invitation by token"""
+        return cls.query.filter_by(invitation_token=token, status='sent').first()
+    
+    @classmethod
+    def find_pending_by_email(cls, email):
+        """Find pending invitation by email"""
+        return cls.query.filter_by(
+            email=email.lower(),
+            status='sent'
+        ).order_by(cls.created_at.desc()).first()
     
     @classmethod
     def get_organization_invitations(cls, organization_id):

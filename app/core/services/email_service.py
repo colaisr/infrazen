@@ -351,4 +351,275 @@ class EmailService:
         """
         
         return EmailService.send_email(to_email, subject, html_body, text_body)
+    
+    @staticmethod
+    def send_organization_invitation(
+        to_email: str,
+        organization_name: str,
+        inviter_name: str,
+        role: str,
+        registration_link: str
+    ) -> bool:
+        """
+        Send an organization invitation email to an unregistered user
+        
+        Args:
+            to_email: Recipient email address
+            organization_name: Name of the organization
+            inviter_name: Name of the user who sent the invitation
+            role: Role assigned (viewer/editor)
+            registration_link: Link to register with invitation token
+            
+        Returns:
+            bool: True if email sent successfully
+        """
+        role_display = 'Редактор' if role == 'editor' else 'Наблюдатель'
+        subject = f"Приглашение в организацию {organization_name} в InfraZen"
+        
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 10px 10px 0 0;
+                    text-align: center;
+                }}
+                .content {{
+                    background: #ffffff;
+                    padding: 30px;
+                    border: 1px solid #e2e8f0;
+                    border-top: none;
+                }}
+                .button {{
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background-color: #4299e1;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    margin: 20px 0;
+                }}
+                .info-box {{
+                    background: #f7fafc;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    border-left: 4px solid #4299e1;
+                }}
+                .footer {{
+                    text-align: center;
+                    color: #718096;
+                    font-size: 14px;
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e2e8f0;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1 style="margin: 0; font-size: 28px;">Приглашение в InfraZen</h1>
+            </div>
+            <div class="content">
+                <p>Здравствуйте!</p>
+                <p><strong>{inviter_name}</strong> пригласил(а) вас присоединиться к организации <strong>"{organization_name}"</strong> в InfraZen.</p>
+                
+                <div class="info-box">
+                    <p style="margin: 0;"><strong>Ваша роль:</strong> {role_display}</p>
+                    <p style="margin: 10px 0 0 0;"><strong>Организация:</strong> {organization_name}</p>
+                </div>
+                
+                <p>InfraZen — это интеллектуальная FinOps-платформа для управления облачными ресурсами и оптимизации расходов.</p>
+                
+                <div style="text-align: center;">
+                    <a href="{registration_link}" class="button">Зарегистрироваться и принять приглашение</a>
+                </div>
+                
+                <p style="font-size: 14px; color: #718096;">Или скопируйте и вставьте эту ссылку в браузер:<br>
+                <a href="{registration_link}" style="color: #4299e1; word-break: break-all;">{registration_link}</a></p>
+                
+                <p style="margin-top: 30px; padding: 15px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+                    <strong>⚠️ Важно:</strong> После регистрации вы автоматически будете добавлены в организацию "{organization_name}" и сможете начать работу.
+                </p>
+                
+                <p style="margin-top: 20px;">Если вы не ожидали это приглашение, проигнорируйте это сообщение.</p>
+                
+                <p style="margin-top: 30px;">С уважением,<br><strong>Команда InfraZen</strong></p>
+            </div>
+            <div class="footer">
+                <p>© 2025 InfraZen. Все права защищены.</p>
+                <p>Это автоматическое сообщение, пожалуйста, не отвечайте на него.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_body = f"""
+        Приглашение в InfraZen
+        
+        Здравствуйте!
+        
+        {inviter_name} пригласил(а) вас присоединиться к организации "{organization_name}" в InfraZen.
+        
+        Ваша роль: {role_display}
+        Организация: {organization_name}
+        
+        InfraZen — это интеллектуальная FinOps-платформа для управления облачными ресурсами и оптимизации расходов.
+        
+        Зарегистрируйтесь и примите приглашение, перейдя по ссылке: {registration_link}
+        
+        ⚠️ Важно: После регистрации вы автоматически будете добавлены в организацию "{organization_name}" и сможете начать работу.
+        
+        Если вы не ожидали это приглашение, проигнорируйте это сообщение.
+        
+        С уважением,
+        Команда InfraZen
+        
+        ---
+        © 2025 InfraZen. Все права защищены.
+        Это автоматическое сообщение, пожалуйста, не отвечайте на него.
+        """
+        
+        return EmailService.send_email(to_email, subject, html_body, text_body)
+    
+    @staticmethod
+    def send_organization_invitation_accepted(
+        to_email: str,
+        username: str,
+        organization_name: str,
+        inviter_name: str,
+        role: str
+    ) -> bool:
+        """
+        Send notification email when an existing user is added to an organization
+        
+        Args:
+            to_email: Recipient email address
+            username: Name of the user who was added
+            organization_name: Name of the organization
+            inviter_name: Name of the user who sent the invitation
+            role: Role assigned (viewer/editor)
+            
+        Returns:
+            bool: True if email sent successfully
+        """
+        role_display = 'Редактор' if role == 'editor' else 'Наблюдатель'
+        subject = f"Вы добавлены в организацию {organization_name} в InfraZen"
+        
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    color: white;
+                    padding: 30px;
+                    border-radius: 10px 10px 0 0;
+                    text-align: center;
+                }}
+                .content {{
+                    background: #ffffff;
+                    padding: 30px;
+                    border: 1px solid #e2e8f0;
+                    border-top: none;
+                }}
+                .button {{
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background-color: #10b981;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    margin: 20px 0;
+                }}
+                .info-box {{
+                    background: #f0fdf4;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    border-left: 4px solid #10b981;
+                }}
+                .footer {{
+                    text-align: center;
+                    color: #718096;
+                    font-size: 14px;
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e2e8f0;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1 style="margin: 0; font-size: 28px;">Добро пожаловать в организацию!</h1>
+            </div>
+            <div class="content">
+                <p>Здравствуйте, {username}!</p>
+                <p><strong>{inviter_name}</strong> добавил(а) вас в организацию <strong>"{organization_name}"</strong> в InfraZen.</p>
+                
+                <div class="info-box">
+                    <p style="margin: 0;"><strong>Ваша роль:</strong> {role_display}</p>
+                    <p style="margin: 10px 0 0 0;"><strong>Организация:</strong> {organization_name}</p>
+                </div>
+                
+                <p>Теперь вы можете работать с ресурсами и данными этой организации.</p>
+                
+                <div style="text-align: center;">
+                    <a href="{{request.url_root}}dashboard" class="button">Перейти в панель управления</a>
+                </div>
+                
+                <p style="margin-top: 30px;">С уважением,<br><strong>Команда InfraZen</strong></p>
+            </div>
+            <div class="footer">
+                <p>© 2025 InfraZen. Все права защищены.</p>
+                <p>Это автоматическое сообщение, пожалуйста, не отвечайте на него.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_body = f"""
+        Добро пожаловать в организацию!
+        
+        Здравствуйте, {username}!
+        
+        {inviter_name} добавил(а) вас в организацию "{organization_name}" в InfraZen.
+        
+        Ваша роль: {role_display}
+        Организация: {organization_name}
+        
+        Теперь вы можете работать с ресурсами и данными этой организации.
+        
+        Перейдите в панель управления: {{request.url_root}}dashboard
+        
+        С уважением,
+        Команда InfraZen
+        
+        ---
+        © 2025 InfraZen. Все права защищены.
+        Это автоматическое сообщение, пожалуйста, не отвечайте на него.
+        """
+        
+        return EmailService.send_email(to_email, subject, html_body, text_body)
 

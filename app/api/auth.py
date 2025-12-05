@@ -451,7 +451,10 @@ def user_details():
 @auth_bp.route('/register')
 def register():
     """Display registration page"""
-    return render_template('register.html', google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'))
+    invitation_token = request.args.get('invitation')
+    return render_template('register.html', 
+                         google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'),
+                         invitation_token=invitation_token)
 
 @auth_bp.route('/register', methods=['POST'])
 def handle_register():
@@ -520,12 +523,48 @@ def handle_register():
             logger.error(f"Failed to send confirmation email: {str(e)}")
             # Don't fail registration if email sending fails
         
+        # Check for pending invitation
+        invitation_token = data.get('invitation_token') or request.args.get('invitation')
+        invitation_org_id = None
+        
+        if invitation_token:
+            from app.core.models.organization_invitation import OrganizationInvitation
+            invitation = OrganizationInvitation.find_by_token(invitation_token)
+            
+            if invitation and invitation.email.lower() == email.lower():
+                # Add user to the organization they were invited to
+                from app.core.models.organization_member import OrganizationMember
+                member = OrganizationMember(
+                    organization_id=invitation.organization_id,
+                    user_id=user.id,
+                    role=invitation.role,
+                    invited_by_user_id=invitation.invited_by_user_id,
+                    invited_at=invitation.created_at,
+                    joined_at=datetime.utcnow(),
+                    is_active=True
+                )
+                db.session.add(member)
+                
+                # Mark invitation as accepted
+                invitation.status = 'accepted'
+                invitation.accepted_at = datetime.utcnow()
+                invitation.invitation_token = None  # Clear token after use
+                
+                db.session.commit()
+                invitation_org_id = invitation.organization_id
+        
         # Automatically log the user in after successful registration
         # Flask-Login integration
         login_user(user)
         
-        # Initialize organization context (will create personal org if needed)
-        org_id = initialize_user_organization_context(user.id)
+        # Initialize organization context
+        # If user was invited, use the invitation org, otherwise create personal org
+        if invitation_org_id:
+            org_id = invitation_org_id
+            from app.core.organization_context import set_current_organization_id
+            set_current_organization_id(org_id, user.id)
+        else:
+            org_id = initialize_user_organization_context(user.id)
         
         session['user'] = {
             'id': str(user.id),
