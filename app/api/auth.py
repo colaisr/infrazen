@@ -520,30 +520,39 @@ def handle_register():
         invitation_org_id = None
         
         if invitation_token:
+            logger.info(f"Processing invitation token for user registration: email={email}")
             from app.core.models.organization_invitation import OrganizationInvitation
             invitation = OrganizationInvitation.find_by_token(invitation_token)
             
-            if invitation and invitation.email.lower() == email.lower():
-                # Add user to the organization they were invited to
-                from app.core.models.organization_member import OrganizationMember
-                member = OrganizationMember(
-                    organization_id=invitation.organization_id,
-                    user_id=user.id,
-                    role=invitation.role,
-                    invited_by_user_id=invitation.invited_by_user_id,
-                    invited_at=invitation.created_at,
-                    joined_at=datetime.utcnow(),
-                    is_active=True
-                )
-                db.session.add(member)
-                
-                # Mark invitation as accepted
-                invitation.status = 'accepted'
-                invitation.accepted_at = datetime.utcnow()
-                invitation.invitation_token = None  # Clear token after use
-                
-                db.session.commit()
-                invitation_org_id = invitation.organization_id
+            if invitation:
+                logger.info(f"Found invitation: org_id={invitation.organization_id}, invitation_email={invitation.email}, user_email={email}")
+                # Check email match (case-insensitive)
+                if invitation.email.lower() == email.lower():
+                    # Add user to the organization they were invited to
+                    from app.core.models.organization_member import OrganizationMember
+                    member = OrganizationMember(
+                        organization_id=invitation.organization_id,
+                        user_id=user.id,
+                        role=invitation.role,
+                        invited_by_user_id=invitation.invited_by_user_id,
+                        invited_at=invitation.created_at,
+                        joined_at=datetime.utcnow(),
+                        is_active=True
+                    )
+                    db.session.add(member)
+                    
+                    # Mark invitation as accepted
+                    invitation.status = 'accepted'
+                    invitation.accepted_at = datetime.utcnow()
+                    invitation.invitation_token = None  # Clear token after use
+                    
+                    db.session.commit()
+                    invitation_org_id = invitation.organization_id
+                    logger.info(f"User {user.id} ({email}) successfully added to organization {invitation_org_id}")
+                else:
+                    logger.warning(f"Email mismatch: invitation email={invitation.email}, registration email={email}")
+            else:
+                logger.warning(f"Invitation token not found: {invitation_token}")
         
         # Automatically log the user in after successful registration
         # Flask-Login integration

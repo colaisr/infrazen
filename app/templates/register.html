@@ -86,6 +86,22 @@
     </div>
 
     <script>
+        // Get invitation token from URL or template variable
+        function getInvitationToken() {
+            // First try to get from URL query parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            let token = urlParams.get('invitation');
+            
+            // If not in URL, try to get from template variable (if passed from backend)
+            {% if invitation_token %}
+            if (!token) {
+                token = '{{ invitation_token }}';
+            }
+            {% endif %}
+            
+            return token;
+        }
+        
         // Handle registration form submission
         function handleRegistration(event) {
             event.preventDefault();
@@ -98,6 +114,12 @@
                 password: formData.get('password'),
                 confirm_password: formData.get('confirm_password')
             };
+            
+            // Add invitation token if present
+            const invitationToken = getInvitationToken();
+            if (invitationToken) {
+                data.invitation_token = invitationToken;
+            }
             
             // Validate passwords match
             if (data.password !== data.confirm_password) {
