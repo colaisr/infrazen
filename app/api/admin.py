@@ -187,7 +187,8 @@ def delete_user(user_id):
         from app.core.models.provider import CloudProvider
         from app.core.models.sync import SyncSnapshot, ResourceState
         from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
-        from app.core.models.recommendations import OptimizationRecommendation, PriceComparisonRecommendation
+        from app.core.models.recommendations import OptimizationRecommendation
+        from app.core.models.pricing import PriceComparisonRecommendation
         from app.core.models.user_provider_preference import UserProviderPreference
         from app.core.models.resource_tag import ResourceTag
         from app.core.models.resource_metric import ResourceMetric
