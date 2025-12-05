@@ -72,7 +72,7 @@ class UserProviderPreference(BaseModel):
         return preference
     
     @classmethod
-    def initialize_for_user(cls, user_id, provider_types=None):
+    def initialize_for_user(cls, user_id, organization_id=None, provider_types=None):
         """Initialize provider preferences for a new user with all providers enabled"""
         from .provider_catalog import ProviderCatalog
         
@@ -89,6 +89,7 @@ class UserProviderPreference(BaseModel):
             if not existing:
                 pref = cls(
                     user_id=user_id,
+                    organization_id=organization_id,
                     provider_type=provider_type,
                     is_enabled=True  # Default: all providers enabled
                 )

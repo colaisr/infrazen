@@ -239,12 +239,11 @@ class User(UserMixin, BaseModel):
         db.session.commit()
         
         # Initialize provider preferences for new user (all providers enabled by default)
-        try:
-            from .user_provider_preference import UserProviderPreference
-            UserProviderPreference.initialize_for_user(user.id)
-        except Exception:
-            # Don't fail user creation if preference initialization fails
-            pass
+        # Note: organization_id will be set after personal org is created in initialize_user_organization_context
+        # This is called from the auth flow, so we'll initialize preferences there with the org_id
+        # For now, we skip initialization here to avoid the organization_id requirement
+        # The preferences will be initialized in the auth flow after organization context is set up
+        pass
         
         return user
     

@@ -131,6 +131,14 @@ def google_auth():
             # Initialize organization context
             org_id = initialize_user_organization_context(user.id)
             
+            # Initialize provider preferences for new user (if this is a new user)
+            if not user.provider_preferences:
+                try:
+                    from app.core.models.user_provider_preference import UserProviderPreference
+                    UserProviderPreference.initialize_for_user(user.id, organization_id=org_id)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
+            
             session['user'] = {
                 'id': str(user.id),
                 'db_id': user.id,
@@ -201,6 +209,14 @@ def google_auth():
             
             # Initialize organization context
             org_id = initialize_user_organization_context(user.id)
+            
+            # Initialize provider preferences for new user (if this is a new user)
+            if not user.provider_preferences:
+                try:
+                    from app.core.models.user_provider_preference import UserProviderPreference
+                    UserProviderPreference.initialize_for_user(user.id, organization_id=org_id)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
             
             # Store user in session with database ID
             session['user'] = {
@@ -499,31 +515,7 @@ def handle_register():
         db.session.add(user)
         db.session.commit()
         
-        # Initialize provider preferences for new user (all providers enabled by default)
-        try:
-            from app.core.models.user_provider_preference import UserProviderPreference
-            UserProviderPreference.initialize_for_user(user.id)
-        except Exception as e:
-            logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
-        
-        # Generate confirmation token and send email
-        token = user.generate_email_confirmation_token()
-        confirmation_link = f"{request.url_root}api/auth/verify-email?token={token}"
-        
-        # Send confirmation email asynchronously (don't block registration if email fails)
-        try:
-            from app.core.services.email_service import EmailService
-            username = f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0]
-            EmailService.send_registration_confirmation(
-                to_email=user.email,
-                username=username,
-                confirmation_link=confirmation_link
-            )
-        except Exception as e:
-            logger.error(f"Failed to send confirmation email: {str(e)}")
-            # Don't fail registration if email sending fails
-        
-        # Check for pending invitation
+        # Check for pending invitation BEFORE initializing preferences
         invitation_token = data.get('invitation_token') or request.args.get('invitation')
         invitation_org_id = None
         
@@ -565,6 +557,31 @@ def handle_register():
             set_current_organization_id(org_id, user.id)
         else:
             org_id = initialize_user_organization_context(user.id)
+        
+        # Initialize provider preferences for new user (all providers enabled by default)
+        # Must be done AFTER organization is set up
+        try:
+            from app.core.models.user_provider_preference import UserProviderPreference
+            UserProviderPreference.initialize_for_user(user.id, organization_id=org_id)
+        except Exception as e:
+            logger.warning(f"Failed to initialize provider preferences for new user: {str(e)}")
+        
+        # Generate confirmation token and send email
+        token = user.generate_email_confirmation_token()
+        confirmation_link = f"{request.url_root}api/auth/verify-email?token={token}"
+        
+        # Send confirmation email asynchronously (don't block registration if email fails)
+        try:
+            from app.core.services.email_service import EmailService
+            username = f"{user.first_name} {user.last_name}".strip() or user.email.split('@')[0]
+            EmailService.send_registration_confirmation(
+                to_email=user.email,
+                username=username,
+                confirmation_link=confirmation_link
+            )
+        except Exception as e:
+            logger.error(f"Failed to send confirmation email: {str(e)}")
+            # Don't fail registration if email sending fails
         
         session['user'] = {
             'id': str(user.id),
