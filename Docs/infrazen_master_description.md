@@ -1193,6 +1193,7 @@ CREATE TABLE resource_states (
 - **Organization-Based Bulk Sync**: Daily cron job syncs all organizations with auto-sync enabled providers (prevents duplicate syncs)
 - **BulkSyncService**: Orchestrates synchronization across all organizations sequentially
 - **CompleteSyncService**: Handles per-organization sync with cost aggregation
+- **Demo Organization Exclusion**: Demo organizations (ID 3, organizations with "Demo" in name, or all-demo-member organizations) are automatically excluded from bulk syncs to prevent authentication failures
 - Configurable sync intervals per provider
 - Background job processing with Celery/Redis (future enhancement)
 - Sync queue management and prioritization (future enhancement)
