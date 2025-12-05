@@ -56,6 +56,14 @@ def index():
     """Landing page"""
     return render_template('index.html')
 
+@main_bp.route('/register')
+def register_redirect():
+    """Handle /register route to support invitation tokens"""
+    invitation_token = request.args.get('invitation')
+    return render_template('register.html', 
+                         google_client_id=current_app.config.get('GOOGLE_CLIENT_ID'),
+                         invitation_token=invitation_token)
+
 @main_bp.route('/dashboard')
 def dashboard():
     """Main dashboard page"""
