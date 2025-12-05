@@ -313,7 +313,8 @@ class CrossProviderPriceCheckRule(BaseRule):
         # Create or update a PriceComparisonRecommendation (idempotent)
         try:
             user_id = context.get('user_id') if isinstance(context, dict) else None
-            if user_id:
+            organization_id = resource.organization_id if resource.organization_id else (context.get('organization_id') if isinstance(context, dict) else None)
+            if user_id and organization_id:
                 existing = PriceComparisonRecommendation.query.filter_by(
                     user_id=user_id,
                     current_resource_id=resource.id,
@@ -322,6 +323,7 @@ class CrossProviderPriceCheckRule(BaseRule):
                 if existing is None:
                     pcr = PriceComparisonRecommendation(
                         user_id=user_id,
+                        organization_id=organization_id,
                         current_resource_id=resource.id,
                         recommended_price_id=best_row.id,
                         similarity_score=round(best_score * 100, 2),
