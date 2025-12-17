@@ -1,0 +1,315 @@
+{% extends "instructions_base.html" %}
+
+{% block title %}Инструкция по подключению Cloud.ru{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="fa-solid fa-book"></i>Инструкция по подключению Cloud.ru</h1>
+    <p class="subtitle">Пошаговое руководство для интеграции Cloud.ru (Облако.ру) с InfraZen</p>
+
+    <!-- Prerequisites -->
+    <div class="section">
+        <h2><i class="fa-solid fa-clipboard-check"></i>Требования</h2>
+        <ul>
+            <li>Активный аккаунт Cloud.ru</li>
+            <li>Доступ к консоли Cloud.ru</li>
+            <li>Права на создание сервисных аккаунтов (роль <code>admin</code> или <code>editor</code> на проект)</li>
+        </ul>
+    </div>
+
+    <!-- Step 1: Create Service Account -->
+    <div class="section">
+        <h2><span class="step-number">1</span>Создание сервисного аккаунта</h2>
+        
+        <p>Сервисный аккаунт необходим для безопасного доступа InfraZen к вашим ресурсам в Cloud.ru.</p>
+        
+        <ol>
+            <li>Откройте <a href="https://console.cloud.ru" target="_blank">консоль Cloud.ru</a></li>
+            <li>В боковом меню перейдите в раздел <strong>"Пользователи"</strong> → <strong>"Сервисные аккаунты"</strong></li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru1.png') }}" 
+             alt="Cloud.ru консоль - раздел Сервисные аккаунты" 
+             class="instruction-image">
+        <p class="image-caption">Раздел управления сервисными аккаунтами: Пользователи → Сервисные аккаунты</p>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru2.png') }}" 
+             alt="Cloud.ru форма создания сервисного аккаунта" 
+             class="instruction-image">
+        <p class="image-caption">Форма создания сервисного аккаунта: укажите имя и описание</p>
+        
+        <ol start="3">
+            <li>Нажмите кнопку <strong>"Создать аккаунт"</strong> (Create Account)</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru3.png') }}" 
+             alt="Cloud.ru выбор проекта для сервисного аккаунта" 
+             class="instruction-image">
+        <p class="image-caption">Выбор проекта для сервисного аккаунта</p>
+        
+        <ol start="4">
+            <li>В открывшейся форме укажите имя аккаунта (например, <code>infrazen-integration</code>)</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru4.png') }}" 
+             alt="Cloud.ru назначение ролей сервисному аккаунту" 
+             class="instruction-image">
+        <p class="image-caption">Назначение роли "viewer" или "reader" на проект</p>
+        
+        <ol start="5">
+            <li>Добавьте описание (например, "Сервисный аккаунт для InfraZen FinOps платформы")</li>
+            <li>Выберите роль из выпадающего списка <strong>"Роли на проект"</strong> (выберите <strong>"Администратор проекта"</strong> или другую подходящую роль)</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru5.png') }}" 
+             alt="Cloud.ru выбор роли из выпадающего списка" 
+             class="instruction-image">
+        <p class="image-caption">Выберите роль из выпадающего списка "Роли на проект" (например, "Администратор проекта")</p>
+        
+        <ol start="7">
+            <li>Нажмите <strong>"Создать"</strong></li>
+        </ol>
+    </div>
+
+    <!-- Step 2: Select Project -->
+    <div class="section">
+        <h2><span class="step-number">2</span>Выбор проекта</h2>
+        
+        <p><strong>⚠️ Важно:</strong> Сервисный аккаунт может иметь доступ только к <strong>одному проекту</strong>. Выберите проект, который содержит ресурсы, которые вы хотите отслеживать.</p>
+        
+        <ol>
+            <li>После создания сервисного аккаунта откройте его страницу</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru6.png') }}" 
+             alt="Cloud.ru страница сервисного аккаунта" 
+             class="instruction-image">
+        <p class="image-caption">Страница созданного сервисного аккаунта</p>
+        
+        <ol start="2">
+            <li>В разделе <strong>"Роли на проект"</strong> (Roles on Project) выберите проект из выпадающего списка</li>
+        </ol>
+        
+        <ol start="3">
+            <li><strong>Примечание:</strong> После создания проект нельзя изменить, поэтому выберите правильный проект</li>
+        </ol>
+        
+        <div class="notice notice-warning">
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <strong>Критически важно:</strong> Выберите проект, который содержит ресурсы (VM, диски, сети), которые вы хотите отслеживать в InfraZen. После создания сервисного аккаунта проект нельзя изменить.
+        </div>
+    </div>
+
+    <!-- Step 3: Create Access Key -->
+    <div class="section">
+        <h2><span class="step-number">3</span>Создание ключа доступа</h2>
+        
+        <p>Ключ доступа (Access Key) используется для аутентификации сервисного аккаунта в InfraZen.</p>
+        
+        <ol>
+            <li>На странице сервисного аккаунта перейдите в раздел <strong>"Учетные данные доступа"</strong> → <strong>"Ключи доступа"</strong> (Access Credentials → Access Keys)</li>
+            <li>Нажмите кнопку <strong>"Создать ключ"</strong> (Create Key)</li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru7.png') }}" 
+             alt="Cloud.ru диалог создания ключа доступа" 
+             class="instruction-image">
+        <p class="image-caption">Диалог создания ключа доступа</p>
+        
+        <ol start="3">
+            <li>В диалоге создания ключа:
+                <ul>
+                    <li>Укажите описание ключа (например, "InfraZen Integration")</li>
+                    <li>Установите срок действия (или выберите <strong>"Бессрочно"</strong> / Unlimited)</li>
+                </ul>
+            </li>
+            <li>Нажмите <strong>"Создать"</strong></li>
+        </ol>
+        
+        <ol start="5">
+            <li><strong>Критически важно:</strong> После создания ключа сохраните оба значения:
+                <ul>
+                    <li><strong>Key ID</strong> (логин) — это ваш <code>api_key</code> для InfraZen</li>
+                    <li><strong>Key Secret</strong> (пароль) — это ваш <code>api_secret</code> для InfraZen</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloudru8.png') }}" 
+             alt="Cloud.ru окно с Key ID и Key Secret" 
+             class="instruction-image">
+        <p class="image-caption">Окно с созданными Key ID и Key Secret — сохраните оба значения!</p>
+        
+        <div class="notice notice-warning">
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <strong>Важно:</strong> Key Secret показывается только один раз! Обязательно сохраните его в безопасном месте. Если потеряете секрет, придется создать новый ключ.
+        </div>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-info-circle"></i>
+            <strong>Формат ключей:</strong> Key ID и Key Secret используются для получения временного токена доступа (access_token) через IAM API Cloud.ru. InfraZen автоматически обновляет токен каждые 50 минут.
+        </div>
+    </div>
+
+    <!-- Step 5: Add Connection -->
+    <div class="section">
+        <h2><span class="step-number">4</span>Добавление подключения в InfraZen</h2>
+        
+        <ol>
+            <li>Перейдите в раздел <strong>"Подключения"</strong> в InfraZen</li>
+            <li>Нажмите кнопку <strong>"+ Добавить подключение"</strong></li>
+            <li>Выберите провайдера <strong>"Cloud.ru"</strong> из выпадающего списка</li>
+            <li>Заполните поля:
+                <ul>
+                    <li><strong>Название подключения:</strong> Любое удобное имя (например, "Cloud.ru Production")</li>
+                    <li><strong>API Key:</strong> Вставьте ваш <strong>Key ID</strong> из шага 3</li>
+                    <li><strong>API Secret:</strong> Вставьте ваш <strong>Key Secret</strong> из шага 3</li>
+                    <li><strong>Описание:</strong> Опционально, для ваших заметок</li>
+                </ul>
+            </li>
+            <li><strong>Обязательно:</strong> Нажмите <strong>"Тест подключения"</strong> — должна появиться галочка ✅</li>
+            <li>Если тест успешен, нажмите <strong>"Сохранить"</strong></li>
+        </ol>
+        
+        <div class="notice notice-warning">
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <strong>Важно:</strong> Всегда тестируйте подключение перед сохранением! Это гарантирует, что Key ID и Key Secret корректные и сервисный аккаунт имеет необходимые права.
+        </div>
+        
+        <h3>Возможные ошибки при тестировании:</h3>
+        <ul>
+            <li><strong>"invalid_client: client not found"</strong> — проверьте, что Key ID и Key Secret скопированы правильно (без лишних пробелов)</li>
+            <li><strong>"Authentication failed"</strong> — проверьте, что ключ не истек (если был установлен срок действия)</li>
+            <li><strong>"Permission denied"</strong> — сервисный аккаунт не имеет роли <code>viewer</code> или <code>reader</code> на проект</li>
+            <li><strong>"Project not found"</strong> — сервисный аккаунт не привязан к проекту или проект был удален</li>
+        </ul>
+    </div>
+
+    <!-- Step 6: Sync -->
+    <div class="section">
+        <h2><span class="step-number">5</span>Синхронизация данных</h2>
+        
+        <p>После сохранения подключения вы можете запустить синхронизацию одним из способов:</p>
+        
+        <h3>Вариант 1: Ручная синхронизация (рекомендуется для первого раза)</h3>
+        <ul>
+            <li><strong>Синхронизация конкретного провайдера:</strong> На карточке подключения нажмите кнопку <strong>"Синхронизировать"</strong></li>
+            <li><strong>Полная синхронизация:</strong> В разделе "Подключения" нажмите <strong>"Синхронизировать все"</strong></li>
+        </ul>
+        
+        <h3>Вариант 2: Автоматическая синхронизация</h3>
+        <p>InfraZen автоматически синхронизирует данные каждое утро по расписанию.</p>
+        
+        <h3>Что будет синхронизировано:</h3>
+        <ul>
+            <li><strong>Виртуальные машины (VMs):</strong> полные характеристики (CPU, RAM, диски, IP-адреса), статус, регион</li>
+            <li><strong>Диски (Volumes):</strong> все диски, включая привязанные к VM (объединены с VM для удобства)</li>
+            <li><strong>IP-адреса (Networks):</strong> прямые IP-адреса, привязанные к VM (объединены с VM)</li>
+            <li><strong>Bare Metal:</strong> серверы Bare Metal (если присутствуют в биллинге)</li>
+            <li><strong>Стоимость:</strong> реальные затраты из биллинга Cloud.ru (ежедневные и месячные)</li>
+        </ul>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-lightbulb"></i>
+            <strong>Совет:</strong> Первая синхронизация занимает 30-60 секунд в зависимости от количества ресурсов. InfraZen использует подход "billing-first" — все ресурсы обнаруживаются из данных биллинга, что гарантирует полное покрытие всех оплачиваемых ресурсов.
+        </div>
+        
+        <h3>Особенности синхронизации Cloud.ru:</h3>
+        <ul>
+            <li><strong>Объединение ресурсов:</strong> Диски и IP-адреса автоматически объединяются с родительскими VM для более удобного отображения</li>
+            <li><strong>Автоматическое определение Project ID:</strong> Project ID извлекается из JWT токена автоматически, не требуется указывать вручную</li>
+            <li><strong>Billing-first discovery:</strong> Все ресурсы обнаруживаются из данных биллинга, включая те, которые могут быть недоступны через обычные API endpoints</li>
+        </ul>
+    </div>
+
+    <!-- Permissions Guide -->
+    <div class="section">
+        <h2><i class="fa-solid fa-shield-halved"></i>Права доступа и безопасность</h2>
+        
+        <h3>Минимальные права для работы InfraZen:</h3>
+        <ul>
+            <li><code>viewer</code> или <code>reader</code> на проект — просмотр всех ресурсов в проекте + доступ к данным биллинга</li>
+        </ul>
+        
+        <h3>Поддерживаемые уровни назначения прав:</h3>
+        <ul>
+            <li><strong>Проект (Project):</strong> InfraZen увидит только ресурсы в этом проекте — рекомендуется для большинства случаев</li>
+        </ul>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-info-circle"></i>
+            <strong>Примечание:</strong> Сервисный аккаунт Cloud.ru может иметь доступ только к одному проекту. Если у вас несколько проектов, создайте отдельный сервисный аккаунт для каждого проекта.
+        </div>
+        
+        <div class="notice notice-info">
+            <i class="fa-solid fa-shield-check"></i>
+            <strong>Безопасность:</strong> InfraZen работает в режиме "только чтение" и не может изменять, создавать или удалять ваши ресурсы в Cloud.ru.
+        </div>
+        
+        <h3>Рекомендации по безопасности:</h3>
+        <ul>
+            <li>✅ Используйте роли на уровне проекта (не организации), когда это возможно</li>
+            <li>✅ Используйте роли только для чтения (<code>viewer</code>, <code>reader</code>)</li>
+            <li>✅ Установите срок действия на ключи доступа (не используйте "Бессрочно")</li>
+            <li>✅ Регулярно обновляйте ключи (минимум раз в год)</li>
+            <li>✅ Используйте отдельный сервисный аккаунт для InfraZen (не делите с другими инструментами)</li>
+            <li>✅ Мониторьте использование сервисного аккаунта в консоли Cloud.ru</li>
+        </ul>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="section">
+        <h2><i class="fa-solid fa-wrench"></i>Решение проблем</h2>
+        
+        <h3>Подключение не проходит тест:</h3>
+        <ol>
+            <li>Убедитесь, что Key ID и Key Secret скопированы правильно (без лишних пробелов в начале или конце)</li>
+            <li>Проверьте, что сервисный аккаунт имеет роль <code>viewer</code> или <code>reader</code> на проект</li>
+            <li>Убедитесь, что роль назначена на нужный проект</li>
+            <li>Проверьте, что ключ доступа не истек (если был установлен срок действия)</li>
+            <li>Убедитесь, что сервисный аккаунт активен в консоли Cloud.ru</li>
+        </ol>
+        
+        <h3>Синхронизация не находит ресурсы:</h3>
+        <ol>
+            <li>Проверьте, что ресурсы находятся в том же проекте, на который назначена роль</li>
+            <li>Убедитесь, что у сервисного аккаунта есть доступ к данным биллинга (может потребоваться роль <code>billing.viewer</code>)</li>
+            <li>Проверьте права сервисного аккаунта в консоли Cloud.ru</li>
+            <li>Убедитесь, что в проекте есть ресурсы (VM, диски, сети)</li>
+        </ol>
+        
+        <h3>Не отображается стоимость ресурсов:</h3>
+        <ol>
+            <li>Убедитесь, что у сервисного аккаунта есть доступ к данным биллинга (роль <code>billing.viewer</code> или <code>viewer</code> на проект)</li>
+            <li>Проверьте, что ресурсы имеют стоимость в биллинге Cloud.ru (бесплатные ресурсы показывают стоимость 0)</li>
+            <li>Запустите синхронизацию повторно через несколько часов (данные биллинга могут обновляться с задержкой)</li>
+        </ol>
+    </div>
+
+    <!-- Support -->
+    <div class="section">
+        <h2><i class="fa-solid fa-life-ring"></i>Нужна помощь?</h2>
+        <p>
+            Если у вас возникли проблемы, ознакомьтесь с 
+            <a href="https://cloud.ru/docs" target="_blank">документацией Cloud.ru</a> 
+            или свяжитесь с нашей службой поддержки.
+        </p>
+        
+        <h3>Полезные ссылки:</h3>
+        <ul>
+            <li><a href="https://cloud.ru/docs/console_api/ug/topics/guides__service_accounts_create?source-platform=Evolution" target="_blank">Создание сервисного аккаунта</a></li>
+            <li><a href="https://cloud.ru/docs/console_api/ug/topics/guides__auth_api?source-platform=Evolution" target="_blank">Аутентификация через API</a></li>
+            <li><a href="https://cloud.ru/docs/billing/ug/topics/api-ref?source-platform=Evolution" target="_blank">Billing API документация</a></li>
+            <li><a href="https://cloud.ru/docs/console_api/ug/topics/overview__reestr_api?source-platform=Evolution" target="_blank">Обзор API Cloud.ru</a></li>
+        </ul>
+    </div>
+
+    <!-- Back Button -->
+    <div class="actions">
+        <button onclick="window.close()" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i> Закрыть
+        </button>
+    </div>
+</div>
+{% endblock %}
+

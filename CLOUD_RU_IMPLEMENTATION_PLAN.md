@@ -15,7 +15,7 @@ This document outlines the step-by-step plan for adding Cloud.ru provider suppor
 - [x] Step 1.2: Add Cloud.ru to Provider Configuration (Frontend) - ✅ COMPLETED - Added to connections.js, removed account_id field
 - [x] Step 1.3: Create Cloud.ru API Routes (Backend) - ✅ COMPLETED - Created routes.py with all CRUD operations, test, add, edit, update, sync, delete
 - [x] Step 1.4: Create Cloud.ru API Client (Basic) - ✅ COMPLETED - Created client with token-based auth, project_id extraction from JWT, billing API integration
-- [ ] Step 1.5: Create Connection Instructions Page (MOVED TO END - Optional)
+- [x] Step 1.5: Create Connection Instructions Page - ✅ COMPLETED - Created cloud_ru.html with step-by-step guide, all 8 screenshots integrated, route added to main.py
 - [x] Step 1.6: Add Cloud.ru to Provider Catalog - ✅ COMPLETED - Added to database and template with icon
 
 ### Phase 2: Proper Syncing
@@ -51,6 +51,7 @@ This document outlines the step-by-step plan for adding Cloud.ru provider suppor
 - ✅ Hardware specs (CPU, RAM, disk) extracted and displayed
 - ✅ Cost extraction from billing API working
 - ✅ All billable resources discovered (VMs, volumes, IPs, Bare Metal ready)
+- ✅ Connection instructions page completed with all 8 screenshots properly integrated
 - 🔄 Next: Phase 3 - Pricing sync (optional, can be done later)
 
 ---

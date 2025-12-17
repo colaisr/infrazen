@@ -1080,7 +1080,8 @@ def instructions(provider_type):
         'beget': 'instructions/beget.html',
         'selectel': 'instructions/selectel.html',
         'yandex': 'instructions/yandex.html',
-        'aws': 'instructions/aws.html'
+        'aws': 'instructions/aws.html',
+        'cloud-ru': 'instructions/cloud_ru.html'
     }
     
     template = provider_templates.get(provider_type)
