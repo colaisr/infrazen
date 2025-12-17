@@ -1,5 +1,8 @@
-"""
-Add Cloud.ru admin credentials placeholder
+"""Add Cloud.ru admin credentials placeholder
+
+Revision ID: a1b2c3d4e5f6
+Revises: <latest>
+Create Date: 2025-12-17 15:00:00.000000
 
 This migration creates a placeholder for Cloud.ru admin credentials.
 Actual credentials should be configured via admin UI or API.
@@ -8,9 +11,16 @@ Run this migration, then configure credentials via:
 - Admin UI: /admin/providers
 - Admin API: POST /api/admin/providers/cloud-ru/credentials
 """
+from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
+
+# revision identifiers, used by Alembic.
+revision: str = 'c1d2e3f4a5b6'
+down_revision: Union[str, None] = '8a9b0c1d2e3f'  # add_invitation_token_to_organization_invitations
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
