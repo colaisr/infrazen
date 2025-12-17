@@ -78,9 +78,10 @@ app/
 │   └── services/            # Business logic (pricing, sync, etc.)
 └── providers/               # Plugin-based provider integrations
     ├── base/                # Base provider classes
-    ├── plugins/             # Provider implementations (beget.py, selectel.py)
+    ├── plugins/             # Provider implementations (beget.py, selectel.py, cloud_ru.py)
     ├── beget/               # Beget-specific client and routes
     ├── selectel/            # Selectel-specific client and routes
+    ├── cloud_ru/            # Cloud.ru-specific client and routes
     └── sync_orchestrator.py # Multi-provider sync coordination
 ```
 
@@ -97,7 +98,7 @@ User Request → Nginx → Gunicorn → Flask Route →
 ### **Current Implementation Status**
 ✅ **Production-ready** multi-cloud FinOps platform with:
 - **Authentication**: Google OAuth integration with role-based access control (user/admin/super_admin)
-- **Provider Support**: Beget, Selectel, and Yandex Cloud integrations with billing-first sync
+- **Provider Support**: Beget, Selectel, Yandex Cloud, and Cloud.ru integrations with billing-first sync
 - **Resource Tracking**: Real-time resource inventory with cost analysis and fresh snapshots per sync
 - **Data Management**: Soft delete implementation for provider connections preserving historical FinOps data
 - **Demo System**: Database-backed demo user with 4 providers, ~45 resources, 20 recommendations
@@ -805,6 +806,7 @@ class ProviderPlugin(ABC):
 - ✅ **Beget**: VPS, domains, databases, FTP, email accounts
 - ✅ **Selectel**: VMs, volumes, file storage, billing integration
 - ✅ **Yandex Cloud**: 11 service types, 99.84% accuracy, SKU+HAR pricing (October 2025) - See `yandex_cloud_integration.md`
+- ✅ **Cloud.ru**: Billing-first discovery, resource unification (volumes/IPs with VMs), hardware specs extraction, cost tracking (December 2025) - See `CLOUD_RU_IMPLEMENTATION_PLAN.md`
 - 🚀 **Ready for**: AWS, Azure, GCP, DigitalOcean, etc.
 
 ### 6.2.4. Multi-Provider User Experience
@@ -1079,6 +1081,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex Cloud**: ✅ **SKU+HAR-Based Cost Tracking** (October 2025) - Service account JWT authentication, 11 service types (VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs), 993 SKU prices synced daily, HAR-derived managed service pricing, 99.84% accuracy, multi-tenancy support (Clouds→Folders), production-tested. **Full details:** See `yandex_cloud_integration.md` for complete architecture, pricing methodology, API integration details, and implementation guide (15,000+ words).
 - **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
+- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025) - Service account Key ID/Secret authentication, JWT token-based project_id extraction, billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.3.5. Sync Mechanics & Features
@@ -1335,7 +1338,7 @@ See detailed technical documentation: `SOFT_DELETE_IMPLEMENTATION.md`
 
 ### 7.1.1 Cloud Connections ✅ IMPLEMENTED
 - **Connection Management:** Full CRUD operations with comprehensive edit functionality, provider pre-selection, and secure credential management
-- **Provider Support:** Beget (fully implemented with dual-endpoint API integration), Selectel (fully implemented with dual authentication system and cloud resource discovery), AWS, Azure, GCP, VK Cloud, Yandex Cloud (UI ready with dynamic forms)
+- **Provider Support:** Beget (fully implemented with dual-endpoint API integration), Selectel (fully implemented with dual authentication system and cloud resource discovery), Cloud.ru (fully implemented with billing-first discovery and resource unification), AWS, Azure, GCP, VK Cloud, Yandex Cloud (UI ready with dynamic forms)
 - **Connection Testing:** Real-time API validation with direct HTTP requests to provider APIs using proper authentication methods
 - **Security:** Encrypted password storage, user ownership validation, authentication checks, secure edit operations
 - **User Experience:** Provider pre-selection from available providers, dynamic forms that adapt to provider type, loading states, comprehensive error handling, pre-filled edit forms
@@ -3042,7 +3045,231 @@ systemctl restart infrazen  # or gunicorn reload
 - **Reporting**: Account information reports
 - **API Access**: Programmatic account information access
 
-## 13.9. Selectel Multi-Region & Volume Integration
+## 13.9. Cloud.ru Billing-First Integration with Resource Unification
+
+### 13.9.1. Overview
+The InfraZen platform implements a comprehensive billing-first integration with Cloud.ru (Облако.ру), Russia's leading cloud platform. This integration prioritizes cost visibility through consumption API data while automatically unifying related resources (volumes and IPs) under their parent VMs for a cleaner, more intuitive user experience.
+
+### 13.9.2. Authentication & Project Discovery
+
+#### 13.9.2.1. Service Account Authentication
+Cloud.ru uses a token-based authentication system similar to Yandex Cloud:
+
+**Authentication Flow:**
+1. **Service Account Setup**: User creates a service account in Cloud.ru console and generates an access key (Key ID + Key Secret)
+2. **Token Exchange**: Client exchanges Key ID/Secret for an `access_token` via IAM API:
+   - Endpoint: `POST https://iam.api.cloud.ru/api/v1/auth/token`
+   - Request: `{"keyId": "YOUR_KEY_ID", "secret": "YOUR_KEY_SECRET"}`
+   - Response: `{"access_token": "...", "expires_in": 3600}` (1-hour token lifetime)
+3. **Project ID Extraction**: `project_id` is automatically extracted from the JWT `access_token` payload - **no hardcoded values required**
+4. **Bearer Token Usage**: All subsequent API calls use `Authorization: Bearer <access_token>`
+
+**Key Features:**
+- ✅ **Automatic Project Discovery**: `project_id` extracted from JWT token, eliminating need for user input
+- ✅ **No Hardcoded Values**: All identifiers dynamically extracted from API responses
+- ✅ **Token Refresh**: Automatic token refresh before expiration (1-hour lifetime)
+- ✅ **Secure Credential Storage**: Key ID and Secret stored encrypted in database
+
+### 13.9.3. Billing-First Resource Discovery
+
+#### 13.9.3.1. Consumption API Integration
+The integration uses Cloud.ru's consumption API as the primary source of truth for resource discovery:
+
+**Billing API Endpoint:**
+- `GET https://organization.api.cloud.ru/v1/consumption`
+- Parameters: `project_ids[]`, `start_date`, `end_date`, `page_filter.limit`
+- Returns: Consumption records for all billable resources
+
+**Discovery Process:**
+1. **Phase 1: Billing Data Collection**
+   - Fetch consumption records for last 7 days
+   - Aggregate costs per resource by `resource_id`
+   - Calculate daily and monthly costs
+   - Group resources by type (server, volume, network, etc.)
+
+2. **Phase 2: Resource Type Mapping**
+   - Map consumption records to unified resource types using:
+     - **SKU patterns**: `PS-COREFT10N24000F-HD1MS0` → server, `PS-COREFT10NSSDFTF-HD1MS0` → volume
+     - **Service names**: "Виртуальная машина" → server, "Диск SSD NVMe" → volume, "Direct IP" → network
+     - **Resource names**: Pattern matching (e.g., `{vm_name}-disk_...` → volume)
+
+3. **Phase 3: Resource Unification**
+   - **Volume-to-VM Matching**: Volumes matched to VMs by name pattern (e.g., `mach1free-disk_...` → `mach1free`)
+   - **IP-to-VM Matching**: IPs matched by checking VM's `external_ip` or interfaces
+   - **Cost Aggregation**: Unified resources have costs combined (VM + volumes + IPs)
+   - **No Separate Resources**: Attached volumes and IPs stored in VM's `provider_config`, not as separate database records
+
+4. **Phase 4: API Enrichment (Optional)**
+   - If VM found via API, enrich with hardware specs (CPU, RAM, disk from flavor data)
+   - If volume/IP not found via API, create from billing data only
+   - Billing data is always the source of truth for cost
+
+### 13.9.4. Resource Types & Capabilities
+
+#### 13.9.4.1. Supported Resource Types
+- ✅ **Virtual Machines (VMs)**: Discovered from both API and billing
+- ✅ **Bare Metal**: Discovered from billing (mapped as `server` type)
+- ✅ **Block Storage Volumes**: Discovered from billing, unified with VMs
+- ✅ **Direct IPs**: Discovered from billing, unified with VMs
+- ✅ **Networks**: Discovered from billing
+- 🔄 **Databases**: Ready for implementation (PostgreSQL, Redis, Kafka, etc.)
+- 🔄 **Kubernetes**: Ready for implementation
+- 🔄 **Load Balancers**: Ready for implementation
+- 🔄 **Object Storage (S3)**: Ready for implementation
+
+#### 13.9.4.2. Hardware Specifications Extraction
+For VMs discovered via API, the integration extracts:
+- **CPU Cores**: From `flavor.cpu` or `flavor.vcpus`
+- **RAM**: From `flavor.ram` (converted from GB to MB)
+- **Disk**: From `flavor.disk` or VM data
+- **External IP**: From `interfaces[].ip_address` or `interfaces[].floating_ip.ip_address`
+- **Region**: From `availability_zone` (e.g., `ru.AZ-2`)
+
+All specs stored in `provider_config` for frontend display.
+
+### 13.9.5. Resource Unification Architecture
+
+#### 13.9.5.1. Unification Logic
+The integration automatically unifies related resources to provide a cleaner UI:
+
+**Volume Unification:**
+- Volumes with names matching pattern `{vm_name}-disk_...` or `{vm_name}_disk_...` are unified
+- Volume information stored in VM's `provider_config['attached_volumes']`
+- Volume cost added to VM's total cost
+- No separate volume resource created in database
+
+**IP Unification:**
+- IPs matched by checking VM's `external_ip` field
+- IPs also matched by checking VM's `interfaces[]` array
+- IP information stored in VM's `provider_config['attached_ips']`
+- IP cost added to VM's total cost
+- No separate IP resource created in database
+
+**Result:**
+- User sees 1 resource (VM) instead of 3 separate resources (VM + Disk + IP)
+- Total cost includes all unified resources
+- Frontend can display attached volumes and IPs from `provider_config`
+
+### 13.9.6. Cost Extraction & Validation
+
+#### 13.9.6.1. Cost Data Sources
+1. **Primary**: Consumption API (`/v1/consumption`)
+   - Daily costs from `consumption.cost` or `consumption.amount`
+   - Aggregated per resource by `resource_id`
+   - Monthly cost calculated as `daily_cost * 30`
+
+2. **Secondary**: VM flavor pricing (if available)
+   - Extracted from `flavor.price` or `flavor.cost`
+   - Normalized to daily basis
+
+3. **Validation**: Cost validation against account billing
+   - Compare calculated costs vs account-level billing
+   - Log warnings if discrepancies > 10%
+
+### 13.9.7. Technical Implementation
+
+#### 13.9.7.1. File Structure
+```
+app/providers/
+├── cloud_ru/
+│   ├── __init__.py          # Package initialization
+│   ├── client.py            # CloudRuClient - API client with auth, resource discovery, billing
+│   └── routes.py            # Flask routes for CRUD operations
+└── plugins/
+    └── cloud_ru.py          # CloudRuProviderPlugin - plugin implementation
+```
+
+#### 13.9.7.2. Key Components
+
+**CloudRuClient (`app/providers/cloud_ru/client.py`):**
+- `_get_access_token()`: Token exchange and JWT parsing for `project_id`
+- `get_vms()`: VM discovery from Compute API
+- `get_billing_data()`: Consumption data from Billing API
+- `get_account_info()`: Account-level information
+- Automatic token refresh and error handling
+
+**CloudRuProviderPlugin (`app/providers/plugins/cloud_ru.py`):**
+- `sync_resources()`: Billing-first sync orchestration
+- `_map_consumption_to_resource_type()`: SKU/service name to unified type mapping
+- `_process_resources()`: Resource processing with unification logic
+- `_add_volume_to_vm()`: Volume unification helper
+- `_add_ip_to_vm()`: IP unification helper
+- `_create_unified_vm()`: VM resource creation with hardware specs
+- `_create_unified_resource_from_billing()`: Billing-only resource creation
+
+**Routes (`app/providers/cloud_ru/routes.py`):**
+- `POST /api/providers/cloud-ru/test`: Connection testing
+- `POST /api/providers/cloud-ru/add`: Add new connection
+- `GET /api/providers/cloud-ru/<id>/edit`: Get connection for editing
+- `POST /api/providers/cloud-ru/<id>/update`: Update connection
+- `POST /api/providers/cloud-ru/<id>/sync`: Manual sync trigger
+- `DELETE /api/providers/cloud-ru/<id>/delete`: Soft delete connection
+
+#### 13.9.7.3. Database Integration
+- **ProviderResourceType**: Registered `server`, `volume`, `network` types for Cloud.ru
+- **Resource Registry**: Resources normalized to unified taxonomy
+- **Sync Snapshots**: Complete sync history with resource counts and costs
+- **Resource States**: Change tracking for cost, status, and configuration changes
+
+### 13.9.8. FinOps Benefits
+
+#### 13.9.8.1. Cost Visibility
+- ✅ **Complete Cost Coverage**: All billable resources discovered from billing API
+- ✅ **Accurate Cost Attribution**: Costs from consumption records, not estimates
+- ✅ **Unified View**: Related resources (volumes/IPs) shown with parent VM
+- ✅ **Daily/Monthly Normalization**: All costs normalized to daily basis for comparison
+
+#### 13.9.8.2. Resource Management
+- ✅ **No Orphaned Resources**: Volumes and IPs always associated with VMs
+- ✅ **Hardware Visibility**: CPU, RAM, disk specs displayed for optimization
+- ✅ **Status Tracking**: Resource status changes tracked over time
+- ✅ **Multi-Resource Support**: Ready for databases, Kubernetes, load balancers
+
+#### 13.9.8.3. Operational Efficiency
+- ✅ **Automatic Discovery**: No manual resource entry required
+- ✅ **Billing-First Approach**: Cost visibility prioritized over infrastructure details
+- ✅ **Zero Hardcoding**: All identifiers extracted dynamically from API
+- ✅ **Error Resilience**: Graceful handling of API failures, partial data
+
+### 13.9.9. Integration Results
+
+**Production Status**: ✅ **FULLY OPERATIONAL** (December 2025)
+
+**Tested Capabilities:**
+- ✅ Service account authentication with Key ID/Secret
+- ✅ Automatic `project_id` extraction from JWT token
+- ✅ VM discovery from Compute API
+- ✅ Billing data extraction from Consumption API
+- ✅ Resource type mapping (SKU-based and service name-based)
+- ✅ Volume unification with VMs
+- ✅ IP unification with VMs
+- ✅ Hardware specs extraction (CPU, RAM, disk)
+- ✅ Cost aggregation (VM + volumes + IPs)
+- ✅ Resource type registration (server, volume, network)
+
+**Resource Discovery:**
+- ✅ VMs: Discovered from both API and billing
+- ✅ Volumes: Discovered from billing, unified with VMs
+- ✅ Direct IPs: Discovered from billing, unified with VMs
+- ✅ Bare Metal: Ready (will be discovered from billing when present)
+
+**Cost Tracking:**
+- ✅ Daily costs from consumption API
+- ✅ Monthly cost calculation (daily * 30)
+- ✅ Cost validation against account billing
+- ✅ Unified resource cost aggregation
+
+**Next Steps:**
+- 🔄 Pricing sync (Phase 3) - Optional, can be implemented later
+- 🔄 Connection instructions page - Optional documentation
+- 🔄 Additional resource types (databases, Kubernetes, etc.) - As needed
+
+**Documentation:**
+- `CLOUD_RU_IMPLEMENTATION_PLAN.md`: Complete implementation plan and progress tracking
+- `Docs/cloud_ru_api_research.md`: API research and endpoint documentation
+- `Docs/cloud_ru_service_account_guide.md`: Service account setup guide
+
+## 13.10. Selectel Multi-Region & Volume Integration
 
 ### 13.9.1. Overview
 The InfraZen platform implements comprehensive multi-region support for Selectel cloud infrastructure, with automated region discovery and standalone volume tracking. This integration ensures complete visibility across all Selectel regions and resource types, including unattached storage volumes that are often missed in traditional cloud inventory systems.

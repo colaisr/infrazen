@@ -1373,6 +1373,26 @@ def _test_credentials_by_provider(provider_type: str, creds: dict) -> dict:
                     'error': 'Неверные учетные данные Beget'
                 }
         
+        elif provider_type == 'cloud-ru':
+            from app.providers.cloud_ru.client import CloudRuClient
+            
+            client = CloudRuClient(creds)
+            test_result = client.test_connection()
+            
+            if test_result.get('success'):
+                account_id = test_result.get('account_info', {}).get('account_id', 'N/A')
+                return {
+                    'success': True,
+                    'message': 'Успешно! Подключение к Cloud.ru подтверждено',
+                    'tested_at': datetime.utcnow().isoformat(),
+                    'details': f'Project ID: {account_id}'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': test_result.get('message', 'Ошибка подключения к Cloud.ru')
+                }
+        
         else:
             return {
                 'success': False,

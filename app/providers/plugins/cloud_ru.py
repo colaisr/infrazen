@@ -965,12 +965,46 @@ class CloudRuProviderPlugin(ProviderPlugin):
         """
         Get pricing data from Cloud.ru
         
-        This will be implemented in Phase 3 (Step 3.3)
-        
-        Returns:
-            List of pricing records
+        Returns standardized pricing data for cross-provider comparison
         """
-        # TODO: Implement in Phase 3, Step 3.3
-        self.logger.warning("Cloud.ru pricing data retrieval not yet implemented")
-        return []
+        try:
+            self.logger.info("Starting Cloud.ru pricing data collection")
+            
+            # Get access token and project_id from client
+            if not self.client.api_key or not self.client.api_secret:
+                self.logger.warning("No credentials provided for Cloud.ru pricing fetch")
+                return []
+            
+            # Authenticate to get access token
+            access_token = self.client._get_access_token()
+            if not access_token:
+                self.logger.warning("Failed to authenticate for Cloud.ru pricing fetch")
+                return []
+            
+            # Get project_id (should be set during authentication)
+            project_id = self.client.project_id
+            if not project_id:
+                self.logger.warning("No project_id available for Cloud.ru pricing fetch")
+                return []
+            
+            # Initialize pricing client
+            from ..cloud_ru.pricing_client import CloudRuPricingClient
+            pricing_client = CloudRuPricingClient(access_token, project_id)
+            
+            # Collect all pricing data
+            pricing_data = pricing_client.get_all_prices()
+            
+            if pricing_data:
+                self.logger.info(
+                    "Collected %d Cloud.ru pricing records",
+                    len(pricing_data)
+                )
+            else:
+                self.logger.warning("No Cloud.ru pricing data collected")
+            
+            return pricing_data
+            
+        except Exception as exc:
+            self.logger.error("Failed to collect Cloud.ru pricing: %s", exc, exc_info=True)
+            return []
 

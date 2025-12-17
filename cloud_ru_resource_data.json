@@ -1,0 +1,39 @@
+{
+  "id": 1394,
+  "name": "direct-ip-addr_45.151.31.50_29780fb2-fd30-4337-b6e8-112c12d5fa47",
+  "type": "network",
+  "daily_cost": 0.17,
+  "effective_cost": 0.17,
+  "provider_config": {
+    "resource_id": "f49c31ca-871c-418e-ad6d-cf1c814a0755",
+    "resource_name": "direct-ip-addr_45.151.31.50_29780fb2-fd30-4337-b6e8-112c12d5fa47",
+    "servname": "Direct IP",
+    "sku": "PS-GTW0PRVTNNNNNNN-HD1MS0",
+    "platform": "Cloud.ru Evolution",
+    "billing_source": "consumption_api",
+    "consumptions": [
+      {
+        "dog_id": "",
+        "dmid": 0,
+        "sku": "PS-GTW0PRVTNNNNNNN-HD1MS0",
+        "servname": "Direct IP",
+        "resource_id": "f49c31ca-871c-418e-ad6d-cf1c814a0755",
+        "resource_name": "direct-ip-addr_45.151.31.50_29780fb2-fd30-4337-b6e8-112c12d5fa47",
+        "usedate": "2025-12-17T00:00:00Z",
+        "amount": 0.40455277777777776,
+        "amount_nds": 0.48546333333333336,
+        "cost": 0.17,
+        "unit": "\u0448\u0442",
+        "usefact": 2.379722222222222,
+        "platform": "Cloud.ru Evolution",
+        "meta": {},
+        "updated_dt": "2025-12-17T06:20:41.162232Z",
+        "encode_id": "c253ca5b-4486-5ab9-85da-4273423b79c7",
+        "is_delete": false,
+        "id": "c253ca5b-4486-5ab9-85da-4273423b79c7"
+      }
+    ]
+  },
+  "region": "unknown",
+  "status": "active"
+}

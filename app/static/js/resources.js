@@ -8,17 +8,34 @@
 // ============================================================================
 
 function toggleProviderSection(providerId) {
-    const content = document.getElementById(`provider-content-${providerId}`);
-    const chevron = document.getElementById(`provider-chevron-${providerId}`);
-    
-    if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        chevron.classList.add('rotated');
-    } else {
-        content.style.display = 'none';
-        chevron.classList.remove('rotated');
+    try {
+        const content = document.getElementById(`provider-content-${providerId}`);
+        const chevron = document.getElementById(`provider-chevron-${providerId}`);
+        
+        if (!content) {
+            console.error(`Provider content not found for ID: ${providerId}`);
+            return;
+        }
+        
+        if (!chevron) {
+            console.error(`Provider chevron not found for ID: ${providerId}`);
+            return;
+        }
+        
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            chevron.classList.add('rotated');
+        } else {
+            content.style.display = 'none';
+            chevron.classList.remove('rotated');
+        }
+    } catch (error) {
+        console.error('Error in toggleProviderSection:', error);
     }
 }
+
+// Export to window immediately for onclick handlers
+window.toggleProviderSection = toggleProviderSection;
 
 function toggleUsageSection(resourceId) {
     const content = document.getElementById(`usage-info-${resourceId}`);
@@ -482,7 +499,7 @@ function exportResourcesToCSVFallback() {
 }
 
 // Make functions globally available for onclick handlers
-window.toggleProviderSection = toggleProviderSection;
+// toggleProviderSection is already exported above after definition
 window.toggleUsageSection = toggleUsageSection;
 window.toggleCostBreakdown = toggleCostBreakdown;
 window.toggleCSIVolumes = toggleCSIVolumes;

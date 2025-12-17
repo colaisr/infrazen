@@ -521,6 +521,10 @@ const providerCredentialFields = {
     ],
     yandex: [
         { id: 'credentialServiceAccountKey', label: 'Service Account JSON *', type: 'textarea', placeholder: '{\n  "id": "...",\n  "service_account_id": "...",\n  "private_key": "..."\n}', required: true, rows: 10 }
+    ],
+    'cloud-ru': [
+        { id: 'credentialApiKey', label: 'Key ID *', type: 'text', placeholder: 'your_key_id', required: true },
+        { id: 'credentialApiSecret', label: 'Key Secret *', type: 'password', placeholder: '••••••••', required: true }
     ]
 };
 
@@ -786,6 +790,8 @@ function fieldIdToKey(fieldId) {
             return 'password';
         case 'credentialApiKey':
             return 'api_key';
+        case 'credentialApiSecret':
+            return 'api_secret';
         case 'credentialServiceUsername':
             return 'service_username';
         case 'credentialServicePassword':
