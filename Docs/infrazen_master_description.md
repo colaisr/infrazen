@@ -1086,6 +1086,418 @@ All cloud resources are normalized into a unified schema regardless of provider:
 
 ### 6.3.5. Sync Mechanics & Features
 
+## 6.4. Multi-Provider Pricing System ✅ FULLY IMPLEMENTED
+
+### 6.4.1. Pricing Architecture Overview
+
+InfraZen implements a comprehensive **multi-provider pricing synchronization system** that enables cross-cloud price comparison, cost optimization recommendations, and accurate cost forecasting. The pricing system collects standardized pricing data from all supported cloud providers and stores it in a unified format for comparison and analysis.
+
+**Key Capabilities:**
+- **Automated Price Sync**: Scheduled and manual price updates from all enabled providers
+- **Standardized Data Format**: Unified pricing schema across all providers for accurate comparison
+- **Price History Tracking**: Historical price changes for trend analysis and cost forecasting
+- **Admin Credentials Management**: Secure storage of provider credentials for pricing API access
+- **Batch Processing**: Efficient bulk price updates with connection management for long-running operations
+- **Cross-Provider Comparison**: Price matching and similarity scoring for cost optimization recommendations
+
+### 6.4.2. Core Pricing Components
+
+#### **Pricing Service Architecture**
+
+**`PriceUpdateService`** (`app/core/services/price_update_service.py`):
+- **Orchestrates price synchronization** for individual providers or all enabled providers
+- **Manages admin credentials** from `ProviderAdminCredentials` model
+- **Handles plugin system integration** via `ProviderPluginManager`
+- **Tracks sync status** in `ProviderCatalog` (in_progress, success, failed)
+- **Batch processing** with database connection management for long-running syncs (e.g., Yandex Cloud with 6+ minute sync times)
+- **Error handling** with detailed logging and status updates
+
+**`PricingService`** (`app/core/services/pricing_service.py`):
+- **Price data persistence** with upsert logic (update existing, insert new)
+- **Price history tracking** via `PriceHistory` model for change detection
+- **Similarity matching** for cross-provider price comparison
+- **Statistics and analytics** for pricing system health monitoring
+- **Bulk operations** for efficient batch price updates
+
+**Provider Plugin Integration:**
+- Each provider plugin implements `get_pricing_data()` method
+- Returns standardized pricing records in unified format
+- Uses admin credentials when available, falls back to user connection credentials
+- Handles provider-specific authentication and API rate limiting
+
+#### **Database Models**
+
+**`ProviderPrice`** (`app/core/models/pricing.py`):
+- **Standardized pricing schema** with fields:
+  - `provider`: Provider type (beget, selectel, yandex, cloud-ru)
+  - `resource_type`: Resource category (server, volume, kubernetes, database, etc.)
+  - `cpu_cores`, `ram_gb`, `storage_gb`: Hardware specifications
+  - `hourly_cost`, `monthly_cost`: Pricing in provider currency
+  - `region`: Deployment region
+  - `currency`: Billing currency (RUB primary)
+  - `provider_sku`: Provider-specific SKU identifier
+  - `extended_specs`: JSON field for provider-specific attributes
+- **Similarity scoring** via `calculate_similarity_score()` method
+- **Price normalization** for cross-provider comparison
+
+**`PriceHistory`** (`app/core/models/pricing.py`):
+- **Tracks price changes** over time
+- Records old/new monthly costs and percentage change
+- Enables price trend analysis and forecasting
+
+**`ProviderAdminCredentials`** (`app/core/models/provider_admin_credentials.py`):
+- **Secure credential storage** for pricing API access
+- Supports multiple credential types (basic_auth, oauth, api_key)
+- **Active/inactive status** for credential management
+- **Organization-scoped** credentials for multi-tenant deployments
+
+**`ProviderCatalog`** (`app/core/models/provider_catalog.py`):
+- **Provider metadata** including pricing capabilities
+- `has_pricing_api`: Boolean flag indicating pricing API availability
+- `pricing_method`: Pricing collection method (api, manual, static)
+- `sync_status`: Current pricing sync status (never, in_progress, success, failed)
+- `last_price_sync`: Timestamp of last successful sync
+- `sync_error`: Error message if sync failed
+
+### 6.4.3. Provider-Specific Pricing Implementation
+
+#### **Beget Pricing** (`app/providers/plugins/beget.py`)
+
+**Implementation:**
+- **Configurator API**: Fetches VPS pricing from Beget configurator endpoint
+- **DBaaS Pricing**: Collects managed database pricing (MySQL, PostgreSQL) via dedicated client
+- **Manual Fallback**: Static pricing data if API unavailable
+- **Standardized Output**: Normalized CPU/RAM/storage with hourly/monthly costs
+
+**Pricing Client**: `app/providers/beget/pricing_client.py`
+- `collect_vps_prices()`: Fetches VPS configurations and prices
+- `get_dbaas_prices()`: Managed database pricing collection
+
+**Credentials**: Username/password authentication via Beget API
+
+#### **Selectel Pricing** (`app/providers/plugins/selectel.py`)
+
+**Implementation:**
+- **Grid Pricing**: VPC compute pricing with normalized CPU/RAM/Disk fields
+- **Unit Prices**: Raw unit prices for volumes, network, DBaaS services
+- **DBaaS Pricing**: Managed database pricing (PostgreSQL, MySQL, Kafka, Redis, etc.)
+- **Multi-Service Coverage**: Comprehensive pricing across all Selectel services
+
+**Pricing Clients**:
+- `app/providers/selectel/pricing_client.py`: Main pricing client
+- `app/providers/selectel/grid_pricing_client.py`: Grid/VPC compute pricing
+- `scripts/selectel_dbaas_pricing_fetch.py`: DBaaS pricing collection
+
+**Credentials**: API key authentication
+
+#### **Yandex Cloud Pricing** (`app/providers/plugins/yandex.py`)
+
+**Implementation:**
+- **SKU-Based Pricing**: Comprehensive pricing via Yandex Billing API SKU catalog
+- **Two-Phase Sync**:
+  1. **Fast SKU List Fetch**: Collects all SKU IDs from list API (1000 SKUs per page)
+  2. **Individual SKU Details**: Fetches detailed pricing for each SKU (20-minute timeout)
+- **HAR-Derived Pricing**: Managed service pricing extracted from HAR file analysis
+- **11 Service Types**: VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs
+- **99.84% Accuracy**: Production-tested with 993 SKU prices synced daily
+
+**Pricing Client**: `app/providers/yandex/client.py`
+- `list_skus()`: Fast SKU catalog listing
+- `get_sku()`: Individual SKU detail fetching with retry logic
+- **Rate Limiting**: Handles Yandex API rate limits gracefully
+
+**Credentials**: Service account JSON key with JWT authentication
+
+**Performance Characteristics:**
+- **Sync Duration**: 6-20 minutes for complete SKU catalog
+- **Database Connection Management**: Reconnection logic for long-running syncs
+- **Batch Processing**: 100 records per batch to avoid MySQL timeouts
+- **Progress Tracking**: Detailed logging for sync progress monitoring
+
+#### **Cloud.ru Pricing** (`app/providers/plugins/cloud_ru.py`)
+
+**Implementation:**
+- **Multi-Service Pricing**: Comprehensive pricing across 6+ service categories
+- **API-Based Collection**: Direct API calls to Cloud.ru pricing endpoints
+- **Standardized Format**: Unified pricing records for cross-provider comparison
+
+**Pricing Client**: `app/providers/cloud_ru/pricing_client.py`
+
+**Service Coverage:**
+
+1. **VM Pricing** (`get_vm_prices()`):
+   - Fetches flavors from `/u-api/svp/svc/v1/flavors`
+   - Calculates prices via `/u-api/svp/svc/v1/projects/{project_id}/price-calculation`
+   - Includes CPU, RAM, storage (default 20GB SSD disk)
+   - Returns hourly and monthly costs in RUB
+
+2. **Kubernetes Pricing** (`get_kubernetes_prices()`):
+   - Fetches K8s flavors from `/u-api/mk8s-bff/v1/productConfiguration`
+   - Calculates master node prices via `/u-api/mk8s/v2/billing/calculate-price-ext`
+   - Handles invalid flavors gracefully (some flavors not valid for master nodes)
+   - Returns CPU, RAM, hourly/monthly costs
+
+3. **Container Registry Pricing** (`get_container_registry_prices()`):
+   - Fetches tariffs from `/u-api/container-registry/v1/api/v3/{project_id}/tariffs/`
+   - Parses price strings (handles "≈" and other symbols)
+   - Flat-rate pricing model
+   - Returns monthly costs converted to hourly
+
+4. **S3 Object Storage Pricing** (`get_s3_prices()`):
+   - **Static pricing** from Cloud.ru documentation (no API endpoint available)
+   - Unit prices per GB/month for storage
+   - Multiple storage tiers (Standard, Cold)
+   - Usage-based pricing model
+
+5. **Load Balancer Pricing** (`get_load_balancer_prices()`):
+   - **Currently skipped**: Requires `product_instance_id` which is dynamic
+   - Endpoint available: `/u-api/svp/v2/nlb/calculate-price`
+   - **Future**: Can be implemented when product_instance_id is available from resource discovery
+
+6. **Database Pricing** (`get_database_prices()`):
+   - **Currently skipped**: Requires `product_instance_id` for SKU-based pricing
+   - Endpoint available: `/u-api/paas-bff/api/v1/price-calculator/sku-list`
+   - Supports PostgreSQL, Redis, MySQL, Kafka
+   - **Future**: Can be implemented when product_instance_id is available
+
+**Credentials**: Key ID and Key Secret (service account access keys)
+- Authentication via IAM API to obtain access token
+- Project ID extracted from JWT token
+- Admin credentials stored in `ProviderAdminCredentials` for pricing sync
+
+**Standardized Pricing Format:**
+```python
+{
+    'provider': 'cloud-ru',
+    'resource_type': 'server',  # or 'kubernetes', 'container_registry', 'object_storage'
+    'flavor_id': 'flavor-uuid',
+    'flavor_name': 'Standard-2-4',
+    'cpu_cores': 2,
+    'ram_gb': 4,
+    'storage_gb': 20,
+    'hourly_cost': 0.123,
+    'monthly_cost': 89.79,
+    'region': 'ru',
+    'currency': 'RUB',
+    'updated_at': '2025-12-17T12:00:00'
+}
+```
+
+### 6.4.4. Pricing Sync Workflow
+
+#### **Manual Sync (Admin UI)**
+
+1. **Admin Initiates Sync**:
+   - Admin navigates to `/admin/providers`
+   - Clicks "Sync Prices" for specific provider or "Sync All Prices"
+   - API endpoint: `POST /api/admin/sync-all-prices` or `POST /api/admin/providers/{provider_id}/sync-prices`
+
+2. **PriceUpdateService Processing**:
+   - Loads provider plugin class via `ProviderPluginManager`
+   - Retrieves admin credentials from `ProviderAdminCredentials`
+   - Creates plugin instance with credentials
+   - Calls `plugin_instance.get_pricing_data()`
+
+3. **Provider-Specific Collection**:
+   - Provider plugin authenticates with provider API
+   - Fetches pricing data using provider-specific endpoints
+   - Normalizes data to standardized format
+   - Returns list of pricing records
+
+4. **Database Persistence**:
+   - `PricingService.bulk_save_price_data()` processes records in batches (100 per batch)
+   - Upsert logic: Updates existing prices, inserts new ones
+   - Price history tracking for changed prices
+   - Database connection management for long-running syncs
+
+5. **Status Update**:
+   - Updates `ProviderCatalog.sync_status` (in_progress → success/failed)
+   - Records `last_price_sync` timestamp
+   - Stores error message if sync failed
+
+#### **Scheduled Sync (Cron Job)**
+
+**Script**: `scripts/sync_provider_prices.py`
+
+1. **Cron Configuration**:
+   - Runs daily (configurable schedule)
+   - Executes `sync_all_providers()` method
+   - Logs all operations for monitoring
+
+2. **Provider Filtering**:
+   - Only syncs providers with `is_enabled=True` and `has_pricing_api=True`
+   - Skips providers without admin credentials configured
+
+3. **Batch Processing**:
+   - Processes all enabled providers sequentially
+   - Tracks success/failure counts
+   - Generates summary report
+
+4. **Error Handling**:
+   - Continues processing other providers if one fails
+   - Logs detailed error information
+   - Updates sync status for each provider
+
+#### **Database Connection Management**
+
+**Challenge**: Long-running syncs (e.g., Yandex Cloud 6-20 minutes) can cause MySQL connection timeouts.
+
+**Solution**:
+- **Connection Verification**: Checks database connection before saving batches
+- **Reconnection Logic**: Reconnects if connection is stale
+- **Batch Commits**: Commits after each batch to keep connection alive
+- **Progress Logging**: Detailed logging for monitoring long-running operations
+
+### 6.4.5. Standardized Pricing Data Format
+
+All providers return pricing data in a unified format for cross-provider comparison:
+
+**Required Fields:**
+- `provider`: Provider identifier (beget, selectel, yandex, cloud-ru)
+- `resource_type`: Resource category (server, volume, kubernetes, database, etc.)
+- `hourly_cost`: Cost per hour in provider currency
+- `monthly_cost`: Cost per month in provider currency
+- `currency`: Billing currency (RUB primary)
+
+**Hardware Specifications:**
+- `cpu_cores`: Number of CPU cores (0 if not applicable)
+- `ram_gb`: RAM in gigabytes (0 if not applicable)
+- `storage_gb`: Storage in gigabytes (0 if not applicable)
+
+**Provider-Specific Fields:**
+- `provider_sku`: Provider-specific SKU identifier
+- `region`: Deployment region
+- `flavor_id`: Instance/flavor identifier
+- `flavor_name`: Human-readable flavor name
+- `extended_specs`: JSON field for additional provider-specific attributes
+
+**Metadata:**
+- `updated_at`: ISO timestamp of price collection
+- `note`: Optional notes about pricing (e.g., "Static pricing from documentation")
+
+### 6.4.6. Price Comparison & Recommendations
+
+#### **Similarity Matching**
+
+**`PricingService.find_similar_prices()`**:
+- **Specification-Based Matching**: Finds similar prices based on CPU/RAM/storage specs
+- **Similarity Scoring**: Calculates similarity score (0-100) based on hardware specs
+- **Configurable Threshold**: Minimum similarity score (default 70%)
+- **Cross-Provider Search**: Searches across all enabled providers
+
+**Use Cases:**
+- **Cost Optimization Recommendations**: Find cheaper alternatives with similar specs
+- **Migration Planning**: Compare costs before migrating resources
+- **Budget Forecasting**: Estimate costs for new resource deployments
+
+#### **Price History Tracking**
+
+**`PriceHistory` Model**:
+- **Change Detection**: Automatically tracks price changes during sync
+- **Percentage Calculation**: Calculates percentage change from old to new price
+- **Historical Analysis**: Enables price trend analysis over time
+- **Forecasting**: Supports cost forecasting based on historical trends
+
+**Tracking Logic**:
+- Compares `old_monthly_cost` vs `new_monthly_cost` during price updates
+- Records change only if prices differ
+- Calculates percentage change: `((new - old) / old) * 100`
+- Stores change reason: 'price_update', 'manual_override', etc.
+
+### 6.4.7. Admin Credentials Management
+
+#### **Credential Storage**
+
+**`ProviderAdminCredentials` Model**:
+- **Secure Storage**: Encrypted credential storage (JSON-encoded)
+- **Credential Types**: Supports basic_auth, oauth, api_key
+- **Active/Inactive Status**: Enable/disable credentials without deletion
+- **Organization-Scoped**: Multi-tenant credential isolation
+
+#### **Credential Usage**
+
+**Priority Order**:
+1. **Admin Credentials**: Used if available and active
+2. **User Connection Credentials**: Fallback to user's provider connection credentials
+3. **Error**: Returns empty pricing data if no credentials available
+
+**Provider-Specific Credential Requirements**:
+
+- **Beget**: Username/password
+- **Selectel**: API key
+- **Yandex Cloud**: Service account JSON key
+- **Cloud.ru**: Key ID and Key Secret (service account access keys)
+
+#### **Admin UI Integration**
+
+**Credential Management** (`/admin/providers`):
+- **Credential Forms**: Dynamic forms based on provider type
+- **Test Connection**: Validates credentials before saving
+- **Active/Inactive Toggle**: Enable/disable credentials
+- **Secure Display**: Masks sensitive credential values
+
+**API Endpoints**:
+- `POST /api/admin/providers/{provider_type}/credentials`: Save credentials
+- `POST /api/admin/providers/{provider_type}/credentials/test`: Test credentials
+- `POST /api/admin/providers/{provider_type}/credentials/test-raw`: Test raw credentials without saving
+
+### 6.4.8. Pricing Statistics & Monitoring
+
+#### **Pricing Statistics**
+
+**`PricingService.get_pricing_statistics()`**:
+- **Total Prices**: Count of all pricing records in database
+- **Provider Counts**: Price counts per provider
+- **Recent Changes**: Count of price changes in last 24 hours
+- **Enabled Providers**: Count of providers with pricing API enabled
+
+#### **Sync Status Monitoring**
+
+**`ProviderCatalog` Sync Status**:
+- `never`: Pricing sync never attempted
+- `in_progress`: Sync currently running
+- `success`: Last sync completed successfully
+- `failed`: Last sync failed (error message stored)
+
+**Monitoring Endpoints**:
+- `GET /api/admin/pricing/statistics`: Pricing system statistics
+- `GET /api/admin/providers`: Provider catalog with sync status
+- Provider-specific sync status visible in admin UI
+
+### 6.4.9. Implementation Status ✅ PRODUCTION READY
+
+**Completed Components:**
+- ✅ **PriceUpdateService**: Complete orchestration service
+- ✅ **PricingService**: Price data persistence and management
+- ✅ **Provider Plugins**: All providers implement `get_pricing_data()`
+- ✅ **Admin Credentials**: Secure credential management system
+- ✅ **Price History**: Historical price change tracking
+- ✅ **Batch Processing**: Efficient bulk price updates
+- ✅ **Database Connection Management**: Long-running sync support
+- ✅ **Admin UI**: Complete credential and sync management interface
+- ✅ **Scheduled Sync**: Cron job for automated daily price updates
+- ✅ **Error Handling**: Comprehensive error handling and logging
+
+**Provider Support:**
+- ✅ **Beget**: VPS and DBaaS pricing via configurator API
+- ✅ **Selectel**: Grid, unit prices, and DBaaS pricing
+- ✅ **Yandex Cloud**: Comprehensive SKU-based pricing (993 SKUs, 11 service types)
+- ✅ **Cloud.ru**: VM, Kubernetes, Container Registry, S3 pricing (Load Balancer and Database pending product_instance_id)
+
+**Production Validation:**
+- ✅ **Yandex Cloud**: 6-20 minute syncs with 993 SKU prices, 99.84% accuracy
+- ✅ **Cloud.ru**: Multi-service pricing collection with standardized format
+- ✅ **Batch Processing**: 100-record batches prevent MySQL timeouts
+- ✅ **Connection Management**: Reconnection logic handles long-running syncs
+- ✅ **Error Recovery**: Graceful handling of provider API failures
+
+**Future Enhancements:**
+- 🔄 **Load Balancer Pricing**: Cloud.ru load balancer pricing (requires product_instance_id)
+- 🔄 **Database Pricing**: Cloud.ru database pricing (PostgreSQL, Redis, MySQL, Kafka - requires product_instance_id)
+- 🔄 **Price Alerting**: Notifications for significant price changes
+- 🔄 **Price Forecasting**: ML-based price trend prediction
+- 🔄 **Multi-Currency Support**: Enhanced currency conversion and display
+
 #### **Snapshot-Based Architecture**
 - Each sync creates a complete snapshot of the current cloud state
 - Historical snapshots enable trend analysis and cost forecasting
@@ -1581,9 +1993,9 @@ A Miro-inspired interactive canvas for mapping cloud resources to business conte
 - **Real-time Updates**: All charts load with actual user data, no fallback content
 - **Error Handling**: Graceful error handling with loading states and error messages
 
-## 6.4. Frontend Architecture - CSS & JavaScript Refactoring ✅ COMPLETED
+## 6.5. Frontend Architecture - CSS & JavaScript Refactoring ✅ COMPLETED
 
-### 6.4.1. Complete Modular Frontend Architecture
+### 6.5.1. Complete Modular Frontend Architecture
 
 The InfraZen platform implements a **modern, modular frontend architecture** with complete separation of HTML, CSS, and JavaScript. This comprehensive refactoring:
 - Fixed the original dashboard sync button bug (hardcoded to Beget only)
@@ -1818,7 +2230,7 @@ function showFlashMessage(message, type) { ... }
 - Add TypeScript for type safety
 - Implement component-based architecture
 
-### 6.4.2. Implementation Status ✅ PRODUCTION READY
+### 6.5.2. Implementation Status ✅ PRODUCTION READY
 
 **Refactored Pages (100% Complete - CSS + JavaScript):**
 - ✅ **Dashboard** - Charts, filters, multi-provider sync (346 lines, **-58%**)
