@@ -1292,6 +1292,18 @@ def test_provider_credentials_raw(provider_type):
                 'password': password
             }
         
+        elif provider_type == 'cloud-ru':
+            api_key = data.get('api_key')
+            api_secret = data.get('api_secret')
+            
+            if not all([api_key, api_secret]):
+                return jsonify({'success': False, 'error': 'Key ID and Key Secret are required'})
+            
+            credentials = {
+                'api_key': api_key,
+                'api_secret': api_secret
+            }
+        
         else:
             return jsonify({'success': False, 'error': f'Unsupported provider type: {provider_type}'})
         
