@@ -274,7 +274,13 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
  * Extracts the button reference and calls syncProvider
  */
 function syncConnection(connectionId, providerType) {
-    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    // Handle provider IDs that may be in format "provider-type-123" or just "123"
+    let numericId = connectionId;
+    if (connectionId.includes('-')) {
+        // Split by '-' and take the last part (the numeric ID)
+        const parts = connectionId.split('-');
+        numericId = parts[parts.length - 1];
+    }
     const button = event.target.closest('button');
     
     // Pass both numeric ID (for API) and full ID (for card updates)

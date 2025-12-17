@@ -60,6 +60,7 @@ def create_app(config_name=None):
     from app.providers.beget.routes import beget_bp
     from app.providers.selectel.routes import selectel_bp
     from app.providers.yandex.routes import yandex_bp
+    from app.providers.cloud_ru.routes import cloud_ru_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -75,6 +76,7 @@ def create_app(config_name=None):
     app.register_blueprint(beget_bp, url_prefix='/api/providers/beget')
     app.register_blueprint(selectel_bp, url_prefix='/api/providers/selectel')
     app.register_blueprint(yandex_bp, url_prefix='/api/providers/yandex')
+    app.register_blueprint(cloud_ru_bp, url_prefix='/api/providers/cloud-ru')
     app.register_blueprint(recommendations_bp, url_prefix='/api')
     app.register_blueprint(reports_bp, url_prefix='/api')
     

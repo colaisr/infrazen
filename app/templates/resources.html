@@ -11,6 +11,25 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/resources.css') }}">
+<script>
+// Define toggleProviderSection in head to ensure it's available for onclick handlers
+(function() {
+    'use strict';
+    window.toggleProviderSection = function(providerId) {
+        const content = document.getElementById('provider-content-' + providerId);
+        const chevron = document.getElementById('provider-chevron-' + providerId);
+        if (content && chevron) {
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                chevron.classList.add('rotated');
+            } else {
+                content.style.display = 'none';
+                chevron.classList.remove('rotated');
+            }
+        }
+    };
+})();
+</script>
 {% endblock %}
 
 {% block content %}
@@ -107,6 +126,8 @@
                             <img src="{{ url_for('static', filename='provider_logos/yc_logo.png') }}" alt="Yandex Cloud" style="width: 3rem; height: 3rem; object-fit: contain;">
                         {% elif provider.provider_type == 'selectel' %}
                             <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 3rem; height: 3rem; object-fit: contain;">
+                        {% elif provider.provider_type == 'cloud-ru' %}
+                            <i class="fa-solid fa-cloud" style="font-size: 2.5rem !important; color: #1E40AF;"></i>
                         {% else %}
                             <i class="fas fa-box" style="font-size: 2.5rem !important; transform: scale(1.5) !important;"></i>
                         {% endif %}
@@ -895,6 +916,9 @@
 </div>
 
 
+{% endblock %}
+
+{% block extra_js %}
 <!-- External JavaScript -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>

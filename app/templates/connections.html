@@ -107,6 +107,10 @@
                         <div class="provider-icon beget">
                             <img src="{{ url_for('static', filename='provider_logos/beget_logo.jpeg') }}" alt="Beget" style="width: 2rem; height: 2rem; object-fit: contain;">
                         </div>
+                    {% elif provider.code == 'cloud-ru' %}
+                        <div class="provider-icon cloud-ru">
+                            <i class="fa-solid fa-cloud" style="color: #1E40AF; font-size: 2rem;"></i>
+                        </div>
                     {% else %}
                         <div class="provider-icon default">
                             <i class="fa-solid fa-cloud"></i>
@@ -465,6 +469,8 @@
                                 <img src="{{ url_for('static', filename='provider_logos/selectel_logo.svg') }}" alt="Selectel" style="width: 2rem; height: 2rem; object-fit: contain;">
                             {% elif provider.provider_type == 'yandex' %}
                                 <img src="{{ url_for('static', filename='provider_logos/yc_logo.png') }}" alt="Yandex Cloud" style="width: 2rem; height: 2rem; object-fit: contain;">
+                            {% elif provider.provider_type == 'cloud-ru' %}
+                                <i class="fa-solid fa-cloud" style="color: #1E40AF;"></i>
                             {% elif provider.provider_type == 'vk-cloud' %}
                                 <i class="fa-solid fa-cloud"></i>
                             {% else %}

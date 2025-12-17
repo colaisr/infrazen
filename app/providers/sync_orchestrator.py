@@ -506,6 +506,15 @@ class SyncOrchestrator:
             with db.session.no_autoflush:
                 for resource, resource_data in processed_resources:
                     try:
+                        # Ensure resource is flushed and has an ID before creating ResourceState
+                        if resource.id is None:
+                            db.session.flush()
+                        
+                        # Double-check resource exists in database
+                        if resource.id is None:
+                            self.logger.error(f"Resource has no ID after flush for {resource_data.get('resource_name', 'unknown')}")
+                            continue
+                        
                         # Create ResourceState record
                         resource_state = ResourceState(
                             sync_snapshot_id=sync_snapshot.id,
@@ -535,7 +544,14 @@ class SyncOrchestrator:
                         
                         self.logger.info(f"Successfully created ResourceState for {resource_data.get('resource_name', 'unknown')}")
                     except Exception as e:
-                        self.logger.error(f"Failed to create ResourceState for {resource_data.get('resource_name', 'unknown')}: {e}")
+                        self.logger.error(f"Failed to create ResourceState for {resource_data.get('resource_name', 'unknown')}: {e}", exc_info=True)
+                        db.session.rollback()
+                        # Re-add the resource if it was rolled back
+                        try:
+                            db.session.add(resource)
+                            db.session.flush()
+                        except:
+                            pass
                         continue
 
             self.logger.info(f"Processed {processed_count} resources for provider {provider.id}")

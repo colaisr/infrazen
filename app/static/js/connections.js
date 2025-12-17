@@ -74,6 +74,14 @@ const providers = {
             { name: 'secret_key', label: 'Secret Key *', type: 'password', placeholder: '••••••••', required: true },
             { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'vk_project_id', required: true }
         ]
+    },
+    'cloud-ru': {
+        name: 'Cloud.ru',
+        description: 'Cloud.ru (Облако.ру) — российская облачная платформа, предоставляющая услуги виртуальных машин, хранения данных и других облачных сервисов. Для подключения требуется сервисный аккаунт с ключом доступа (Key ID и Key Secret). Project ID определяется автоматически из токена доступа.',
+        fields: [
+            { name: 'api_key', label: 'Key ID (Key ID) *', type: 'text', placeholder: 'Ваш Key ID из ключа доступа', required: true },
+            { name: 'api_secret', label: 'Key Secret (Secret) *', type: 'password', placeholder: '••••••••', required: true }
+        ]
     }
 };
 
@@ -124,6 +132,8 @@ function changeProvider() {
             form.action = '/api/providers/beget/add';
         } else if (selectedProvider === 'yandex') {
             form.action = '/api/providers/yandex/add';
+        } else if (selectedProvider === 'cloud-ru') {
+            form.action = '/api/providers/cloud-ru/add';
         } else {
             form.action = '/api/providers/beget/add';
         }
@@ -195,16 +205,32 @@ function createFieldHtml(field) {
 // ============================================================================
 
 function syncConnection(connectionId, providerType) {
-    const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+    // Handle provider IDs that may be in format "provider-type-123" or just "123"
+    let numericId = connectionId;
+    if (connectionId.includes('-')) {
+        // Split by '-' and take the last part (the numeric ID)
+        const parts = connectionId.split('-');
+        numericId = parts[parts.length - 1];
+    }
     const button = event.target.closest('button');
     
     syncProvider(numericId, providerType, button);
 }
 
 function editConnection(connectionId) {
-    const parts = connectionId.includes('-') ? connectionId.split('-') : [connectionId];
-    const providerType = parts.length === 2 ? parts[0] : (document.querySelector(`#provider-${connectionId}`)?.dataset?.providerType || 'beget');
-    const numericId = parts.length === 2 ? parts[1] : parts[0];
+    // Handle provider IDs that may be in format "provider-type-123" or just "123"
+    let numericId = connectionId;
+    let providerType = 'beget';
+    
+    if (connectionId.includes('-')) {
+        const parts = connectionId.split('-');
+        numericId = parts[parts.length - 1]; // Last part is the numeric ID
+        // Provider type is everything except the last part
+        providerType = parts.slice(0, -1).join('-');
+    } else {
+        // Fallback to getting provider type from DOM
+        providerType = document.querySelector(`#provider-${connectionId}`)?.dataset?.providerType || 'beget';
+    }
     
     const button = event?.target?.closest('button');
     const originalText = button ? button.innerHTML : '';
@@ -243,7 +269,12 @@ function editConnection(connectionId) {
 
 function deleteConnection(connectionId, providerType) {
     if (confirm('Вы уверены, что хотите удалить это подключение?\n\nЭто действие нельзя отменить.')) {
-        const numericId = connectionId.includes('-') ? connectionId.split('-')[1] : connectionId;
+        // Handle provider IDs that may be in format "provider-type-123" or just "123"
+        let numericId = connectionId;
+        if (connectionId.includes('-')) {
+            const parts = connectionId.split('-');
+            numericId = parts[parts.length - 1]; // Last part is the numeric ID
+        }
         const button = event.target.closest('button');
         const originalText = button.innerHTML;
         button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
@@ -395,6 +426,8 @@ function testConnection() {
         testEndpoint = '/api/providers/selectel/test';
     } else if (selectedProvider === 'yandex') {
         testEndpoint = '/api/providers/yandex/test';
+    } else if (selectedProvider === 'cloud-ru') {
+        testEndpoint = '/api/providers/cloud-ru/test';
     }
     fetch(testEndpoint, {
         method: 'POST',
@@ -557,6 +590,18 @@ function fillEditForm(connectionData) {
         if (serviceAccountKeyField) {
             serviceAccountKeyField.value = connectionData.service_account_key || '';
         }
+    } else if (provider === 'cloud-ru') {
+        const apiKeyField = document.querySelector('input[name="api_key"]');
+        if (apiKeyField) {
+            apiKeyField.value = connectionData.api_key || '';
+        }
+        
+        const apiSecretField = document.querySelector('input[name="api_secret"]');
+        if (apiSecretField) {
+            apiSecretField.value = connectionData.api_secret || '';
+            apiSecretField.placeholder = 'Введите новый секретный ключ (оставьте пустым, чтобы не менять)';
+        }
+        // Note: account_id removed - project_id is extracted automatically from token
     }
     
     const autoSyncCheckbox = document.getElementById('auto_sync');
