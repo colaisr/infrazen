@@ -80,21 +80,19 @@ def add_connection():
         connection_name = request.form.get('connection_name')
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
-        # account_id removed - project_id is extracted automatically from token
+        project_id = (request.form.get('project_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
-        if not all([connection_name, api_key, api_secret]):
-            flash('Connection name, API key, and API secret are required', 'error')
+        if not all([connection_name, api_key, api_secret, project_id]):
+            flash('Connection name, API key, API secret, and Project ID are required', 'error')
             return redirect(url_for('main.connections'))
         
         # Test connection first
         from .client import CloudRuClient
-        credentials = {
-            'api_key': api_key,
-            'api_secret': api_secret
-            # account_id removed - project_id is extracted automatically from JWT token
-        }
+        credentials = {'api_key': api_key, 'api_secret': api_secret}
+        if project_id:
+            credentials['project_id'] = project_id
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         
@@ -128,11 +126,7 @@ def add_connection():
             provider_type='cloud-ru',
             connection_name=connection_name,
             account_id=account_id,  # Stored for display, but not used for API calls
-            credentials=json.dumps({
-                'api_key': api_key,
-                'api_secret': api_secret
-                # account_id removed from credentials - project_id extracted from token
-            }),
+            credentials=json.dumps(credentials),
             provider_metadata=json.dumps(test_result.get('account_info', {})),
             is_active=True,
             auto_sync=auto_sync,
@@ -186,6 +180,7 @@ def edit_connection(provider_id):
                 'account_id': provider.account_id,
                 'api_key': credentials.get('api_key', ''),
                 'api_secret': credentials.get('api_secret', ''),
+                'project_id': credentials.get('project_id', ''),
                 'auto_sync': provider.auto_sync,
                 'sync_interval': provider.sync_interval
             }
@@ -231,7 +226,7 @@ def update_connection(provider_id):
         connection_name = request.form.get('connection_name')
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
-        # account_id removed - project_id is extracted automatically from token
+        project_id = (request.form.get('project_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
@@ -241,18 +236,24 @@ def update_connection(provider_id):
                 'message': 'Connection name and API key are required'
             }), 400
         
-        # If api_secret is empty, keep existing one
         existing_credentials = json.loads(provider.credentials) if provider.credentials else {}
+        if not project_id and not existing_credentials.get('project_id'):
+            return jsonify({
+                'success': False,
+                'message': 'Project ID is required'
+            }), 400
+        
+        # If api_secret is empty, keep existing one
         if not api_secret:
             api_secret = existing_credentials.get('api_secret', '')
         
         # Test connection with new credentials
         from .client import CloudRuClient
-        credentials = {
-            'api_key': api_key,
-            'api_secret': api_secret
-            # account_id removed - project_id is extracted automatically from JWT token
-        }
+        credentials = {'api_key': api_key, 'api_secret': api_secret}
+        if project_id:
+            credentials['project_id'] = project_id
+        elif existing_credentials.get('project_id'):
+            credentials['project_id'] = existing_credentials['project_id']
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         

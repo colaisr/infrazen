@@ -501,21 +501,20 @@ class SyncOrchestrator:
                     self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}")
                     continue
             
+            # Ensure all resources are flushed before creating ResourceState records
+            db.session.flush()
+
             # Create ResourceState records and finish resource processing
             from app.core.models.sync import ResourceState
-            with db.session.no_autoflush:
-                for resource, resource_data in processed_resources:
+            for resource, resource_data in processed_resources:
+                try:
+                    if resource.id is None:
+                        self.logger.error(f"Resource has no ID for {resource_data.get('resource_name', 'unknown')}")
+                        continue
+
+                    # Use savepoint so a single ResourceState failure doesn't rollback all resources
+                    savepoint = db.session.begin_nested()
                     try:
-                        # Ensure resource is flushed and has an ID before creating ResourceState
-                        if resource.id is None:
-                            db.session.flush()
-                        
-                        # Double-check resource exists in database
-                        if resource.id is None:
-                            self.logger.error(f"Resource has no ID after flush for {resource_data.get('resource_name', 'unknown')}")
-                            continue
-                        
-                        # Create ResourceState record
                         resource_state = ResourceState(
                             sync_snapshot_id=sync_snapshot.id,
                             resource_id=resource.id,
@@ -529,30 +528,25 @@ class SyncOrchestrator:
                             effective_cost=resource_data.get('effective_cost', 0.0)
                         )
                         db.session.add(resource_state)
-                        
-                        # Finish resource processing (set daily cost baseline and add tags)
+
                         resource.set_daily_cost_baseline(
                             original_cost=resource_data.get('effective_cost', 0.0),
                             period=resource_data.get('billing_period', 'monthly'),
                             frequency='recurring'
                         )
-                        
-                        # Add tags
+
                         tags = resource_data.get('tags', {})
                         for key, value in tags.items():
                             resource.add_tag(key, str(value))
-                        
+
+                        db.session.flush()
                         self.logger.info(f"Successfully created ResourceState for {resource_data.get('resource_name', 'unknown')}")
-                    except Exception as e:
-                        self.logger.error(f"Failed to create ResourceState for {resource_data.get('resource_name', 'unknown')}: {e}", exc_info=True)
-                        db.session.rollback()
-                        # Re-add the resource if it was rolled back
-                        try:
-                            db.session.add(resource)
-                            db.session.flush()
-                        except:
-                            pass
-                        continue
+                    except Exception as inner_e:
+                        savepoint.rollback()
+                        self.logger.warning(f"Skipped ResourceState for {resource_data.get('resource_name', 'unknown')}: {inner_e}")
+                except Exception as e:
+                    self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}", exc_info=True)
+                    continue
 
             self.logger.info(f"Processed {processed_count} resources for provider {provider.id}")
             return processed_count

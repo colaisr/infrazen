@@ -1081,7 +1081,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex Cloud**: ✅ **SKU+HAR-Based Cost Tracking** (October 2025) - Service account JWT authentication, 11 service types (VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs), 993 SKU prices synced daily, HAR-derived managed service pricing, 99.84% accuracy, multi-tenancy support (Clouds→Folders), production-tested. **Full details:** See `yandex_cloud_integration.md` for complete architecture, pricing methodology, API integration details, and implementation guide (15,000+ words).
 - **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
-- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025) - Service account Key ID/Secret authentication, JWT token-based project_id extraction, billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
+- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025) - Service account Key ID/Secret authentication, **Project ID required** (from console URL: Контроль затрат → Потребление), billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.3.5. Sync Mechanics & Features
@@ -1260,9 +1260,9 @@ InfraZen implements a comprehensive **multi-provider pricing synchronization sys
    - Supports PostgreSQL, Redis, MySQL, Kafka
    - **Future**: Can be implemented when product_instance_id is available
 
-**Credentials**: Key ID and Key Secret (service account access keys)
+**Credentials**: Key ID, Key Secret (service account access keys), and Project ID (from console URL)
 - Authentication via IAM API to obtain access token
-- Project ID extracted from JWT token
+- Project ID required (user-provided from Контроль затрат → Потребление)
 - Admin credentials stored in `ProviderAdminCredentials` for pricing sync
 
 **Standardized Pricing Format:**
@@ -1426,7 +1426,7 @@ All providers return pricing data in a unified format for cross-provider compari
 - **Beget**: Username/password
 - **Selectel**: API key
 - **Yandex Cloud**: Service account JSON key
-- **Cloud.ru**: Key ID and Key Secret (service account access keys)
+- **Cloud.ru**: Key ID, Key Secret (service account access keys), and Project ID (from console URL: Контроль затрат → Потребление)
 
 #### **Admin UI Integration**
 
@@ -3469,18 +3469,20 @@ Cloud.ru uses a token-based authentication system similar to Yandex Cloud:
 
 **Authentication Flow:**
 1. **Service Account Setup**: User creates a service account in Cloud.ru console and generates an access key (Key ID + Key Secret)
-2. **Token Exchange**: Client exchanges Key ID/Secret for an `access_token` via IAM API:
+2. **Project ID** (required): User obtains Project ID from Cloud.ru console URL:
+   - Navigate to **Контроль затрат** → **Потребление** (Cost Control → Consumption)
+   - Copy the `projectId` parameter from the browser URL (e.g., `projectId=a36def41-9e99-4f05-923c-a80182cd2a08`)
+3. **Token Exchange**: Client exchanges Key ID/Secret for an `access_token` via IAM API:
    - Endpoint: `POST https://iam.api.cloud.ru/api/v1/auth/token`
    - Request: `{"keyId": "YOUR_KEY_ID", "secret": "YOUR_KEY_SECRET"}`
    - Response: `{"access_token": "...", "expires_in": 3600}` (1-hour token lifetime)
-3. **Project ID Extraction**: `project_id` is automatically extracted from the JWT `access_token` payload - **no hardcoded values required**
 4. **Bearer Token Usage**: All subsequent API calls use `Authorization: Bearer <access_token>`
+5. **Billing API**: Uses `project_ids` parameter with the user-provided Project ID for consumption data
 
 **Key Features:**
-- ✅ **Automatic Project Discovery**: `project_id` extracted from JWT token, eliminating need for user input
-- ✅ **No Hardcoded Values**: All identifiers dynamically extracted from API responses
+- ✅ **Project ID Required**: User provides Project ID from console URL — required for billing API access
 - ✅ **Token Refresh**: Automatic token refresh before expiration (1-hour lifetime)
-- ✅ **Secure Credential Storage**: Key ID and Secret stored encrypted in database
+- ✅ **Secure Credential Storage**: Key ID, Secret, and Project ID stored encrypted in database
 
 ### 13.9.3. Billing-First Resource Discovery
 
@@ -3594,9 +3596,10 @@ app/providers/
 #### 13.9.7.2. Key Components
 
 **CloudRuClient (`app/providers/cloud_ru/client.py`):**
-- `_get_access_token()`: Token exchange and JWT parsing for `project_id`
+- `_get_access_token()`: Token exchange; extracts `customer_id` from JWT (for optional project discovery)
+- `get_projects()`: Project discovery via API (BFF returns 403 for service accounts — Project ID must be user-provided)
 - `get_vms()`: VM discovery from Compute API
-- `get_billing_data()`: Consumption data from Billing API
+- `get_billing_data()`: Consumption data from Billing API using `project_ids` from credentials
 - `get_account_info()`: Account-level information
 - Automatic token refresh and error handling
 
@@ -3638,10 +3641,10 @@ app/providers/
 - ✅ **Multi-Resource Support**: Ready for databases, Kubernetes, load balancers
 
 #### 13.9.8.3. Operational Efficiency
-- ✅ **Automatic Discovery**: No manual resource entry required
 - ✅ **Billing-First Approach**: Cost visibility prioritized over infrastructure details
-- ✅ **Zero Hardcoding**: All identifiers extracted dynamically from API
-- ✅ **Error Resilience**: Graceful handling of API failures, partial data
+- ✅ **Project ID from Console**: User copies Project ID from Cloud.ru console URL (Контроль затрат → Потребление)
+- ✅ **Instructions**: Step-by-step guide at `/instructions/cloud-ru` including Project ID section with screenshot
+- ✅ **Error Resilience**: Graceful handling of API failures, partial data; savepoints prevent batch rollback on ResourceState errors
 
 ### 13.9.9. Integration Results
 
@@ -3649,7 +3652,7 @@ app/providers/
 
 **Tested Capabilities:**
 - ✅ Service account authentication with Key ID/Secret
-- ✅ Automatic `project_id` extraction from JWT token
+- ✅ Project ID from user (required; obtained from console URL: Контроль затрат → Потребление)
 - ✅ VM discovery from Compute API
 - ✅ Billing data extraction from Consumption API
 - ✅ Resource type mapping (SKU-based and service name-based)

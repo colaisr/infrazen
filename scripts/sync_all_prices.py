@@ -64,6 +64,9 @@ def setup_logging(verbose=False, quiet=False):
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('requests').setLevel(logging.WARNING)
+    # Suppress SQLAlchemy SQL query logging (major log bloat)
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
 
 def print_header(text, char='='):
     """Print a formatted header"""

@@ -77,10 +77,11 @@ const providers = {
     },
     'cloud-ru': {
         name: 'Cloud.ru',
-        description: 'Cloud.ru (Облако.ру) — российская облачная платформа, предоставляющая услуги виртуальных машин, хранения данных и других облачных сервисов. Для подключения требуется сервисный аккаунт с ключом доступа (Key ID и Key Secret). Project ID определяется автоматически из токена доступа.',
+        description: 'Cloud.ru (Облако.ру) — российская облачная платформа. Требуется сервисный аккаунт (Key ID и Key Secret) и Project ID из URL консоли Cloud.ru (раздел Биллинг → Потребление, параметр projectId в адресной строке).',
         fields: [
             { name: 'api_key', label: 'Key ID (Key ID) *', type: 'text', placeholder: 'Ваш Key ID из ключа доступа', required: true },
-            { name: 'api_secret', label: 'Key Secret (Secret) *', type: 'password', placeholder: '••••••••', required: true }
+            { name: 'api_secret', label: 'Key Secret (Secret) *', type: 'password', placeholder: '••••••••', required: true },
+            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'UUID проекта из консоли Cloud.ru (projectId в URL)', required: true }
         ]
     }
 };
@@ -601,7 +602,11 @@ function fillEditForm(connectionData) {
             apiSecretField.value = connectionData.api_secret || '';
             apiSecretField.placeholder = 'Введите новый секретный ключ (оставьте пустым, чтобы не менять)';
         }
-        // Note: account_id removed - project_id is extracted automatically from token
+        
+        const projectIdField = document.querySelector('input[name="project_id"]');
+        if (projectIdField) {
+            projectIdField.value = connectionData.project_id || '';
+        }
     }
     
     const autoSyncCheckbox = document.getElementById('auto_sync');

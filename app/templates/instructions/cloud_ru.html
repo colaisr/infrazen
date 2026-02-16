@@ -151,9 +151,37 @@
         </div>
     </div>
 
+    <!-- Step 4: Get Project ID -->
+    <div class="section">
+        <h2><span class="step-number">4</span>Получение Project ID</h2>
+        
+        <p><strong>Project ID</strong> — обязательный параметр для подключения Cloud.ru к InfraZen. Он нужен для доступа к данным биллинга и потребления.</p>
+        
+        <ol>
+            <li>Откройте <a href="https://console.cloud.ru" target="_blank">консоль Cloud.ru</a></li>
+            <li>Выберите нужный проект в боковом меню (например, <strong>school21_adv</strong>)</li>
+            <li>Перейдите в раздел <strong>«Контроль затрат»</strong> → <strong>«Потребление»</strong></li>
+            <li>Посмотрите на адресную строку браузера — в URL будет параметр <code>projectId=</code></li>
+        </ol>
+        
+        <img src="{{ url_for('static', filename='instructions/cloud_ru_proj_id.png') }}" 
+             alt="Cloud.ru — страница Потребление с Project ID в URL" 
+             class="instruction-image">
+        <p class="image-caption">Раздел «Потребление»: Project ID находится в URL (параметр projectId=...)</p>
+        
+        <ol start="5">
+            <li>Скопируйте значение <strong>Project ID</strong> — это UUID вида <code>a36def41-9e99-4f05-923c-a80182cd2a08</code></li>
+        </ol>
+        
+        <div class="notice notice-warning">
+            <i class="fa-solid fa-exclamation-triangle"></i>
+            <strong>Важно:</strong> Project ID обязателен для работы подключения. Без него InfraZen не сможет получить данные о ресурсах и затратах.
+        </div>
+    </div>
+
     <!-- Step 5: Add Connection -->
     <div class="section">
-        <h2><span class="step-number">4</span>Добавление подключения в InfraZen</h2>
+        <h2><span class="step-number">5</span>Добавление подключения в InfraZen</h2>
         
         <ol>
             <li>Перейдите в раздел <strong>"Подключения"</strong> в InfraZen</li>
@@ -162,8 +190,9 @@
             <li>Заполните поля:
                 <ul>
                     <li><strong>Название подключения:</strong> Любое удобное имя (например, "Cloud.ru Production")</li>
-                    <li><strong>API Key:</strong> Вставьте ваш <strong>Key ID</strong> из шага 3</li>
-                    <li><strong>API Secret:</strong> Вставьте ваш <strong>Key Secret</strong> из шага 3</li>
+                    <li><strong>Key ID:</strong> Вставьте ваш <strong>Key ID</strong> из шага 3</li>
+                    <li><strong>Key Secret:</strong> Вставьте ваш <strong>Key Secret</strong> из шага 3</li>
+                    <li><strong>Project ID:</strong> Вставьте <strong>Project ID</strong> из шага 4 (UUID из URL консоли)</li>
                     <li><strong>Описание:</strong> Опционально, для ваших заметок</li>
                 </ul>
             </li>
@@ -187,7 +216,7 @@
 
     <!-- Step 6: Sync -->
     <div class="section">
-        <h2><span class="step-number">5</span>Синхронизация данных</h2>
+        <h2><span class="step-number">6</span>Синхронизация данных</h2>
         
         <p>После сохранения подключения вы можете запустить синхронизацию одним из способов:</p>
         
@@ -217,7 +246,7 @@
         <h3>Особенности синхронизации Cloud.ru:</h3>
         <ul>
             <li><strong>Объединение ресурсов:</strong> Диски и IP-адреса автоматически объединяются с родительскими VM для более удобного отображения</li>
-            <li><strong>Автоматическое определение Project ID:</strong> Project ID извлекается из JWT токена автоматически, не требуется указывать вручную</li>
+            <li><strong>Project ID:</strong> Указывается при создании подключения (из URL консоли Cloud.ru → Контроль затрат → Потребление)</li>
             <li><strong>Billing-first discovery:</strong> Все ресурсы обнаруживаются из данных биллинга, включая те, которые могут быть недоступны через обычные API endpoints</li>
         </ul>
     </div>
@@ -272,6 +301,7 @@
         
         <h3>Синхронизация не находит ресурсы:</h3>
         <ol>
+            <li><strong>Проверьте Project ID:</strong> Убедитесь, что указан правильный Project ID из URL консоли (раздел Контроль затрат → Потребление)</li>
             <li>Проверьте, что ресурсы находятся в том же проекте, на который назначена роль</li>
             <li>Убедитесь, что у сервисного аккаунта есть доступ к данным биллинга (может потребоваться роль <code>billing.viewer</code>)</li>
             <li>Проверьте права сервисного аккаунта в консоли Cloud.ru</li>

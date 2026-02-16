@@ -28,10 +28,15 @@ class CloudRuClient:
                 - api_key: API key for authentication
                 - api_secret: API secret for authentication
                 - account_id: Optional account ID
+                - agreement_id: Optional agreement ID (contract ID) for billing API
+                - project_id: Optional project ID (can be extracted from token or provided)
         """
         self.api_key = credentials.get('api_key')
         self.api_secret = credentials.get('api_secret')
         self.account_id = credentials.get('account_id')
+        self.agreement_id = credentials.get('agreement_id')
+        self.project_id = credentials.get('project_id')
+        self.customer_id = credentials.get('customer_id')  # Extracted from JWT
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         
         # Session for connection pooling
@@ -39,7 +44,6 @@ class CloudRuClient:
         self._access_token = None
         self._token_expires_at = None
         self._last_auth_error = None
-        self.project_id = None  # Will be extracted from JWT token
         self._setup_session()
     
     def _setup_session(self):
@@ -99,12 +103,14 @@ class CloudRuClient:
                         token_payload = json_lib.loads(decoded)
                         project_id = token_payload.get('project_id') or token_payload.get('projectId')
                         if project_id:
-                            # Set project_id (used for API calls)
                             self.project_id = project_id
-                            # Also set account_id if not already set
                             if not self.account_id:
                                 self.account_id = project_id
                             self.logger.info(f"Extracted project_id from token: {project_id}")
+                        customer_id = token_payload.get('customer_id') or token_payload.get('customerId')
+                        if customer_id:
+                            self.customer_id = customer_id
+                            self.logger.info(f"Extracted customer_id from token: {customer_id}")
                 except Exception as e:
                     self.logger.debug(f"Could not extract project_id from token: {e}")
                 
@@ -291,7 +297,28 @@ class CloudRuClient:
             return []
         
         try:
-            # Try different project endpoints
+            # BFF Console: simple-projects by customer_id (from JWT token)
+            if self.customer_id:
+                bff_url = f"https://advanced.cloud.ru/u-api/bff-console/v1/simple-projects?customerId={self.customer_id}"
+                try:
+                    self.logger.info(f"Trying BFF simple-projects: {bff_url}")
+                    response = self.session.get(bff_url, timeout=30)
+                    if response.status_code == 200:
+                        data = response.json()
+                        projects = data if isinstance(data, list) else (data.get('projects') or data.get('items') or data.get('data', []))
+                        if projects and isinstance(projects, list):
+                            out = []
+                            for p in projects:
+                                pid = (p.get('id') or p.get('project_id') or p.get('projectId')) if isinstance(p, dict) else str(p)
+                                if pid:
+                                    out.append({'id': pid, 'project_id': pid})
+                            if out:
+                                self.logger.info(f"Found {len(out)} project(s) via BFF simple-projects")
+                                return out
+                except Exception as e:
+                    self.logger.debug(f"BFF simple-projects failed: {e}")
+
+            # Fallback: generic project endpoints
             endpoints = [
                 f"{self.BASE_URL}/api/v1/projects",
                 f"{self.BASE_URL}/v1/projects",
@@ -300,7 +327,6 @@ class CloudRuClient:
                 f"https://billing.api.cloud.ru/api/v1/projects",
                 f"https://billing.api.cloud.ru/v1/projects",
             ]
-            
             for endpoint in endpoints:
                 try:
                     self.logger.info(f"Trying projects endpoint: {endpoint}")
@@ -528,14 +554,26 @@ class CloudRuClient:
                 self.logger.error("Cannot get billing data: authentication failed")
                 return {}
             
-            # After authentication, project_id should be set
-            # If not, try to get token again
+            # After authentication, project_id should be set (from JWT token)
+            # If not, try to get token again, then discover projects via API
             if not self.project_id:
                 self.logger.warning("project_id not set after authentication, trying to get token again...")
                 self._get_access_token()
                 if not self.project_id:
-                    self.logger.error("Failed to extract project_id from token")
-                    return {}
+                    # Try to discover projects via API (ideal: get all projects and query automatically)
+                    projects = self.get_projects()
+                    if projects:
+                        pids = []
+                        for p in projects:
+                            pid = p.get('id') or p.get('project_id') or p.get('projectId')
+                            if pid:
+                                pids.append(pid)
+                        if pids:
+                            self.project_id = pids[0]  # Use first for primary; we'll query all below
+                            self.logger.info(f"Discovered {len(pids)} project(s) via API, using for billing")
+                    if not self.project_id:
+                        self.logger.error("Failed to extract project_id from token or discover projects")
+                        return {}
             
             # Cloud.ru billing API endpoint
             # Based on docs: https://cloud.ru/docs/billing/ug/topics/api-ref
@@ -553,54 +591,57 @@ class CloudRuClient:
             params = {
                 'start_date': start_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
                 'end_date': end_date.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'page_filter.page': 1,  # Page number (required, must be >= 1)
                 'page_filter.limit': 10000  # Max recommended limit
             }
             
-            # Required: Either agreement_id or project_ids must be provided
-            # Based on HAR file analysis: agreement_id is different from project_id
-            # Try to use agreement_id if available (from account_id or discovered)
-            # Otherwise use project_ids as array
-            
-            # Check if account_id might be an agreement_id (different format)
-            # Agreement IDs are UUIDs, same format as project_ids
-            # For now, try project_ids first (as per API docs)
+            # User provides Key ID + Secret only. We get project_ids from token or get_projects().
+            project_ids = []
             if self.project_id:
-                # Cloud.ru API expects project_ids as array
-                # requests library handles list params: project_ids[]=id1
-                params['project_ids'] = [self.project_id]
-                self.logger.info(f"Using project_id {self.project_id} for billing API (as project_ids array)")
-            
-            # If account_id is provided and different from project_id, it might be agreement_id
-            # But per docs, we should use either agreement_id OR project_ids, not both
-            # So we'll only use project_ids for now
-            # TODO: Add agreement discovery API call if needed
-            
-            # Note: agreement_id is different from project_id
-            # Only add agreement_id if it's explicitly provided and different from project_id
-            # For now, try without agreement_id first (it's optional per docs)
-            # if self.account_id and self.account_id != self.project_id:
-            #     params['agreement_id'] = self.account_id
-            #     self.logger.info(f"Using agreement_id {self.account_id} for billing API")
+                project_ids = [self.project_id]
+            else:
+                projects = self.get_projects()
+                for p in projects:
+                    pid = p.get('id') or p.get('project_id') or p.get('projectId')
+                    if pid:
+                        project_ids.append(pid)
+            if project_ids:
+                params['project_ids'] = project_ids
+                self.logger.info(f"Using {len(project_ids)} project(s) for billing API")
+            else:
+                self.logger.warning("No project_ids available for billing API")
             
             try:
                 self.logger.info(f"Fetching billing data from {endpoint} for {days} days")
-                self.logger.debug(f"Request params: {params}")
+                self.logger.info(f"Request params: {params}")
                 
                 response = self.session.get(endpoint, params=params, timeout=60)
                 
                 # Log the actual request URL for debugging
                 if hasattr(response, 'request') and hasattr(response.request, 'url'):
-                    self.logger.debug(f"Actual request URL: {response.request.url[:400]}")
+                    self.logger.info(f"Actual request URL: {response.request.url[:400]}")
+                
+                self.logger.info(f"Response status: {response.status_code}")
                 
                 if response.status_code == 200:
                     data = response.json()
-                    self.logger.info(f"Successfully fetched billing data: {len(data.get('consumptions', []))} consumption records")
+                    consumptions = data.get('consumptions', [])
+                    self.logger.info(f"Successfully fetched billing data: {len(consumptions)} consumption records")
+                    if len(consumptions) == 0:
+                        self.logger.warning("Billing API returned 200 but with 0 consumption records")
+                        self.logger.warning(f"Response data keys: {list(data.keys())}")
+                        import json as json_lib
+                        self.logger.debug(f"Full response: {json_lib.dumps(data, indent=2)[:1000]}")
+                    
                     return data
                 elif response.status_code == 401:
-                    self.logger.error("Authentication failed for billing API - check token")
+                    error_text = response.text[:500]
+                    self.logger.error(f"Authentication failed for billing API - check token. Error: {error_text}")
                     return {}
                 elif response.status_code == 403:
-                    self.logger.error("Access forbidden for billing API - check service account permissions")
+                    error_text = response.text[:500]
+                    self.logger.error(f"Access forbidden for billing API - check service account permissions. Error: {error_text}")
+                    self.logger.error(f"Request was: {response.request.url[:400] if hasattr(response, 'request') else 'unknown'}")
                     return {}
                 elif response.status_code == 400:
                     # Log full error for debugging
@@ -608,11 +649,12 @@ class CloudRuClient:
                     self.logger.warning(f"Billing API returned status 400: {error_text}")
                     # Check if it's the "must provide" error
                     if "Either agreement_id or project_ids must be provided" in error_text:
-                        self.logger.warning(f"API didn't receive project_ids. Request params were: {params}")
+                        self.logger.warning(f"API didn't receive agreement_id/project_ids. Request params were: {params}")
                         self.logger.warning(f"Request URL was: {response.url[:400] if hasattr(response, 'url') else 'unknown'}")
                     return {}
                 else:
-                    self.logger.warning(f"Billing API returned status {response.status_code}: {response.text[:200]}")
+                    error_text = response.text[:500]
+                    self.logger.warning(f"Billing API returned status {response.status_code}: {error_text}")
                     return {}
             except Exception as e:
                 self.logger.error(f"Failed to get billing data from {endpoint}: {str(e)}")

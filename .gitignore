@@ -75,3 +75,13 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Credentials / sensitive
+cookies.txt
+*cookies*.txt
+
+# Debug / temp data
+*_data.json
+*_response.json
+*_export.json
+*_debug.log
