@@ -3,6 +3,7 @@ Cloud.ru provider plugin
 Implements Cloud.ru provider integration using the plugin architecture
 """
 import logging
+import re
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -130,6 +131,19 @@ class CloudRuProviderPlugin(ProviderPlugin):
             total_calculated_cost = sum(r.effective_cost for r in unified_resources)
             billing_validation = self._validate_costs(total_calculated_cost, account_billing)
             
+            # Persist auto-discovered agreement_id to provider credentials (no manual input needed)
+            if self.client.agreement_id and not provider.get_credentials().get('agreement_id'):
+                try:
+                    from app.core.models import db
+                    creds = provider.get_credentials()
+                    creds['agreement_id'] = self.client.agreement_id
+                    provider.set_credentials(creds)
+                    db.session.add(provider)
+                    db.session.commit()
+                    self.logger.info(f"Saved auto-discovered agreement_id to provider credentials")
+                except Exception as e:
+                    self.logger.warning(f"Could not persist agreement_id: {e}")
+            
             # The sync orchestrator will handle saving resources to database
             result.success = True
             result.message = f"Successfully synced {len(unified_resources)} resources from Cloud.ru"
@@ -210,18 +224,23 @@ class CloudRuProviderPlugin(ProviderPlugin):
     def _map_consumption_to_resource_type(self, consumption: Dict[str, Any]) -> str:
         """
         Map Cloud.ru consumption record to unified resource type
-        Uses servname (service name) and sku to determine resource type
+        Uses servname (service name), sku/sku_name to determine resource type
         """
         servname = consumption.get('servname', '').lower()
-        sku = consumption.get('sku', '').lower()
+        sku = (consumption.get('sku') or consumption.get('sku_name') or '').lower()
         resource_name = consumption.get('resource_name', '').lower()
         
         # Check SKU first (more reliable)
         # SKU patterns: PS-COREFT10N24000F-HD1MS0 (VM), PS-COREFT10NSSDFTF-HD1MS0 (Disk), PS-GTW0PRVTNNNNNNN-HD1MS0 (IP)
+        # BFF format: HA-ECS0CH0LS02X206-HX2MS0 (VM), HA-ECS0CH0LS0L2006-HX2MS0 (VM)
         if 'coreft' in sku and 'ssd' in sku:
             return 'volume'  # Disk/Volume
         elif 'coreft' in sku:
             return 'server'  # VM
+        elif 'ecs' in sku and 'ha-' in sku:
+            return 'server'  # BFF ECS VM (HA-ECS...)
+        elif 'ecs' in sku:
+            return 'server'  # ECS compute
         elif 'gtw0prvt' in sku or 'gateway' in sku:
             return 'network'  # IP/Network
         
@@ -271,6 +290,102 @@ class CloudRuProviderPlugin(ProviderPlugin):
         # Default to unknown - will be handled as generic resource
         return 'unknown'
     
+    def _parse_sku_specs(self, sku_name: str) -> Dict[str, Any]:
+        """
+        Parse Cloud.ru SKU name to extract VM specs (vCPU, RAM) for tile display.
+        BFF format: HA-ECS0CH0LS02X206-HX2MS0 (2 vCPU, 6 GB), HA-ECS0CH0LS0L2006 (2 vCPU, 6 GB).
+        Returns dict with vcpus, ram_mb, cpu_cores if parseable; empty dict otherwise.
+        """
+        if not sku_name or not isinstance(sku_name, str):
+            return {}
+        sku = sku_name.upper()
+        result = {}
+        # Extract digit sequences (e.g. 02, 206, 2006)
+        numbers = re.findall(r'\d+', sku)
+        if not numbers:
+            return {}
+        # Filter out leading zeros: 02 -> 2, 06 -> 6
+        nums = [int(n) for n in numbers if int(n) > 0]
+        if not nums:
+            return {}
+        # First try: find 3-digit number encoding vCPU*100+RAM (206=2vCPU 6GB, 408=4vCPU 8GB)
+        for n in nums:
+            if 100 <= n <= 999:
+                vcpu = n // 100
+                ram = n % 100
+                if 1 <= vcpu <= 32 and 1 <= ram <= 128:
+                    result['vcpus'] = vcpu
+                    result['cpu_cores'] = vcpu
+                    result['ram_mb'] = ram * 1024
+                    result['memory_mb'] = ram * 1024
+                    return result
+        # Second try: 4-digit like 2006 -> 2 vCPU, 6 GB
+        for n in nums:
+            if 1000 <= n <= 9999:
+                vcpu = n // 1000
+                ram = n % 1000
+                if ram >= 100:
+                    ram = ram // 10  # 006 -> 6
+                if 1 <= vcpu <= 32 and 1 <= ram <= 128:
+                    result['vcpus'] = vcpu
+                    result['cpu_cores'] = vcpu
+                    result['ram_mb'] = ram * 1024
+                    result['memory_mb'] = ram * 1024
+                    return result
+        # Third: pair of small numbers (e.g. 2, 8)
+        if len(nums) >= 2:
+            last = nums[-1]
+            prev = nums[-2]
+            if last <= 32 and prev <= 32:
+                result['vcpus'] = prev
+                result['cpu_cores'] = prev
+                result['ram_mb'] = last * 1024
+                result['memory_mb'] = last * 1024
+            elif last <= 128 and prev <= 64:
+                result['vcpus'] = min(prev, last)
+                result['cpu_cores'] = min(prev, last)
+                result['ram_mb'] = max(prev, last) * 1024
+                result['memory_mb'] = max(prev, last) * 1024
+        elif len(nums) == 1:
+            n = nums[0]
+            if 2 <= n <= 32:
+                # Single number - could be vCPU or RAM; assume vCPU if small
+                result['vcpus'] = n
+                result['cpu_cores'] = n
+            elif 100 <= n <= 999:
+                # e.g. 206 -> 2 vCPU, 6 GB
+                vcpu = n // 100
+                ram = n % 100
+                if 1 <= vcpu <= 32 and 1 <= ram <= 128:
+                    result['vcpus'] = vcpu
+                    result['cpu_cores'] = vcpu
+                    result['ram_mb'] = ram * 1024
+                    result['memory_mb'] = ram * 1024
+            elif 1000 <= n <= 9999:
+                # e.g. 2006 -> 2 vCPU, 6 GB
+                vcpu = n // 1000
+                ram = n % 1000
+                if ram >= 100:
+                    ram = ram // 10  # 006 -> 6
+                if 1 <= vcpu <= 32 and 1 <= ram <= 128:
+                    result['vcpus'] = vcpu
+                    result['cpu_cores'] = vcpu
+                    result['ram_mb'] = ram * 1024
+                    result['memory_mb'] = ram * 1024
+        return result
+
+    def _is_s3_api_operation(self, resource_id: str, consumption: Dict[str, Any]) -> bool:
+        """Check if consumption record is an S3 API operation (not a real resource)."""
+        rid = str(resource_id).lower()
+        rname = str(consumption.get('resource_name', '')).lower()
+        servname = str(consumption.get('servname', '')).lower()
+        # Must be object storage / S3 related
+        if not any(x in servname for x in ['object storage', 's3', 's3e']):
+            return False
+        # API operation patterns (List*, Get*, Put*, Delete*, Head*, etc.)
+        op_suffixes = ('operation', 'request', 'list', 'get', 'put', 'delete', 'head', 'copy', 'post')
+        return rid.endswith(op_suffixes) or any(rid.startswith(p) for p in ('list', 'get', 'put', 'delete', 'head'))
+    
     def _process_resources(self, resources: Dict[str, List[Dict[str, Any]]], 
                           account_billing: Dict[str, Any]) -> List:
         """Phase 3: Process resources into unified format - BILLING-FIRST approach"""
@@ -280,24 +395,37 @@ class CloudRuProviderPlugin(ProviderPlugin):
         billing_data = {}
         billing_resources_by_type = {}  # Group by resource type for processing
         try:
-            billing_response = self.client.get_billing_data(days=7)  # Get last 7 days for current costs
+            # Use 1 calendar day (yesterday) for daily cost - matches console totals
+            billing_response = self.client.get_billing_data(days=1)
             if billing_response and isinstance(billing_response, dict):
                 # Cloud.ru API returns: { "consumptions": [...] }
                 consumptions = billing_response.get('consumptions', [])
                 self.logger.info(f"Processing {len(consumptions)} consumption records from billing API")
                 
                 # Group consumption by resource_id and calculate daily costs
+                s3_aggregate_cost = 0.0  # Aggregate S3 API operations into one resource
+                s3_consumptions = []
                 for consumption in consumptions:
-                    # Extract resource identifier
-                    resource_id = consumption.get('resource_id') or consumption.get('id') or consumption.get('resource_name')
+                    # Extract resource identifier (support both organization API and BFF formats)
+                    # BFF/console: instance_id for VMs, organization API: resource_id
+                    resource_id = (consumption.get('resource_id') or consumption.get('instance_id') or
+                                  consumption.get('id') or consumption.get('resource_name'))
                     if not resource_id:
+                        continue
+                    resource_id = str(resource_id)
+                    # S3/object storage API operations (ListAllMyBucketsOperation, GetObject, etc.)
+                    # - aggregate into one "Object Storage" resource instead of one per operation
+                    if self._is_s3_api_operation(resource_id, consumption):
+                        cost = consumption.get('amount_nds') or consumption.get('amount') or consumption.get('cost') or consumption.get('price', 0)
+                        s3_aggregate_cost += float(cost) if cost else 0.0
+                        s3_consumptions.append(consumption)
                         continue
                     
                     # Map to resource type based on service name/SKU
                     resource_type = self._map_consumption_to_resource_type(consumption)
                     
-                    # Extract cost information
-                    cost = consumption.get('cost') or consumption.get('amount') or consumption.get('price', 0)
+                    # Extract cost: amount_nds = with VAT (НДС, matches console "включая НДС")
+                    cost = consumption.get('amount_nds') or consumption.get('amount') or consumption.get('cost') or consumption.get('price', 0)
                     daily_cost = float(cost) if cost else 0.0
                     
                     # Aggregate costs per resource
@@ -309,18 +437,40 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'consumptions': [],
                             'resource_type': resource_type,
                             'servname': consumption.get('servname', ''),
-                            'sku': consumption.get('sku', ''),
+                            'sku': consumption.get('sku') or consumption.get('sku_name', ''),
+                            'sku_name': consumption.get('sku_name', ''),
                             'resource_name': consumption.get('resource_name', ''),
                             'platform': consumption.get('platform', '')
                         }
                     
                     billing_data[resource_id]['daily_cost'] += daily_cost
                     billing_data[resource_id]['consumptions'].append(consumption)
+                    # Prefer resource_name from consumption when we have it (org API provides it)
+                    if consumption.get('resource_name') and not billing_data[resource_id].get('resource_name'):
+                        billing_data[resource_id]['resource_name'] = consumption.get('resource_name', '')
                     
                     # Group by resource type for processing
                     if resource_type not in billing_resources_by_type:
                         billing_resources_by_type[resource_type] = {}
                     billing_resources_by_type[resource_type][resource_id] = billing_data[resource_id]
+                
+                # Add aggregated S3/object storage as single resource (if any)
+                if s3_aggregate_cost > 0:
+                    s3_resource_id = 'object-storage-aggregate'
+                    billing_data[s3_resource_id] = {
+                        'daily_cost': s3_aggregate_cost,
+                        'monthly_cost': s3_aggregate_cost * 30.0,
+                        'currency': 'RUB',
+                        'consumptions': s3_consumptions,
+                        'resource_type': 's3',
+                        'servname': 'Object Storage',
+                        'sku': '',
+                        'resource_name': 'Object Storage',
+                        'platform': s3_consumptions[0].get('platform', '') if s3_consumptions else ''
+                    }
+                    if 's3' not in billing_resources_by_type:
+                        billing_resources_by_type['s3'] = {}
+                    billing_resources_by_type['s3'][s3_resource_id] = billing_data[s3_resource_id]
                 
                 # Calculate monthly costs (daily * 30)
                 for resource_id, cost_data in billing_data.items():
@@ -892,7 +1042,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
         """
         from app.providers.resource_registry import ProviderResource
         
-        resource_name = billing_info.get('resource_name') or billing_info.get('servname', '') or f"Resource-{resource_id[:8]}"
+        resource_name = (billing_info.get('resource_name') or billing_info.get('servname', '') or
+                        f"{resource_type.title()}-{resource_id[:8]}")
         daily_cost = billing_info.get('daily_cost', 0.0)
         monthly_cost = billing_info.get('monthly_cost', daily_cost * 30.0)
         
@@ -917,15 +1068,23 @@ class CloudRuProviderPlugin(ProviderPlugin):
         service_name = service_name_map.get(resource_type, 'Other')
         
         # Store full billing info in provider_config
+        sku = billing_info.get('sku', '')
         provider_config = {
             'resource_id': resource_id,
             'resource_name': resource_name,
             'servname': billing_info.get('servname', ''),
-            'sku': billing_info.get('sku', ''),
+            'sku': sku,
+            'sku_name': billing_info.get('sku_name', ''),
             'platform': billing_info.get('platform', ''),
             'billing_source': 'consumption_api',
             'consumptions': billing_info.get('consumptions', [])
         }
+        # Parse SKU for VM/volume specs (vCPU, RAM, disk) for tile display
+        sku_for_parse = sku or billing_info.get('sku_name', '')
+        if sku_for_parse and resource_type == 'server':
+            parsed = self._parse_sku_specs(sku_for_parse)
+            if parsed:
+                provider_config.update(parsed)
         
         return ProviderResource(
             resource_id=resource_id,

@@ -77,11 +77,12 @@ const providers = {
     },
     'cloud-ru': {
         name: 'Cloud.ru',
-        description: 'Cloud.ru (Облако.ру) — российская облачная платформа. Требуется сервисный аккаунт (Key ID и Key Secret) и Project ID из URL консоли Cloud.ru (раздел Биллинг → Потребление, параметр projectId в адресной строке).',
+        description: 'Cloud.ru — Key ID, Key Secret, Project ID. Agreement ID — для полного расчёта затрат (Контроль затрат → Договор в консоли).',
         fields: [
             { name: 'api_key', label: 'Key ID (Key ID) *', type: 'text', placeholder: 'Ваш Key ID из ключа доступа', required: true },
             { name: 'api_secret', label: 'Key Secret (Secret) *', type: 'password', placeholder: '••••••••', required: true },
-            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'UUID проекта из консоли Cloud.ru (projectId в URL)', required: true }
+            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'UUID проекта (projectId в URL)', required: true },
+            { name: 'agreement_id', label: 'Agreement ID (опционально)', type: 'text', placeholder: 'UUID договора (agreementId в URL, Контроль затрат → Договор)', required: false }
         ]
     }
 };
@@ -606,6 +607,11 @@ function fillEditForm(connectionData) {
         const projectIdField = document.querySelector('input[name="project_id"]');
         if (projectIdField) {
             projectIdField.value = connectionData.project_id || '';
+        }
+        
+        const agreementIdField = document.querySelector('input[name="agreement_id"]');
+        if (agreementIdField) {
+            agreementIdField.value = connectionData.agreement_id || '';
         }
     }
     

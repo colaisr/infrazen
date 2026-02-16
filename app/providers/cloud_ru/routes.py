@@ -81,6 +81,7 @@ def add_connection():
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
         project_id = (request.form.get('project_id') or '').strip()
+        agreement_id = (request.form.get('agreement_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
@@ -93,12 +94,19 @@ def add_connection():
         credentials = {'api_key': api_key, 'api_secret': api_secret}
         if project_id:
             credentials['project_id'] = project_id
+        if agreement_id:
+            credentials['agreement_id'] = agreement_id
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         
         if not test_result.get('success'):
             flash(f'Connection test failed: {test_result.get("message", "Unknown error")}', 'error')
             return redirect(url_for('main.connections'))
+        
+        # Use agreement_id: form > auto-discovered from connection test
+        aid = agreement_id or test_result.get('account_info', {}).get('agreement_id')
+        if aid:
+            credentials['agreement_id'] = aid
         
         # Get current organization
         org_id = get_current_organization_id()
@@ -181,6 +189,7 @@ def edit_connection(provider_id):
                 'api_key': credentials.get('api_key', ''),
                 'api_secret': credentials.get('api_secret', ''),
                 'project_id': credentials.get('project_id', ''),
+                'agreement_id': credentials.get('agreement_id', ''),
                 'auto_sync': provider.auto_sync,
                 'sync_interval': provider.sync_interval
             }
@@ -227,6 +236,7 @@ def update_connection(provider_id):
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
         project_id = (request.form.get('project_id') or '').strip()
+        agreement_id = (request.form.get('agreement_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
@@ -254,6 +264,11 @@ def update_connection(provider_id):
             credentials['project_id'] = project_id
         elif existing_credentials.get('project_id'):
             credentials['project_id'] = existing_credentials['project_id']
+        # agreement_id: form > existing > auto-discovered from test
+        if agreement_id:
+            credentials['agreement_id'] = agreement_id
+        elif existing_credentials.get('agreement_id'):
+            credentials['agreement_id'] = existing_credentials['agreement_id']
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         
@@ -262,6 +277,11 @@ def update_connection(provider_id):
                 'success': False,
                 'message': f'Connection test failed: {test_result.get("message", "Unknown error")}'
             }), 400
+        
+        # Use agreement_id: form > auto-discovered from test > existing (from prior sync)
+        aid = agreement_id or test_result.get('account_info', {}).get('agreement_id') or existing_credentials.get('agreement_id')
+        if aid:
+            credentials['agreement_id'] = aid
         
         # Update provider
         provider.connection_name = connection_name

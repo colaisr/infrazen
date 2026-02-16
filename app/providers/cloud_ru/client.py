@@ -111,6 +111,11 @@ class CloudRuClient:
                         if customer_id:
                             self.customer_id = customer_id
                             self.logger.info(f"Extracted customer_id from token: {customer_id}")
+                        agreement_id = (token_payload.get('agreement_id') or token_payload.get('agreementId') or
+                                        token_payload.get('agreement') or token_payload.get('contract_id'))
+                        if agreement_id:
+                            self.agreement_id = str(agreement_id)
+                            self.logger.info(f"Extracted agreement_id from token: {self.agreement_id}")
                 except Exception as e:
                     self.logger.debug(f"Could not extract project_id from token: {e}")
                 
@@ -209,6 +214,13 @@ class CloudRuClient:
                     self.logger.debug(f"Account endpoint {endpoint} not available: {str(e)}")
                     continue
             
+            # Try to auto-discover agreement_id (for full contract billing)
+            discovered_agreement_id = self.discover_agreement_id()
+            if discovered_agreement_id:
+                account_info = account_info or {}
+                account_info['agreement_id'] = discovered_agreement_id
+                self.logger.info(f"Auto-discovered agreement_id during connection test")
+            
             # If we got a token, connection is successful even without account info
             if access_token:
                 return {
@@ -276,6 +288,186 @@ class CloudRuClient:
         except Exception as e:
             self.logger.error(f"Failed to get account info: {str(e)}")
             return None
+    
+    def _extract_agreement_id_from_response(self, data: Any, _depth: int = 0) -> Optional[str]:
+        """
+        Recursively search for agreement_id in API response (consumption, projects, etc).
+        Handles nested dicts, lists, and common field names.
+        """
+        if _depth > 10:
+            return None
+        if isinstance(data, dict):
+            for key in ('agreement_id', 'agreementId'):
+                v = data.get(key)
+                if v and isinstance(v, str) and len(v) > 10:
+                    return v
+            ag = data.get('agreement')
+            if isinstance(ag, dict):
+                aid = ag.get('id') or ag.get('agreement_id') or ag.get('agreementId')
+                if aid:
+                    return str(aid)
+            for v in data.values():
+                found = self._extract_agreement_id_from_response(v, _depth + 1)
+                if found:
+                    return found
+        elif isinstance(data, list):
+            for item in data[:50]:  # Limit search
+                found = self._extract_agreement_id_from_response(item, _depth + 1)
+                if found:
+                    return found
+        return None
+
+    def discover_agreement_id(self) -> Optional[str]:
+        """
+        Discover agreement_id via API - no manual input. Tries (in order):
+        1. Consumption API with project_ids - extract agreement_id from response (same auth as billing)
+        2. JWT token (user tokens may include it; service accounts often do not)
+        3. BFF Console API (requires user/session auth; 403 for service accounts)
+        4. Organization API (agreements, projects - may return 403 for service accounts)
+        """
+        if not self._ensure_authenticated():
+            return None
+        if not self.customer_id:
+            self.logger.debug("No customer_id in JWT - attempting project-based discovery")
+
+        # 1. Consumption-first: fetch with project_ids, extract agreement_id from response.
+        # Same auth as billing - most reliable path when BFF/org API return 403.
+        project_ids = []
+        if self.project_id:
+            project_ids = [self.project_id]
+        elif self.account_id:
+            project_ids = [self.account_id]
+        else:
+            projects = self.get_projects()
+            for p in projects:
+                pid = (p.get('id') or p.get('project_id') or p.get('projectId')) if isinstance(p, dict) else None
+                if pid:
+                    project_ids.append(pid)
+        if project_ids:
+            try:
+                from datetime import date, timedelta, datetime, time
+                end_day = date.today() - timedelta(days=1)
+                start_dt = datetime.combine(end_day, time(0, 0, 0))
+                end_dt = datetime.combine(end_day, time(23, 59, 59))
+                url = f"{self.BILLING_URL}/v1/consumption"
+                params = {
+                    'start_date': start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    'end_date': end_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    'page_filter.page': 1,
+                    'page_filter.limit': 10,
+                    'project_ids': project_ids[:1],
+                }
+                r = self.session.get(url, params=params, timeout=30)
+                if r.status_code == 200:
+                    data = r.json()
+                    aid = self._extract_agreement_id_from_response(data)
+                    if aid:
+                        self.logger.info(f"Discovered agreement_id via consumption response: {aid}")
+                        return aid
+            except Exception as e:
+                self.logger.debug(f"discover_agreement_id consumption-first: {e}")
+        # Try BFF Console: customers/{customer_id}/agreements (when customer_id in JWT)
+        if self.customer_id:
+            endpoints = [
+                f"https://advanced.cloud.ru/u-api/bff-console/v1/customers/{self.customer_id}/agreements",
+                f"https://console.cloud.ru/u-api/bff-console/v1/customers/{self.customer_id}/agreements",
+            ]
+            for url in endpoints:
+                try:
+                    r = self.session.get(url, timeout=15)
+                    if r.status_code == 200:
+                        data = r.json()
+                        agreements = data if isinstance(data, list) else (data.get('agreements') or data.get('items') or [])
+                        if agreements and isinstance(agreements, list):
+                            first = agreements[0] if isinstance(agreements[0], dict) else None
+                            aid = first.get('id') or first.get('agreement_id') or first.get('agreementId') if first else None
+                            if aid:
+                                self.logger.info(f"Discovered agreement_id via customers/agreements: {aid}")
+                                return aid
+                except Exception as e:
+                    self.logger.debug(f"discover_agreement_id {url}: {e}")
+        # Try BFF: simple-projects - may include agreement_id per project (works with customer_id)
+        if self.customer_id:
+            for base in ["https://advanced.cloud.ru", "https://console.cloud.ru"]:
+                try:
+                    url = f"{base}/u-api/bff-console/v1/simple-projects?customerId={self.customer_id}"
+                    r = self.session.get(url, timeout=15)
+                    if r.status_code == 200:
+                        data = r.json()
+                        projects = data if isinstance(data, list) else (data.get('projects') or data.get('items') or [])
+                        if projects and isinstance(projects, list):
+                            for p in projects:
+                                if isinstance(p, dict):
+                                    aid = p.get('agreement_id') or p.get('agreementId') or p.get('agreement', {}).get('id') if isinstance(p.get('agreement'), dict) else None
+                                    if aid:
+                                        self.logger.info(f"Discovered agreement_id via simple-projects: {aid}")
+                                        return aid
+                except Exception as e:
+                    self.logger.debug(f"discover_agreement_id simple-projects: {e}")
+        # Try BFF: project/{project_id} - may return agreement for the project
+        if self.project_id:
+            for base in ["https://advanced.cloud.ru", "https://console.cloud.ru"]:
+                try:
+                    url = f"{base}/u-api/bff-console/v1/project/{self.project_id}"
+                    r = self.session.get(url, timeout=15)
+                    if r.status_code == 200:
+                        data = r.json()
+                        if isinstance(data, dict):
+                            aid = data.get('agreement_id') or data.get('agreementId') or (data.get('agreement', {}).get('id') if isinstance(data.get('agreement'), dict) else None)
+                            if aid:
+                                self.logger.info(f"Discovered agreement_id via project/{self.project_id}: {aid}")
+                                return aid
+                except Exception as e:
+                    self.logger.debug(f"discover_agreement_id project: {e}")
+        # Try organization API: agreements/projects endpoints (same auth as consumption)
+        for path in ["/v1/agreements", "/v1/customers/agreements", "/v1/me", "/v1/me/agreements"]:
+            try:
+                url = f"{self.BILLING_URL}{path}"
+                r = self.session.get(url, timeout=15)
+                if r.status_code == 200:
+                    data = r.json()
+                    agreements = data if isinstance(data, list) else (data.get('agreements') or data.get('items') or [])
+                    if agreements and isinstance(agreements, list):
+                        first = agreements[0] if isinstance(agreements[0], dict) else None
+                        aid = first.get('id') or first.get('agreement_id') or first.get('agreementId') if first else None
+                        if aid:
+                            self.logger.info(f"Discovered agreement_id via organization API {path}: {aid}")
+                            return aid
+                    if isinstance(data, dict):
+                        aid = data.get('agreement_id') or data.get('agreementId') or data.get('agreement')
+                        if aid:
+                            self.logger.info(f"Discovered agreement_id via organization API {path}: {aid}")
+                            return str(aid) if not isinstance(aid, dict) else aid.get('id') or aid.get('agreement_id')
+            except Exception as e:
+                self.logger.debug(f"discover_agreement_id org API {path}: {e}")
+        # Try organization API: projects list (may include agreement_id per project)
+        try:
+            url = f"{self.BILLING_URL}/v1/projects"
+            r = self.session.get(url, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                aid = self._extract_agreement_id_from_response(data)
+                if aid:
+                    self.logger.info(f"Discovered agreement_id via organization API /v1/projects: {aid}")
+                    return aid
+        except Exception as e:
+            self.logger.debug(f"discover_agreement_id org API /v1/projects: {e}")
+        # Try organization API: project detail (may include agreement_id)
+        if self.project_id:
+            for path in [f"/v1/projects/{self.project_id}", f"/v1/project/{self.project_id}"]:
+                try:
+                    url = f"{self.BILLING_URL}{path}"
+                    r = self.session.get(url, timeout=15)
+                    if r.status_code == 200:
+                        data = r.json()
+                        if isinstance(data, dict):
+                            aid = data.get('agreement_id') or data.get('agreementId') or (data.get('agreement', {}).get('id') if isinstance(data.get('agreement'), dict) else None)
+                            if aid:
+                                self.logger.info(f"Discovered agreement_id via project/{self.project_id}: {aid}")
+                                return aid
+                except Exception as e:
+                    self.logger.debug(f"discover_agreement_id project API: {e}")
+        return None
     
     def _ensure_authenticated(self) -> bool:
         """Ensure we have a valid access token"""
@@ -579,13 +771,17 @@ class CloudRuClient:
             # Based on docs: https://cloud.ru/docs/billing/ug/topics/api-ref
             # Endpoint: GET /v1/consumption
             # Base URL: https://organization.api.cloud.ru
-            from datetime import datetime, timedelta
+            from datetime import datetime, timedelta, date, time
             
             endpoint = f"{self.BILLING_URL}/v1/consumption"
             
-            # Calculate date range (last N days, default 30)
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
+            # Use calendar-day boundaries (not rolling 24h) to match console totals.
+            # Rolling window (now - 1 day to now) spans 2 calendar days and inflates cost.
+            # Console uses single day: 2026-02-15 00:00 - 23:59 -> 140,233 ₽
+            end_day = date.today() - timedelta(days=1)  # Yesterday (most recent complete day)
+            start_day = end_day - timedelta(days=days - 1)
+            start_date = datetime.combine(start_day, time(0, 0, 0))
+            end_date = datetime.combine(end_day, time(23, 59, 59))
             
             # Format dates as ISO 8601 (required by API)
             params = {
@@ -595,21 +791,31 @@ class CloudRuClient:
                 'page_filter.limit': 10000  # Max recommended limit
             }
             
-            # User provides Key ID + Secret only. We get project_ids from token or get_projects().
-            project_ids = []
-            if self.project_id:
-                project_ids = [self.project_id]
+            # Prefer agreement_id for full contract view (all projects, matches console "Проекты: Все")
+            # Try to discover agreement_id automatically if not set
+            agreement_id = self.agreement_id
+            if not agreement_id:
+                agreement_id = self.discover_agreement_id()
+                if agreement_id:
+                    self.agreement_id = agreement_id  # Cache for subsequent calls
+            if agreement_id:
+                params['agreement_id'] = agreement_id
+                self.logger.info(f"Using agreement_id {agreement_id} for billing API (full contract)")
             else:
-                projects = self.get_projects()
-                for p in projects:
-                    pid = p.get('id') or p.get('project_id') or p.get('projectId')
-                    if pid:
-                        project_ids.append(pid)
-            if project_ids:
-                params['project_ids'] = project_ids
-                self.logger.info(f"Using {len(project_ids)} project(s) for billing API")
-            else:
-                self.logger.warning("No project_ids available for billing API")
+                project_ids = []
+                if self.project_id:
+                    project_ids = [self.project_id]
+                else:
+                    projects = self.get_projects()
+                    for p in projects:
+                        pid = p.get('id') or p.get('project_id') or p.get('projectId')
+                        if pid:
+                            project_ids.append(pid)
+                if project_ids:
+                    params['project_ids'] = project_ids
+                    self.logger.info(f"Using {len(project_ids)} project(s) for billing API")
+                else:
+                    self.logger.warning("No agreement_id or project_ids available for billing API")
             
             try:
                 self.logger.info(f"Fetching billing data from {endpoint} for {days} days")
@@ -632,6 +838,30 @@ class CloudRuClient:
                         self.logger.warning(f"Response data keys: {list(data.keys())}")
                         import json as json_lib
                         self.logger.debug(f"Full response: {json_lib.dumps(data, indent=2)[:1000]}")
+                    
+                    # If we used project_ids and got data, extract agreement_id from response and retry for full contract
+                    if not params.get('agreement_id') and consumptions:
+                        aid = self._extract_agreement_id_from_response(data)
+                        if aid:
+                            self.agreement_id = aid
+                            self.logger.info(f"Extracted agreement_id from consumption response: {aid}")
+                            retry_params = {
+                                'start_date': params['start_date'],
+                                'end_date': params['end_date'],
+                                'page_filter.page': 1,
+                                'page_filter.limit': params.get('page_filter.limit', 10000),
+                                'agreement_id': aid
+                            }
+                            self.logger.info(f"Retrying with agreement_id for full contract view")
+                            r2 = self.session.get(endpoint, params=retry_params, timeout=60)
+                            if r2.status_code == 200:
+                                data = r2.json()
+                                consumptions = data.get('consumptions', [])
+                                self.logger.info(f"Full contract: {len(consumptions)} consumption records")
+                                return data
+                        else:
+                            self.logger.info("No agreement_id in consumption response - using project-scoped data. First record keys: %s",
+                                            list(consumptions[0].keys())[:15] if consumptions else [])
                     
                     return data
                 elif response.status_code == 401:
