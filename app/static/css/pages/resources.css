@@ -129,6 +129,11 @@
     color: var(--text-secondary);
 }
 
+.provider-sync .sync-error-hint {
+    color: var(--error-red, #dc2626);
+    font-weight: 500;
+}
+
 .provider-right {
     display: flex;
     align-items: center;

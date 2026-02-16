@@ -220,7 +220,8 @@ def connections():
                 'provider_metadata': provider.provider_metadata,
                 'total_daily_cost': round(total_daily_cost, 2),
                 'total_monthly_cost': round(total_monthly_cost, 2),
-                'last_snapshot_resources': last_snapshot_resources,
+                # Use actual stored count when available; snapshot count when processing may have failed
+                'last_snapshot_resources': resource_count if resource_count > 0 else last_snapshot_resources,
                 'resource_count': resource_count,
                 'sync_interval': provider.sync_interval,
                 'details': {
@@ -290,7 +291,8 @@ def connections():
                 'provider_metadata': provider.provider_metadata,  # Add this line
                 'total_daily_cost': round(total_daily_cost, 2),
                 'total_monthly_cost': round(total_monthly_cost, 2),
-                'last_snapshot_resources': last_snapshot_resources,  # Add resource count from last snapshot
+                # Use actual stored resource count (what Resources page shows); snapshot count can be higher when processing fails
+                'last_snapshot_resources': resource_count if resource_count > 0 else last_snapshot_resources,
                 'details': {
                     'connection_name': provider.connection_name,
                     'account_id': provider.account_id,
@@ -890,6 +892,7 @@ def get_real_user_resources(user_id):
 def get_real_user_providers(user_id):
     """Get providers for a real user from database using unified models"""
     from app.core.organization_context import get_current_organization_id
+    from app.core.models.sync import SyncSnapshot
     
     # Get current organization ID
     org_id = get_current_organization_id()
@@ -903,20 +906,39 @@ def get_real_user_providers(user_id):
         user_id_int = int(float(user_id))
         providers = CloudProvider.query.filter_by(is_deleted=False, user_id=user_id_int).all()
     
-    return [{
-        'id': provider.id,  # Use the actual database ID
-        'provider_type': provider.provider_type,
-        'connection_name': provider.connection_name,
-        'code': provider.provider_type,
-        'name': provider.provider_type.title(),
-        'status': 'connected' if provider.is_active else 'disconnected',
-        'added_at': provider.created_at.isoformat() if provider.created_at else '2024-01-01',
-        'details': {
+    result = []
+    for provider in providers:
+        # Use the latest successful snapshot's completion time for "last snapshot" display
+        # (more accurate than provider.last_sync - matches the resources shown)
+        latest_snapshot = SyncSnapshot.query.filter(
+            SyncSnapshot.provider_id == provider.id,
+            SyncSnapshot.sync_status == 'success',
+            SyncSnapshot.sync_completed_at.isnot(None)
+        ).order_by(SyncSnapshot.sync_completed_at.desc()).first()
+        
+        last_sync_display = None
+        if latest_snapshot and latest_snapshot.sync_completed_at:
+            last_sync_display = latest_snapshot.sync_completed_at.isoformat()
+        elif provider.last_sync:
+            last_sync_display = provider.last_sync.isoformat()
+        
+        result.append({
+            'id': provider.id,  # Use the actual database ID
+            'provider_type': provider.provider_type,
             'connection_name': provider.connection_name,
-            'account_id': provider.account_id,
-            'last_sync': provider.last_sync.isoformat() if provider.last_sync else None
-        }
-    } for provider in providers]
+            'code': provider.provider_type,
+            'name': provider.provider_type.title(),
+            'status': 'connected' if provider.is_active else 'disconnected',
+            'added_at': provider.created_at.isoformat() if provider.created_at else '2024-01-01',
+            'details': {
+                'connection_name': provider.connection_name,
+                'account_id': provider.account_id,
+                'last_sync': last_sync_display,
+                'sync_error': provider.sync_error,
+                'sync_status': provider.sync_status
+            }
+        })
+    return result
 
 def get_latest_snapshot_metadata(user_id):
     """Get the latest snapshot metadata for performance data"""

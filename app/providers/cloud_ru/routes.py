@@ -1,6 +1,7 @@
 """
 Cloud.ru provider routes
 """
+import threading
 from flask import Blueprint, request, jsonify, session, redirect, url_for, flash
 from app.core.database import db
 from app.core.models.provider import CloudProvider
@@ -357,7 +358,9 @@ def delete_connection(provider_id):
 
 @cloud_ru_bp.route('/<int:provider_id>/sync', methods=['POST'])
 def sync_connection(provider_id):
-    """Manually trigger resource synchronization for Cloud.ru"""
+    """Manually trigger resource synchronization for Cloud.ru.
+    Runs in background to avoid HTTP timeout when syncing 2500+ resources (~15s).
+    """
     try:
         if 'user' not in session:
             return jsonify({'success': False, 'message': 'Authentication required'}), 401
@@ -383,27 +386,31 @@ def sync_connection(provider_id):
         if not provider:
             return jsonify({'success': False, 'message': 'Provider not found'}), 404
         
-        # Use sync orchestrator (will be implemented in Phase 2)
         from app.providers import sync_orchestrator
-        
-        sync_result = sync_orchestrator.sync_provider(provider_id, sync_type='manual')
-        
-        if sync_result.get('success'):
-            return jsonify({
-                'success': True,
-                'message': sync_result.get('message'),
-                'resources_synced': sync_result.get('resources_synced', 0),
-                'total_daily_cost': sync_result.get('total_cost', 0),
-                'total_monthly_cost': sync_result.get('total_cost', 0) * 30
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': sync_result.get('error', 'Sync failed')
-            }), 500
+        from app import create_app
+
+        def background_sync():
+            app = create_app()
+            with app.app_context():
+                try:
+                    sync_orchestrator.sync_provider(provider_id, sync_type='manual')
+                except Exception as e:
+                    logger.error(f"Background Cloud.ru sync failed for provider {provider_id}: {e}", exc_info=True)
+
+        thread = threading.Thread(target=background_sync, daemon=True)
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'message': 'Синхронизация запущена в фоне. Обновите страницу через 15–30 секунд.',
+            'resources_synced': 0,
+            'total_daily_cost': 0,
+            'total_monthly_cost': 0,
+            'background': True,
+        })
             
     except Exception as e:
-        logger.error(f"Error syncing Cloud.ru resources for provider {provider_id}: {str(e)}")
+        logger.error(f"Error starting Cloud.ru sync for provider {provider_id}: {str(e)}")
         return jsonify({
             'success': False,
             'message': f'Error syncing resources: {str(e)}'

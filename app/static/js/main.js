@@ -189,6 +189,20 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
     })
     .then(data => {
         if (data.success) {
+            // Cloud.ru runs in background to avoid timeout with 2500+ resources
+            if (data.background) {
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span style="margin-left: 0.5rem;">Синхронизация в фоне...</span>';
+                showFlashMessage(data.message || 'Синхронизация запущена. Обновите страницу через 15–30 сек.', 'success');
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.classList.remove('loading');
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                    button.style.borderColor = '';
+                    button.style.color = originalColor;
+                }, 2000);
+                return;
+            }
             // Check if this was a partial sync (OpenStack auth failed)
             const isPartialSync = data.openstack_auth_ok === false || (data.message && data.message.includes('⚠️'));
             

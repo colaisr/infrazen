@@ -287,6 +287,16 @@ class CloudRuProviderPlugin(ProviderPlugin):
         if any(x in servname for x in ['object storage', 's3']):
             return 's3'
         
+        # Event/audit logging, recording services (often S3/object-storage related)
+        if any(x in servname for x in ['запис', 'событ', 'действ', 'event', 'audit', 'логирован']):
+            return 's3'
+        
+        # Check resource_name for volume/disk patterns (ext4, data- prefix, empty)
+        if any(x in resource_name for x in ['ext4', 'ext3', 'xfs', '-empty-', 'data-']):
+            return 'volume'
+        if 'disk' in resource_name or 'volume' in resource_name:
+            return 'volume'
+        
         # Default to unknown - will be handled as generic resource
         return 'unknown'
     
@@ -373,6 +383,34 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     result['ram_mb'] = ram * 1024
                     result['memory_mb'] = ram * 1024
         return result
+
+    def _parse_volume_size_from_consumption(self, billing_info: Dict[str, Any]) -> Optional[float]:
+        """
+        Extract volume size (GB) from billing/consumption data for tile display.
+        Checks: consumptions[].quantity, consumptions[].consumption_amount, sku patterns.
+        """
+        consumptions = billing_info.get('consumptions', [])
+        for c in consumptions:
+            qty = c.get('quantity') or c.get('consumption_amount') or c.get('amount')
+            if qty is not None:
+                try:
+                    v = float(qty)
+                    if 1 <= v <= 100000:  # Reasonable GB range
+                        return round(v, 1)
+                except (TypeError, ValueError):
+                    pass
+        sku = (billing_info.get('sku') or billing_info.get('sku_name') or '').upper()
+        if sku:
+            # Try patterns like "20GB", "HD1MS0" (1 = 1GB?), numbers in sku
+            m = re.search(r'(\d+)\s*GB', sku, re.I)
+            if m:
+                return float(m.group(1))
+            nums = re.findall(r'\d+', sku)
+            for n in nums:
+                v = int(n)
+                if 1 <= v <= 10000:
+                    return float(v)
+        return None
 
     def _is_s3_api_operation(self, resource_id: str, consumption: Dict[str, Any]) -> bool:
         """Check if consumption record is an S3 API operation (not a real resource)."""
@@ -659,18 +697,18 @@ class CloudRuProviderPlugin(ProviderPlugin):
         
         resource_name = vm_data.get('name') or f"VM-{resource_id[:8]}"
         
-        # Map Cloud.ru state to unified status
+        # Map Cloud.ru state to unified status (RUNNING/STOPPED for template display)
         cloud_ru_state = vm_data.get('state', '').lower()
         status_mapping = {
-            'active': 'active',
-            'running': 'active',
-            'stopped': 'stopped',
-            'paused': 'paused',
-            'suspended': 'suspended',
-            'error': 'error',
-            'deleted': 'deleted'
+            'active': 'RUNNING',
+            'running': 'RUNNING',
+            'stopped': 'STOPPED',
+            'paused': 'STOPPED',
+            'suspended': 'STOPPED',
+            'error': 'STOPPED',
+            'deleted': 'STOPPED'
         }
-        status = status_mapping.get(cloud_ru_state, cloud_ru_state or 'unknown')
+        status = status_mapping.get(cloud_ru_state, cloud_ru_state.upper() if cloud_ru_state else 'RUNNING')
         
         # Get region/availability zone
         # Cloud.ru returns region as a dict with id, name, enabled
@@ -865,7 +903,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
             return None
         
         resource_name = volume_data.get('name') or f"Volume-{resource_id[:8]}"
-        status = volume_data.get('status', 'unknown')
+        raw_status = (volume_data.get('status') or 'unknown').lower()
+        status_map = {'in-use': 'RUNNING', 'in_use': 'RUNNING', 'available': 'RUNNING', 'attached': 'RUNNING'}
+        status = status_map.get(raw_status, raw_status.upper() if raw_status else 'RUNNING')
         region = volume_data.get('region') or volume_data.get('zone') or 'unknown'
         
         # Extract cost
@@ -1050,9 +1090,11 @@ class CloudRuProviderPlugin(ProviderPlugin):
         # Extract region from consumption if available
         region = 'unknown'
         if billing_info.get('consumptions'):
-            # Try to get region from first consumption record
             first_consumption = billing_info['consumptions'][0]
-            region = first_consumption.get('region') or first_consumption.get('availability_zone') or 'unknown'
+            region = (first_consumption.get('region') or first_consumption.get('availability_zone') or
+                      first_consumption.get('zone') or first_consumption.get('platform') or 'unknown')
+        if region == 'unknown' and billing_info.get('platform'):
+            region = billing_info['platform']
         
         # Map resource type to service name
         service_name_map = {
@@ -1085,6 +1127,12 @@ class CloudRuProviderPlugin(ProviderPlugin):
             parsed = self._parse_sku_specs(sku_for_parse)
             if parsed:
                 provider_config.update(parsed)
+        elif sku_for_parse and resource_type == 'volume':
+            # Extract volume size from SKU (e.g. "20GB", "100" in sku name)
+            size_gb = self._parse_volume_size_from_consumption(billing_info)
+            if size_gb:
+                provider_config['size_gb'] = size_gb
+                provider_config['storage_gb'] = size_gb
         
         return ProviderResource(
             resource_id=resource_id,
@@ -1092,7 +1140,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
             resource_type=resource_type if resource_type != 'unknown' else 'other',
             service_name=service_name,
             region=region,
-            status='active',  # Assume active if being billed
+            status='RUNNING',  # Assume running if being billed (for template display)
             effective_cost=daily_cost,
             currency=billing_info.get('currency', 'RUB'),
             billing_period='daily',

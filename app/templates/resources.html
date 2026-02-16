@@ -136,7 +136,9 @@
                         <div class="provider-type">{{ provider.provider_type|upper }}</div>
                         <div class="provider-name">{{ provider.connection_name or provider.provider_type|title }}</div>
                         <div class="provider-sync">
-                            {% if provider.details.last_sync %}
+                            {% if provider.details.sync_error %}
+                                <span class="sync-error-hint" title="{{ provider.details.sync_error }}">Не обновлено — проверьте логи и подключение</span>
+                            {% elif provider.details.last_sync %}
                                 {{ provider.details.last_sync[:10] }} в {{ provider.details.last_sync[11:16] }}
                             {% else %}
                                 Никогда
@@ -174,6 +176,8 @@
                         <i class="fa-solid fa-globe"></i>
                     {% elif resource.resource_type == 'email' %}
                         <i class="fa-solid fa-envelope"></i>
+                    {% elif resource.resource_type == 's3' or 'bucket' in (resource.resource_type or '') %}
+                        <i class="fa-solid fa-bucket" style="color: #F59E0B;"></i>
                     {% else %}
                         <i class="fa-solid fa-box"></i>
                     {% endif %}
@@ -183,7 +187,7 @@
                     <div class="resource-type">{{ resource.resource_type|upper }}</div>
                 </div>
                 <div class="resource-status">
-                    {% if resource.status == 'RUNNING' %}
+                    {% if resource.status == 'RUNNING' or resource.status == 'ACTIVE' %}
                         <span class="status-badge status-running">
                                         <i class="fa-solid fa-circle"></i> {{ resource.status }}
                         </span>
@@ -211,12 +215,16 @@
                             <div class="detail-row">
                                 <span class="detail-label">Стоимость мес.</span>
                                 <span class="detail-value" style="font-weight: 700; font-size: 1.05rem;">
-                                    {{ "{:,.1f}".format((resource.daily_cost or 0) * 30) }} ₽/месяц
+                                    {% set monthly = (resource.daily_cost or 0) * 30 %}
+                                    {% if monthly > 0 and monthly < 0.01 %}<0.01{% else %}{{ "{:,.2f}".format(monthly) }}{% endif %} ₽/месяц
                                 </span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">Стоимость день</span>
-                                <span class="detail-value">{{ "{:,.1f}".format(resource.daily_cost or 0) }} ₽/день</span>
+                                <span class="detail-value">
+                                    {% set daily = resource.daily_cost or 0 %}
+                                    {% if daily > 0 and daily < 0.01 %}<0.01{% else %}{{ "{:,.2f}".format(daily) }}{% endif %} ₽/день
+                                </span>
                             </div>
                         </div>
 
@@ -265,6 +273,17 @@
                                         <div class="spec-content">
                                             <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else config.get('storage') }} {{ 'GB' if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else '' }}</span>
                                             <span class="spec-label">HD</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if (not config.get('cpu_cores') and not config.get('vcpus')) and (config.get('sku_name') or config.get('sku')) %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon">
+                                            <i class="fa-solid fa-tag"></i>
+                                        </div>
+                                        <div class="spec-content">
+                                            <span class="spec-value" title="{{ config.get('sku_name') or config.get('sku') }}">{{ (config.get('sku_name') or config.get('sku'))[:20] }}{% if (config.get('sku_name') or config.get('sku'))|length > 20 %}…{% endif %}</span>
+                                            <span class="spec-label">SKU</span>
                                         </div>
                                     </div>
                                     {% endif %}
@@ -608,6 +627,27 @@
                                 
                                 <!-- Kubernetes clusters don't show Total Storage spec -->
                                 <!-- (worker node boot disks - not meaningful for user) -->
+                                
+                                <!-- Other/Unknown: show servname or SKU when available -->
+                                {% elif resource.resource_type in ['other', 'unknown'] %}
+                                    {% if config.get('servname') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon"><i class="fa-solid fa-tag"></i></div>
+                                        <div class="spec-content">
+                                            <span class="spec-value" title="{{ config.get('servname') }}">{{ (config.get('servname'))[:25] }}{% if config.get('servname')|length > 25 %}…{% endif %}</span>
+                                            <span class="spec-label">Сервис</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    {% if config.get('sku') or config.get('sku_name') %}
+                                    <div class="spec-item">
+                                        <div class="spec-icon"><i class="fa-solid fa-barcode"></i></div>
+                                        <div class="spec-content">
+                                            <span class="spec-value" title="{{ config.get('sku_name') or config.get('sku') }}">{{ (config.get('sku_name') or config.get('sku'))[:20] }}{% if (config.get('sku_name') or config.get('sku'))|length > 20 %}…{% endif %}</span>
+                                            <span class="spec-label">SKU</span>
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 
                                 {% endif %}
                             </div>

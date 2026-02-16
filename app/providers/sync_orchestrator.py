@@ -457,9 +457,13 @@ class SyncOrchestrator:
 
         except Exception as e:
             self.logger.error(f"Failed to process sync result: {e}")
-            if 'sync_snapshot' in locals():
-                sync_snapshot.mark_completed('error', f'Processing failed: {str(e)}')
-                db.session.commit()
+            try:
+                db.session.rollback()
+                if 'sync_snapshot' in locals():
+                    sync_snapshot.mark_completed('error', f'Processing failed: {str(e)}')
+                    db.session.commit()
+            except Exception as rollback_e:
+                self.logger.error(f"Error during rollback/cleanup: {rollback_e}")
 
             return {
                 'success': False,
@@ -493,7 +497,6 @@ class SyncOrchestrator:
                     if resource:
                         processed_count += 1
                         processed_resources.append((resource, resource_data))
-                        self.logger.info(f"Successfully processed resource: {resource_data.get('resource_name', 'unknown')}")
                     else:
                         self.logger.warning(f"Resource processing returned None for: {resource_data.get('resource_name', 'unknown')}")
 
@@ -504,15 +507,17 @@ class SyncOrchestrator:
             # Ensure all resources are flushed before creating ResourceState records
             db.session.flush()
 
-            # Create ResourceState records and finish resource processing
+            # Create ResourceState records and finish resource processing.
+            # Batch commit every 100 resources to avoid 2500+ nested savepoints
+            # which cause "maximum recursion" and "invalid savepoint" errors.
             from app.core.models.sync import ResourceState
-            for resource, resource_data in processed_resources:
+            BATCH_SIZE = 100
+            for idx, (resource, resource_data) in enumerate(processed_resources):
                 try:
                     if resource.id is None:
                         self.logger.error(f"Resource has no ID for {resource_data.get('resource_name', 'unknown')}")
                         continue
 
-                    # Use savepoint so a single ResourceState failure doesn't rollback all resources
                     savepoint = db.session.begin_nested()
                     try:
                         resource_state = ResourceState(
@@ -540,12 +545,19 @@ class SyncOrchestrator:
                             resource.add_tag(key, str(value))
 
                         db.session.flush()
-                        self.logger.info(f"Successfully created ResourceState for {resource_data.get('resource_name', 'unknown')}")
                     except Exception as inner_e:
                         savepoint.rollback()
                         self.logger.warning(f"Skipped ResourceState for {resource_data.get('resource_name', 'unknown')}: {inner_e}")
+                        continue
+
+                    if (idx + 1) % 100 == 0:
+                        self.logger.info(f"Processed {idx + 1}/{len(processed_resources)} resources for provider {provider.id}")
+
+                    # Batch commit to avoid savepoint accumulation (PostgreSQL limit)
+                    if (idx + 1) % BATCH_SIZE == 0:
+                        db.session.commit()
                 except Exception as e:
-                    self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}", exc_info=True)
+                    self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}")
                     continue
 
             self.logger.info(f"Processed {processed_count} resources for provider {provider.id}")
