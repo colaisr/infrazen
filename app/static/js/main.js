@@ -192,7 +192,7 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
             // Cloud.ru runs in background to avoid timeout with 2500+ resources
             if (data.background) {
                 button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span style="margin-left: 0.5rem;">Синхронизация в фоне...</span>';
-                showFlashMessage(data.message || 'Синхронизация запущена. Обновите страницу через 15–30 сек.', 'success');
+                showFlashMessage(data.message || 'Синхронизация запущена. Страница обновится через 25 сек.', 'success');
                 setTimeout(() => {
                     button.disabled = false;
                     button.classList.remove('loading');
@@ -201,6 +201,10 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
                     button.style.borderColor = '';
                     button.style.color = originalColor;
                 }, 2000);
+                // Auto-refresh page after background sync completes (~25 sec)
+                setTimeout(() => {
+                    location.reload();
+                }, 25000);
                 return;
             }
             // Check if this was a partial sync (OpenStack auth failed)

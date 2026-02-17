@@ -175,7 +175,8 @@ def connections():
         providers = []
         for provider in cloud_providers:
             # Get resource counts for this provider
-            resource_count = Resource.query.filter_by(provider_id=provider.id).count()
+            # Count only active resources (matches Resources page; avoids historical duplicates)
+            resource_count = Resource.query.filter_by(provider_id=provider.id, is_active=True).count()
             
             # Get resource count from last successful sync snapshot
             last_snapshot = SyncSnapshot.query.filter_by(
@@ -247,7 +248,8 @@ def connections():
         providers = []
         for provider in cloud_providers:
             # Get resource counts for this provider
-            resource_count = Resource.query.filter_by(provider_id=provider.id).count()
+            # Count only active resources (matches Resources page; avoids historical duplicates)
+            resource_count = Resource.query.filter_by(provider_id=provider.id, is_active=True).count()
             
             # Get resource count from last successful sync snapshot
             last_snapshot = SyncSnapshot.query.filter_by(

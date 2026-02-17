@@ -3684,6 +3684,80 @@ app/providers/
 - `Docs/cloud_ru_api_research.md`: API research and endpoint documentation
 - `Docs/cloud_ru_service_account_guide.md`: Service account setup guide
 
+### 13.9.10. Deployment-Centric Unification & Semantic Resource Cards (Feb 2026)
+
+This Cloud.ru integration evolved from “raw resources” into **deployment-centric cards** (similar to Yandex consolidation): we keep **total cost unchanged**, but group consumption lines into a smaller set of logical “things you deploy and delete together” (VMs, clusters, file storages, object storage, backups, etc.).
+
+#### 13.9.10.1. Core Design
+- **Billing-first source of truth**: `GET https://organization.api.cloud.ru/v1/consumption` is authoritative for costs.
+- **Grouping**: resources are **unified by a `grouping_key`** derived from billing `resource_name`/`resource_id` patterns.
+- **Cost invariants**: unified cards **sum** component costs; totals match the billing-day total.
+- **Provider config**: unified cards store semantic metadata in `provider_config`:
+  - `unified=true`
+  - `unified_display_type` (semantic display type used by UI)
+  - `grouping_key`
+  - `component_count`
+  - `components` (full list for small groups; summarized for huge groups)
+  - `components_truncated=true` + `components_sample` for large groups
+
+#### 13.9.10.2. Cloud.ru Unification Rules (implemented in `app/providers/plugins/cloud_ru.py`)
+
+**A) VM + EVS disks**
+- Billing often reports EVS volumes as separate lines named like:
+  - `vm-...-volume...` or `...-volume-0000`
+- `_extract_base_name_for_grouping()` normalizes these so disks are grouped into the VM card.
+
+**B) Kubernetes clusters from billing-only signals**
+- Cloud.ru may not expose explicit “kubernetes” resource rows in billing for nodes. Instead, nodes are ECS VMs named:
+  - `<cluster>-nodepool-...`
+- `_create_unified_resources_by_name()` infers cluster name from `-nodepool-` and groups:
+  - node VMs (`server`)
+  - node disks (`volume`)
+  - obvious cluster networking (`network`)
+  into `grouping_key = k8s:<cluster>`, displayed as `kubernetes-cluster`.
+
+**C) CCE control-plane billing**
+- Managed Kubernetes control plane is billed as “Контейнеры (CCE) …”.
+- These rows are mapped to `kubernetes` and grouped under `k8s:<resource_name>` so a cluster card can include control-plane cost.
+
+**D) Kubernetes PVC volumes**
+- PVCs appear as opaque `pvc-<uuid>` volume names.
+- These are aggregated into a single card:
+  - `grouping_key = k8s-persistent-volumes`
+  - Large component lists are **summarized** to avoid DB overflow.
+
+**E) Object Storage operations**
+- S3 API operations (List/Get/Put/etc.) are usage signals, not deployables.
+- These are aggregated into a single Object Storage resource (`object-storage-aggregate`) to remove UI noise.
+
+**F) Logging (LTS / AOM)**
+- LTS billing uses resource IDs with `*.lts.*` and often has no `resource_name`.
+- These rows are aggregated into `logging-lts-<prefix>` and typed/displayed as `logging` (service `Logging`).
+
+**G) File storage (SFS Turbo / NFS)**
+- NFS/SFS Turbo is re-typed as storage and displayed as `file-storage` (service `File Storage`).
+
+**H) Backup (CBR / vault-*)**
+- CBR usage appears as `vault-*` resource names.
+- These are typed/displayed as `backup` (service `Backup`).
+- When safe/unique, backup lines are merged into the owning VM using normalized-name matching (ignoring `vm-` and numeric tokens like `-01-`); otherwise they remain standalone backup cards.
+
+**I) KMS**
+- KMS “Default CMK” consumption lines are typed/displayed as `kms` (service `KMS`).
+
+#### 13.9.10.3. UI rendering changes (`app/templates/resources.html`)
+- UI uses `provider_config.unified_display_type` for icons/badges.
+- “Components” breakdown is shown for unified resources.
+- Large component lists are truncated (first N items + “and more”) and can show compact summaries (e.g., `volume ×813`).
+
+#### 13.9.10.4. Sync snapshot persistence hardening (`app/providers/sync_orchestrator.py`)
+- Sync snapshots no longer store full plugin payloads (`resources`) inside `sync_config` to avoid DB overflow.
+- Instead, `sync_config.plugin_data` is kept as a compact summary (`resources_count`, `billing_validation`, etc.).
+
+#### 13.9.10.5. Known limitations
+- Service-account access cannot reliably enrich relationships via Compute/VPC inventory APIs (project identifiers may be rejected by those APIs).
+- Because of this, Cloud.ru currently relies on **billing + naming conventions** for relationship inference (VM↔disk, cluster↔nodes, etc.).
+
 ## 13.10. Selectel Multi-Region & Volume Integration
 
 ### 13.9.1. Overview

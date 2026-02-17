@@ -2,9 +2,10 @@
 Cloud.ru provider plugin
 Implements Cloud.ru provider integration using the plugin architecture
 """
+import hashlib
 import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
 from ..plugin_system import ProviderPlugin, SyncResult
@@ -258,11 +259,29 @@ class CloudRuProviderPlugin(ProviderPlugin):
         # Storage/Volumes (check after VM to avoid false positives)
         if any(x in servname for x in ['диск', 'disk', 'ssd', 'nvme']):
             return 'volume'
+        # File Storage / NFS (SFS Turbo) - treat as storage (volume bucket)
+        if any(x in servname for x in ['nfs', 'sfs', 'файлов', 'file system', 'file storage']):
+            return 'volume'
         
+        # Backup / snapshots (CBR)
+        if any(x in servname for x in ['резервное копирование', 'backup', 'cbr', 'vault.backup']):
+            return 'backup'
+
+        # KMS (Key Management Service)
+        if any(x in servname for x in ['kms', 'управления ключами', 'key management', 'cmk']):
+            return 'kms'
+
+        # Logging / LTS (often appears as AOM LTS services)
+        if any(x in servname for x in ['lts', 'логов', 'logging']) and 'aom' in servname:
+            return 'logging'
+
         # Networks/IPs
         if any(x in servname for x in ['direct ip', 'floating ip', 'ip адрес', 'ip address']):
             return 'network'
         if 'ip' in servname and 'direct' in servname:
+            return 'network'
+        # Evolution EIP / Internet access / bandwidth (рус/eng)
+        if any(x in servname for x in ['eip', 'доступ в интернет', 'полоса пропускания', 'bandwidth', 'bgp']):
             return 'network'
         
         # Check resource_name for patterns
@@ -274,9 +293,16 @@ class CloudRuProviderPlugin(ProviderPlugin):
         # Databases
         if any(x in servname for x in ['postgresql', 'postgres', 'mysql', 'redis', 'mongodb', 'kafka']):
             return 'database'
+        if any(x in servname for x in ['субд', 'база данных', 'кластер баз', 'managed database']):
+            return 'database'
         
         # Kubernetes
         if any(x in servname for x in ['kubernetes', 'k8s', 'managed kubernetes']):
+            return 'kubernetes'
+        if any(x in servname for x in ['кубер', 'kuber']):
+            return 'kubernetes'
+        # Cloud.ru Managed Kubernetes is billed as "Контейнеры (CCE)"
+        if 'cce' in servname or 'контейнеры' in servname:
             return 'kubernetes'
         
         # Load Balancer
@@ -296,6 +322,14 @@ class CloudRuProviderPlugin(ProviderPlugin):
             return 'volume'
         if 'disk' in resource_name or 'volume' in resource_name:
             return 'volume'
+        
+        # S3 / object storage API operations and related (reduce 'unknown' in components)
+        if any(x in servname for x in ['object storage', 's3', 's3e', 'obs']):
+            return 's3'
+        if any(x in resource_name for x in ['operation', 'request', 'bucket', 'listall', 'getobject', 'putobject']):
+            return 's3'
+        if resource_name.endswith(('operation', 'request')) and 'storage' in servname:
+            return 's3'
         
         # Default to unknown - will be handled as generic resource
         return 'unknown'
@@ -443,6 +477,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # Group consumption by resource_id and calculate daily costs
                 s3_aggregate_cost = 0.0  # Aggregate S3 API operations into one resource
                 s3_consumptions = []
+                # Aggregate AOM/LTS log indexing+storage (not a deployable resource; reduce noise)
+                lts_aggregates: Dict[str, Dict[str, Any]] = {}
                 for consumption in consumptions:
                     # Extract resource identifier (support both organization API and BFF formats)
                     # BFF/console: instance_id for VMs, organization API: resource_id
@@ -451,6 +487,27 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     if not resource_id:
                         continue
                     resource_id = str(resource_id)
+
+                    # LTS/AOM logs: resource_id like "<prefix>.lts.*", usually no resource_name
+                    rid_lower = resource_id.lower()
+                    servname_lower = str(consumption.get('servname', '')).lower()
+                    resource_name_raw = consumption.get('resource_name')
+                    if ('.lts.' in rid_lower and (not resource_name_raw) and ('lts' in servname_lower)):
+                        prefix = resource_id.split('.lts.')[0]
+                        agg_id = f"lts:{prefix}"
+                        cost = consumption.get('amount_nds') or consumption.get('amount') or consumption.get('cost') or consumption.get('price', 0)
+                        daily_cost = float(cost) if cost else 0.0
+                        if agg_id not in lts_aggregates:
+                            lts_aggregates[agg_id] = {
+                                'daily_cost': 0.0,
+                                'currency': consumption.get('currency', 'RUB'),
+                                'consumptions': [],
+                                'platform': consumption.get('platform', ''),
+                            }
+                        lts_aggregates[agg_id]['daily_cost'] += daily_cost
+                        lts_aggregates[agg_id]['consumptions'].append(consumption)
+                        continue
+
                     # S3/object storage API operations (ListAllMyBucketsOperation, GetObject, etc.)
                     # - aggregate into one "Object Storage" resource instead of one per operation
                     if self._is_s3_api_operation(resource_id, consumption):
@@ -509,6 +566,26 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     if 's3' not in billing_resources_by_type:
                         billing_resources_by_type['s3'] = {}
                     billing_resources_by_type['s3'][s3_resource_id] = billing_data[s3_resource_id]
+
+                # Add aggregated LTS logs as one resource per prefix
+                if lts_aggregates:
+                    if 'logging' not in billing_resources_by_type:
+                        billing_resources_by_type['logging'] = {}
+                    for agg_id, agg in lts_aggregates.items():
+                        prefix = agg_id.split(':', 1)[-1]
+                        short = prefix[:8]
+                        billing_data[agg_id] = {
+                            'daily_cost': agg.get('daily_cost', 0.0),
+                            'monthly_cost': (agg.get('daily_cost', 0.0) * 30.0),
+                            'currency': agg.get('currency', 'RUB'),
+                            'consumptions': agg.get('consumptions', []),
+                            'resource_type': 'logging',
+                            'servname': 'Logging (LTS)',
+                            'sku': '',
+                            'resource_name': f'logging-lts-{short}',
+                            'platform': agg.get('platform', ''),
+                        }
+                        billing_resources_by_type['logging'][agg_id] = billing_data[agg_id]
                 
                 # Calculate monthly costs (daily * 30)
                 for resource_id, cost_data in billing_data.items():
@@ -519,174 +596,357 @@ class CloudRuProviderPlugin(ProviderPlugin):
         except Exception as e:
             self.logger.warning(f"Failed to get per-resource billing data: {e}", exc_info=True)
         
-        unified_resources = []
-        
-        # Create a map of API-discovered resources by ID for enrichment
-        api_resources_by_id = {}
-        for vm in resources.get('vms', []):
-            vm_id = vm.get('id') or vm.get('uuid')
-            if vm_id:
-                api_resources_by_id[vm_id] = {'type': 'server', 'data': vm}
-        for volume in resources.get('volumes', []):
-            vol_id = volume.get('id') or volume.get('uuid')
-            if vol_id:
-                api_resources_by_id[vol_id] = {'type': 'volume', 'data': volume}
-        for network in resources.get('networks', []):
-            net_id = network.get('id') or network.get('uuid')
-            if net_id:
-                api_resources_by_id[net_id] = {'type': 'network', 'data': network}
-        
-        # UNIFICATION: First process all VMs and store them for volume/IP matching
-        unified_vms = {}  # Map of VM resource_id -> ProviderResource
-        
-        # Process servers (VMs and Bare Metal) first
-        if 'server' in billing_resources_by_type:
-            for resource_id, billing_info in billing_resources_by_type['server'].items():
-                try:
-                    # Try to enrich with API data if available
-                    if resource_id in api_resources_by_id and api_resources_by_id[resource_id]['type'] == 'server':
-                        vm_data = api_resources_by_id[resource_id]['data'].copy()
-                        vm_data['billing'] = billing_info
-                        unified_vm = self._create_unified_vm(vm_data, account_billing)
-                    else:
-                        # Create from billing data only (Bare Metal or VM not in API)
-                        unified_vm = self._create_unified_resource_from_billing(
-                            resource_id, billing_info, 'server', account_billing
-                        )
-                    if unified_vm:
-                        unified_vms[resource_id] = unified_vm
-                        unified_resources.append(unified_vm)
-                except Exception as e:
-                    self.logger.warning(f"Failed to process server {resource_id}: {e}")
-        
-        # Process volumes - try to unify with VMs
-        if 'volume' in billing_resources_by_type:
-            for resource_id, billing_info in billing_resources_by_type['volume'].items():
-                try:
-                    # Try to match volume to VM by name pattern (e.g., "mach1free-disk_..." -> "mach1free")
-                    volume_name = billing_info.get('resource_name', '')
-                    matched_vm_id = None
-                    
-                    # Match by name pattern: "{vm_name}-disk_..." or "{vm_name}_disk_..."
-                    for vm_id, vm_resource in unified_vms.items():
-                        vm_name = vm_resource.resource_name
-                        # Check if volume name starts with VM name followed by "-disk" or "_disk"
-                        if vm_name and (volume_name.startswith(f"{vm_name}-disk") or 
-                                       volume_name.startswith(f"{vm_name}_disk") or
-                                       f"-{vm_name}-" in volume_name):
-                            matched_vm_id = vm_id
-                            self.logger.info(f"Matched volume {volume_name} to VM {vm_name} by name pattern")
-                            break
-                    
-                    if matched_vm_id:
-                        # Unify volume into VM - add to VM's provider_config
-                        self._add_volume_to_vm(unified_vms[matched_vm_id], resource_id, billing_info)
-                        self.logger.info(f"Unified volume {volume_name} into VM {unified_vms[matched_vm_id].resource_name}")
-                    else:
-                        # Standalone volume - create separate resource
-                        if resource_id in api_resources_by_id and api_resources_by_id[resource_id]['type'] == 'volume':
-                            volume_data = api_resources_by_id[resource_id]['data'].copy()
-                            volume_data['billing'] = billing_info
-                            unified_volume = self._create_unified_volume(volume_data, account_billing)
-                        else:
-                            unified_volume = self._create_unified_resource_from_billing(
-                                resource_id, billing_info, 'volume', account_billing
-                            )
-                        if unified_volume:
-                            unified_resources.append(unified_volume)
-                except Exception as e:
-                    self.logger.warning(f"Failed to process volume {resource_id}: {e}")
-        
-        # Process networks/IPs - try to unify with VMs
-        if 'network' in billing_resources_by_type:
-            for resource_id, billing_info in billing_resources_by_type['network'].items():
-                try:
-                    # Try to match IP to VM by checking VM's external_ip or interfaces
-                    matched_vm_id = None
-                    ip_name = billing_info.get('resource_name', '')
-                    
-                    # Extract IP address from resource_name (e.g., "direct-ip-addr_45.151.31.50_...")
-                    ip_address = None
-                    if 'direct-ip-addr_' in ip_name:
-                        parts = ip_name.split('_')
-                        if len(parts) >= 2:
-                            ip_address = parts[1]  # Extract IP from name
-                    
-                    # Try to match by checking VM's external IP
-                    for vm_id, vm_resource in unified_vms.items():
-                        # Check if VM has this IP in external_ip
-                        if vm_resource.external_ip == ip_address:
-                            matched_vm_id = vm_id
-                            self.logger.info(f"Matched IP {ip_address} to VM {vm_resource.resource_name} by external_ip")
-                            break
-                        
-                        # Check VM's provider_config for interfaces
-                        vm_config = vm_resource.provider_config
-                        if isinstance(vm_config, dict):
-                            interfaces = vm_config.get('interfaces', [])
-                            for interface in interfaces:
-                                if isinstance(interface, dict):
-                                    if interface.get('ip_address') == ip_address:
-                                        matched_vm_id = vm_id
-                                        self.logger.info(f"Matched IP {ip_address} to VM {vm_resource.resource_name} by interface")
-                                        break
-                                    floating_ip = interface.get('floating_ip', {})
-                                    if isinstance(floating_ip, dict) and floating_ip.get('ip_address') == ip_address:
-                                        matched_vm_id = vm_id
-                                        self.logger.info(f"Matched IP {ip_address} to VM {vm_resource.resource_name} by floating_ip")
-                                        break
-                                if matched_vm_id:
-                                    break
-                        if matched_vm_id:
-                            break
-                    
-                    if matched_vm_id:
-                        # Unify IP into VM - add to VM's provider_config
-                        self._add_ip_to_vm(unified_vms[matched_vm_id], resource_id, billing_info, ip_address)
-                        self.logger.info(f"Unified IP {ip_address} into VM {unified_vms[matched_vm_id].resource_name}")
-                    else:
-                        # Standalone IP - create separate resource
-                        if resource_id in api_resources_by_id and api_resources_by_id[resource_id]['type'] == 'network':
-                            network_data = api_resources_by_id[resource_id]['data'].copy()
-                            network_data['billing'] = billing_info
-                            unified_network = self._create_unified_network(network_data, account_billing)
-                        else:
-                            unified_network = self._create_unified_resource_from_billing(
-                                resource_id, billing_info, 'network', account_billing
-                            )
-                        if unified_network:
-                            unified_resources.append(unified_network)
-                except Exception as e:
-                    self.logger.warning(f"Failed to process network {resource_id}: {e}")
-        
-        # Process other resource types (databases, kubernetes, load_balancer, etc.)
-        other_types = [t for t in billing_resources_by_type.keys() 
-                      if t not in ['server', 'volume', 'network', 'unknown']]
-        for resource_type in other_types:
-            for resource_id, billing_info in billing_resources_by_type[resource_type].items():
-                try:
-                    unified_resource = self._create_unified_resource_from_billing(
-                        resource_id, billing_info, resource_type, account_billing
-                    )
-                    if unified_resource:
-                        unified_resources.append(unified_resource)
-                except Exception as e:
-                    self.logger.warning(f"Failed to process {resource_type} {resource_id}: {e}")
-        
-        # Process unknown types as generic resources
-        if 'unknown' in billing_resources_by_type:
-            for resource_id, billing_info in billing_resources_by_type['unknown'].items():
-                try:
-                    unified_resource = self._create_unified_resource_from_billing(
-                        resource_id, billing_info, 'unknown', account_billing
-                    )
-                    if unified_resource:
-                        unified_resources.append(unified_resource)
-                except Exception as e:
-                    self.logger.warning(f"Failed to process unknown resource {resource_id}: {e}")
-        
+        # GROUP BY resource_name (with heuristic base-name for VM+disk): same deployment = one card
+        # Like Yandex: one card per logical resource with summed cost
+        unified_resources = self._create_unified_resources_by_name(
+            billing_data, billing_resources_by_type, resources, account_billing
+        )
         return unified_resources
-    
+
+    def _extract_base_name_for_grouping(self, name: str, resource_type: str) -> str:
+        """
+        Extract base name for heuristic VM+disk grouping when names differ.
+        e.g. prod01-nodepool-dmz2-az2-8ywxb-volume-0000 -> prod01-nodepool-dmz2-az2-8ywxb
+        """
+        if not name or resource_type not in ('server', 'volume'):
+            return name or ''
+        name_lower = name.lower()
+        # Strip volume/disk suffixes for volumes to match VM base name
+        if resource_type == 'volume':
+            # Common pattern: VM boot/data disks named "<vm-name>-volume..." should attach to VM "<vm-name>"
+            # Examples:
+            # - vm-foo-bar-volume
+            # - vm-foo-bar-volume-data-opensearch
+            if name_lower.startswith('vm-') and '-volume' in name_lower:
+                idx = name_lower.index('-volume')
+                if idx > 0:
+                    return name[:idx].rstrip('-')
+            for pattern in [
+                r'-volume$',  # trailing "-volume"
+                r'-volume-\d+$', r'-volume-\w+$', r'-volume_\w+$',
+                r'-disk-\d+$', r'-disk-\w+$', r'-disk_[a-f0-9-]+$',
+                r'-data\d+$', r'-data-\d+$',
+            ]:
+                m = re.search(pattern, name_lower)
+                if m:
+                    return name[:m.start()].rstrip('-')
+        return name
+
+    def _create_unified_resources_by_name(self, billing_data: Dict, billing_resources_by_type: Dict,
+                                          resources: Dict, account_billing: Dict) -> List:
+        """
+        Group resources by resource_name (with heuristic base-name for VM+disk) and create unified cards.
+        Total cost unchanged - just regrouping like Yandex clusters.
+        """
+        from app.providers.resource_registry import ProviderResource
+
+        # Infer Kubernetes clusters from VM naming ("<cluster>-nodepool-...").
+        # Cloud.ru often bills MK8S only as ECS nodes; no explicit "Kubernetes" servname appears.
+        nodepool_clusters: List[str] = []
+        server_names_lower: set = set()
+        server_name_lookup: Dict[str, str] = {}
+        server_norm_map: Dict[Tuple[str, ...], List[str]] = {}
+        try:
+            clusters_set = set()
+            for _t, items in (billing_resources_by_type or {}).items():
+                for _rid, info in (items or {}).items():
+                    nm = str((info or {}).get('resource_name') or '').strip()
+                    low = nm.lower()
+                    if nm and '-nodepool-' in low:
+                        clusters_set.add(nm[:low.index('-nodepool-')])
+            nodepool_clusters = sorted(clusters_set, key=lambda s: (-len(s), s.lower()))
+        except Exception:
+            nodepool_clusters = []
+        try:
+            for _rid, info in (billing_resources_by_type.get('server') or {}).items():
+                nm = str((info or {}).get('resource_name') or '').strip()
+                if nm:
+                    server_names_lower.add(nm.lower())
+                    server_name_lookup[nm.lower()] = nm
+            # Normalized token index for fuzzy matching (ignore 'vm' token and numeric tokens like '01')
+            def _norm_tokens(s: str) -> Tuple[str, ...]:
+                toks = [t for t in str(s).lower().split('-') if t]
+                toks = [t for t in toks if not re.fullmatch(r'\\d+', t)]
+                if toks and toks[0] == 'vm':
+                    toks = toks[1:]
+                return tuple(toks)
+            for low, orig in server_name_lookup.items():
+                key = _norm_tokens(orig)
+                if key:
+                    server_norm_map.setdefault(key, []).append(orig)
+        except Exception:
+            server_names_lower = set()
+            server_name_lookup = {}
+            server_norm_map = {}
+
+        # Group by grouping_key: use base name for server+volume to merge vm+disk with different names
+        # plus stronger heuristics for DB volumes and EIP bandwidth add-ons.
+        groups: Dict[str, List[Tuple[str, Dict, str]]] = {}
+        for resource_type, items in billing_resources_by_type.items():
+            for resource_id, billing_info in items.items():
+                name = billing_info.get('resource_name') or resource_id
+                grouping_key = None
+
+                # 0) Managed Kubernetes (CCE) control-plane charge is a deployable cluster line.
+                # Map it into the same cluster key so cluster cards include masters/control-plane cost.
+                serv_l = str((billing_info or {}).get('servname', '')).lower()
+                if (not grouping_key) and (resource_type == 'kubernetes' or 'контейнеры' in serv_l or 'cce' in serv_l):
+                    nm = str(name).strip()
+                    if nm:
+                        grouping_key = f'k8s:{nm.lower()}'
+
+                # 0b) Backup (CBR) is attached to a VM: merge `vault-*` lines into the owning VM when possible.
+                # Examples:
+                # - vault-vm-21sch-hq-1c-01-infra -> vm-21sch-hq-1c-01-infra
+                # - vault-21sch-hq-atlassian-01-infra -> vm-21sch-hq-atlassian-01-infra (if exists)
+                if not grouping_key:
+                    sku_l = str((billing_info or {}).get('sku', '')).lower()
+                    nm = str(name).strip()
+                    nm_l = nm.lower()
+                    if nm_l.startswith('vault-') and (('резерв' in serv_l) or ('cbr' in serv_l) or ('vault.backup' in sku_l)):
+                        base = nm[6:]
+                        base_l = base.lower()
+                        if base_l in server_names_lower:
+                            grouping_key = server_name_lookup.get(base_l, base)
+                        elif f"vm-{base_l}" in server_names_lower:
+                            grouping_key = server_name_lookup.get(f"vm-{base_l}", f"vm-{base}")
+                        else:
+                            # Fuzzy match: normalize tokens and require a single exact normalized match.
+                            base_key = tuple([t for t in base_l.split('-') if t and not re.fullmatch(r'\\d+', t)])
+                            vm_base_key = tuple(['vm'] + list(base_key))
+                            candidates = server_norm_map.get(base_key, []) or server_norm_map.get(vm_base_key, [])
+                            if len(candidates) == 1:
+                                grouping_key = candidates[0]
+                            else:
+                                grouping_key = base
+
+                # 0) Kubernetes Persistent Volumes (PVC): these are deploy-time k8s artifacts, not standalone infra.
+                # Billing uses opaque names like "pvc-<uuid>" → group into one "Kubernetes Persistent Volumes" card.
+                if resource_type == 'volume':
+                    nm0 = str(name).strip().lower()
+                    if nm0.startswith('pvc-'):
+                        grouping_key = 'k8s-persistent-volumes'
+
+                # 1) DB instance sub-resources often have resource_id like "<db_uuid>in03.volume"
+                # Apply regardless of mapped type (these lines are sometimes classified as 'database').
+                rid = str(resource_id)
+                m = re.match(r'^([0-9a-fA-F-]{36}).*\\.(volume|disk|storage)$', rid)
+                if m:
+                    grouping_key = f"db:{m.group(1).lower()}"
+
+                # 2) EIP bandwidth add-on lines often have resource_name prefixed with "bw-"
+                if not grouping_key and resource_type == 'network':
+                    nm = str(name).strip()
+                    if nm.lower().startswith('bw-') and len(nm) > 3:
+                        grouping_key = nm[3:]  # pair with the base resource name
+
+                # 3) Kubernetes clusters: group all nodepool nodes (and their volumes) under cluster key
+                nm_l = str(name).lower()
+                if not grouping_key and '-nodepool-' in nm_l:
+                    grouping_key = f"k8s:{str(name)[:nm_l.index('-nodepool-')].lower()}"
+                # 3b) Also attach obvious cluster-related network add-ons to the cluster (LB/EIP)
+                if (not grouping_key and resource_type == 'network' and nodepool_clusters
+                        and isinstance(name, str) and name):
+                    low = nm_l
+                    # Only if name looks like cluster-scoped networking
+                    if any(tok in low for tok in ('eip', 'bandwidth', 'lb', 'nlb')):
+                        for cluster in nodepool_clusters:
+                            cl = cluster.lower()
+                            if low.startswith(cl + '-'):
+                                grouping_key = f'k8s:{cl}'
+                                break
+
+                # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
+                if not grouping_key:
+                    grouping_key = self._extract_base_name_for_grouping(name, resource_type)
+
+                if grouping_key not in groups:
+                    groups[grouping_key] = []
+                groups[grouping_key].append((resource_id, billing_info, resource_type))
+
+        unified_resources = []
+        for grouping_key, components in groups.items():
+            try:
+                # Display name: prefer primary component name (db/k8s/server), else grouping_key
+                resource_name = str(grouping_key)
+                preferred_types = ('kubernetes', 'database', 'server')
+                for rid, info, t in components:
+                    if t in preferred_types and (info.get('resource_name') or '').strip():
+                        resource_name = info.get('resource_name').strip()
+                        break
+                # Strip internal prefixes from display
+                if resource_name.startswith('db:'):
+                    resource_name = resource_name[3:]
+                if resource_name.startswith('k8s:'):
+                    resource_name = resource_name[4:]
+                # For inferred k8s groups, force cluster name (not a node name)
+                if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
+                    resource_name = grouping_key[4:]
+
+                # Sum cost across all components
+                total_daily_cost = sum(b[1].get('daily_cost', 0) for b in components)
+                # Infer unified resource type from components
+                component_types = [c[2] for c in components]
+                unified_type = self._infer_unified_type(component_types, components)
+                # Semantic type for card display (vm, k8s, db, etc.) - stored in provider_config
+                display_type = self._infer_display_type(component_types, components)
+                if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
+                    unified_type = 'server'  # keep k8s clusters consistent (not 'volume')
+                    display_type = 'kubernetes-cluster'
+                # File storage / NFS cards: show as file storage
+                servnames_lower = [str((info or {}).get('servname', '')).lower() for _, info, _ in components]
+                if unified_type == 'volume' and any(('nfs' in s) or ('sfs' in s) or ('файлов' in s) for s in servnames_lower):
+                    display_type = 'file-storage'
+                # Backup-only groups: show as backup
+                if unified_type == 'other' and ('backup' in set(component_types)) and ('server' not in set(component_types)):
+                    display_type = 'backup'
+                # KMS-only groups: show as kms
+                if unified_type == 'other' and ('kms' in set(component_types)) and len(set(component_types)) == 1:
+                    display_type = 'kms'
+                # Build provider_config with component breakdown
+                component_count = len(components)
+                # Avoid huge provider_config payloads for very large groups (e.g., hundreds of PVC volumes)
+                # MySQL TEXT can overflow; keep a compact summary and a small sample.
+                max_components_in_config = 200
+                if component_count > max_components_in_config:
+                    by_type = {}
+                    for rid, info, t in components:
+                        if t not in by_type:
+                            by_type[t] = {'type': t, 'count': 0, 'daily_cost': 0.0}
+                        by_type[t]['count'] += 1
+                        by_type[t]['daily_cost'] += float(info.get('daily_cost', 0) or 0.0)
+                    component_list = list(by_type.values())
+                    component_sample = [
+                        {'resource_id': rid, 'type': t, 'daily_cost': info.get('daily_cost', 0)}
+                        for rid, info, t in components[:20]
+                    ]
+                else:
+                    component_list = [
+                        {'resource_id': rid, 'type': t, 'daily_cost': info.get('daily_cost', 0)}
+                        for rid, info, t in components
+                    ]
+                    component_sample = None
+                # Stable resource_id for DB (unique per provider)
+                unified_resource_id = f"unified-{hashlib.md5(grouping_key.encode()).hexdigest()[:24]}"
+                # Region from first component
+                region = components[0][1].get('platform', 'Cloud.ru') if components else 'Cloud.ru'
+                # Service name from type
+                service_map = {
+                    'server': 'Compute', 'kubernetes-cluster': 'Kubernetes',
+                    'postgresql-cluster': 'PostgreSQL', 'mysql-cluster': 'MySQL',
+                    'load_balancer': 'Load Balancer', 'database': 'Database',
+                    'volume': 'Block Storage', 'network': 'Network', 's3': 'Object Storage'
+                }
+                service_name = service_map.get(unified_type, unified_type.replace('-', ' ').title())
+                if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
+                    service_name = 'Kubernetes'
+                if grouping_key == 'k8s-persistent-volumes':
+                    service_name = 'Kubernetes'
+                if display_type == 'file-storage':
+                    service_name = 'File Storage'
+                if display_type == 'backup':
+                    service_name = 'Backup'
+                if display_type == 'kms':
+                    service_name = 'KMS'
+                if display_type == 'logging':
+                    service_name = 'Logging'
+
+                provider_config = {
+                    'unified': True,
+                    'unified_display_type': display_type,  # vm, kubernetes-cluster, postgresql-cluster, etc.
+                    'grouping_key': grouping_key,
+                    'components': component_list,
+                    'component_count': component_count,
+                    'billing_source': 'consumption_api',
+                }
+                if component_sample is not None:
+                    provider_config['components_truncated'] = True
+                    provider_config['components_sample'] = component_sample
+                # Add first component's details for card display
+                first_info = components[0][1]
+                provider_config.update({
+                    'servname': first_info.get('servname', ''),
+                    'sku': first_info.get('sku', ''),
+                    'platform': first_info.get('platform', 'Cloud.ru'),
+                })
+
+                unified_resources.append(ProviderResource(
+                    resource_id=unified_resource_id,
+                    resource_name=resource_name,
+                    resource_type=unified_type,
+                    service_name=service_name,
+                    region=region,
+                    status='RUNNING',
+                    effective_cost=total_daily_cost,
+                    currency=account_billing.get('currency', 'RUB'),
+                    billing_period='daily',
+                    provider_config=provider_config,
+                    provider_type='cloud-ru',
+                    tags={'cloud_ru_unified': 'true'}
+                ))
+            except Exception as e:
+                self.logger.warning(f"Failed to create unified resource for {resource_name}: {e}")
+
+        self.logger.info(f"Created {len(unified_resources)} unified resources (grouped by name)")
+        return unified_resources
+
+    def _infer_unified_type(self, component_types: List[str], components: List[Tuple]) -> str:
+        """Infer unified resource type from component types (like Yandex: vm, k8s, db cluster)."""
+        types_set = set(component_types)
+        # Databases - use 'database' (registered for cloud-ru)
+        if 'database' in types_set:
+            return 'database'
+        for t in ['postgresql-cluster', 'mysql-cluster', 'kafka-cluster', 'redis-cluster']:
+            if t in types_set:
+                return 'database'  # Map to registered type
+        # Kubernetes - use 'server' (compute) for now; provider_config.unified preserves semantics
+        if 'kubernetes' in types_set:
+            return 'server'
+        # Load balancer - use 'other' (registered)
+        if 'load_balancer' in types_set and len(types_set) == 1:
+            return 'other'
+        # VM with optional disk/IP: server + volume, server + network, server + volume + network
+        if 'server' in types_set:
+            return 'server'
+        # Standalone volume or network
+        if 'volume' in types_set and 'network' not in types_set:
+            return 'volume'
+        if 'network' in types_set and 'volume' not in types_set:
+            return 'network'
+        if 'volume' in types_set:
+            return 'volume'
+        if 's3' in types_set:
+            return 's3'
+        return 'other'
+
+    def _infer_display_type(self, component_types: List[str], components: List[Tuple]) -> str:
+        """Semantic type for card display (vm, kubernetes-cluster, postgresql-cluster, etc.)."""
+        types_set = set(component_types)
+        if 'database' in types_set:
+            return 'database'
+        for t in ['postgresql-cluster', 'mysql-cluster', 'kafka-cluster', 'redis-cluster']:
+            if t in types_set:
+                return t
+        if 'kubernetes' in types_set:
+            return 'kubernetes-cluster'
+        if 'backup' in types_set and len(types_set) == 1:
+            return 'backup'
+        if 'kms' in types_set and len(types_set) == 1:
+            return 'kms'
+        if 'logging' in types_set and len(types_set) == 1:
+            return 'logging'
+        if 'load_balancer' in types_set:
+            return 'load_balancer'
+        if 'server' in types_set:
+            return 'server'  # VM
+        if 'volume' in types_set:
+            return 'volume'
+        if 'network' in types_set:
+            return 'network'
+        if 's3' in types_set:
+            return 's3'
+        return 'other'
+
     def _create_unified_vm(self, vm_data: Dict[str, Any], account_billing: Dict[str, Any]) -> Optional:
         """Create unified VM resource from Cloud.ru VM data"""
         from app.providers.resource_registry import ProviderResource

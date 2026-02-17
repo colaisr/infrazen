@@ -13,7 +13,7 @@ from app.core.models.sync import SyncSnapshot
 from app.core.models.resource import Resource
 from .plugin_system import ProviderPluginManager, SyncResult
 from .resource_registry import resource_registry, ProviderResource
-from . import plugin_manager
+from . import plugin_manager as default_plugin_manager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,8 @@ class SyncOrchestrator:
     """Unified sync orchestrator for all provider types"""
 
     def __init__(self, plugin_manager: ProviderPluginManager = None):
-        self.plugin_manager = plugin_manager or plugin_manager
+        # If caller doesn't pass a plugin manager, use the shared module instance.
+        self.plugin_manager = plugin_manager or default_plugin_manager
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     def sync_provider(self, provider_id: int, sync_type: str = 'manual') -> Dict[str, Any]:
@@ -379,12 +380,26 @@ class SyncOrchestrator:
 
             # Store sync metadata
             sync_config = json.loads(sync_snapshot.sync_config) if sync_snapshot.sync_config else {}
+            # IMPORTANT:
+            # Do NOT store full plugin payload (especially `resources`) in sync_config.
+            # Cloud.ru returns thousands of per-consumption components and can exceed DB column limits.
+            plugin_data_summary = {}
+            try:
+                if isinstance(sync_data, dict):
+                    plugin_data_summary = {
+                        'sync_timestamp': sync_data.get('sync_timestamp'),
+                        'resources_count': len(sync_data.get('resources', []) or []),
+                        'account_billing': sync_data.get('account_billing'),
+                        'billing_validation': sync_data.get('billing_validation'),
+                    }
+            except Exception:
+                plugin_data_summary = {}
             sync_config.update({
                 'sync_success': sync_result.success,
                 'resources_synced': sync_result.resources_synced,
                 'total_cost': sync_result.total_cost,
                 'errors': sync_result.errors,
-                'plugin_data': sync_data
+                'plugin_data': plugin_data_summary
             })
             sync_snapshot.sync_config = json.dumps(sync_config)
 
@@ -560,6 +575,17 @@ class SyncOrchestrator:
                     self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}")
                     continue
 
+            # Cloud.ru: deactivate old raw resources not in this sync (unified replaces all)
+            if provider.provider_type == 'cloud-ru' and processed_resources:
+                processed_ids = {rd['resource_id'] for _, rd in processed_resources}
+                deactivated = Resource.query.filter(
+                    Resource.provider_id == provider.id,
+                    Resource.resource_id.notin_(processed_ids),
+                    Resource.is_active == True
+                ).update({'is_active': False}, synchronize_session=False)
+                if deactivated > 0:
+                    self.logger.info(f"Cloud.ru: deactivated {deactivated} old resources not in current sync")
+
             self.logger.info(f"Processed {processed_count} resources for provider {provider.id}")
             return processed_count
 
@@ -711,4 +737,4 @@ class SyncOrchestrator:
 
 
 # Global sync orchestrator instance
-sync_orchestrator = SyncOrchestrator(plugin_manager)
+sync_orchestrator = SyncOrchestrator(default_plugin_manager)

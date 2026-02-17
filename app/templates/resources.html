@@ -159,24 +159,34 @@
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
             <div class="resources-grid">
                 {% for resource in resources_by_provider.get(provider.id, []) %}
+                {% set _config = resource.provider_config if resource.provider_config is mapping else (resource.provider_config | from_json if resource.provider_config is string else {}) %}
+                {% set _display_type = _config.get('unified_display_type') if _config.get('unified') else resource.resource_type %}
                 <div class="resource-card" data-resource-id="{{ resource.id }}">
             <div class="resource-header">
                 <div class="resource-icon">
-                    {% if resource.resource_type == 'vps' or resource.resource_type == 'vm' or resource.resource_type == 'server' %}
+                    {% if _display_type == 'vps' or _display_type == 'vm' or _display_type == 'server' %}
                         <i class="fa-solid fa-server"></i>
-                    {% elif resource.resource_type == 'disk' or resource.resource_type == 'volume' %}
+                    {% elif _display_type == 'disk' or _display_type == 'volume' %}
                         <i class="fa-solid fa-hdd"></i>
-                    {% elif resource.resource_type == 'database' %}
+                    {% elif _display_type == 'file-storage' %}
+                        <i class="fa-solid fa-folder-tree"></i>
+                    {% elif _display_type == 'database' %}
                         <i class="fa-solid fa-database"></i>
-                    {% elif resource.resource_type == 'kubernetes-cluster' %}
+                    {% elif _display_type == 'kubernetes-cluster' %}
                         <i class="fa-brands fa-docker" style="color: #326CE5;"></i>
-                    {% elif 'postgresql' in resource.resource_type or 'mysql' in resource.resource_type or 'mongodb' in resource.resource_type or 'clickhouse' in resource.resource_type or 'redis' in resource.resource_type %}
+                    {% elif _display_type == 'backup' %}
+                        <i class="fa-solid fa-box-archive" style="color: #6B7280;"></i>
+                    {% elif _display_type == 'kms' %}
+                        <i class="fa-solid fa-key" style="color: #6B7280;"></i>
+                    {% elif _display_type == 'logging' %}
+                        <i class="fa-solid fa-file-lines" style="color: #6B7280;"></i>
+                    {% elif 'postgresql' in (_display_type or '') or 'mysql' in (_display_type or '') or 'mongodb' in (_display_type or '') or 'clickhouse' in (_display_type or '') or 'redis' in (_display_type or '') %}
                         <i class="fa-solid fa-database" style="color: #336791;"></i>
-                    {% elif resource.resource_type == 'domain' %}
+                    {% elif _display_type == 'domain' %}
                         <i class="fa-solid fa-globe"></i>
-                    {% elif resource.resource_type == 'email' %}
+                    {% elif _display_type == 'email' %}
                         <i class="fa-solid fa-envelope"></i>
-                    {% elif resource.resource_type == 's3' or 'bucket' in (resource.resource_type or '') %}
+                    {% elif _display_type == 's3' or 'bucket' in (_display_type or '') %}
                         <i class="fa-solid fa-bucket" style="color: #F59E0B;"></i>
                     {% else %}
                         <i class="fa-solid fa-box"></i>
@@ -184,7 +194,7 @@
                 </div>
                 <div class="resource-info">
                     <div class="resource-name">{{ resource.resource_name }}</div>
-                    <div class="resource-type">{{ resource.resource_type|upper }}</div>
+                    <div class="resource-type">{{ (_display_type or resource.resource_type)|upper }}{% if _config.get('unified') and _config.get('component_count', 0) > 1 %} ({{ _config.component_count }} компонентов){% endif %}</div>
                 </div>
                 <div class="resource-status">
                     {% if resource.status == 'RUNNING' or resource.status == 'ACTIVE' %}
@@ -227,6 +237,38 @@
                                 </span>
                             </div>
                         </div>
+
+                        <!-- Unified resource component breakdown -->
+                        {% if _config.get('unified') and _config.get('components') %}
+                        <div class="resource-components" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb; font-size: 0.85rem;">
+                            <div class="detail-label" style="margin-bottom: 0.35rem; color: var(--text-secondary);">Компоненты развёртки:</div>
+                            {% set _components = _config.components %}
+                            {% set _max_components = 20 %}
+                            {% for comp in _components[:_max_components] %}
+                            <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem;">
+                                <span class="detail-value">
+                                    {{ comp.get('type', '—') }}{% if comp.get('count') %} ×{{ comp.get('count') }}{% endif %}
+                                </span>
+                                <span class="detail-value">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
+                            </div>
+                            {% endfor %}
+                            {% if (_components|length) > _max_components %}
+                            <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem; color: var(--text-secondary);">
+                                <span class="detail-value">… и ещё {{ (_components|length) - _max_components }} компонентов</span>
+                                <span class="detail-value"></span>
+                            </div>
+                            {% endif %}
+                            {% if _config.get('components_truncated') and _config.get('components_sample') %}
+                            <div class="detail-label" style="margin-top: 0.5rem; margin-bottom: 0.25rem; color: var(--text-secondary);">Пример компонентов (первые {{ _config.components_sample|length }}):</div>
+                            {% for comp in _config.components_sample %}
+                            <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem; color: var(--text-secondary);">
+                                <span class="detail-value">{{ comp.get('type', '—') }}</span>
+                                <span class="detail-value">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endif %}
 
                         <!-- Resource Specifications -->
                             {% if resource.provider_config %}
