@@ -23,6 +23,7 @@ class ProviderResource:
     billing_period: str
     provider_config: Dict[str, Any]
     provider_type: str
+    tenant: Optional[str] = None
     external_ip: str = None
     tags: Dict[str, str] = None
 
@@ -38,6 +39,7 @@ class ProviderResource:
             'resource_type': self.resource_type,
             'service_name': self.service_name,
             'region': self.region,
+            'tenant': self.tenant,
             'status': self.status,
             'effective_cost': self.effective_cost,
             'currency': self.currency,

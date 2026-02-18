@@ -342,6 +342,21 @@ function createMemoryChart(canvas, resourceId) {
 // CSV Export
 // ============================================================================
 
+function getCardDetailValue(card, labelText) {
+    try {
+        const rows = card.querySelectorAll('.detail-row');
+        for (const row of rows) {
+            const label = row.querySelector('.detail-label')?.textContent?.trim();
+            if (label === labelText) {
+                return row.querySelector('.detail-value')?.textContent?.trim() || '';
+            }
+        }
+    } catch (e) {
+        console.error('Error reading card detail value:', e);
+    }
+    return '';
+}
+
 function exportResourcesToCSV() {
     // Check if SheetJS (XLSX) library is available
     if (typeof XLSX === 'undefined') {
@@ -383,7 +398,7 @@ function exportResourcesToCSV() {
     
     // Create resources data array
     const resourcesData = [
-        ['Провайдер', 'Ресурс', 'Тип', 'Статус', 'External IP', 'Регион', 'Стоимость день (₽)', 'Стоимость месяц (₽)']
+        ['Провайдер', 'Ресурс', 'Тип', 'Статус', 'External IP', 'Регион', 'Tenant', 'Стоимость день (₽)', 'Стоимость месяц (₽)']
     ];
     
     // Process each provider section
@@ -398,10 +413,11 @@ function exportResourcesToCSV() {
                 const resourceName = card.querySelector('.resource-name').textContent;
                 const resourceType = card.querySelector('.resource-type').textContent;
                 const status = card.querySelector('.status-badge').textContent.trim();
-                const externalIp = card.querySelector('.detail-row:nth-child(1) .detail-value').textContent;
-                const region = card.querySelector('.detail-row:nth-child(2) .detail-value').textContent;
-                const costMonthly = card.querySelector('.detail-row:nth-child(3) .detail-value').textContent;
-                const costDaily = card.querySelector('.detail-row:nth-child(4) .detail-value').textContent;
+                const externalIp = getCardDetailValue(card, 'Внешний IP');
+                const region = getCardDetailValue(card, 'Регион');
+                const tenant = getCardDetailValue(card, 'Tenant');
+                const costMonthly = getCardDetailValue(card, 'Стоимость мес.');
+                const costDaily = getCardDetailValue(card, 'Стоимость день');
                 
                 // Extract numeric values from cost strings
                 const dailyNumeric = parseFloat(costDaily.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
@@ -414,6 +430,7 @@ function exportResourcesToCSV() {
                     status,
                     externalIp,
                     region,
+                    tenant,
                     dailyNumeric,
                     monthlyNumeric
                 ]);
@@ -432,6 +449,7 @@ function exportResourcesToCSV() {
         { wch: 12 }, // Статус
         { wch: 15 }, // External IP
         { wch: 20 }, // Регион
+        { wch: 24 }, // Tenant
         { wch: 18 }, // Стоимость день
         { wch: 18 }  // Стоимость месяц
     ];
@@ -465,7 +483,7 @@ function exportResourcesToCSVFallback() {
     }
     
     csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
-    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Стоимость (₽/день)\n';
+    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Tenant,Стоимость (₽/день)\n';
     
     providerSections.forEach(section => {
         const providerName = section.querySelector('.provider-name').textContent;
@@ -478,11 +496,12 @@ function exportResourcesToCSVFallback() {
                 const resourceName = card.querySelector('.resource-name').textContent;
                 const resourceType = card.querySelector('.resource-type').textContent;
                 const status = card.querySelector('.status-badge').textContent.trim();
-                const externalIp = card.querySelector('.detail-row:nth-child(1) .detail-value').textContent;
-                const region = card.querySelector('.detail-row:nth-child(2) .detail-value').textContent;
-                const cost = card.querySelector('.detail-row:nth-child(3) .detail-value').textContent;
+                const externalIp = getCardDetailValue(card, 'Внешний IP');
+                const region = getCardDetailValue(card, 'Регион');
+                const tenant = getCardDetailValue(card, 'Tenant');
+                const cost = getCardDetailValue(card, 'Стоимость день');
                 
-                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${cost}"\n`;
+                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${tenant}","${cost}"\n`;
             });
         }
     });

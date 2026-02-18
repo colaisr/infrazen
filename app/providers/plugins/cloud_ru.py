@@ -518,6 +518,12 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     
                     # Map to resource type based on service name/SKU
                     resource_type = self._map_consumption_to_resource_type(consumption)
+
+                    meta = consumption.get('meta') if isinstance(consumption.get('meta'), dict) else {}
+                    iam_project_name = (
+                        meta.get('iam_project_name') or meta.get('iamProjectName') or meta.get('iam_project') or ''
+                    )
+                    tenant_name = meta.get('tenant_name') or meta.get('tenantName') or meta.get('tenant') or ''
                     
                     # Extract cost: amount_nds = with VAT (НДС, matches console "включая НДС")
                     cost = consumption.get('amount_nds') or consumption.get('amount') or consumption.get('cost') or consumption.get('price', 0)
@@ -535,11 +541,19 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'sku': consumption.get('sku') or consumption.get('sku_name', ''),
                             'sku_name': consumption.get('sku_name', ''),
                             'resource_name': consumption.get('resource_name', ''),
-                            'platform': consumption.get('platform', '')
+                            'platform': consumption.get('platform', ''),
+                            # Billing metadata used for UI grouping/filtering
+                            'iam_project_name': iam_project_name,
+                            'tenant_name': tenant_name,
                         }
                     
                     billing_data[resource_id]['daily_cost'] += daily_cost
                     billing_data[resource_id]['consumptions'].append(consumption)
+                    # Keep first non-empty metadata (should be stable per resource)
+                    if iam_project_name and not billing_data[resource_id].get('iam_project_name'):
+                        billing_data[resource_id]['iam_project_name'] = iam_project_name
+                    if tenant_name and not billing_data[resource_id].get('tenant_name'):
+                        billing_data[resource_id]['tenant_name'] = tenant_name
                     # Prefer resource_name from consumption when we have it (org API provides it)
                     if consumption.get('resource_name') and not billing_data[resource_id].get('resource_name'):
                         billing_data[resource_id]['resource_name'] = consumption.get('resource_name', '')
@@ -552,6 +566,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # Add aggregated S3/object storage as single resource (if any)
                 if s3_aggregate_cost > 0:
                     s3_resource_id = 'object-storage-aggregate'
+                    s3_meta = s3_consumptions[0].get('meta') if (s3_consumptions and isinstance(s3_consumptions[0].get('meta'), dict)) else {}
                     billing_data[s3_resource_id] = {
                         'daily_cost': s3_aggregate_cost,
                         'monthly_cost': s3_aggregate_cost * 30.0,
@@ -561,7 +576,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         'servname': 'Object Storage',
                         'sku': '',
                         'resource_name': 'Object Storage',
-                        'platform': s3_consumptions[0].get('platform', '') if s3_consumptions else ''
+                        'platform': s3_consumptions[0].get('platform', '') if s3_consumptions else '',
+                        'iam_project_name': s3_meta.get('iam_project_name') or '',
+                        'tenant_name': s3_meta.get('tenant_name') or '',
                     }
                     if 's3' not in billing_resources_by_type:
                         billing_resources_by_type['s3'] = {}
@@ -574,6 +591,13 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     for agg_id, agg in lts_aggregates.items():
                         prefix = agg_id.split(':', 1)[-1]
                         short = prefix[:8]
+                        first_meta = None
+                        try:
+                            first = (agg.get('consumptions') or [None])[0]
+                            if isinstance(first, dict) and isinstance(first.get('meta'), dict):
+                                first_meta = first.get('meta')
+                        except Exception:
+                            first_meta = None
                         billing_data[agg_id] = {
                             'daily_cost': agg.get('daily_cost', 0.0),
                             'monthly_cost': (agg.get('daily_cost', 0.0) * 30.0),
@@ -584,6 +608,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'sku': '',
                             'resource_name': f'logging-lts-{short}',
                             'platform': agg.get('platform', ''),
+                            'iam_project_name': (first_meta or {}).get('iam_project_name') or '',
+                            'tenant_name': (first_meta or {}).get('tenant_name') or '',
                         }
                         billing_resources_by_type['logging'][agg_id] = billing_data[agg_id]
                 
@@ -828,8 +854,13 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     component_sample = None
                 # Stable resource_id for DB (unique per provider)
                 unified_resource_id = f"unified-{hashlib.md5(grouping_key.encode()).hexdigest()[:24]}"
-                # Region from first component
-                region = components[0][1].get('platform', 'Cloud.ru') if components else 'Cloud.ru'
+                # Region + tenant from first component (Cloud.ru billing meta)
+                region = (
+                    components[0][1].get('iam_project_name') or components[0][1].get('platform') or 'Cloud.ru'
+                ) if components else 'Cloud.ru'
+                tenant = (
+                    components[0][1].get('tenant_name') or None
+                ) if components else None
                 # Service name from type
                 service_map = {
                     'server': 'Compute', 'kubernetes-cluster': 'Kubernetes',
@@ -868,6 +899,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     'servname': first_info.get('servname', ''),
                     'sku': first_info.get('sku', ''),
                     'platform': first_info.get('platform', 'Cloud.ru'),
+                    'iam_project_name': first_info.get('iam_project_name', ''),
+                    'tenant_name': first_info.get('tenant_name', ''),
                 })
 
                 unified_resources.append(ProviderResource(
@@ -876,6 +909,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     resource_type=unified_type,
                     service_name=service_name,
                     region=region,
+                    tenant=tenant,
                     status='RUNNING',
                     effective_cost=total_daily_cost,
                     currency=account_billing.get('currency', 'RUB'),
@@ -1347,14 +1381,21 @@ class CloudRuProviderPlugin(ProviderPlugin):
         daily_cost = billing_info.get('daily_cost', 0.0)
         monthly_cost = billing_info.get('monthly_cost', daily_cost * 30.0)
         
-        # Extract region from consumption if available
-        region = 'unknown'
-        if billing_info.get('consumptions'):
+        # Region (Cloud.ru: use billing meta.iam_project_name) + tenant (meta.tenant_name)
+        region = billing_info.get('iam_project_name') or 'unknown'
+        if region == 'unknown' and billing_info.get('consumptions'):
             first_consumption = billing_info['consumptions'][0]
-            region = (first_consumption.get('region') or first_consumption.get('availability_zone') or
-                      first_consumption.get('zone') or first_consumption.get('platform') or 'unknown')
+            meta = first_consumption.get('meta') if isinstance(first_consumption.get('meta'), dict) else {}
+            region = (meta.get('iam_project_name') or first_consumption.get('region') or
+                      first_consumption.get('availability_zone') or first_consumption.get('zone') or
+                      first_consumption.get('platform') or 'unknown')
         if region == 'unknown' and billing_info.get('platform'):
             region = billing_info['platform']
+        tenant = billing_info.get('tenant_name') or None
+        if not tenant and billing_info.get('consumptions'):
+            first_consumption = billing_info['consumptions'][0]
+            meta = first_consumption.get('meta') if isinstance(first_consumption.get('meta'), dict) else {}
+            tenant = meta.get('tenant_name') or meta.get('tenantName') or None
         
         # Map resource type to service name
         service_name_map = {
@@ -1378,6 +1419,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
             'sku': sku,
             'sku_name': billing_info.get('sku_name', ''),
             'platform': billing_info.get('platform', ''),
+            'iam_project_name': billing_info.get('iam_project_name', ''),
+            'tenant_name': billing_info.get('tenant_name', ''),
             'billing_source': 'consumption_api',
             'consumptions': billing_info.get('consumptions', [])
         }
@@ -1400,6 +1443,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
             resource_type=resource_type if resource_type != 'unknown' else 'other',
             service_name=service_name,
             region=region,
+            tenant=tenant,
             status='RUNNING',  # Assume running if being billed (for template display)
             effective_cost=daily_cost,
             currency=billing_info.get('currency', 'RUB'),

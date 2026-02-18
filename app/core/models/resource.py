@@ -20,6 +20,7 @@ class Resource(BaseModel):
     resource_id = db.Column(db.String(100), nullable=False)  # Provider's resource ID
     resource_name = db.Column(db.String(255), nullable=False)
     region = db.Column(db.String(100), nullable=False)
+    tenant = db.Column(db.String(255))  # Cloud.ru tenant (meta.tenant_name) or similar grouping
     external_ip = db.Column(db.String(45))  # External/Public IP address (IPv4 or IPv6)
     
     # Classification

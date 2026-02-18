@@ -46,6 +46,7 @@ def list_resources():
                 'provider_id': r.provider_id,
                 'external_ip': r.external_ip,
                 'region': r.region,
+                'tenant': getattr(r, 'tenant', None),
                 'daily_cost': r.daily_cost
             } for r in resources
         ]

@@ -669,6 +669,7 @@ class SyncOrchestrator:
             self.logger.info(f"Processing resource: {resource_name} ({resource_type}) - ID: {resource_id}")
             service_name = resource_data.get('service_name', resource_type.title())
             region = resource_data.get('region', 'unknown')
+            tenant = resource_data.get('tenant')
             status = resource_data.get('status', 'unknown')
             effective_cost = resource_data.get('effective_cost', 0.0)
             currency = resource_data.get('currency', 'RUB')
@@ -690,6 +691,7 @@ class SyncOrchestrator:
                 resource.resource_type = resource_type
                 resource.service_name = service_name
                 resource.region = region
+                resource.tenant = tenant
                 resource.status = status
                 resource.effective_cost = effective_cost
                 resource.currency = currency
@@ -708,6 +710,7 @@ class SyncOrchestrator:
                     resource_type=resource_type,
                     service_name=service_name,
                     region=region,
+                    tenant=tenant,
                     status=status,
                     effective_cost=effective_cost,
                     currency=currency,
