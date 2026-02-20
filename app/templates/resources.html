@@ -249,12 +249,25 @@
                             {% set _components = _config.components %}
                             {% set _max_components = 20 %}
                             {% for comp in _components[:_max_components] %}
+                            {% if comp.get('resource_id') %}
+                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('resource_id', '') }}">{{ comp.get('resource_name') or comp.get('resource_id', '—') }}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ comp.get('resource_id', '')[:24] }}{% if (comp.get('resource_id') or '')|length > 24 %}…{% endif %}</div>
+                                </div>
+                                {% if comp.get('servname') %}
+                                <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e0e7ff; color: #3730a3; border-radius: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('servname', '') }}">{{ comp.get('servname', '') }}</span>
+                                {% else %}
+                                <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e5e7eb; color: #6b7280; border-radius: 4px;">{{ comp.get('type', '—') }}</span>
+                                {% endif %}
+                                <span style="flex-shrink: 0; font-weight: 600; color: var(--text-primary);">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
+                            </div>
+                            {% else %}
                             <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem;">
-                                <span class="detail-value">
-                                    {{ comp.get('type', '—') }}{% if comp.get('count') %} ×{{ comp.get('count') }}{% endif %}
-                                </span>
+                                <span class="detail-value">{{ comp.get('type', '—') }}{% if comp.get('count') %} ×{{ comp.get('count') }}{% endif %}</span>
                                 <span class="detail-value">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
                             </div>
+                            {% endif %}
                             {% endfor %}
                             {% if (_components|length) > _max_components %}
                             <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem; color: var(--text-secondary);">
@@ -265,9 +278,17 @@
                             {% if _config.get('components_truncated') and _config.get('components_sample') %}
                             <div class="detail-label" style="margin-top: 0.5rem; margin-bottom: 0.25rem; color: var(--text-secondary);">Пример компонентов (первые {{ _config.components_sample|length }}):</div>
                             {% for comp in _config.components_sample %}
-                            <div class="detail-row" style="display: flex; justify-content: space-between; gap: 0.5rem; color: var(--text-secondary);">
-                                <span class="detail-value">{{ comp.get('type', '—') }}</span>
-                                <span class="detail-value">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
+                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="flex: 1; min-width: 0;">
+                                    <div style="font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('resource_id', '') }}">{{ comp.get('resource_name') or comp.get('resource_id', '—') }}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ comp.get('resource_id', '')[:24] }}{% if (comp.get('resource_id') or '')|length > 24 %}…{% endif %}</div>
+                                </div>
+                                {% if comp.get('servname') %}
+                                <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e0e7ff; color: #3730a3; border-radius: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('servname', '') }}">{{ comp.get('servname', '') }}</span>
+                                {% else %}
+                                <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e5e7eb; color: #6b7280; border-radius: 4px;">{{ comp.get('type', '—') }}</span>
+                                {% endif %}
+                                <span style="flex-shrink: 0; font-weight: 600; color: var(--text-primary);">{{ "{:,.2f}".format((comp.get('daily_cost') or 0) * 30) }} ₽/мес</span>
                             </div>
                             {% endfor %}
                             {% endif %}
@@ -319,17 +340,6 @@
                                         <div class="spec-content">
                                             <span class="spec-value">{{ (config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or (mysql_config.get('disk_size_mb', 0) / 1024))|round(1) if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else config.get('storage') }} {{ 'GB' if config.get('disk_gb') or config.get('total_storage_gb') or config.get('billing', {}).get('total_storage_gb') or mysql_config.get('disk_size_mb') else '' }}</span>
                                             <span class="spec-label">HD</span>
-                                        </div>
-                                    </div>
-                                    {% endif %}
-                                    {% if (not config.get('cpu_cores') and not config.get('vcpus')) and (config.get('sku_name') or config.get('sku')) %}
-                                    <div class="spec-item">
-                                        <div class="spec-icon">
-                                            <i class="fa-solid fa-tag"></i>
-                                        </div>
-                                        <div class="spec-content">
-                                            <span class="spec-value" title="{{ config.get('sku_name') or config.get('sku') }}">{{ (config.get('sku_name') or config.get('sku'))[:20] }}{% if (config.get('sku_name') or config.get('sku'))|length > 20 %}…{% endif %}</span>
-                                            <span class="spec-label">SKU</span>
                                         </div>
                                     </div>
                                     {% endif %}
@@ -674,23 +684,14 @@
                                 <!-- Kubernetes clusters don't show Total Storage spec -->
                                 <!-- (worker node boot disks - not meaningful for user) -->
                                 
-                                <!-- Other/Unknown: show servname or SKU when available -->
+                                <!-- Other/Unknown: show servname only when not unified (unified cards show servname in component badges) -->
                                 {% elif resource.resource_type in ['other', 'unknown'] %}
-                                    {% if config.get('servname') %}
+                                    {% if config.get('servname') and not config.get('unified') %}
                                     <div class="spec-item">
                                         <div class="spec-icon"><i class="fa-solid fa-tag"></i></div>
                                         <div class="spec-content">
                                             <span class="spec-value" title="{{ config.get('servname') }}">{{ (config.get('servname'))[:25] }}{% if config.get('servname')|length > 25 %}…{% endif %}</span>
                                             <span class="spec-label">Сервис</span>
-                                        </div>
-                                    </div>
-                                    {% endif %}
-                                    {% if config.get('sku') or config.get('sku_name') %}
-                                    <div class="spec-item">
-                                        <div class="spec-icon"><i class="fa-solid fa-barcode"></i></div>
-                                        <div class="spec-content">
-                                            <span class="spec-value" title="{{ config.get('sku_name') or config.get('sku') }}">{{ (config.get('sku_name') or config.get('sku'))[:20] }}{% if (config.get('sku_name') or config.get('sku'))|length > 20 %}…{% endif %}</span>
-                                            <span class="spec-label">SKU</span>
                                         </div>
                                     </div>
                                     {% endif %}

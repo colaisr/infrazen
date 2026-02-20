@@ -843,12 +843,24 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         by_type[t]['daily_cost'] += float(info.get('daily_cost', 0) or 0.0)
                     component_list = list(by_type.values())
                     component_sample = [
-                        {'resource_id': rid, 'type': t, 'daily_cost': info.get('daily_cost', 0)}
+                        {
+                            'resource_id': rid,
+                            'resource_name': (info.get('resource_name') or rid)[:80],
+                            'type': t,
+                            'servname': info.get('servname', '')[:60],
+                            'daily_cost': info.get('daily_cost', 0),
+                        }
                         for rid, info, t in components[:20]
                     ]
                 else:
                     component_list = [
-                        {'resource_id': rid, 'type': t, 'daily_cost': info.get('daily_cost', 0)}
+                        {
+                            'resource_id': rid,
+                            'resource_name': (info.get('resource_name') or rid)[:80],
+                            'type': t,
+                            'servname': info.get('servname', '')[:60],
+                            'daily_cost': info.get('daily_cost', 0),
+                        }
                         for rid, info, t in components
                     ]
                     component_sample = None
