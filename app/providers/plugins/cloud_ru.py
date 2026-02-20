@@ -650,20 +650,19 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 if idx > 0:
                     base = name[:idx].rstrip('-')
             elif name_lower.endswith('-infra-infra'):
-                # Volume names like vm-21sch-hq-gitlab-01-infra-infra attach to vm-21sch-hq-gitlab-01-infra
                 base = name[:-6].rstrip('-')
             else:
                 for pattern in [
-                    r'-volume$',  # trailing "-volume"
-                    r'-volume-\d+$', r'-volume-\w+$', r'-volume_\w+$',
+                    r'-volume$', r'-volume-\d+$', r'-volume-\w+$', r'-volume_\w+$',
+                    r'-volume-data-cache-\d+$', r'-volume-data-\d+$',
                     r'-disk-\d+$', r'-disk-\w+$', r'-disk_[a-f0-9-]+$',
                     r'-data\d+$', r'-data-\d+$',
+                    r'-ext4-empty$', r'-ext4-empty-\d+$',
                 ]:
                     m = re.search(pattern, name_lower)
                     if m:
                         base = name[:m.start()].rstrip('-')
                         break
-            # Apply -infra-infra strip if base still ends with it (e.g. from -volume strip above)
             if base.lower().endswith('-infra-infra'):
                 base = base[:-6].rstrip('-')
             return base
@@ -793,11 +792,22 @@ class CloudRuProviderPlugin(ProviderPlugin):
                                 grouping_key = f'k8s:{cl}'
                                 break
 
+                # 3c) K8s node volumes: disk billed as "vm-{cluster}-{suffix}" (no -nodepool- in name)
+                if (not grouping_key and resource_type == 'volume' and nodepool_clusters
+                        and isinstance(name, str) and name):
+                    for cluster in nodepool_clusters:
+                        cl = cluster.lower()
+                        if nm_l.startswith(f'vm-{cl}-') or nm_l == f'vm-{cl}':
+                            grouping_key = f'k8s:{cl}'
+                            break
+                        if nm_l.startswith(cl + '-') or nm_l == cl:
+                            grouping_key = f'k8s:{cl}'
+                            break
+
                 # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
                 if not grouping_key:
                     grouping_key = self._extract_base_name_for_grouping(name, resource_type)
                     # For volumes: if base doesn't match a server but "vm-{base}" does, use that server
-                    # e.g. volume "mach1free-disk_xxx" -> base "mach1free"; server "vm-mach1free" exists
                     if resource_type == 'volume' and grouping_key:
                         base_l = grouping_key.lower()
                         if base_l in server_names_lower:
@@ -805,11 +815,15 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         elif f"vm-{base_l}" in server_names_lower:
                             grouping_key = server_name_lookup.get(f"vm-{base_l}", f"vm-{grouping_key}")
                         else:
-                            base_key = tuple([t for t in base_l.split('-') if t and not re.fullmatch(r'\\d+', t)])
+                            base_key = tuple([t for t in base_l.split('-') if t and not re.fullmatch(r'\d+', t)])
                             vm_base_key = tuple(['vm'] + list(base_key))
                             candidates = server_norm_map.get(base_key, []) or server_norm_map.get(vm_base_key, [])
                             if len(candidates) == 1:
                                 grouping_key = candidates[0]
+                            else:
+                                prefix_match = [s for s in server_names_lower if s.startswith(f'vm-{base_l}-') or s.startswith(f'{base_l}-')]
+                                if len(prefix_match) == 1:
+                                    grouping_key = server_name_lookup.get(prefix_match[0], grouping_key)
 
                 if grouping_key not in groups:
                     groups[grouping_key] = []

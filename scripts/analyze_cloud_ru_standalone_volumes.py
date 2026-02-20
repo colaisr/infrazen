@@ -11,7 +11,6 @@ We list these and suggest heuristic patterns to add for grouping.
 
 import sys
 import os
-import json
 import re
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -19,7 +18,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app import create_app
 from app.core.models.provider import CloudProvider
 from app.core.models.resource import Resource
-from app.core.models.complete_sync import CompleteSync, ProviderSyncReference
 
 
 def extract_base_for_grouping(name: str, resource_type: str) -> str:
@@ -53,76 +51,66 @@ def extract_base_for_grouping(name: str, resource_type: str) -> str:
 def main():
     app = create_app()
     with app.app_context():
-        provider = CloudProvider.query.filter_by(provider_type='cloud-ru').first()
-        if not provider:
-            print("No Cloud.ru provider found")
+        providers = CloudProvider.query.filter_by(provider_type='cloud-ru').all()
+        if not providers:
+            print("No Cloud.ru providers found")
             return 1
 
-        # Get last successful complete sync
-        refs = (
-            ProviderSyncReference.query
-            .filter_by(provider_id=provider.id, sync_status='success')
-            .order_by(ProviderSyncReference.id.desc())
-            .limit(1)
-            .all()
-        )
-        if not refs:
-            # Fallback: get resources directly for this provider
-            refs = []
+        all_volume_resources = []
+        total_resources = 0
 
-        # Get all active Cloud.ru resources from last sync
-        resources = Resource.query.filter_by(
-            provider_id=provider.id,
-            organization_id=provider.organization_id,
-            is_active=True
-        ).all()
+        for provider in providers:
+            resources = Resource.query.filter_by(
+                provider_id=provider.id,
+                organization_id=provider.organization_id,
+                is_active=True
+            ).all()
+            total_resources += len(resources)
 
-        # Collect servers (for matching) - resource_name of server cards + component names
-        server_names = set()
-        volume_resources = []
-        for r in resources:
-            cfg = r.get_provider_config() or {}
-            rtype = (r.resource_type or '').lower()
-            comps = cfg.get('components') or []
-            comp_types = [c.get('type', '') for c in comps if isinstance(c, dict)]
+            # Collect servers (for matching) - resource_name of server cards + component names
+            server_names = set()
+            volume_resources = []
+            for r in resources:
+                cfg = r.get_provider_config() or {}
+                rtype = (r.resource_type or '').lower()
+                comps = cfg.get('components') or []
+                comp_types = [c.get('type', '') for c in comps if isinstance(c, dict)]
 
-            if 'server' in comp_types or rtype in ('server', 'compute', 'vm'):
-                server_names.add(r.resource_name.strip().lower())
-                for c in comps:
-                    if isinstance(c, dict) and c.get('type') == 'server':
-                        n = (c.get('resource_name') or c.get('name') or '').strip()
-                        if n:
-                            server_names.add(n.lower())
+                if 'server' in comp_types or rtype in ('server', 'compute', 'vm'):
+                    server_names.add(r.resource_name.strip().lower())
+                    for c in comps:
+                        if isinstance(c, dict) and c.get('type') == 'server':
+                            n = (c.get('resource_name') or c.get('name') or '').strip()
+                            if n:
+                                server_names.add(n.lower())
 
-            # Standalone volume: resource_type is volume AND no server in components
-            is_volume_card = rtype == 'volume' or (r.service_name or '').lower() == 'block storage'
-            has_server = 'server' in comp_types
-            if is_volume_card and not has_server:
-                volume_resources.append(r)
+                # Standalone volume: resource_type is volume AND no server in components
+                is_volume_card = rtype == 'volume' or (r.service_name or '').lower() == 'block storage'
+                has_server = 'server' in comp_types
+                if is_volume_card and not has_server:
+                    all_volume_resources.append((r, provider, server_names))
 
-        # Deduplicate by (resource_name, resource_id) - same volume may appear in different forms
+        # Deduplicate by (resource_name, resource_id, provider_id)
         seen = set()
         unique_volumes = []
-        for r in volume_resources:
-            key = (r.resource_name or '', r.resource_id or '')
+        for r, provider, server_names in all_volume_resources:
+            key = (r.resource_name or '', r.resource_id or '', provider.id)
             if key in seen:
                 continue
             seen.add(key)
-            unique_volumes.append(r)
+            unique_volumes.append((r, provider, server_names))
 
-        print(f"Cloud.ru provider: {provider.connection_name} (id={provider.id})")
-        print(f"Total active resources: {len(resources)}")
-        print(f"Server names (for matching): {sorted(server_names)}")
-        print(f"Standalone volumes: {len(unique_volumes)}")
+        print(f"Cloud.ru: {len(providers)} provider(s), {total_resources} total resources")
+        print(f"Standalone volume cards: {len(unique_volumes)}")
         print()
 
         if not unique_volumes:
-            print("No standalone volumes found.")
+            print("No standalone volumes – all volumes are grouped with their related resources.")
             return 0
 
         groupable = []
         purely_standalone = []
-        for r in unique_volumes:
+        for r, provider, server_names in unique_volumes:
             name = r.resource_name or r.resource_id or ''
             base = extract_base_for_grouping(name, 'volume')
             base_l = base.lower()
@@ -132,10 +120,11 @@ def main():
                 (base_l and any(base_l in s or s.endswith(f"-{base_l}") for s in server_names))
             )
             daily = float(r.daily_cost or 0)
+            prov_info = f"{provider.connection_name} (id={provider.id})"
             if matches:
-                groupable.append((r, base, daily))
+                groupable.append((r, base, daily, prov_info))
             else:
-                purely_standalone.append((r, base, daily))
+                purely_standalone.append((r, base, daily, prov_info))
 
         print("=" * 70)
         print("SUMMARY")
@@ -148,19 +137,19 @@ def main():
             print("=" * 70)
             print("GROUPABLE VOLUMES (will merge into server card after next sync)")
             print("=" * 70)
-            for r, base, daily in groupable:
+            for r, base, daily, prov in groupable:
                 name = r.resource_name or r.resource_id or ''
                 print(f"  • {name}")
-                print(f"    base -> {base}  (daily: {daily:.2f} ₽)")
+                print(f"    provider: {prov} | base -> {base}  (daily: {daily:.2f} ₽)")
 
         if purely_standalone:
             print("\n" + "=" * 70)
             print("PURELY STANDALONE VOLUMES (orphans - no server to attach to)")
             print("=" * 70)
-            for r, base, daily in purely_standalone:
+            for r, base, daily, prov in purely_standalone:
                 name = r.resource_name or r.resource_id or ''
                 print(f"  • {name}")
-                print(f"    base: {base}  (daily: {daily:.2f} ₽)")
+                print(f"    provider: {prov} | base: {base}  (daily: {daily:.2f} ₽)")
 
         return 0
 
