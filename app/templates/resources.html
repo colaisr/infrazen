@@ -170,6 +170,8 @@
                         <i class="fa-solid fa-hdd"></i>
                     {% elif _display_type == 'file-storage' %}
                         <i class="fa-solid fa-folder-tree"></i>
+                    {% elif _display_type == 'image-template' %}
+                        <i class="fa-solid fa-images" style="color: #8B5CF6;"></i>
                     {% elif _display_type == 'database' %}
                         <i class="fa-solid fa-database"></i>
                     {% elif _display_type == 'kubernetes-cluster' %}
@@ -194,7 +196,7 @@
                 </div>
                 <div class="resource-info">
                     <div class="resource-name">{{ resource.resource_name }}</div>
-                    <div class="resource-type">{{ (_display_type or resource.resource_type)|upper }}{% if _config.get('unified') and _config.get('component_count', 0) > 1 %} ({{ _config.component_count }} компонентов){% endif %}</div>
+                    <div class="resource-type">{{ (_display_type or resource.resource_type)|replace('-', ' ')|upper }}{% if _config.get('unified') and _config.get('component_count', 0) > 1 %} ({{ _config.component_count }} компонентов){% endif %}</div>
                 </div>
                 <div class="resource-status">
                     {% if resource.status == 'RUNNING' or resource.status == 'ACTIVE' %}

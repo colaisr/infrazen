@@ -862,6 +862,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 servnames_lower = [str((info or {}).get('servname', '')).lower() for _, info, _ in components]
                 if unified_type == 'volume' and any(('nfs' in s) or ('sfs' in s) or ('файлов' in s) for s in servnames_lower):
                     display_type = 'file-storage'
+                # Image template / IMS: volume + s3 with Image Management Service (управления образами)
+                if unified_type == 'volume' and any(('управления образами' in s) or ('ims' in s) or ('образ' in s) for s in servnames_lower):
+                    display_type = 'image-template'
                 # Backup-only groups: show as backup
                 if unified_type == 'other' and ('backup' in set(component_types)) and ('server' not in set(component_types)):
                     display_type = 'backup'
@@ -926,6 +929,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     service_name = 'Kubernetes'
                 if display_type == 'file-storage':
                     service_name = 'File Storage'
+                if display_type == 'image-template':
+                    service_name = 'Image Template'
                 if display_type == 'backup':
                     service_name = 'Backup'
                 if display_type == 'kms':
