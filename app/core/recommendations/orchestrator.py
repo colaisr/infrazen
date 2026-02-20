@@ -321,10 +321,22 @@ class RecommendationOrchestrator:
             else:
                 existing = None
 
+            # Resolve organization_id (required by DB; avoid IntegrityError on bulk sync)
+            organization_id = None
+            if out.resource_id:
+                res = Resource.query.get(out.resource_id)
+                if res and res.organization_id:
+                    organization_id = res.organization_id
+            if organization_id is None and out.provider_id:
+                prov = CloudProvider.query.get(out.provider_id)
+                if prov and prov.organization_id:
+                    organization_id = prov.organization_id
+
             if existing is None:
                 rec = OptimizationRecommendation(
                     resource_id=out.resource_id,
                     provider_id=out.provider_id,
+                    organization_id=organization_id,
                     recommendation_type=out.recommendation_type,
                     category=out.category.value if hasattr(out.category, 'value') else str(out.category),
                     severity=out.severity,
