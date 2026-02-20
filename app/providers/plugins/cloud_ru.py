@@ -639,23 +639,34 @@ class CloudRuProviderPlugin(ProviderPlugin):
         name_lower = name.lower()
         # Strip volume/disk suffixes for volumes to match VM base name
         if resource_type == 'volume':
+            base = name
             # Common pattern: VM boot/data disks named "<vm-name>-volume..." should attach to VM "<vm-name>"
             # Examples:
             # - vm-foo-bar-volume
             # - vm-foo-bar-volume-data-opensearch
+            # - vm-21sch-hq-gitlab-01-infra-infra-volume-data-0001 -> vm-21sch-hq-gitlab-01-infra
             if name_lower.startswith('vm-') and '-volume' in name_lower:
                 idx = name_lower.index('-volume')
                 if idx > 0:
-                    return name[:idx].rstrip('-')
-            for pattern in [
-                r'-volume$',  # trailing "-volume"
-                r'-volume-\d+$', r'-volume-\w+$', r'-volume_\w+$',
-                r'-disk-\d+$', r'-disk-\w+$', r'-disk_[a-f0-9-]+$',
-                r'-data\d+$', r'-data-\d+$',
-            ]:
-                m = re.search(pattern, name_lower)
-                if m:
-                    return name[:m.start()].rstrip('-')
+                    base = name[:idx].rstrip('-')
+            elif name_lower.endswith('-infra-infra'):
+                # Volume names like vm-21sch-hq-gitlab-01-infra-infra attach to vm-21sch-hq-gitlab-01-infra
+                base = name[:-6].rstrip('-')
+            else:
+                for pattern in [
+                    r'-volume$',  # trailing "-volume"
+                    r'-volume-\d+$', r'-volume-\w+$', r'-volume_\w+$',
+                    r'-disk-\d+$', r'-disk-\w+$', r'-disk_[a-f0-9-]+$',
+                    r'-data\d+$', r'-data-\d+$',
+                ]:
+                    m = re.search(pattern, name_lower)
+                    if m:
+                        base = name[:m.start()].rstrip('-')
+                        break
+            # Apply -infra-infra strip if base still ends with it (e.g. from -volume strip above)
+            if base.lower().endswith('-infra-infra'):
+                base = base[:-6].rstrip('-')
+            return base
         return name
 
     def _create_unified_resources_by_name(self, billing_data: Dict, billing_resources_by_type: Dict,
@@ -785,6 +796,20 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
                 if not grouping_key:
                     grouping_key = self._extract_base_name_for_grouping(name, resource_type)
+                    # For volumes: if base doesn't match a server but "vm-{base}" does, use that server
+                    # e.g. volume "mach1free-disk_xxx" -> base "mach1free"; server "vm-mach1free" exists
+                    if resource_type == 'volume' and grouping_key:
+                        base_l = grouping_key.lower()
+                        if base_l in server_names_lower:
+                            grouping_key = server_name_lookup.get(base_l, grouping_key)
+                        elif f"vm-{base_l}" in server_names_lower:
+                            grouping_key = server_name_lookup.get(f"vm-{base_l}", f"vm-{grouping_key}")
+                        else:
+                            base_key = tuple([t for t in base_l.split('-') if t and not re.fullmatch(r'\\d+', t)])
+                            vm_base_key = tuple(['vm'] + list(base_key))
+                            candidates = server_norm_map.get(base_key, []) or server_norm_map.get(vm_base_key, [])
+                            if len(candidates) == 1:
+                                grouping_key = candidates[0]
 
                 if grouping_key not in groups:
                     groups[grouping_key] = []
