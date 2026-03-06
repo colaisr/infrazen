@@ -1142,30 +1142,57 @@ class CloudRuAdvancedClient:
     # ------------------------------------------------------------------
 
     def get_vms(self, project_id: str) -> List[Dict]:
-        """Fetch all ECS servers for the given project (handles pagination)."""
+        """Fetch all ECS servers for the given project.
+
+        The v1 ``/cloudservers/detail`` endpoint silently ignores the
+        ``offset`` parameter (returns 0 results for offset > 0), so
+        offset-based pagination is unusable.  Use ``limit=1000`` to
+        retrieve all servers in a single call.  If the project has more
+        than 1000 VMs, fall back to the v2 Nova endpoint which supports
+        proper marker-based pagination.
+        """
         path = f"/v1/{project_id}/cloudservers/detail"
-        all_vms: List[Dict] = []
-        offset = 0
-        limit = 100
-        while True:
-            data = self._get("ecs", path, project_id,
-                             {"limit": limit, "offset": offset})
-            if not data:
-                break
+        data = self._get("ecs", path, project_id, {"limit": 1000})
+        if data:
             servers = data.get("servers", [])
-            all_vms.extend(servers)
-            if len(servers) < limit:
+            total = data.get("count", len(servers))
+            if len(servers) >= total:
+                self.logger.info(f"Advanced ECS: {len(servers)} VMs for project {project_id}")
+                return servers
+            self.logger.info(
+                f"Advanced ECS v1 returned {len(servers)}/{total} VMs, "
+                f"falling back to v2 paginated endpoint"
+            )
+
+        # Fallback: v2 Nova API with marker-based pagination
+        v2_path = f"/v2/{project_id}/servers/detail"
+        all_vms: List[Dict] = []
+        params: Dict[str, Any] = {"limit": 200}
+        while True:
+            page = self._get("ecs", v2_path, project_id, params)
+            if not page:
                 break
-            offset += limit
-        self.logger.info(f"Advanced ECS: {len(all_vms)} VMs for project {project_id}")
+            servers = page.get("servers", [])
+            all_vms.extend(servers)
+            links = page.get("servers_links", [])
+            next_link = next((l for l in links if l.get("rel") == "next"), None)
+            if not next_link or len(servers) < 200:
+                break
+            last_id = servers[-1].get("id", "")
+            params["marker"] = last_id
+        self.logger.info(f"Advanced ECS (v2): {len(all_vms)} VMs for project {project_id}")
         return all_vms
 
     def get_volumes(self, project_id: str) -> List[Dict]:
-        """Fetch all EVS volumes for the given project (handles pagination)."""
+        """Fetch all EVS volumes for the given project.
+
+        Uses ``limit=1000`` for the first call; if the project has more,
+        falls back to offset-based pagination with ``limit=1000``.
+        """
         path = f"/v2/{project_id}/volumes/detail"
         all_vols: List[Dict] = []
         offset = 0
-        limit = 100
+        limit = 1000
         while True:
             data = self._get("evs", path, project_id,
                              {"limit": limit, "offset": offset})
@@ -1268,6 +1295,7 @@ class CloudRuAdvancedClient:
         vm_to_cluster: Dict[str, Dict] = {}
         vm_details: Dict[str, Dict] = {}
         cluster_details: Dict[str, Dict] = {}
+        vm_name_to_id: Dict[str, str] = {}  # lowercase name → vm_id
 
         # --- ECS VMs ---
         try:
@@ -1280,6 +1308,9 @@ class CloudRuAdvancedClient:
             vm_id = vm.get("id")
             if not vm_id:
                 continue
+            vm_name = (vm.get("name") or "").strip()
+            if vm_name:
+                vm_name_to_id[vm_name.lower()] = vm_id
             flavor = vm.get("flavor") or {}
             vcpus = int(flavor.get("vcpus") or 0)
             ram_mb = int(flavor.get("ram") or 0)
@@ -1384,5 +1415,6 @@ class CloudRuAdvancedClient:
             "vm_to_cluster": vm_to_cluster,
             "vm_details": vm_details,
             "cluster_details": cluster_details,
+            "vm_name_to_id": vm_name_to_id,
         }
 

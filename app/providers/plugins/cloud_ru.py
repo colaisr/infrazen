@@ -657,6 +657,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
             'vm_to_cluster': {},
             'vm_details': {},
             'cluster_details': {},
+            'vm_name_to_id': {},
         }
 
         for tenant in tenants:
@@ -739,6 +740,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
         vm_details: Dict[str, Dict] = advanced_id_map.get('vm_details', {})
         vm_to_cluster: Dict[str, Dict] = advanced_id_map.get('vm_to_cluster', {})
         cluster_details: Dict[str, Dict] = advanced_id_map.get('cluster_details', {})
+        vm_name_to_id: Dict[str, str] = advanced_id_map.get('vm_name_to_id', {})
         from app.providers.resource_registry import ProviderResource
 
         # Infer Kubernetes clusters from VM naming ("<cluster>-nodepool-...").
@@ -869,7 +871,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             grouping_key = f'k8s:{cl}'
                             break
 
-                # 3d) Volume→VM via Advanced API EVS attachments (most reliable)
+                # 3d) Volume→VM via Advanced API EVS attachments (most reliable).
+                # Match billing resource_id to EVS volume UUID; no name fallback
+                # needed for volumes since EVS UUIDs match billing directly.
                 if not grouping_key and resource_type == 'volume' and disk_to_vm:
                     vm_info = disk_to_vm.get(rid) or disk_to_vm.get(rid.lower())
                     if vm_info:
@@ -881,6 +885,11 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # 3e) VM→Cluster via Advanced API node naming (when vm resource_id is a UUID)
                 if not grouping_key and resource_type == 'server' and vm_to_cluster:
                     cluster_info = vm_to_cluster.get(rid) or vm_to_cluster.get(rid.lower())
+                    if not cluster_info and vm_name_to_id:
+                        name_l = str(name).strip().lower()
+                        vm_uuid = vm_name_to_id.get(name_l)
+                        if vm_uuid:
+                            cluster_info = vm_to_cluster.get(vm_uuid)
                     if cluster_info:
                         cluster_name = (cluster_info.get('cluster_name') or '').strip()
                         if cluster_name:
@@ -1043,12 +1052,18 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 })
 
                 # --- Advanced API enrichment ---
-                # For VM groups: overlay real CPU/RAM/disk/IP from vm_details
+                # For VM groups: overlay real CPU/RAM/disk/IP from vm_details.
+                # Match by billing resource_id → Advanced server UUID; fall back
+                # to billing resource_name → Advanced VM name when UUID differs.
                 if display_type == 'server' and vm_details:
-                    # Match by resource_id of any 'server' component that appears in vm_details
                     for comp_rid, comp_info, comp_t in components:
                         if comp_t == 'server':
                             vd = vm_details.get(comp_rid) or vm_details.get(comp_rid.lower())
+                            if not vd and vm_name_to_id:
+                                comp_name = (comp_info.get('resource_name') or '').strip().lower()
+                                vm_uuid = vm_name_to_id.get(comp_name)
+                                if vm_uuid:
+                                    vd = vm_details.get(vm_uuid)
                             if vd:
                                 if vd.get('cpu_cores'):
                                     provider_config['cpu_cores'] = vd['cpu_cores']
