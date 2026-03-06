@@ -81,22 +81,30 @@ def add_connection():
         connection_name = request.form.get('connection_name')
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
-        project_id = (request.form.get('project_id') or '').strip()
         agreement_id = (request.form.get('agreement_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
         
-        if not all([connection_name, api_key, api_secret, project_id]):
-            flash('Connection name, API key, API secret, and Project ID are required', 'error')
+        # Parse advanced tenants list (JSON string from form)
+        advanced_tenants_raw = request.form.get('advanced_tenants', '[]')
+        try:
+            advanced_tenants = json.loads(advanced_tenants_raw)
+            if not isinstance(advanced_tenants, list):
+                advanced_tenants = []
+        except (json.JSONDecodeError, TypeError):
+            advanced_tenants = []
+        
+        if not all([connection_name, api_key, api_secret]):
+            flash('Connection name, API key and API secret are required', 'error')
             return redirect(url_for('main.connections'))
         
         # Test connection first
         from .client import CloudRuClient
         credentials = {'api_key': api_key, 'api_secret': api_secret}
-        if project_id:
-            credentials['project_id'] = project_id
         if agreement_id:
             credentials['agreement_id'] = agreement_id
+        if advanced_tenants:
+            credentials['advanced_tenants'] = advanced_tenants
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         
@@ -189,8 +197,8 @@ def edit_connection(provider_id):
                 'account_id': provider.account_id,
                 'api_key': credentials.get('api_key', ''),
                 'api_secret': credentials.get('api_secret', ''),
-                'project_id': credentials.get('project_id', ''),
                 'agreement_id': credentials.get('agreement_id', ''),
+                'advanced_tenants': credentials.get('advanced_tenants', []),
                 'auto_sync': provider.auto_sync,
                 'sync_interval': provider.sync_interval
             }
@@ -236,10 +244,13 @@ def update_connection(provider_id):
         connection_name = request.form.get('connection_name')
         api_key = request.form.get('api_key')
         api_secret = request.form.get('api_secret')
-        project_id = (request.form.get('project_id') or '').strip()
         agreement_id = (request.form.get('agreement_id') or '').strip()
         auto_sync = request.form.get('auto_sync') == 'on'
         sync_interval = request.form.get('sync_interval', 'daily')
+        
+        # Parse advanced tenants list (JSON string from form)
+        advanced_tenants_raw = request.form.get('advanced_tenants', None)
+        existing_credentials = json.loads(provider.credentials) if provider.credentials else {}
         
         if not all([connection_name, api_key]):
             return jsonify({
@@ -247,29 +258,37 @@ def update_connection(provider_id):
                 'message': 'Connection name and API key are required'
             }), 400
         
-        existing_credentials = json.loads(provider.credentials) if provider.credentials else {}
-        if not project_id and not existing_credentials.get('project_id'):
-            return jsonify({
-                'success': False,
-                'message': 'Project ID is required'
-            }), 400
-        
         # If api_secret is empty, keep existing one
         if not api_secret:
             api_secret = existing_credentials.get('api_secret', '')
         
+        # Parse advanced_tenants: form value takes priority; fall back to existing
+        if advanced_tenants_raw is not None:
+            try:
+                advanced_tenants = json.loads(advanced_tenants_raw)
+                if not isinstance(advanced_tenants, list):
+                    advanced_tenants = []
+            except (json.JSONDecodeError, TypeError):
+                advanced_tenants = existing_credentials.get('advanced_tenants', [])
+        else:
+            advanced_tenants = existing_credentials.get('advanced_tenants', [])
+        
+        # For rows where SK is blank, preserve existing SK for that tenant (by name)
+        existing_tenant_map = {t.get('name'): t for t in existing_credentials.get('advanced_tenants', [])}
+        for tenant in advanced_tenants:
+            if not tenant.get('sk') and tenant.get('name') in existing_tenant_map:
+                tenant['sk'] = existing_tenant_map[tenant['name']].get('sk', '')
+        
         # Test connection with new credentials
         from .client import CloudRuClient
         credentials = {'api_key': api_key, 'api_secret': api_secret}
-        if project_id:
-            credentials['project_id'] = project_id
-        elif existing_credentials.get('project_id'):
-            credentials['project_id'] = existing_credentials['project_id']
         # agreement_id: form > existing > auto-discovered from test
         if agreement_id:
             credentials['agreement_id'] = agreement_id
         elif existing_credentials.get('agreement_id'):
             credentials['agreement_id'] = existing_credentials['agreement_id']
+        if advanced_tenants:
+            credentials['advanced_tenants'] = advanced_tenants
         client = CloudRuClient(credentials)
         test_result = client.test_connection()
         

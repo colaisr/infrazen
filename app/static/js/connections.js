@@ -77,13 +77,13 @@ const providers = {
     },
     'cloud-ru': {
         name: 'Cloud.ru',
-        description: 'Cloud.ru — Key ID, Key Secret, Project ID. Agreement ID — для полного расчёта затрат (Контроль затрат → Договор в консоли).',
+        description: 'Cloud.ru — Key ID и Key Secret для доступа к billing API (Evolution). Agreement ID — для полного расчёта затрат. Advanced тенанты — AK/SK ключи для каждого тенанта (для точной группировки ресурсов).',
         fields: [
-            { name: 'api_key', label: 'Key ID (Key ID) *', type: 'text', placeholder: 'Ваш Key ID из ключа доступа', required: true },
-            { name: 'api_secret', label: 'Key Secret (Secret) *', type: 'password', placeholder: '••••••••', required: true },
-            { name: 'project_id', label: 'Project ID *', type: 'text', placeholder: 'UUID проекта (projectId в URL)', required: true },
+            { name: 'api_key', label: 'Key ID (Evolution) *', type: 'text', placeholder: 'Ваш Key ID из ключа доступа', required: true },
+            { name: 'api_secret', label: 'Key Secret (Evolution) *', type: 'password', placeholder: '••••••••', required: true },
             { name: 'agreement_id', label: 'Agreement ID (опционально)', type: 'text', placeholder: 'UUID договора (agreementId в URL, Контроль затрат → Договор)', required: false }
-        ]
+        ],
+        customSection: 'cloud-ru-tenants'
     }
 };
 
@@ -112,6 +112,8 @@ function closeProviderModal() {
     document.getElementById('connectBtn').style.display = 'none';
     document.getElementById('provider_select').value = '';
     document.getElementById('providerFields').innerHTML = '';
+    const full = document.getElementById('providerFieldsFull');
+    if (full) full.innerHTML = '';
 }
 
 function changeProvider() {
@@ -140,12 +142,22 @@ function changeProvider() {
             form.action = '/api/providers/beget/add';
         }
         
-        // Generate dynamic fields
+        // Generate dynamic fields (base credential fields go in the left column)
         providerFields.innerHTML = '';
         provider.fields.forEach(field => {
             const fieldHtml = createFieldHtml(field);
             providerFields.innerHTML += fieldHtml;
         });
+
+        // Full-width custom sections (e.g. cloud-ru Advanced Tenants) go in the full-width row
+        const providerFieldsFull = document.getElementById('providerFieldsFull');
+        if (providerFieldsFull) {
+            if (provider.customSection === 'cloud-ru-tenants') {
+                providerFieldsFull.innerHTML = createCloudRuTenantsSection([]);
+            } else {
+                providerFieldsFull.innerHTML = '';
+            }
+        }
         
         testBtn.style.display = 'inline-block';
         connectBtn.style.display = 'inline-block';
@@ -200,6 +212,105 @@ function createFieldHtml(field) {
             </div>
         `;
     }
+}
+
+// ============================================================================
+// Cloud.ru Advanced Tenants UI
+// ============================================================================
+
+function createCloudRuTenantsSection(tenants) {
+    let rowsHtml = '';
+    if (tenants && tenants.length > 0) {
+        tenants.forEach(t => {
+            rowsHtml += cloudRuTenantRowHtml(t.name || '', t.ak || '', t.sk || '', t.project_id || '');
+        });
+    }
+    return `
+        <div class="form-group" style="margin-top: 1.25rem;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom: 0.5rem;">
+                <label class="form-label" style="font-weight: 600; margin: 0;">
+                    Advanced Тенанты
+                    <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); margin-left: 0.35rem;">(AK/SK для группировки ресурсов; опционально)</span>
+                </label>
+                <button type="button" onclick="addCloudRuTenantRow()"
+                        style="background:none; border:1px solid var(--border-color,#d1d5db); color:var(--text-secondary,#6b7280); border-radius:6px; padding:0.2rem 0.6rem; font-size:0.8rem; cursor:pointer; white-space:nowrap;">
+                    <i class="fa-solid fa-plus" style="font-size:0.75rem;"></i> Добавить
+                </button>
+            </div>
+            <div id="cloud-ru-tenants-container" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                ${rowsHtml}
+            </div>
+        </div>
+    `;
+}
+
+function cloudRuTenantRowHtml(name, ak, sk, project_id) {
+    return `
+        <div class="cloud-ru-tenant-row" style="border: 1px solid var(--border-color, #e5e7eb); border-radius: 8px; padding: 0.6rem 0.75rem; background: var(--bg-secondary, #f9fafb);">
+            <!-- Row 1: tenant name + delete -->
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; display: block;">Имя тенанта</label>
+                    <input type="text" class="form-control form-control-sm" name="adv_tenant_name" placeholder="school21_adv" value="${escapeHtml(name)}" style="font-size: 0.84rem;">
+                </div>
+                <button type="button" onclick="this.closest('.cloud-ru-tenant-row').remove()"
+                        title="Удалить тенант"
+                        style="flex-shrink:0; margin-top:18px; background:none; border:1px solid #dc3545; color:#dc3545; border-radius:6px; padding:0.3rem 0.5rem; cursor:pointer; line-height:1;">
+                    <i class="fa-solid fa-trash-can" style="font-size:0.8rem;"></i>
+                </button>
+            </div>
+            <!-- Row 2: AK / SK / Project ID -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+                <div>
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; display: block;">AK (Access Key)</label>
+                    <input type="text" class="form-control form-control-sm" name="adv_tenant_ak" placeholder="HPUA…" value="${escapeHtml(ak)}" style="font-size: 0.82rem; font-family: monospace;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; display: block;">SK (Secret Key)</label>
+                    <input type="password" class="form-control form-control-sm" name="adv_tenant_sk" placeholder="••••••••" value="${escapeHtml(sk)}" style="font-size: 0.82rem;">
+                </div>
+                <div>
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; display: block;">Project ID</label>
+                    <input type="text" class="form-control form-control-sm" name="adv_tenant_project_id" placeholder="101a02ba…" value="${escapeHtml(project_id)}" style="font-size: 0.82rem; font-family: monospace;">
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function addCloudRuTenantRow(tenant) {
+    const container = document.getElementById('cloud-ru-tenants-container');
+    if (!container) return;
+    const t = tenant || {};
+    const div = document.createElement('div');
+    div.innerHTML = cloudRuTenantRowHtml(t.name || '', t.ak || '', t.sk || '', t.project_id || '');
+    container.appendChild(div.firstElementChild);
+}
+
+function getCloudRuTenantsData() {
+    const container = document.getElementById('cloud-ru-tenants-container');
+    if (!container) return [];
+    const rows = container.querySelectorAll('.cloud-ru-tenant-row');
+    const tenants = [];
+    rows.forEach(row => {
+        const name = row.querySelector('input[name="adv_tenant_name"]').value.trim();
+        const ak = row.querySelector('input[name="adv_tenant_ak"]').value.trim();
+        const sk = row.querySelector('input[name="adv_tenant_sk"]').value.trim();
+        const project_id = row.querySelector('input[name="adv_tenant_project_id"]').value.trim();
+        if (name || ak || project_id) {
+            tenants.push({ name, ak, sk, project_id });
+        }
+    });
+    return tenants;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 // ============================================================================
@@ -604,14 +715,21 @@ function fillEditForm(connectionData) {
             apiSecretField.placeholder = 'Введите новый секретный ключ (оставьте пустым, чтобы не менять)';
         }
         
-        const projectIdField = document.querySelector('input[name="project_id"]');
-        if (projectIdField) {
-            projectIdField.value = connectionData.project_id || '';
-        }
-        
         const agreementIdField = document.querySelector('input[name="agreement_id"]');
         if (agreementIdField) {
             agreementIdField.value = connectionData.agreement_id || '';
+        }
+        
+        // Populate advanced tenants in the full-width section
+        const tenants = connectionData.advanced_tenants || [];
+        const fullSection = document.getElementById('providerFieldsFull');
+        if (fullSection && !fullSection.querySelector('#cloud-ru-tenants-container')) {
+            fullSection.innerHTML = createCloudRuTenantsSection([]);
+        }
+        const tenantsContainer = document.getElementById('cloud-ru-tenants-container');
+        if (tenantsContainer) {
+            tenantsContainer.innerHTML = '';
+            tenants.forEach(t => addCloudRuTenantRow(t));
         }
     }
     
@@ -661,6 +779,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 const formData = new FormData(form);
                 
+                // Attach advanced_tenants JSON for cloud-ru
+                if (selectedProvider === 'cloud-ru') {
+                    formData.set('advanced_tenants', JSON.stringify(getCloudRuTenantsData()));
+                }
+                
                 fetch(updateUrl, {
                     method: 'POST',
                     body: formData
@@ -680,6 +803,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Update error:', error);
                 });
             } else {
+                // For cloud-ru, inject advanced_tenants before submitting
+                if (selectedProvider === 'cloud-ru') {
+                    let hiddenInput = form.querySelector('input[name="advanced_tenants"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'advanced_tenants';
+                        form.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = JSON.stringify(getCloudRuTenantsData());
+                }
                 form.submit();
             }
         });

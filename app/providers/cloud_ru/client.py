@@ -2,10 +2,13 @@
 Cloud.ru API Client
 Basic client for Cloud.ru API integration
 """
+import hashlib
+import hmac
 import logging
 import requests
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
+from urllib.parse import quote, unquote
 
 logger = logging.getLogger(__name__)
 
@@ -686,6 +689,74 @@ class CloudRuClient:
             self.logger.error(f"Failed to get volumes: {str(e)}")
             return []
     
+    def get_disk_to_vm_mapping(self) -> Dict[str, Dict[str, str]]:
+        """
+        Build disk_id -> {vm_id, vm_name} mapping from Compute API.
+        VM detail (GET /api/v1/vms/{vm_id}) includes disks[] with disk id.
+        Used for volume-to-server grouping instead of name heuristics.
+        
+        Returns:
+            Dict mapping disk_id (str) -> {vm_id, vm_name}
+        """
+        result: Dict[str, Dict[str, str]] = {}
+        if not self._ensure_authenticated():
+            self.logger.warning("Cannot get disk mapping: authentication failed")
+            return result
+        
+        project_ids = []
+        if self.project_id:
+            project_ids = [self.project_id]
+        else:
+            projects = self.get_projects()
+            for p in projects:
+                pid = (p.get('id') or p.get('project_id') or p.get('projectId')) if isinstance(p, dict) else None
+                if pid:
+                    project_ids.append(pid)
+        
+        if not project_ids:
+            self.logger.warning("No project_id for disk mapping")
+            return result
+        
+        for project_id in project_ids:
+            try:
+                vms_url = f"{self.COMPUTE_URL}/api/v1/vms"
+                r = self.session.get(vms_url, params={'project_id': project_id}, timeout=30)
+                if r.status_code != 200:
+                    self.logger.debug(f"VMs list returned {r.status_code} for project {project_id}")
+                    continue
+                data = r.json()
+                vms = data if isinstance(data, list) else (
+                    data.get('vms') or data.get('instances') or data.get('items') or []
+                )
+                if not isinstance(vms, list):
+                    continue
+                for vm in vms:
+                    vm_id = vm.get('id') if isinstance(vm, dict) else None
+                    vm_name = (vm.get('name') or '').strip() if isinstance(vm, dict) else ''
+                    if not vm_id:
+                        continue
+                    try:
+                        detail_url = f"{self.COMPUTE_URL}/api/v1/vms/{vm_id}"
+                        dr = self.session.get(detail_url, params={'project_id': project_id}, timeout=15)
+                        if dr.status_code != 200:
+                            continue
+                        vd = dr.json()
+                        disks = vd.get('disks') if isinstance(vd, dict) else []
+                        if not isinstance(disks, list):
+                            continue
+                        for d in disks:
+                            disk_id = d.get('id') if isinstance(d, dict) else None
+                            if disk_id:
+                                result[disk_id] = {'vm_id': vm_id, 'vm_name': vm_name}
+                    except Exception as e:
+                        self.logger.debug(f"VM detail for {vm_id}: {e}")
+                        continue
+            except Exception as e:
+                self.logger.warning(f"Disk mapping for project {project_id}: {e}")
+        
+        self.logger.info(f"Disk-to-VM mapping: {len(result)} disks from Compute API")
+        return result
+    
     def get_networks(self) -> List[Dict[str, Any]]:
         """
         Get list of networks
@@ -940,4 +1011,378 @@ class CloudRuClient:
         except Exception as e:
             self.logger.error(f"Failed to get account billing: {str(e)}")
             return {}
+
+
+class CloudRuAdvancedClient:
+    """
+    Client for Cloud.ru Advanced (Huawei-based) APIs.
+    Uses AK/SK HMAC-SHA256 request signing.
+    Each instance is scoped to a single tenant/project.
+    """
+
+    REGION = "ru-moscow-1"
+
+    # Service endpoint templates
+    _SERVICE_HOSTS = {
+        'ecs': 'ecs.{region}.hc.sbercloud.ru',
+        'evs': 'evs.{region}.hc.sbercloud.ru',
+        'cce': 'cce.{region}.hc.sbercloud.ru',
+        'vpc': 'vpc.{region}.hc.sbercloud.ru',
+        'elb': 'elb.{region}.hc.sbercloud.ru',
+        'rds': 'rds.{region}.hc.sbercloud.ru',
+    }
+
+    def __init__(self, ak: str, sk: str, region: str = "ru-moscow-1"):
+        self.ak = ak
+        self.sk = sk
+        self.region = region
+        self.logger = logging.getLogger(f"{__name__}.CloudRuAdvancedClient")
+
+    # ------------------------------------------------------------------
+    # AK/SK signing (Huawei Cloud SDK-HMAC-SHA256 algorithm)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _canonical_uri(raw_path: str) -> str:
+        """Encode URI path per Huawei Cloud canonical-request rules and ensure trailing slash."""
+        segments = unquote(raw_path).split("/")
+        encoded = [quote(seg, safe="-_.~") for seg in segments]
+        result = "/".join(encoded)
+        if not result.endswith("/"):
+            result += "/"
+        return result
+
+    def _sign_request(self, method: str, host: str, path: str,
+                      query_params: Dict[str, Any], body: str = "") -> Dict[str, str]:
+        """
+        Build signed headers for a Huawei Cloud AK/SK request.
+        Returns a headers dict ready to use in requests.
+        """
+        now = datetime.utcnow()
+        x_date = now.strftime("%Y%m%dT%H%M%SZ")
+        date_str = x_date[:8]
+
+        # Canonical query string: sorted, URL-encoded
+        sorted_params = sorted(query_params.items())
+        canonical_qs = "&".join(
+            f"{quote(str(k), safe='-_.~')}={quote(str(v), safe='-_.~')}"
+            for k, v in sorted_params
+        )
+
+        # Payload hash
+        body_bytes = body.encode("utf-8") if isinstance(body, str) else body
+        payload_hash = hashlib.sha256(body_bytes).hexdigest()
+
+        # Signed headers
+        signed_headers = "content-type;host;x-sdk-date"
+        canonical_headers = (
+            f"content-type:application/json\n"
+            f"host:{host}\n"
+            f"x-sdk-date:{x_date}\n"
+        )
+
+        canonical_request = "\n".join([
+            method.upper(),
+            self._canonical_uri(path),
+            canonical_qs,
+            canonical_headers,
+            signed_headers,
+            payload_hash,
+        ])
+
+        # String to sign
+        algorithm = "SDK-HMAC-SHA256"
+        cr_hash = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
+        string_to_sign = f"{algorithm}\n{x_date}\n{cr_hash}"
+
+        # HMAC signature
+        signature = hmac.new(
+            self.sk.encode("utf-8"),
+            string_to_sign.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+        authorization = (
+            f"{algorithm} Access={self.ak}, "
+            f"SignedHeaders={signed_headers}, "
+            f"Signature={signature}"
+        )
+
+        return {
+            "Content-Type": "application/json",
+            "Host": host,
+            "X-Sdk-Date": x_date,
+            "Authorization": authorization,
+        }
+
+    def _get(self, service: str, path: str, project_id: str,
+             query_params: Optional[Dict] = None, timeout: int = 30) -> Optional[Any]:
+        """
+        Perform a signed GET request to an Advanced API service.
+        Returns parsed JSON or None on error.
+        """
+        host = self._SERVICE_HOSTS[service].format(region=self.region)
+        params = dict(query_params or {})
+        headers = self._sign_request("GET", host, path, params)
+        url = f"https://{host}{path}"
+
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=timeout)
+            if resp.status_code == 200:
+                return resp.json()
+            self.logger.debug(
+                f"Advanced API {service} {path} → {resp.status_code}: {resp.text[:300]}"
+            )
+        except Exception as e:
+            self.logger.warning(f"Advanced API {service} {path} error: {e}")
+        return None
+
+    # ------------------------------------------------------------------
+    # Resource fetchers
+    # ------------------------------------------------------------------
+
+    def get_vms(self, project_id: str) -> List[Dict]:
+        """Fetch all ECS servers for the given project (handles pagination)."""
+        path = f"/v1/{project_id}/cloudservers/detail"
+        all_vms: List[Dict] = []
+        offset = 0
+        limit = 100
+        while True:
+            data = self._get("ecs", path, project_id,
+                             {"limit": limit, "offset": offset})
+            if not data:
+                break
+            servers = data.get("servers", [])
+            all_vms.extend(servers)
+            if len(servers) < limit:
+                break
+            offset += limit
+        self.logger.info(f"Advanced ECS: {len(all_vms)} VMs for project {project_id}")
+        return all_vms
+
+    def get_volumes(self, project_id: str) -> List[Dict]:
+        """Fetch all EVS volumes for the given project (handles pagination)."""
+        path = f"/v2/{project_id}/volumes/detail"
+        all_vols: List[Dict] = []
+        offset = 0
+        limit = 100
+        while True:
+            data = self._get("evs", path, project_id,
+                             {"limit": limit, "offset": offset})
+            if not data:
+                break
+            vols = data.get("volumes", [])
+            all_vols.extend(vols)
+            if len(vols) < limit:
+                break
+            offset += limit
+        self.logger.info(f"Advanced EVS: {len(all_vols)} volumes for project {project_id}")
+        return all_vols
+
+    def get_clusters(self, project_id: str) -> List[Dict]:
+        """Fetch all CCE clusters for the given project."""
+        path = f"/api/v3/projects/{project_id}/clusters"
+        data = self._get("cce", path, project_id)
+        if not data:
+            return []
+        items = data.get("items", [])
+        self.logger.info(f"Advanced CCE: {len(items)} clusters for project {project_id}")
+        return items
+
+    def get_load_balancers(self, project_id: str) -> List[Dict]:
+        """Fetch all ELB load balancers for the given project."""
+        path = f"/v3/{project_id}/elb/loadbalancers"
+        all_lbs: List[Dict] = []
+        marker = None
+        limit = 100
+        while True:
+            params: Dict[str, Any] = {"limit": limit}
+            if marker:
+                params["marker"] = marker
+            data = self._get("elb", path, project_id, params)
+            if not data:
+                break
+            lbs = data.get("loadbalancers", [])
+            all_lbs.extend(lbs)
+            page_info = data.get("page_info", {})
+            next_marker = page_info.get("next_marker")
+            if not next_marker or len(lbs) < limit:
+                break
+            marker = next_marker
+        self.logger.info(f"Advanced ELB: {len(all_lbs)} LBs for project {project_id}")
+        return all_lbs
+
+    def get_databases(self, project_id: str) -> List[Dict]:
+        """Fetch all RDS instances for the given project."""
+        path = f"/v3/{project_id}/instances"
+        all_dbs: List[Dict] = []
+        offset = 0
+        limit = 100
+        while True:
+            data = self._get("rds", path, project_id,
+                             {"limit": limit, "offset": offset})
+            if not data:
+                break
+            instances = data.get("instances", [])
+            all_dbs.extend(instances)
+            if len(instances) < limit:
+                break
+            offset += limit
+        self.logger.info(f"Advanced RDS: {len(all_dbs)} DB instances for project {project_id}")
+        return all_dbs
+
+    # ------------------------------------------------------------------
+    # ID relationship map
+    # ------------------------------------------------------------------
+
+    def build_id_map(self, project_id: str) -> Dict[str, Any]:
+        """
+        Build ID-relationship maps for a single project tenant.
+
+        Returns::
+
+            {
+              'disk_to_vm': {
+                  '<volume-uuid>': {
+                      'vm_id': '...', 'vm_name': '...',
+                      'vm_data': {...}
+                  }
+              },
+              'vm_to_cluster': {
+                  '<server-uuid>': {
+                      'cluster_id': '...', 'cluster_name': '...'
+                  }
+              },
+              'vm_details': {
+                  '<server-uuid>': {
+                      'cpu_cores': N, 'ram_mb': N, 'disk_gb': N,
+                      'external_ip': '...', 'status': '...', ...
+                  }
+              },
+              'cluster_details': {
+                  '<cluster-uid>': { ... }
+              },
+            }
+        """
+        disk_to_vm: Dict[str, Dict] = {}
+        vm_to_cluster: Dict[str, Dict] = {}
+        vm_details: Dict[str, Dict] = {}
+        cluster_details: Dict[str, Dict] = {}
+
+        # --- ECS VMs ---
+        try:
+            vms = self.get_vms(project_id)
+        except Exception as e:
+            self.logger.warning(f"build_id_map ECS failed for {project_id}: {e}")
+            vms = []
+
+        for vm in vms:
+            vm_id = vm.get("id")
+            if not vm_id:
+                continue
+            flavor = vm.get("flavor") or {}
+            vcpus = int(flavor.get("vcpus") or 0)
+            ram_mb = int(flavor.get("ram") or 0)
+
+            # Extract floating IP from addresses
+            external_ip = ""
+            addresses = vm.get("addresses") or {}
+            for net_addrs in addresses.values():
+                if not isinstance(net_addrs, list):
+                    continue
+                for addr in net_addrs:
+                    if addr.get("OS-EXT-IPS:type") == "floating":
+                        external_ip = addr.get("addr", "")
+                        break
+                if external_ip:
+                    break
+
+            vm_details[vm_id] = {
+                "cpu_cores": vcpus,
+                "vcpus": vcpus,
+                "ram_mb": ram_mb,
+                "disk_gb": 0,  # Filled from EVS volumes below
+                "external_ip": external_ip,
+                "status": (vm.get("status") or "").upper(),
+                "flavor_name": flavor.get("name", ""),
+                "availability_zone": vm.get("OS-EXT-AZ:availability_zone", ""),
+                "vm_name": vm.get("name", ""),
+                "attached_volume_ids": [],
+            }
+
+        # --- EVS Volumes (authoritative for disk→VM mapping) ---
+        try:
+            volumes = self.get_volumes(project_id)
+        except Exception as e:
+            self.logger.warning(f"build_id_map EVS failed for {project_id}: {e}")
+            volumes = []
+
+        for vol in volumes:
+            vol_id = vol.get("id")
+            if not vol_id:
+                continue
+            attachments = vol.get("attachments") or []
+            for att in attachments:
+                server_id = att.get("server_id")
+                if server_id:
+                    vm_name = vm_details.get(server_id, {}).get("vm_name", "")
+                    disk_to_vm[vol_id] = {
+                        "vm_id": server_id,
+                        "vm_name": vm_name,
+                        "vm_data": vm_details.get(server_id, {}),
+                    }
+                    # Accumulate disk size on the VM
+                    size_gb = int(vol.get("size") or 0)
+                    if server_id in vm_details:
+                        vm_details[server_id]["disk_gb"] += size_gb
+                        vm_details[server_id]["attached_volume_ids"].append(vol_id)
+                    break  # A volume has at most one attachment
+
+        # --- CCE Clusters ---
+        try:
+            clusters = self.get_clusters(project_id)
+        except Exception as e:
+            self.logger.warning(f"build_id_map CCE failed for {project_id}: {e}")
+            clusters = []
+
+        for cluster in clusters:
+            meta = cluster.get("metadata") or {}
+            cluster_uid = meta.get("uid") or meta.get("id")
+            cluster_name = meta.get("name", "")
+            if not cluster_uid:
+                continue
+
+            status_obj = cluster.get("status") or {}
+            spec = cluster.get("spec") or {}
+
+            cluster_details[cluster_uid] = {
+                "cluster_name": cluster_name,
+                "status": status_obj.get("phase", ""),
+                "version": spec.get("version", ""),
+                "flavor": spec.get("flavor", ""),
+                "node_count": spec.get("hostNetwork", {}).get("vpcId", ""),
+            }
+
+            # Map cluster nodes to this cluster via node pool naming convention.
+            # Advanced API node names typically follow: <cluster-name>-<nodepool>-<suffix>
+            for vm_id, vd in vm_details.items():
+                vm_name_lower = (vd.get("vm_name") or "").lower()
+                cluster_name_lower = cluster_name.lower()
+                if cluster_name_lower and vm_name_lower.startswith(cluster_name_lower):
+                    vm_to_cluster[vm_id] = {
+                        "cluster_id": cluster_uid,
+                        "cluster_name": cluster_name,
+                    }
+
+        self.logger.info(
+            f"build_id_map project={project_id}: "
+            f"{len(disk_to_vm)} disk→vm, {len(vm_to_cluster)} vm→cluster, "
+            f"{len(vm_details)} vm_details, {len(cluster_details)} clusters"
+        )
+        return {
+            "disk_to_vm": disk_to_vm,
+            "vm_to_cluster": vm_to_cluster,
+            "vm_details": vm_details,
+            "cluster_details": cluster_details,
+        }
 

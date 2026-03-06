@@ -86,3 +86,4 @@ cookies.txt
 *_export.json
 *_debug.log
 cloud_ru_product_instances_sample.json
+config.cloud_ru_advanced.env

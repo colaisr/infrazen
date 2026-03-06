@@ -521,7 +521,7 @@
                 
                 <!-- Two-column layout -->
                 <div class="modal-form-grid">
-                    <!-- Left Column -->
+                    <!-- Left Column: credentials -->
                     <div class="modal-form-left">
                         <!-- Provider Selection -->
                         <div class="form-group">
@@ -534,22 +534,21 @@
                             </select>
                         </div>
 
-                        
                         <!-- Connection Test (compact) -->
                         <div class="connection-test-compact" id="connectionTest" style="display: none;"></div>
-                        
+
                         <!-- Basic Connection Info -->
                         <div class="form-group">
                             <label class="form-label" for="connection_name">Название подключения *</label>
-                            <input type="text" class="form-control" id="connection_name" name="connection_name" 
+                            <input type="text" class="form-control" id="connection_name" name="connection_name"
                                    placeholder="Мой аккаунт" required>
                         </div>
-                        
-                        <!-- Dynamic provider-specific fields -->
+
+                        <!-- Dynamic provider-specific fields (base fields only; tenants section appended to full-width row) -->
                         <div id="providerFields"></div>
                     </div>
-                    
-                    <!-- Right Column -->
+
+                    <!-- Right Column: settings -->
                     <div class="modal-form-right">
                         <!-- Settings Section -->
                         <div class="settings-section">
@@ -557,8 +556,7 @@
                                 <i class="fa-solid fa-gear" style="color: #1E40AF; margin-right: 0.5rem;"></i>
                                 Настройки
                             </h5>
-                            
-                            <div class="form-group">
+                            <div class="form-group" style="margin-bottom: 0;">
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="auto_sync" name="auto_sync" checked>
                                     <label class="form-check-label" for="auto_sync">Автоматическая синхронизация</label>
@@ -566,21 +564,24 @@
                                 <small class="form-text text-muted">Включать провайдер в автоматическую синхронизацию</small>
                             </div>
                         </div>
-                        
+
                         <!-- Description (optional, compact) -->
                         <div class="form-group">
                             <label class="form-label" for="description">Описание (необязательно)</label>
-                            <textarea class="form-control form-textarea-compact" id="description" name="description" 
+                            <textarea class="form-control form-textarea-compact" id="description" name="description"
                                       placeholder="Дополнительная информация..."></textarea>
                         </div>
-                        
+
                         <!-- Instructions Button -->
-                        <div class="form-group" style="margin-top: 1rem;">
+                        <div class="form-group">
                             <button type="button" class="btn btn-outline-primary" onclick="openInstructions()" style="width: 100%;">
                                 <i class="fa-solid fa-book-open"></i> Инструкции по подключению
                             </button>
                         </div>
                     </div>
+
+                    <!-- Full-width row: Advanced Tenants (cloud-ru) or other provider-specific full-width sections -->
+                    <div class="modal-form-full" id="providerFieldsFull"></div>
                 </div>
             </form>
         </div>

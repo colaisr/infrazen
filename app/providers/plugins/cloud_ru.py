@@ -4,12 +4,13 @@ Implements Cloud.ru provider integration using the plugin architecture
 """
 import hashlib
 import logging
+import os
 import re
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
 from ..plugin_system import ProviderPlugin, SyncResult
-from ..cloud_ru.client import CloudRuClient
+from ..cloud_ru.client import CloudRuClient, CloudRuAdvancedClient
 
 logger = logging.getLogger(__name__)
 
@@ -622,12 +623,69 @@ class CloudRuProviderPlugin(ProviderPlugin):
         except Exception as e:
             self.logger.warning(f"Failed to get per-resource billing data: {e}", exc_info=True)
         
-        # GROUP BY resource_name (with heuristic base-name for VM+disk): same deployment = one card
-        # Like Yandex: one card per logical resource with summed cost
+        # GROUP BY resource_name: use Advanced API ID map (disk→vm, vm→cluster) when tenants
+        # are configured; fall back to name heuristics for Evolution-only accounts.
+        advanced_id_map: Dict[str, Any] = {}
+        if not os.environ.get('CLOUD_RU_SKIP_DISK_MAPPING'):
+            try:
+                advanced_id_map = self._build_advanced_id_map()
+            except Exception as e:
+                self.logger.warning(f"Advanced API ID map failed, using name heuristics: {e}")
         unified_resources = self._create_unified_resources_by_name(
-            billing_data, billing_resources_by_type, resources, account_billing
+            billing_data, billing_resources_by_type, resources, account_billing,
+            advanced_id_map.get('disk_to_vm', {}),
+            advanced_id_map,
         )
         return unified_resources
+
+    def _build_advanced_id_map(self) -> Dict[str, Any]:
+        """
+        Build a unified ID-relationship map across all configured Advanced tenants.
+
+        Returns the merged result of ``CloudRuAdvancedClient.build_id_map()`` for
+        every tenant in ``credentials['advanced_tenants']``.  If no tenants are
+        configured (Evolution-only account), returns an empty dict so the caller
+        falls back gracefully to name heuristics.
+        """
+        tenants = self.credentials.get('advanced_tenants') or []
+        if not tenants:
+            self.logger.info("No advanced_tenants configured – skipping Advanced ID map")
+            return {}
+
+        merged: Dict[str, Any] = {
+            'disk_to_vm': {},
+            'vm_to_cluster': {},
+            'vm_details': {},
+            'cluster_details': {},
+        }
+
+        for tenant in tenants:
+            ak = tenant.get('ak', '').strip()
+            sk = tenant.get('sk', '').strip()
+            project_id = tenant.get('project_id', '').strip()
+            name = tenant.get('name', project_id)
+            if not (ak and sk and project_id):
+                self.logger.warning(f"Advanced tenant '{name}' missing ak/sk/project_id – skipping")
+                continue
+            try:
+                adv_client = CloudRuAdvancedClient(ak, sk)
+                tenant_map = adv_client.build_id_map(project_id)
+                for key in merged:
+                    merged[key].update(tenant_map.get(key, {}))
+                self.logger.info(
+                    f"Advanced ID map for tenant '{name}': "
+                    f"{len(tenant_map.get('disk_to_vm', {}))} disk→vm, "
+                    f"{len(tenant_map.get('vm_to_cluster', {}))} vm→cluster"
+                )
+            except Exception as e:
+                self.logger.warning(f"Advanced ID map failed for tenant '{name}': {e}")
+
+        self.logger.info(
+            f"Advanced ID map total: {len(merged['disk_to_vm'])} disk→vm, "
+            f"{len(merged['vm_to_cluster'])} vm→cluster, "
+            f"{len(merged['vm_details'])} vm_details"
+        )
+        return merged
 
     def _extract_base_name_for_grouping(self, name: str, resource_type: str) -> str:
         """
@@ -669,11 +727,18 @@ class CloudRuProviderPlugin(ProviderPlugin):
         return name
 
     def _create_unified_resources_by_name(self, billing_data: Dict, billing_resources_by_type: Dict,
-                                          resources: Dict, account_billing: Dict) -> List:
+                                          resources: Dict, account_billing: Dict,
+                                          disk_to_vm: Optional[Dict[str, Dict[str, str]]] = None,
+                                          advanced_id_map: Optional[Dict[str, Any]] = None) -> List:
         """
-        Group resources by resource_name (with heuristic base-name for VM+disk) and create unified cards.
-        Total cost unchanged - just regrouping like Yandex clusters.
+        Group resources by resource_name. Uses disk-to-VM / vm-to-cluster maps from Advanced API
+        when available; falls back to heuristic base-name matching for Evolution-only accounts.
         """
+        disk_to_vm = disk_to_vm or {}
+        advanced_id_map = advanced_id_map or {}
+        vm_details: Dict[str, Dict] = advanced_id_map.get('vm_details', {})
+        vm_to_cluster: Dict[str, Dict] = advanced_id_map.get('vm_to_cluster', {})
+        cluster_details: Dict[str, Dict] = advanced_id_map.get('cluster_details', {})
         from app.providers.resource_registry import ProviderResource
 
         # Infer Kubernetes clusters from VM naming ("<cluster>-nodepool-...").
@@ -803,6 +868,24 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         if nm_l.startswith(cl + '-') or nm_l == cl:
                             grouping_key = f'k8s:{cl}'
                             break
+
+                # 3d) Volume→VM via Advanced API EVS attachments (most reliable)
+                if not grouping_key and resource_type == 'volume' and disk_to_vm:
+                    vm_info = disk_to_vm.get(rid) or disk_to_vm.get(rid.lower())
+                    if vm_info:
+                        vm_name = (vm_info.get('vm_name') or '').strip()
+                        if vm_name:
+                            grouping_key = vm_name
+                            self.logger.debug(f"Volume {rid[:8]}... grouped with VM {vm_name} (Advanced EVS)")
+
+                # 3e) VM→Cluster via Advanced API node naming (when vm resource_id is a UUID)
+                if not grouping_key and resource_type == 'server' and vm_to_cluster:
+                    cluster_info = vm_to_cluster.get(rid) or vm_to_cluster.get(rid.lower())
+                    if cluster_info:
+                        cluster_name = (cluster_info.get('cluster_name') or '').strip()
+                        if cluster_name:
+                            grouping_key = f'k8s:{cluster_name.lower()}'
+                            self.logger.debug(f"VM {rid[:8]}... grouped with cluster {cluster_name} (Advanced CCE)")
 
                 # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
                 if not grouping_key:
@@ -958,6 +1041,54 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     'iam_project_name': first_info.get('iam_project_name', ''),
                     'tenant_name': first_info.get('tenant_name', ''),
                 })
+
+                # --- Advanced API enrichment ---
+                # For VM groups: overlay real CPU/RAM/disk/IP from vm_details
+                if display_type == 'server' and vm_details:
+                    # Match by resource_id of any 'server' component that appears in vm_details
+                    for comp_rid, comp_info, comp_t in components:
+                        if comp_t == 'server':
+                            vd = vm_details.get(comp_rid) or vm_details.get(comp_rid.lower())
+                            if vd:
+                                if vd.get('cpu_cores'):
+                                    provider_config['cpu_cores'] = vd['cpu_cores']
+                                    provider_config['vcpus'] = vd['cpu_cores']
+                                if vd.get('ram_mb'):
+                                    provider_config['ram_mb'] = vd['ram_mb']
+                                    provider_config['memory_mb'] = vd['ram_mb']
+                                if vd.get('disk_gb'):
+                                    provider_config['disk_gb'] = vd['disk_gb']
+                                    provider_config['total_storage_gb'] = vd['disk_gb']
+                                if vd.get('external_ip'):
+                                    provider_config['external_ip'] = vd['external_ip']
+                                if vd.get('status'):
+                                    provider_config['status'] = vd['status']
+                                if vd.get('flavor_name'):
+                                    provider_config['flavor_name'] = vd['flavor_name']
+                                if vd.get('availability_zone'):
+                                    provider_config['availability_zone'] = vd['availability_zone']
+                                if vd.get('attached_volume_ids'):
+                                    provider_config['attached_volume_ids'] = vd['attached_volume_ids']
+                                break  # Use first matched VM
+
+                # For k8s cluster groups: aggregate node specs from vm_details
+                if display_type == 'kubernetes-cluster' and vm_details and vm_to_cluster:
+                    cluster_name_key = grouping_key[4:] if isinstance(grouping_key, str) and grouping_key.startswith('k8s:') else ''
+                    node_vcpus = 0
+                    node_ram_mb = 0
+                    node_count = 0
+                    for vm_id, cluster_info in vm_to_cluster.items():
+                        if (cluster_info.get('cluster_name') or '').lower() == cluster_name_key:
+                            vd = vm_details.get(vm_id, {})
+                            node_vcpus += vd.get('cpu_cores', 0)
+                            node_ram_mb += vd.get('ram_mb', 0)
+                            node_count += 1
+                    if node_count:
+                        provider_config['total_nodes'] = node_count
+                        provider_config['total_vcpus'] = node_vcpus
+                        provider_config['total_ram_gb'] = round(node_ram_mb / 1024, 1)
+                        provider_config['cpu_cores'] = node_vcpus
+                        provider_config['ram_mb'] = node_ram_mb
 
                 unified_resources.append(ProviderResource(
                     resource_id=unified_resource_id,
