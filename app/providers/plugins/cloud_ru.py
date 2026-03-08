@@ -970,17 +970,24 @@ class CloudRuProviderPlugin(ProviderPlugin):
 
                 # 3f) CCE worker VMs and their volumes: Cloud.ru CCE worker node names embed
                 # the CCE cluster name literally.
-                # Pattern: vm-{nodepool}-{cce-cluster-name}-{az}-{random5}
+                # Pattern A: vm-{nodepool}-{cce-cluster-name}-{az}-{random5}
                 # Example: vm-sdp-workers1-cce-mgmt-shared-shared-u92rt → cluster cce-mgmt-shared
                 # We match by checking if "-{cluster-name}-" appears as a substring of the VM name.
                 # NOTE: For volumes, step 3d may have already set grouping_key to the VM name (e.g.
                 # "vm-sdp-workers1-cce-mgmt-shared-shared-u92rt"). We deliberately override that key
                 # so the volumes end up inside the CCE cluster group rather than floating standalone.
+                #
+                # Pattern B: node(-pool)?-{base}-k8s-cce-{az}-{pool}-{env}[-suffix]
+                # Example: node-21sch-hq-k8s-cce-az2-applicant-02-prod → cluster cce-21sch-hq-k8s-prod
+                # Here the cluster name is NOT embedded literally; instead the cluster's base and
+                # environment appear at different positions in the node name.
                 if resource_type in ('server', 'volume') and cce_clusters:
                     # Determine which name to test: prefer the current grouping_key (VM name from step 3d)
                     # so that volumes grouped to a CCE worker VM are promoted to the cluster.
                     check_name = (grouping_key or nm_l).lower()
+                    matched_cce = False
                     for cname in cce_clusters:
+                        # Pattern A: cluster name appears as literal substring
                         if f'-{cname}-' in check_name or check_name.startswith(f'{cname}-') or check_name == cname:
                             new_key = f'k8s:{cname}'
                             if grouping_key != new_key:
@@ -988,7 +995,38 @@ class CloudRuProviderPlugin(ProviderPlugin):
                                     f"{resource_type} '{name[:40]}' grouped into CCE cluster '{cname}' (name embedding)"
                                 )
                                 grouping_key = new_key
+                            matched_cce = True
                             break
+                    if not matched_cce and ('k8s' in check_name and 'cce' in check_name):
+                        # Pattern B: node-{base}-k8s-cce-{az}-...-{env} style names.
+                        # Try each cluster whose name is "cce-{base}-{env}": check if {base} is in
+                        # the node name AND the {env} suffix also appears in the node name.
+                        _ENV_KEYWORDS = ('prod', 'stage', 'infra', 'test', 'dev', 'rocketchat')
+                        for cname in cce_clusters:
+                            for env_word in _ENV_KEYWORDS:
+                                if not cname.endswith(f'-{env_word}'):
+                                    continue
+                                # Strip env suffix and optional 'cce-' prefix to get the base
+                                cluster_base = cname[:-len(env_word) - 1]  # e.g. "cce-21sch-hq-k8s"
+                                if cluster_base.startswith('cce-'):
+                                    cluster_base = cluster_base[4:]       # e.g. "21sch-hq-k8s"
+                                if not cluster_base or len(cluster_base) < 5:
+                                    continue
+                                # Match: base appears in node name AND env suffix also present
+                                if (cluster_base in check_name and
+                                        (check_name.endswith(f'-{env_word}') or
+                                         f'-{env_word}-' in check_name)):
+                                    new_key = f'k8s:{cname}'
+                                    if grouping_key != new_key:
+                                        self.logger.debug(
+                                            f"{resource_type} '{name[:40]}' grouped into CCE cluster "
+                                            f"'{cname}' (base+env pattern)"
+                                        )
+                                        grouping_key = new_key
+                                    matched_cce = True
+                                    break
+                            if matched_cce:
+                                break
 
                 # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
                 if not grouping_key:

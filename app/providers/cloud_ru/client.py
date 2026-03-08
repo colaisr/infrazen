@@ -1247,6 +1247,20 @@ class CloudRuAdvancedClient:
         self.logger.info(f"Advanced CCE: {len(items)} clusters for project {project_id}")
         return items
 
+    def get_cluster_nodes(self, project_id: str, cluster_id: str) -> List[Dict]:
+        """Fetch all nodes for a CCE cluster.
+
+        Each node item contains:
+          metadata.uid         — CCE node resource UID
+          metadata.name        — node name (matches ECS VM name)
+          status.serverId      — ECS VM UUID (the reliable link to billing)
+        """
+        path = f"/api/v3/projects/{project_id}/clusters/{cluster_id}/nodes"
+        data = self._get("cce", path, project_id)
+        if not data:
+            return []
+        return data.get("items", [])
+
     def get_load_balancers(self, project_id: str) -> List[Dict]:
         """Fetch all ELB load balancers for the given project."""
         path = f"/v3/{project_id}/elb/loadbalancers"
@@ -1422,19 +1436,51 @@ class CloudRuAdvancedClient:
                 "status": status_obj.get("phase", ""),
                 "version": spec.get("version", ""),
                 "flavor": spec.get("flavor", ""),
-                "node_count": spec.get("hostNetwork", {}).get("vpcId", ""),
             }
 
-            # Map cluster nodes to this cluster via node pool naming convention.
-            # Advanced API node names typically follow: <cluster-name>-<nodepool>-<suffix>
-            for vm_id, vd in vm_details.items():
-                vm_name_lower = (vd.get("vm_name") or "").lower()
+            # --- Reliable node→cluster mapping via CCE Nodes API ---
+            # Each node.status.serverId is the actual ECS VM UUID used in billing.
+            # This avoids fragile name-prefix matching.
+            nodes_mapped = 0
+            try:
+                cluster_nodes = self.get_cluster_nodes(project_id, cluster_uid)
+                for node in cluster_nodes:
+                    node_status = node.get("status") or {}
+                    server_id = node_status.get("serverId") or ""
+                    node_meta = node.get("metadata") or {}
+                    node_name = node_meta.get("name") or ""
+                    if server_id:
+                        vm_to_cluster[server_id.lower()] = {
+                            "cluster_id": cluster_uid,
+                            "cluster_name": cluster_name,
+                        }
+                        nodes_mapped += 1
+                    elif node_name:
+                        # serverId absent — fall back to name lookup
+                        vm_uuid = vm_name_to_id.get(node_name.lower())
+                        if vm_uuid:
+                            vm_to_cluster[vm_uuid] = {
+                                "cluster_id": cluster_uid,
+                                "cluster_name": cluster_name,
+                            }
+                            nodes_mapped += 1
+            except Exception as e:
+                self.logger.warning(
+                    f"build_id_map CCE nodes failed for cluster {cluster_name} ({cluster_uid}): {e}"
+                )
+                nodes_mapped = 0
+
+            # Fallback: name-prefix matching for clusters where the Nodes API returned
+            # nothing (e.g. API permission gap or cluster in creating/deleting state).
+            if nodes_mapped == 0:
                 cluster_name_lower = cluster_name.lower()
-                if cluster_name_lower and vm_name_lower.startswith(cluster_name_lower):
-                    vm_to_cluster[vm_id] = {
-                        "cluster_id": cluster_uid,
-                        "cluster_name": cluster_name,
-                    }
+                for vm_id, vd in vm_details.items():
+                    vm_name_lower = (vd.get("vm_name") or "").lower()
+                    if cluster_name_lower and vm_name_lower.startswith(cluster_name_lower):
+                        vm_to_cluster[vm_id] = {
+                            "cluster_id": cluster_uid,
+                            "cluster_name": cluster_name,
+                        }
 
         self.logger.info(
             f"build_id_map project={project_id}: "
