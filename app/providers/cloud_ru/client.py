@@ -1030,6 +1030,37 @@ class CloudRuAdvancedClient:
         'vpc': 'vpc.{region}.hc.sbercloud.ru',
         'elb': 'elb.{region}.hc.sbercloud.ru',
         'rds': 'rds.{region}.hc.sbercloud.ru',
+        'ces': 'ces.{region}.hc.sbercloud.ru',
+        'sfs-turbo': 'sfs-turbo.{region}.hc.sbercloud.ru',
+    }
+
+    # CES namespace → dimension key for each resource type
+    _CES_NAMESPACES = {
+        'ecs': ('SYS.ECS', 'instance_id'),
+        'evs': ('SYS.EVS', 'disk_name'),
+        'efs': ('SYS.EFS', 'efs_instance_id'),
+        'elb': ('SYS.ELB', 'lbaas_instance_id'),
+        'rds': ('SYS.RDS', 'postgresql_cluster_id'),
+        'cbr': ('SYS.CBR', 'instance_id'),
+        'obs': ('SYS.OBS', 'bucket_name'),
+        'nat': ('SYS.NAT', 'nat_gateway_id'),
+        'vpc': ('SYS.VPC', 'publicip_id'),
+        'sfs': ('SYS.SFS', 'share_id'),
+    }
+
+    # Key FinOps metrics per namespace — kept minimal for batch efficiency.
+    # With 10 queries per batch call: fewer metrics = fewer API calls.
+    _CES_FINOPS_METRICS = {
+        'SYS.ECS': ['cpu_util',
+                     'network_incoming_bytes_aggregate_rate',
+                     'network_outgoing_bytes_aggregate_rate'],
+        'SYS.EFS': ['used_capacity', 'used_capacity_percent', 'iops'],
+        'SYS.ELB': ['m2_act_conn', 'm22_in_bandwidth', 'm23_out_bandwidth'],
+        'SYS.RDS': ['rds001_cpu_util', 'rds002_mem_util', 'rds039_disk_util'],
+        'SYS.CBR': ['vault_util', 'used_vault_size'],
+        'SYS.OBS': ['capacity_total'],
+        'SYS.NAT': ['snat_connection', 'inbound_bandwidth', 'outbound_bandwidth'],
+        'SYS.VPC': ['upstream_bandwidth', 'downstream_bandwidth'],
     }
 
     def __init__(self, ak: str, sk: str, region: str = "ru-moscow-1"):
@@ -1417,4 +1448,165 @@ class CloudRuAdvancedClient:
             "cluster_details": cluster_details,
             "vm_name_to_id": vm_name_to_id,
         }
+
+    # ------------------------------------------------------------------
+    # Cloud Eye (CES) — utilization metrics
+    # ------------------------------------------------------------------
+
+    def get_sfs_turbo_shares(self, project_id: str) -> List[Dict]:
+        """Fetch all SFS Turbo shares for the project."""
+        path = f"/v1/{project_id}/sfs-turbo/shares/detail"
+        data = self._get("sfs-turbo", path, project_id)
+        shares = (data or {}).get("shares", [])
+        self.logger.info(f"SFS Turbo: {len(shares)} shares for project {project_id}")
+        return shares
+
+    def _post(self, service: str, path: str, project_id: str,
+              body: str, timeout: int = 30) -> Optional[Any]:
+        """Perform a signed POST request to an Advanced API service."""
+        host = self._SERVICE_HOSTS[service].format(region=self.region)
+        headers = self._sign_request("POST", host, path, {}, body)
+        url = f"https://{host}{path}"
+        try:
+            resp = requests.post(url, headers=headers, data=body, timeout=timeout)
+            if resp.status_code == 200:
+                return resp.json()
+            self.logger.debug(
+                f"Advanced API POST {service} {path} → {resp.status_code}: "
+                f"{resp.text[:300]}"
+            )
+        except Exception as e:
+            self.logger.warning(f"Advanced API POST {service} {path} error: {e}")
+        return None
+
+    def get_ces_metrics_batch(
+        self, project_id: str, namespace: str, dim_name: str,
+        dim_values: List[str], metric_names: Optional[List[str]] = None,
+        hours: int = 24,
+    ) -> Dict[str, Dict[str, Dict[str, float]]]:
+        """
+        Fetch CES metrics for a batch of resources using the batch API.
+
+        Uses POST /V1.0/{project_id}/batch-query-metric-data which accepts
+        up to 10 metric queries per call, dramatically reducing API calls.
+
+        Returns::
+
+            {
+                '<dim_value>': {
+                    'cpu_util': {'avg': 3.2, 'max': 14.5, ...},
+                    ...
+                },
+                ...
+            }
+        """
+        import time, json as json_lib
+        if not dim_values:
+            return {}
+        if metric_names is None:
+            metric_names = self._CES_FINOPS_METRICS.get(namespace, [])
+        if not metric_names:
+            return {}
+
+        now_ms = int(time.time() * 1000)
+        from_ms = now_ms - hours * 3600 * 1000
+        batch_path = f"/V1.0/{project_id}/batch-query-metric-data"
+        max_per_batch = 10
+
+        # Build all metric queries
+        all_queries = []
+        for dim_val in dim_values:
+            for metric in metric_names:
+                all_queries.append({
+                    "namespace": namespace,
+                    "metric_name": metric,
+                    "dimensions": [{"name": dim_name, "value": dim_val}],
+                })
+
+        result: Dict[str, Dict] = {}
+        total_batches = (len(all_queries) + max_per_batch - 1) // max_per_batch
+
+        for i in range(0, len(all_queries), max_per_batch):
+            chunk = all_queries[i:i + max_per_batch]
+            body = json_lib.dumps({
+                "metrics": chunk,
+                "from": from_ms,
+                "to": now_ms,
+                "period": "3600",
+                "filter": "average",
+            })
+            data = self._post("ces", batch_path, project_id, body, timeout=30)
+            if not data:
+                continue
+            for m in data.get("metrics", []):
+                dps = m.get("datapoints", [])
+                if not dps:
+                    continue
+                dims = m.get("dimensions", [])
+                dim_val = dims[0].get("value", "") if dims else ""
+                metric_name = m.get("metric_name", "")
+                if not dim_val or not metric_name:
+                    continue
+                vals = [dp.get("average", 0) for dp in dps]
+                if dim_val not in result:
+                    result[dim_val] = {}
+                result[dim_val][metric_name] = {
+                    "avg": round(sum(vals) / len(vals), 2) if vals else 0,
+                    "max": round(max(vals), 2) if vals else 0,
+                    "latest": round(vals[-1], 2) if vals else 0,
+                    "points": len(vals),
+                }
+
+        self.logger.info(
+            f"CES batch {namespace}: {len(result)}/{len(dim_values)} "
+            f"resources with metrics ({total_batches} API calls)"
+        )
+        return result
+
+    def build_ces_utilization_map(
+        self, project_id: str, vm_ids: List[str] = None,
+        sfs_share_ids: List[str] = None,
+        elb_ids: List[str] = None,
+        rds_ids: List[str] = None,
+        hours: int = 24,
+    ) -> Dict[str, Dict]:
+        """
+        Build a flat utilization map keyed by resource ID.
+
+        Keys are resource IDs (VM UUID, share UUID, etc.).
+        Values are dicts of metric → {avg, max, latest}.
+
+        This is the main entry point for the sync plugin.
+        """
+        utilization: Dict[str, Dict] = {}
+
+        if vm_ids:
+            ns, dim = self._CES_NAMESPACES['ecs']
+            data = self.get_ces_metrics_batch(
+                project_id, ns, dim, vm_ids, hours=hours)
+            utilization.update(data)
+
+        if sfs_share_ids:
+            ns, dim = self._CES_NAMESPACES['efs']
+            data = self.get_ces_metrics_batch(
+                project_id, ns, dim, sfs_share_ids, hours=hours)
+            utilization.update(data)
+
+        if elb_ids:
+            ns, dim = self._CES_NAMESPACES['elb']
+            data = self.get_ces_metrics_batch(
+                project_id, ns, dim, elb_ids, hours=hours)
+            utilization.update(data)
+
+        if rds_ids:
+            ns, dim = self._CES_NAMESPACES['rds']
+            data = self.get_ces_metrics_batch(
+                project_id, ns, dim, rds_ids, hours=hours)
+            utilization.update(data)
+
+        self.logger.info(
+            f"CES utilization map for project {project_id}: "
+            f"{len(utilization)} resources with metrics"
+        )
+        return utilization
 

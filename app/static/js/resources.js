@@ -37,6 +37,22 @@ function toggleProviderSection(providerId) {
 // Export to window immediately for onclick handlers
 window.toggleProviderSection = toggleProviderSection;
 
+function filterProviderResources(providerId, typeValue) {
+    const grid = document.getElementById('provider-grid-' + providerId);
+    const countEl = document.getElementById('provider-filtered-count-' + providerId);
+    if (!grid || !countEl) return;
+
+    const cards = grid.querySelectorAll('.resource-card');
+    let visible = 0;
+    cards.forEach(function(card) {
+        const cardType = (card.getAttribute('data-resource-type') || '').toLowerCase();
+        const match = !typeValue || cardType === typeValue.toLowerCase();
+        card.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    countEl.textContent = typeValue ? visible + ' из ' + cards.length : '';
+}
+
 function toggleUsageSection(resourceId) {
     const content = document.getElementById(`usage-info-${resourceId}`);
     const chevron = document.getElementById(`usage-chevron-${resourceId}`);
@@ -518,7 +534,7 @@ function exportResourcesToCSVFallback() {
 }
 
 // Make functions globally available for onclick handlers
-// toggleProviderSection is already exported above after definition
+window.filterProviderResources = filterProviderResources;
 window.toggleUsageSection = toggleUsageSection;
 window.toggleCostBreakdown = toggleCostBreakdown;
 window.toggleCSIVolumes = toggleCSIVolumes;

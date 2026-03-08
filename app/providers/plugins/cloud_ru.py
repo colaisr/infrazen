@@ -646,6 +646,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
         every tenant in ``credentials['advanced_tenants']``.  If no tenants are
         configured (Evolution-only account), returns an empty dict so the caller
         falls back gracefully to name heuristics.
+
+        Also fetches SFS Turbo share details and CES utilization metrics.
         """
         tenants = self.credentials.get('advanced_tenants') or []
         if not tenants:
@@ -658,6 +660,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
             'vm_details': {},
             'cluster_details': {},
             'vm_name_to_id': {},
+            'db_name_to_id': {},
+            'sfs_shares': {},
+            'ces_utilization': {},
         }
 
         for tenant in tenants:
@@ -671,20 +676,68 @@ class CloudRuProviderPlugin(ProviderPlugin):
             try:
                 adv_client = CloudRuAdvancedClient(ak, sk)
                 tenant_map = adv_client.build_id_map(project_id)
-                for key in merged:
+                for key in ('disk_to_vm', 'vm_to_cluster', 'vm_details',
+                            'cluster_details', 'vm_name_to_id'):
                     merged[key].update(tenant_map.get(key, {}))
                 self.logger.info(
                     f"Advanced ID map for tenant '{name}': "
                     f"{len(tenant_map.get('disk_to_vm', {}))} disk→vm, "
                     f"{len(tenant_map.get('vm_to_cluster', {}))} vm→cluster"
                 )
+
+                # SFS Turbo shares (for capacity/utilization enrichment)
+                try:
+                    shares = adv_client.get_sfs_turbo_shares(project_id)
+                    for s in shares:
+                        sid = s.get('id')
+                        if sid:
+                            merged['sfs_shares'][sid] = s
+                    self.logger.info(f"SFS Turbo for tenant '{name}': {len(shares)} shares")
+                except Exception as e:
+                    self.logger.warning(f"SFS Turbo fetch failed for tenant '{name}': {e}")
+
+                # CES utilization metrics
+                try:
+                    vm_ids = list(tenant_map.get('vm_details', {}).keys())
+                    sfs_ids = [s.get('id') for s in shares if s.get('id')] if shares else []
+                    rds_ids = []
+                    try:
+                        dbs = adv_client.get_databases(project_id)
+                        for d in dbs:
+                            rid = d.get('id')
+                            if rid:
+                                rds_ids.append(rid)
+                            rname = (d.get('name') or '').strip().lower()
+                            if rname:
+                                merged['db_name_to_id'][rname] = rid or ''
+                        if rds_ids:
+                            self.logger.info(f"RDS instances for CES: {len(rds_ids)}")
+                    except Exception as e:
+                        self.logger.warning(f"RDS fetch for CES failed: {e}")
+                    utilization = adv_client.build_ces_utilization_map(
+                        project_id,
+                        vm_ids=vm_ids,
+                        sfs_share_ids=sfs_ids,
+                        rds_ids=rds_ids,
+                        hours=24,
+                    )
+                    merged['ces_utilization'].update(utilization)
+                    self.logger.info(
+                        f"CES metrics for tenant '{name}': "
+                        f"{len(utilization)} resources with utilization data"
+                    )
+                except Exception as e:
+                    self.logger.warning(f"CES metrics failed for tenant '{name}': {e}")
+
             except Exception as e:
                 self.logger.warning(f"Advanced ID map failed for tenant '{name}': {e}")
 
         self.logger.info(
             f"Advanced ID map total: {len(merged['disk_to_vm'])} disk→vm, "
             f"{len(merged['vm_to_cluster'])} vm→cluster, "
-            f"{len(merged['vm_details'])} vm_details"
+            f"{len(merged['vm_details'])} vm_details, "
+            f"{len(merged['sfs_shares'])} sfs_shares, "
+            f"{len(merged['ces_utilization'])} ces_utilization"
         )
         return merged
 
@@ -741,11 +794,17 @@ class CloudRuProviderPlugin(ProviderPlugin):
         vm_to_cluster: Dict[str, Dict] = advanced_id_map.get('vm_to_cluster', {})
         cluster_details: Dict[str, Dict] = advanced_id_map.get('cluster_details', {})
         vm_name_to_id: Dict[str, str] = advanced_id_map.get('vm_name_to_id', {})
+        db_name_to_id: Dict[str, str] = advanced_id_map.get('db_name_to_id', {})
+        sfs_shares: Dict[str, Dict] = advanced_id_map.get('sfs_shares', {})
+        ces_utilization: Dict[str, Dict] = advanced_id_map.get('ces_utilization', {})
         from app.providers.resource_registry import ProviderResource
 
         # Infer Kubernetes clusters from VM naming ("<cluster>-nodepool-...").
         # Cloud.ru often bills MK8S only as ECS nodes; no explicit "Kubernetes" servname appears.
         nodepool_clusters: List[str] = []
+        # CCE cluster names from explicit CCE control-plane billing lines (Контейнеры CCE).
+        # These are used to group CCE worker VMs whose names embed the cluster name.
+        cce_clusters: List[str] = []
         server_names_lower: set = set()
         server_name_lookup: Dict[str, str] = {}
         server_norm_map: Dict[Tuple[str, ...], List[str]] = {}
@@ -760,6 +819,19 @@ class CloudRuProviderPlugin(ProviderPlugin):
             nodepool_clusters = sorted(clusters_set, key=lambda s: (-len(s), s.lower()))
         except Exception:
             nodepool_clusters = []
+        try:
+            # CCE cluster names come from billing lines with servname containing 'cce' or 'контейнеры'
+            # (resource_type='kubernetes' after _map_consumption_to_resource_type).
+            k8s_items = billing_resources_by_type.get('kubernetes') or {}
+            cce_set = set()
+            for _rid, info in k8s_items.items():
+                nm = str((info or {}).get('resource_name') or '').strip()
+                if nm:
+                    cce_set.add(nm.lower())
+            # Sort longest first so more-specific names match before shorter ones
+            cce_clusters = sorted(cce_set, key=lambda s: (-len(s), s))
+        except Exception:
+            cce_clusters = []
         try:
             for _rid, info in (billing_resources_by_type.get('server') or {}).items():
                 nm = str((info or {}).get('resource_name') or '').strip()
@@ -896,6 +968,28 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             grouping_key = f'k8s:{cluster_name.lower()}'
                             self.logger.debug(f"VM {rid[:8]}... grouped with cluster {cluster_name} (Advanced CCE)")
 
+                # 3f) CCE worker VMs and their volumes: Cloud.ru CCE worker node names embed
+                # the CCE cluster name literally.
+                # Pattern: vm-{nodepool}-{cce-cluster-name}-{az}-{random5}
+                # Example: vm-sdp-workers1-cce-mgmt-shared-shared-u92rt → cluster cce-mgmt-shared
+                # We match by checking if "-{cluster-name}-" appears as a substring of the VM name.
+                # NOTE: For volumes, step 3d may have already set grouping_key to the VM name (e.g.
+                # "vm-sdp-workers1-cce-mgmt-shared-shared-u92rt"). We deliberately override that key
+                # so the volumes end up inside the CCE cluster group rather than floating standalone.
+                if resource_type in ('server', 'volume') and cce_clusters:
+                    # Determine which name to test: prefer the current grouping_key (VM name from step 3d)
+                    # so that volumes grouped to a CCE worker VM are promoted to the cluster.
+                    check_name = (grouping_key or nm_l).lower()
+                    for cname in cce_clusters:
+                        if f'-{cname}-' in check_name or check_name.startswith(f'{cname}-') or check_name == cname:
+                            new_key = f'k8s:{cname}'
+                            if grouping_key != new_key:
+                                self.logger.debug(
+                                    f"{resource_type} '{name[:40]}' grouped into CCE cluster '{cname}' (name embedding)"
+                                )
+                                grouping_key = new_key
+                            break
+
                 # 4) Default heuristic: for server/volume, use base name so vm-x and vm-x-volume-0000 group
                 if not grouping_key:
                     grouping_key = self._extract_base_name_for_grouping(name, resource_type)
@@ -948,19 +1042,21 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # Semantic type for card display (vm, k8s, db, etc.) - stored in provider_config
                 display_type = self._infer_display_type(component_types, components)
                 if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
-                    unified_type = 'server'  # keep k8s clusters consistent (not 'volume')
+                    unified_type = 'kubernetes-cluster'
                     display_type = 'kubernetes-cluster'
-                # File storage / NFS cards: show as file storage
+                # File storage / NFS: separate type for pricing comparison
                 servnames_lower = [str((info or {}).get('servname', '')).lower() for _, info, _ in components]
                 if unified_type == 'volume' and any(('nfs' in s) or ('sfs' in s) or ('файлов' in s) for s in servnames_lower):
-                    display_type = 'file-storage'
-                # Image template / IMS: volume + s3 with Image Management Service (управления образами)
+                    unified_type = 'file_storage'
+                    display_type = 'file_storage'
+                # Image template / IMS
                 if unified_type == 'volume' and any(('управления образами' in s) or ('ims' in s) or ('образ' in s) for s in servnames_lower):
                     display_type = 'image-template'
-                # Backup-only groups: show as backup
+                # Backup-only groups
                 if unified_type == 'other' and ('backup' in set(component_types)) and ('server' not in set(component_types)):
+                    unified_type = 'backup'
                     display_type = 'backup'
-                # KMS-only groups: show as kms
+                # KMS-only groups
                 if unified_type == 'other' and ('kms' in set(component_types)) and len(set(component_types)) == 1:
                     display_type = 'kms'
                 # Build provider_config with component breakdown
@@ -1007,24 +1103,23 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 tenant = (
                     components[0][1].get('tenant_name') or None
                 ) if components else None
-                # Service name from type
+                # Service name from unified type
                 service_map = {
-                    'server': 'Compute', 'kubernetes-cluster': 'Kubernetes',
-                    'postgresql-cluster': 'PostgreSQL', 'mysql-cluster': 'MySQL',
-                    'load_balancer': 'Load Balancer', 'database': 'Database',
-                    'volume': 'Block Storage', 'network': 'Network', 's3': 'Object Storage'
+                    'server': 'Compute',
+                    'kubernetes-cluster': 'Kubernetes',
+                    'load_balancer': 'Load Balancer',
+                    'database': 'Database',
+                    'volume': 'Block Storage',
+                    'file_storage': 'File Storage',
+                    'network': 'Network',
+                    's3': 'Object Storage',
+                    'backup': 'Backup',
                 }
-                service_name = service_map.get(unified_type, unified_type.replace('-', ' ').title())
-                if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
-                    service_name = 'Kubernetes'
+                service_name = service_map.get(unified_type, unified_type.replace('-', ' ').replace('_', ' ').title())
                 if grouping_key == 'k8s-persistent-volumes':
                     service_name = 'Kubernetes'
-                if display_type == 'file-storage':
-                    service_name = 'File Storage'
                 if display_type == 'image-template':
                     service_name = 'Image Template'
-                if display_type == 'backup':
-                    service_name = 'Backup'
                 if display_type == 'kms':
                     service_name = 'KMS'
                 if display_type == 'logging':
@@ -1105,6 +1200,116 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         provider_config['cpu_cores'] = node_vcpus
                         provider_config['ram_mb'] = node_ram_mb
 
+                # --- SFS Turbo enrichment ---
+                if display_type == 'file_storage' and sfs_shares:
+                    for comp_rid, comp_info, comp_t in components:
+                        share = sfs_shares.get(comp_rid)
+                        if share:
+                            try:
+                                total_gb = float(share.get('size', 0))
+                                avail_gb = float(share.get('avail_capacity', 0))
+                                used_gb = total_gb - avail_gb
+                                provider_config['total_storage_gb'] = total_gb
+                                provider_config['used_storage_gb'] = round(used_gb, 1)
+                                provider_config['avail_storage_gb'] = round(avail_gb, 1)
+                                if total_gb > 0:
+                                    provider_config['storage_used_pct'] = round(used_gb / total_gb * 100, 1)
+                                provider_config['share_type'] = share.get('share_type', '')
+                                provider_config['share_proto'] = share.get('share_proto', '')
+                                provider_config['export_location'] = share.get('export_location', '')
+                                provider_config['availability_zone'] = share.get('az_name', '')
+                            except (ValueError, TypeError):
+                                pass
+                            break
+
+                # --- CES utilization enrichment ---
+                ces_tags: Dict[str, str] = {}
+                if ces_utilization:
+                    matched_ces: Optional[Dict] = None
+                    matched_ces_id = ''
+                    for comp_rid, comp_info, comp_t in components:
+                        if comp_rid in ces_utilization:
+                            matched_ces = ces_utilization[comp_rid]
+                            matched_ces_id = comp_rid
+                            break
+                        rid_lower = comp_rid.lower()
+                        if rid_lower in ces_utilization:
+                            matched_ces = ces_utilization[rid_lower]
+                            matched_ces_id = rid_lower
+                            break
+                    # For VMs: also try name-based CES lookup
+                    if not matched_ces and display_type == 'server' and vm_name_to_id:
+                        for comp_rid, comp_info, comp_t in components:
+                            if comp_t == 'server':
+                                cname = (comp_info.get('resource_name') or '').strip().lower()
+                                vm_uuid = vm_name_to_id.get(cname)
+                                if vm_uuid and vm_uuid in ces_utilization:
+                                    matched_ces = ces_utilization[vm_uuid]
+                                    matched_ces_id = vm_uuid
+                                    break
+                    # For databases: try name-based CES lookup (billing resource_id may differ from RDS instance id)
+                    if not matched_ces and display_type == 'database' and db_name_to_id:
+                        for comp_rid, comp_info, comp_t in components:
+                            cname = (comp_info.get('resource_name') or '').strip().lower()
+                            rds_id = db_name_to_id.get(cname)
+                            if rds_id and rds_id in ces_utilization:
+                                matched_ces = ces_utilization[rds_id]
+                                matched_ces_id = rds_id
+                                break
+                    # For k8s: aggregate node metrics
+                    if not matched_ces and display_type == 'kubernetes-cluster' and vm_to_cluster:
+                        cluster_key = grouping_key[4:] if isinstance(grouping_key, str) and grouping_key.startswith('k8s:') else ''
+                        node_metrics: List[Dict] = []
+                        for vm_id, ci in vm_to_cluster.items():
+                            if (ci.get('cluster_name') or '').lower() == cluster_key and vm_id in ces_utilization:
+                                node_metrics.append(ces_utilization[vm_id])
+                        if node_metrics:
+                            agg: Dict[str, Dict[str, float]] = {}
+                            for nm in node_metrics:
+                                for metric, vals in nm.items():
+                                    if metric not in agg:
+                                        agg[metric] = {'avg': 0, 'max': 0, 'count': 0}
+                                    agg[metric]['avg'] += vals.get('avg', 0)
+                                    agg[metric]['max'] = max(agg[metric]['max'], vals.get('max', 0))
+                                    agg[metric]['count'] += 1
+                            matched_ces = {}
+                            for metric, a in agg.items():
+                                cnt = a['count'] or 1
+                                matched_ces[metric] = {
+                                    'avg': round(a['avg'] / cnt, 2),
+                                    'max': round(a['max'], 2),
+                                    'nodes': cnt,
+                                }
+
+                    if matched_ces:
+                        provider_config['ces_metrics'] = matched_ces
+                        # Map to template-compatible tags
+                        cpu = matched_ces.get('cpu_util') or matched_ces.get('rds001_cpu_util')
+                        if cpu:
+                            ces_tags['cpu_avg_usage'] = str(cpu.get('avg', 0))
+                            ces_tags['cpu_max_usage'] = str(cpu.get('max', 0))
+                        mem = matched_ces.get('rds002_mem_util')
+                        if mem:
+                            ces_tags['memory_usage_percent'] = str(mem.get('avg', 0))
+                        # Disk utilization (RDS)
+                        disk_util = matched_ces.get('rds039_disk_util')
+                        if disk_util:
+                            ces_tags['disk_util_percent'] = str(disk_util.get('avg', 0))
+                        # SFS used capacity percent
+                        sfs_pct = matched_ces.get('used_capacity_percent')
+                        if sfs_pct:
+                            ces_tags['storage_used_percent'] = str(sfs_pct.get('avg', 0))
+                        # Network
+                        net_in = matched_ces.get('network_incoming_bytes_aggregate_rate')
+                        net_out = matched_ces.get('network_outgoing_bytes_aggregate_rate')
+                        if net_in:
+                            ces_tags['net_in_avg_bps'] = str(net_in.get('avg', 0))
+                        if net_out:
+                            ces_tags['net_out_avg_bps'] = str(net_out.get('avg', 0))
+
+                resource_tags = {'cloud_ru_unified': 'true'}
+                resource_tags.update(ces_tags)
+
                 unified_resources.append(ProviderResource(
                     resource_id=unified_resource_id,
                     resource_name=resource_name,
@@ -1118,7 +1323,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     billing_period='daily',
                     provider_config=provider_config,
                     provider_type='cloud-ru',
-                    tags={'cloud_ru_unified': 'true'}
+                    tags=resource_tags,
                 ))
             except Exception as e:
                 self.logger.warning(f"Failed to create unified resource for {resource_name}: {e}")
@@ -1127,24 +1332,25 @@ class CloudRuProviderPlugin(ProviderPlugin):
         return unified_resources
 
     def _infer_unified_type(self, component_types: List[str], components: List[Tuple]) -> str:
-        """Infer unified resource type from component types (like Yandex: vm, k8s, db cluster)."""
+        """Infer unified resource type from component types.
+
+        Types must match the cross-provider taxonomy used by Beget, Selectel,
+        and Yandex so pricing comparison works correctly.
+        """
         types_set = set(component_types)
-        # Databases - use 'database' (registered for cloud-ru)
         if 'database' in types_set:
             return 'database'
         for t in ['postgresql-cluster', 'mysql-cluster', 'kafka-cluster', 'redis-cluster']:
             if t in types_set:
-                return 'database'  # Map to registered type
-        # Kubernetes - use 'server' (compute) for now; provider_config.unified preserves semantics
+                return 'database'
         if 'kubernetes' in types_set:
-            return 'server'
-        # Load balancer - use 'other' (registered)
-        if 'load_balancer' in types_set and len(types_set) == 1:
-            return 'other'
-        # VM with optional disk/IP: server + volume, server + network, server + volume + network
+            return 'kubernetes-cluster'
+        if 'load_balancer' in types_set:
+            return 'load_balancer'
         if 'server' in types_set:
             return 'server'
-        # Standalone volume or network
+        if 'backup' in types_set and 'server' not in types_set:
+            return 'backup'
         if 'volume' in types_set and 'network' not in types_set:
             return 'volume'
         if 'network' in types_set and 'volume' not in types_set:
@@ -1153,10 +1359,14 @@ class CloudRuProviderPlugin(ProviderPlugin):
             return 'volume'
         if 's3' in types_set:
             return 's3'
+        if 'logging' in types_set:
+            return 'other'
+        if 'kms' in types_set:
+            return 'other'
         return 'other'
 
     def _infer_display_type(self, component_types: List[str], components: List[Tuple]) -> str:
-        """Semantic type for card display (vm, kubernetes-cluster, postgresql-cluster, etc.)."""
+        """Semantic type for card display (vm, kubernetes-cluster, etc.)."""
         types_set = set(component_types)
         if 'database' in types_set:
             return 'database'
@@ -1165,7 +1375,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 return t
         if 'kubernetes' in types_set:
             return 'kubernetes-cluster'
-        if 'backup' in types_set and len(types_set) == 1:
+        if 'backup' in types_set and 'server' not in types_set:
             return 'backup'
         if 'kms' in types_set and len(types_set) == 1:
             return 'kms'
