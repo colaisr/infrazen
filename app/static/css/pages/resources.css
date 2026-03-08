@@ -494,42 +494,138 @@
 /* Usage Data Section */
 .usage-section {
     margin: 1rem 0;
-    border: 1px solid var(--border-light);
-    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
     overflow: hidden;
+    background: var(--background-white);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .usage-header {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    background: var(--background-light);
+    padding: 0.875rem 1rem;
+    background: linear-gradient(180deg, #F9FAFB 0%, #F3F4F6 100%);
     cursor: pointer;
     transition: background-color 0.2s ease;
     user-select: none;
+    border-bottom: 1px solid #E5E7EB;
 }
 
 .usage-header:hover {
-    background: var(--background-gray);
+    background: #F3F4F6;
 }
 
 .usage-header i:first-child {
-    color: var(--primary-blue);
+    color: #3B82F6;
+    font-size: 1rem;
 }
 
 .usage-header span {
     flex: 1;
     font-weight: 600;
-    font-size: 0.875rem;
+    font-size: 0.9rem;
+    color: #1F2937;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
+.usage-period-badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #6B7280;
+    background: #E5E7EB;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+}
+
 .usage-chevron {
     margin-left: auto;
     transition: transform 0.2s ease;
+    color: #6B7280;
+    font-size: 0.75rem;
+}
+
+/* Professional usage metrics grid */
+.usage-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+}
+
+.usage-metric-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.875rem;
+    background: #F9FAFB;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+}
+
+.usage-metric-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.usage-metric-icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+.usage-metric-icon.cpu { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); color: white; }
+.usage-metric-icon.ram { background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); color: white; }
+.usage-metric-icon.disk { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white; }
+.usage-metric-icon.network { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: white; }
+.usage-metric-icon.storage { background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%); color: white; }
+
+.usage-metric-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.usage-metric-bar-wrap {
+    margin-top: 0.25rem;
+}
+
+.usage-metric-card .usage-bar {
+    width: 100%;
+    height: 6px;
+    background: #E5E7EB;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.usage-metric-card .usage-fill {
+    border-radius: 3px;
+}
+
+.usage-metric-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1F2937;
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-metric-value-secondary {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6B7280;
+    margin-top: 0.15rem;
 }
 
 .usage-chevron.rotated {
@@ -539,6 +635,12 @@
 .usage-content {
     padding: 1rem;
     background: var(--background-white);
+}
+
+.usage-legacy-items {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #E5E7EB;
 }
 
 .usage-graph {
