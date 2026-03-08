@@ -1299,13 +1299,17 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         sfs_pct = matched_ces.get('used_capacity_percent')
                         if sfs_pct:
                             ces_tags['storage_used_percent'] = str(sfs_pct.get('avg', 0))
-                        # Network
+                        # Network (ECS)
                         net_in = matched_ces.get('network_incoming_bytes_aggregate_rate')
                         net_out = matched_ces.get('network_outgoing_bytes_aggregate_rate')
                         if net_in:
                             ces_tags['net_in_avg_bps'] = str(net_in.get('avg', 0))
                         if net_out:
                             ces_tags['net_out_avg_bps'] = str(net_out.get('avg', 0))
+                        # ELB active connections
+                        elb_conn = matched_ces.get('m2_act_conn')
+                        if elb_conn:
+                            ces_tags['elb_active_conn_avg'] = str(elb_conn.get('avg', 0))
 
                 resource_tags = {'cloud_ru_unified': 'true'}
                 resource_tags.update(ces_tags)

@@ -7,6 +7,7 @@ Uses CES metrics stored as tags during sync:
   memory_usage_percent            — RDS memory utilization
   disk_util_percent               — RDS disk utilization
   storage_used_percent            — SFS Turbo storage fill %
+  elb_active_conn_avg             — ELB active connections avg over 24 h
 """
 from __future__ import annotations
 
@@ -638,6 +639,359 @@ class CloudRuIdleEipRule(BaseRule):
 
 
 # ---------------------------------------------------------------------------
+# Rule 6: RDS Oversized (CPU < 5 % AND memory < 20 %)
+# ---------------------------------------------------------------------------
+
+class CloudRuRdsOversizedRule(BaseRule):
+    """Cloud.ru RDS — CPU avg < 5 % AND memory < 20 % → downsize the DB flavor."""
+
+    @property
+    def id(self) -> str:
+        return "cost.cloud_ru.rightsize.rds_oversized"
+
+    @property
+    def name(self) -> str:
+        return "Cloud.ru: БД с избыточными ресурсами (CPU + память)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Управляемая БД (RDS) использует менее 5 % CPU и менее 20 % памяти за 24 ч. "
+            "Рассмотрите переход на меньший тариф — это снизит стоимость без потери производительности."
+        )
+
+    @property
+    def category(self) -> RuleCategory:
+        return RuleCategory.COST
+
+    @property
+    def scope(self) -> RuleScope:
+        return RuleScope.RESOURCE
+
+    @property
+    def resource_types(self):
+        return {"database"}
+
+    @property
+    def providers(self):
+        return {"cloud-ru"}
+
+    def applies(self, resource, context) -> bool:
+        rtype = str(getattr(resource, "resource_type", "") or "").lower()
+        return rtype == "database" and _is_cloud_ru(resource)
+
+    def evaluate(self, resource, context) -> List[RecommendationOutput]:
+        tags = _get_tags(resource)
+
+        cpu_avg = _float_tag(tags, "cpu_avg_usage")
+        mem_avg = _float_tag(tags, "memory_usage_percent")
+
+        if cpu_avg is None or mem_avg is None:
+            return []  # No CES data
+        if cpu_avg >= 5.0 or mem_avg >= 20.0:
+            return []
+
+        current_monthly = _monthly_cost(resource)
+        if current_monthly <= 0:
+            return []
+
+        estimated_savings = round(current_monthly * 0.30, 2)
+        name = getattr(resource, "resource_name", "") or "неизвестно"
+
+        return [
+            RecommendationOutput(
+                recommendation_type="rightsizing_rds_oversized",
+                title="БД избыточна по CPU и памяти — рекомендуется уменьшить тариф",
+                description=(
+                    f"RDS «{name}»: CPU avg {cpu_avg:.1f}%, memory avg {mem_avg:.1f}% за 24 ч. "
+                    "Оба показателя значительно ниже порогов эффективности (CPU < 5 %, RAM < 20 %). "
+                    f"Переход на меньший flavor позволит сэкономить ~{estimated_savings:.0f} ₽/мес."
+                ),
+                category=RuleCategory.COST,
+                severity="medium",
+                source=self.id,
+                estimated_monthly_savings=estimated_savings,
+                currency=getattr(resource, "currency", "RUB") or "RUB",
+                confidence_score=0.78,
+                metrics_snapshot={
+                    "cpu_avg_percent": cpu_avg,
+                    "memory_avg_percent": mem_avg,
+                    "window_hours": 24,
+                },
+                insights={
+                    "threshold_cpu_pct": 5.0,
+                    "threshold_mem_pct": 20.0,
+                    "action": "downsize_rds",
+                    "current_monthly_cost": current_monthly,
+                },
+            )
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Rule 7: RDS Disk Full Warning (disk_util > 85 %)
+# ---------------------------------------------------------------------------
+
+class CloudRuRdsDiskFullRule(BaseRule):
+    """Cloud.ru RDS — disk utilization > 85 % → risk of backup failure / autoscale."""
+
+    @property
+    def id(self) -> str:
+        return "reliability.cloud_ru.rds_disk_full"
+
+    @property
+    def name(self) -> str:
+        return "Cloud.ru: диск БД почти заполнен"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Диск управляемой БД (RDS) заполнен более чем на 85 %. "
+            "Это повышает риск сбоя резервного копирования и замедления работы. "
+            "Рекомендуется увеличить объём диска или удалить устаревшие данные."
+        )
+
+    @property
+    def category(self) -> RuleCategory:
+        return RuleCategory.RELIABILITY
+
+    @property
+    def scope(self) -> RuleScope:
+        return RuleScope.RESOURCE
+
+    @property
+    def resource_types(self):
+        return {"database"}
+
+    @property
+    def providers(self):
+        return {"cloud-ru"}
+
+    def applies(self, resource, context) -> bool:
+        rtype = str(getattr(resource, "resource_type", "") or "").lower()
+        return rtype == "database" and _is_cloud_ru(resource)
+
+    def evaluate(self, resource, context) -> List[RecommendationOutput]:
+        tags = _get_tags(resource)
+
+        disk_util = _float_tag(tags, "disk_util_percent")
+        if disk_util is None:
+            return []
+        if disk_util < 85.0:
+            return []
+
+        severity = "critical" if disk_util >= 95.0 else "high"
+        name = getattr(resource, "resource_name", "") or "неизвестно"
+
+        return [
+            RecommendationOutput(
+                recommendation_type="reliability_rds_disk_full",
+                title=f"Диск БД заполнен на {disk_util:.0f}% — риск сбоя",
+                description=(
+                    f"RDS «{name}»: утилизация диска {disk_util:.1f}% за последние 24 ч. "
+                    "При заполнении >95 % база данных может перейти в режим «только чтение». "
+                    "Увеличьте размер хранилища или освободите место (очистка логов, VACUUM)."
+                ),
+                category=RuleCategory.RELIABILITY,
+                severity=severity,
+                source=self.id,
+                estimated_monthly_savings=0.0,
+                currency=getattr(resource, "currency", "RUB") or "RUB",
+                confidence_score=0.90,
+                metrics_snapshot={
+                    "disk_util_percent": disk_util,
+                    "window_hours": 24,
+                },
+                insights={
+                    "threshold_pct": 85.0,
+                    "action": "expand_disk_or_cleanup",
+                },
+            )
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Rule 8: SFS Turbo Low Utilization (storage_used < 10 %)
+# ---------------------------------------------------------------------------
+
+class CloudRuSfsLowUtilRule(BaseRule):
+    """
+    Cloud.ru SFS Turbo — storage used < 10 % of allocated capacity.
+    SFS Turbo is billed for the full allocated capacity regardless of usage.
+    Low fill suggests the share is oversized or idle.
+    """
+
+    @property
+    def id(self) -> str:
+        return "cost.cloud_ru.rightsize.sfs_underused"
+
+    @property
+    def name(self) -> str:
+        return "Cloud.ru: файловое хранилище SFS почти пустое"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Файловое хранилище SFS Turbo занято менее чем на 10 % выделенного объёма. "
+            "SFS Turbo тарифицируется за весь выделенный объём — рассмотрите уменьшение "
+            "ёмкости или миграцию данных в стандартный NFS."
+        )
+
+    @property
+    def category(self) -> RuleCategory:
+        return RuleCategory.COST
+
+    @property
+    def scope(self) -> RuleScope:
+        return RuleScope.RESOURCE
+
+    @property
+    def resource_types(self):
+        return {"file_storage"}
+
+    @property
+    def providers(self):
+        return {"cloud-ru"}
+
+    def applies(self, resource, context) -> bool:
+        rtype = str(getattr(resource, "resource_type", "") or "").lower()
+        return rtype == "file_storage" and _is_cloud_ru(resource)
+
+    def evaluate(self, resource, context) -> List[RecommendationOutput]:
+        tags = _get_tags(resource)
+
+        storage_pct = _float_tag(tags, "storage_used_percent")
+        if storage_pct is None:
+            return []
+        if storage_pct >= 10.0:
+            return []
+
+        current_monthly = _monthly_cost(resource)
+        if current_monthly < 5.0:
+            return []
+
+        # Estimate savings: if usage is X%, minimum viable capacity is ~X% of current.
+        # Conservative: savings from shrinking to 50% of current capacity = 50% cost.
+        estimated_savings = round(current_monthly * 0.40, 2)
+        name = getattr(resource, "resource_name", "") or "неизвестно"
+
+        return [
+            RecommendationOutput(
+                recommendation_type="rightsizing_sfs_underused",
+                title=f"SFS Turbo занят на {storage_pct:.1f}% — рассмотрите уменьшение ёмкости",
+                description=(
+                    f"Файловое хранилище «{name}» использует лишь {storage_pct:.1f}% "
+                    f"выделенного объёма. SFS Turbo тарифицируется за полный выделенный размер "
+                    f"(~{current_monthly:.0f} ₽/мес). Уменьшение ёмкости или переход на "
+                    "стандартный NFS может снизить расходы."
+                ),
+                category=RuleCategory.COST,
+                severity="medium",
+                source=self.id,
+                estimated_monthly_savings=estimated_savings,
+                currency=getattr(resource, "currency", "RUB") or "RUB",
+                confidence_score=0.72,
+                metrics_snapshot={
+                    "storage_used_percent": storage_pct,
+                    "window_hours": 24,
+                },
+                insights={
+                    "threshold_pct": 10.0,
+                    "action": "shrink_or_migrate_sfs",
+                    "current_monthly_cost": current_monthly,
+                },
+            )
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Rule 9: Idle ELB (zero active connections for 24 h)
+# ---------------------------------------------------------------------------
+
+class CloudRuIdleElbRule(BaseRule):
+    """
+    Cloud.ru Load Balancer — zero active connections avg over 24 h.
+    An ELB with no active connections is likely unused and can be deleted.
+    """
+
+    @property
+    def id(self) -> str:
+        return "cost.cloud_ru.cleanup.idle_elb"
+
+    @property
+    def name(self) -> str:
+        return "Cloud.ru: балансировщик нагрузки без трафика"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Балансировщик нагрузки (ELB) не имеет активных соединений за последние 24 ч. "
+            "Вероятно, он не используется — рассмотрите удаление для экономии."
+        )
+
+    @property
+    def category(self) -> RuleCategory:
+        return RuleCategory.COST
+
+    @property
+    def scope(self) -> RuleScope:
+        return RuleScope.RESOURCE
+
+    @property
+    def resource_types(self):
+        return {"load_balancer"}
+
+    @property
+    def providers(self):
+        return {"cloud-ru"}
+
+    def applies(self, resource, context) -> bool:
+        rtype = str(getattr(resource, "resource_type", "") or "").lower()
+        return rtype == "load_balancer" and _is_cloud_ru(resource)
+
+    def evaluate(self, resource, context) -> List[RecommendationOutput]:
+        tags = _get_tags(resource)
+
+        active_conn = _float_tag(tags, "elb_active_conn_avg")
+        if active_conn is None:
+            return []  # No CES data — skip to avoid false positives
+        if active_conn > 0:
+            return []
+
+        current_monthly = _monthly_cost(resource)
+        if current_monthly < 5.0:
+            return []
+
+        name = getattr(resource, "resource_name", "") or "неизвестно"
+
+        return [
+            RecommendationOutput(
+                recommendation_type="cleanup_idle_elb",
+                title="Балансировщик нагрузки без трафика — рассмотрите удаление",
+                description=(
+                    f"ELB «{name}» не имел активных соединений за последние 24 ч. "
+                    f"Ежемесячная стоимость ~{current_monthly:.0f} ₽. "
+                    "Проверьте, используется ли балансировщик, и удалите его при ненадобности."
+                ),
+                category=RuleCategory.COST,
+                severity="medium",
+                source=self.id,
+                estimated_monthly_savings=current_monthly,
+                currency=getattr(resource, "currency", "RUB") or "RUB",
+                confidence_score=0.80,
+                metrics_snapshot={
+                    "elb_active_conn_avg": active_conn,
+                    "window_hours": 24,
+                },
+                insights={
+                    "action": "delete_elb",
+                    "current_monthly_cost": current_monthly,
+                },
+            )
+        ]
+
+
+# ---------------------------------------------------------------------------
 # Rule registry export
 # ---------------------------------------------------------------------------
 
@@ -647,4 +1001,8 @@ RULES = [
     CloudRuIdleVmRule,
     CloudRuUnattachedVolumeRule,
     CloudRuIdleEipRule,
+    CloudRuRdsOversizedRule,
+    CloudRuRdsDiskFullRule,
+    CloudRuSfsLowUtilRule,
+    CloudRuIdleElbRule,
 ]
