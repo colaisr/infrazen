@@ -373,6 +373,21 @@ function getCardDetailValue(card, labelText) {
     return '';
 }
 
+/** Parse cost string from template. Handles US (1,231.20) and EU (1.231,20) formats. */
+function parseCostString(str) {
+    if (!str) return 0;
+    const cleaned = str.replace(/[^\d.,]/g, '').trim();
+    if (!cleaned) return 0;
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastPeriod = cleaned.lastIndexOf('.');
+    if (lastComma > lastPeriod) {
+        // EU: comma is decimal (e.g. "1.231,20")
+        return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    // US: period is decimal (e.g. "1,231.20") or no decimal
+    return parseFloat(cleaned.replace(/,/g, '')) || 0;
+}
+
 function exportResourcesToCSV() {
     // Check if SheetJS (XLSX) library is available
     if (typeof XLSX === 'undefined') {
@@ -434,10 +449,8 @@ function exportResourcesToCSV() {
                 const tenant = getCardDetailValue(card, 'Tenant');
                 const costMonthly = getCardDetailValue(card, 'Стоимость мес.');
                 const costDaily = getCardDetailValue(card, 'Стоимость день');
-                
-                // Extract numeric values from cost strings
-                const dailyNumeric = parseFloat(costDaily.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-                const monthlyNumeric = parseFloat(costMonthly.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+                const dailyNumeric = parseCostString(costDaily);
+                const monthlyNumeric = parseCostString(costMonthly);
                 
                 resourcesData.push([
                     providerName,
@@ -499,14 +512,14 @@ function exportResourcesToCSVFallback() {
     }
     
     csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
-    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Tenant,Стоимость (₽/день)\n';
+    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Tenant,Стоимость день (₽),Стоимость месяц (₽)\n';
     
     providerSections.forEach(section => {
         const providerName = section.querySelector('.provider-name').textContent;
         const resourceCards = section.querySelectorAll('.resource-card');
         
         if (resourceCards.length === 0) {
-            csvContent += `"${providerName}","Нет ресурсов","","","","",""\n`;
+            csvContent += `"${providerName}","Нет ресурсов","","","","","","",""\n`;
         } else {
             resourceCards.forEach(card => {
                 const resourceName = card.querySelector('.resource-name').textContent;
@@ -515,9 +528,12 @@ function exportResourcesToCSVFallback() {
                 const externalIp = getCardDetailValue(card, 'Внешний IP');
                 const region = getCardDetailValue(card, 'Регион');
                 const tenant = getCardDetailValue(card, 'Tenant');
-                const cost = getCardDetailValue(card, 'Стоимость день');
+                const costDaily = getCardDetailValue(card, 'Стоимость день');
+                const costMonthly = getCardDetailValue(card, 'Стоимость мес.');
+                const dailyNumeric = parseCostString(costDaily);
+                const monthlyNumeric = parseCostString(costMonthly);
                 
-                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${tenant}","${cost}"\n`;
+                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${tenant}",${dailyNumeric},${monthlyNumeric}\n`;
             });
         }
     });
