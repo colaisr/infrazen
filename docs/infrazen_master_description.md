@@ -806,7 +806,7 @@ class ProviderPlugin(ABC):
 - ✅ **Beget**: VPS, domains, databases, FTP, email accounts
 - ✅ **Selectel**: VMs, volumes, file storage, billing integration
 - ✅ **Yandex Cloud**: 11 service types, 99.84% accuracy, SKU+HAR pricing (October 2025) - See `yandex_cloud_integration.md`
-- ✅ **Cloud.ru**: Billing-first discovery, resource unification (volumes/IPs with VMs), hardware specs extraction, cost tracking (December 2025) - See `CLOUD_RU_IMPLEMENTATION_PLAN.md`
+- ✅ **Cloud.ru**: Billing-first discovery, resource unification (volumes/IPs with VMs), hardware specs extraction, cost tracking, **CES (Cloud Eye) utilization metrics** (CPU/RAM/disk/network 24h), **5 FinOps recommendation rules** (rightsizing, idle VM, unattached volume, idle EIP), CCE worker grouping (December 2025–Feb 2026) - See `CLOUD_RU_IMPLEMENTATION_PLAN.md`
 - 🚀 **Ready for**: AWS, Azure, GCP, DigitalOcean, etc.
 
 ### 6.2.4. Multi-Provider User Experience
@@ -1081,7 +1081,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex Cloud**: ✅ **SKU+HAR-Based Cost Tracking** (October 2025) - Service account JWT authentication, 11 service types (VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs), 993 SKU prices synced daily, HAR-derived managed service pricing, 99.84% accuracy, multi-tenancy support (Clouds→Folders), production-tested. **Full details:** See `yandex_cloud_integration.md` for complete architecture, pricing methodology, API integration details, and implementation guide (15,000+ words).
 - **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
-- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025) - Service account Key ID/Secret authentication, **Project ID required** (from console URL: Контроль затрат → Потребление), billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
+- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025–Feb 2026) - Service account Key ID/Secret authentication, **Project ID required** (from console URL: Контроль затрат → Потребление), billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **CES (Cloud Eye) metrics**: 24h utilization (cpu_avg_usage, cpu_max_usage, memory_usage_percent, disk_util_percent, net_in/out_avg_bps, storage_used_percent) for VMs, SFS Turbo, RDS, ELB. **FinOps recommendations**: 5 Cloud.ru-specific rules (cpu_oversized &lt;5% avg, cpu_undersized &gt;85%, idle_vm, unattached_volume, idle_eip). **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.3.5. Sync Mechanics & Features
@@ -3601,16 +3601,16 @@ app/providers/
 - `get_vms()`: VM discovery from Compute API
 - `get_billing_data()`: Consumption data from Billing API using `project_ids` from credentials
 - `get_account_info()`: Account-level information
+- **CES metrics**: `get_ces_metrics_batch()`, `build_ces_utilization_map()`, `get_sfs_turbo_shares()` — Cloud Eye utilization (CPU, network, storage) for VMs, SFS, RDS, ELB
 - Automatic token refresh and error handling
 
 **CloudRuProviderPlugin (`app/providers/plugins/cloud_ru.py`):**
-- `sync_resources()`: Billing-first sync orchestration
+- `sync_resources()`: Billing-first sync orchestration with Advanced API enrichment
 - `_map_consumption_to_resource_type()`: SKU/service name to unified type mapping
-- `_process_resources()`: Resource processing with unification logic
+- `_create_unified_resources_by_name()`: Deployment-centric grouping with CCE worker rules (step 3f)
 - `_add_volume_to_vm()`: Volume unification helper
 - `_add_ip_to_vm()`: IP unification helper
-- `_create_unified_vm()`: VM resource creation with hardware specs
-- `_create_unified_resource_from_billing()`: Billing-only resource creation
+- CES enrichment: Maps `build_ces_utilization_map()` output to resource tags (`cpu_avg_usage`, `memory_usage_percent`, etc.) for usage display
 
 **Routes (`app/providers/cloud_ru/routes.py`):**
 - `POST /api/providers/cloud-ru/test`: Connection testing
@@ -3720,6 +3720,11 @@ This Cloud.ru integration evolved from “raw resources” into **deployment-cen
 - Managed Kubernetes control plane is billed as “Контейнеры (CCE) …”.
 - These rows are mapped to `kubernetes` and grouped under `k8s:<resource_name>` so a cluster card can include control-plane cost.
 
+**C') CCE worker VMs and volumes (step 3f)**
+- CCE worker node names embed the cluster name: `vm-{nodepool}-cce-{cluster-name}-{az}-{random5}` (e.g. `vm-sdp-workers1-cce-mgmt-shared-shared-u92rt`).
+- Step 3f matches `-{cluster-name}-` in the resource name and groups both server and volume resources into `k8s:<cluster-name>`.
+- Volumes grouped by step 3d (EVS API) to a VM name are promoted to the cluster group when the VM name itself matches a CCE cluster, so worker disks appear inside the cluster card rather than standalone.
+
 **D) Kubernetes PVC volumes**
 - PVCs appear as opaque `pvc-<uuid>` volume names.
 - These are aggregated into a single card:
@@ -3757,6 +3762,38 @@ This Cloud.ru integration evolved from “raw resources” into **deployment-cen
 #### 13.9.10.5. Known limitations
 - Service-account access cannot reliably enrich relationships via Compute/VPC inventory APIs (project identifiers may be rejected by those APIs).
 - Because of this, Cloud.ru currently relies on **billing + naming conventions** for relationship inference (VM↔disk, cluster↔nodes, etc.).
+
+### 13.9.11. CES (Cloud Eye) Metrics & FinOps Recommendations (Feb 2026)
+
+#### 13.9.11.1. Cloud Eye (CES) Utilization Metrics
+The Cloud.ru client (`app/providers/cloud_ru/client.py`) integrates with the **Cloud Eye Service (CES)** API to fetch 24-hour utilization metrics for FinOps analysis:
+
+**Metrics Collected:**
+- **VMs (ECS)**: `cpu_util` (avg/max), `network_incoming_bytes_aggregate_rate`, `network_outgoing_bytes_aggregate_rate` → mapped to `cpu_avg_usage`, `cpu_max_usage`, `net_in_avg_bps`, `net_out_avg_bps` in resource tags
+- **SFS Turbo**: `used_capacity`, `used_capacity_percent`, `iops` → `storage_used_percent`
+- **RDS**: `rds001_cpu_util`, `rds002_mem_util`, `rds039_disk_util` → `cpu_avg_usage`, `memory_usage_percent`, `disk_util_percent`
+- **ELB, CBR, OBS, NAT, VPC**: Additional namespaces supported for future expansion
+
+**Implementation:**
+- `get_ces_metrics_batch()`: Batch API (`POST /V1.0/{project_id}/batch-query-metric-data`) for up to 10 metric queries per call
+- `build_ces_utilization_map()`: Orchestrates batch fetches for VMs, SFS shares, RDS clusters, ELBs
+- Metrics stored in `provider_config` tags and displayed in the resource card "Использование (24 ч)" section with professional metric cards (CPU, RAM, disk, network progress bars)
+
+#### 13.9.11.2. Cloud.ru FinOps Recommendation Rules
+Plugin `app/core/recommendations/plugins/cloud_ru_rules.py` implements 5 provider-specific rules (scope: `cloud-ru`):
+
+| Rule ID | Description | Trigger |
+|---------|-------------|---------|
+| `cost.cloud_ru.rightsize.cpu_oversized` | Инстанс избыточен по CPU — рекомендуется уменьшить тариф | VM avg CPU &lt; 5% over 24h |
+| `cost.cloud_ru.rightsize.cpu_undersized` | Инстанс перегружен по CPU — риск деградации | VM avg CPU &gt; 85% over 24h |
+| `cost.cloud_ru.cleanup.idle_vm` | Простаивающий инстанс — рассмотрите остановку или удаление | VM avg CPU &lt; 2% AND network &lt; 10 KB/s; excludes CCE worker nodes |
+| `cost.cloud_ru.cleanup.unattached_volume` | Неприкреплённый диск — тарифицируется без использования | Volume with no server component; excludes CCE worker disks, PVCs, IMS, RDS |
+| `cost.cloud_ru.cleanup.idle_eip` | Неиспользуемый EIP — освободите IP-адрес для экономии | EIP billed but not associated with active VM; excludes VPC/NAT/pfSense infrastructure |
+
+Rules are configurable per-provider in Admin → Recommendation Settings. Recommendations are generated when the orchestrator runs (after complete sync or manual trigger).
+
+#### 13.9.11.3. Per-Provider Resource Type Filter
+`app/static/js/resources.js` adds `filterProviderResources(providerId, typeValue)` to filter resource cards by type (server, volume, kubernetes-cluster, etc.) per provider section.
 
 ## 13.10. Selectel Multi-Region & Volume Integration
 
@@ -6377,6 +6414,26 @@ Kubernetes clusters require aggregated cost estimation across multiple component
 - Selectel: `app/providers/plugins/selectel.py` calls `SelectelDBaaSPricingClient.get_dbaas_prices()`
 - Beget: `app/providers/plugins/beget.py` calls `BegetDBaaSPricingClient.get_dbaas_prices()`
 - Pricing syncs automatically during nightly cron job
+
+---
+
+#### **19.4.8. Cloud.ru FinOps Rules** ✅ (Feb 2026)
+
+**Scope**: Resource  
+**Providers**: `cloud-ru` only  
+**File**: `app/core/recommendations/plugins/cloud_ru_rules.py`
+
+**Data Source**: CES (Cloud Eye) metrics collected during sync — `cpu_avg_usage`, `cpu_max_usage`, `memory_usage_percent`, `disk_util_percent`, `net_in_avg_bps`, `net_out_avg_bps` in resource tags.
+
+| Rule ID | Trigger | Exclusions |
+|---------|---------|------------|
+| `cost.cloud_ru.rightsize.cpu_oversized` | VM avg CPU &lt; 5% over 24h | Requires CES data |
+| `cost.cloud_ru.rightsize.cpu_undersized` | VM avg CPU &gt; 85% over 24h | Requires CES data |
+| `cost.cloud_ru.cleanup.idle_vm` | VM avg CPU &lt; 2% AND network &lt; 10 KB/s | CCE worker nodes (`-cce-`, `-nodepool-`, `cce-mgmt`) |
+| `cost.cloud_ru.cleanup.unattached_volume` | Volume with no server component | CCE worker disks, PVCs, IMS, RDS, templates |
+| `cost.cloud_ru.cleanup.idle_eip` | EIP billed but not linked to VM | VPC bandwidth, NAT gateways, pfSense/firewalls |
+
+**Configuration**: Per-provider enable/disable in Admin → Recommendation Settings.
 
 ---
 
