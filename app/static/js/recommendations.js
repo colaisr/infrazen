@@ -18,6 +18,7 @@ const state = {
     page: 1, 
     page_size: 25, 
     order_by: '-estimated_monthly_savings',
+    total: 0,
     allRecommendations: []
 };
 
@@ -56,7 +57,7 @@ async function fetchProviders(){
         (data.providers || []).forEach(p=>{
             const o = document.createElement('option'); 
             o.value = p.id; 
-            o.textContent = p.provider_type || p.code || p.name; 
+            o.textContent = p.name || p.provider_type || p.code || String(p.id); 
             sel.appendChild(o);
         });
     } catch(e) {
@@ -198,8 +199,8 @@ async function load(){
             return;
         }
         
-        // Store all recommendations for client-side filtering
         state.allRecommendations = data.items || [];
+        state.total = data.total || 0;
         
         // Apply client-side search filter if search term exists
         let items = data.items || [];
@@ -219,6 +220,7 @@ async function load(){
             list.innerHTML = items.map(cardTemplate).join('');
         }
         
+        renderPagination(data.page, data.page_size, data.total);
         enableBulkButtons();
     } catch (error) {
         console.error('Error in load function:', error);
@@ -227,6 +229,32 @@ async function load(){
             list.innerHTML = '<div style="padding: 2rem; text-align: center; color: #d32f2f;">Ошибка загрузки рекомендаций: ' + error.message + '</div>';
         }
     }
+}
+
+// ============================================================================
+// Pagination
+// ============================================================================
+
+function renderPagination(page, pageSize, total) {
+    const container = qs('#recPagination');
+    const infoEl = qs('#recPaginationInfo');
+    const prevBtn = qs('#recPagePrev');
+    const nextBtn = qs('#recPageNext');
+    if (!container || !infoEl) return;
+    
+    if (total <= pageSize) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'flex';
+    const totalPages = Math.ceil(total / pageSize);
+    const from = (page - 1) * pageSize + 1;
+    const to = Math.min(page * pageSize, total);
+    
+    infoEl.textContent = `Показано ${from}–${to} из ${total}`;
+    prevBtn.disabled = page <= 1;
+    nextBtn.disabled = page >= totalPages;
 }
 
 // ============================================================================
@@ -346,14 +374,34 @@ async function toggleDetails(id){
 // CSV Export
 // ============================================================================
 
-function exportToCSV() {
-    if (!state.allRecommendations || state.allRecommendations.length === 0) {
+async function exportToCSV() {
+    // Fetch all pages for current filters to export complete dataset
+    let items = [];
+    let page = 1;
+    const pageSize = 200;
+    let hasMore = true;
+    while (hasMore) {
+        const params = new URLSearchParams();
+        ['q','provider','status','severity','type','resource_type'].forEach(k=>{
+            const v = qs('#'+k)?.value?.trim();
+            if(v) params.set(k, v);
+        });
+        params.set('page', page);
+        params.set('page_size', pageSize);
+        params.set('order_by', state.order_by);
+        const res = await fetch('/api/recommendations?'+params.toString());
+        const data = await res.json();
+        items = items.concat(data.items || []);
+        hasMore = (data.items?.length || 0) >= pageSize && items.length < (data.total || 0);
+        page++;
+    }
+    
+    if (!items || items.length === 0) {
         alert('Нет данных для экспорта');
         return;
     }
     
-    // Apply current filters to get the filtered data
-    let items = state.allRecommendations;
+    // Apply client-side search filter (API doesn't support q for recommendations)
     const searchTerm = qs('#search')?.value?.trim();
     if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
@@ -364,31 +412,8 @@ function exportToCSV() {
         );
     }
     
-    // Apply other filters
-    const provider = qs('#provider')?.value;
-    const status = qs('#status')?.value;
-    const severity = qs('#severity')?.value;
-    const type = qs('#type')?.value;
-    const resourceType = qs('#resource_type')?.value;
-    
-    if (provider) {
-        items = items.filter(rec => rec.provider_id == provider);
-    }
-    if (status) {
-        items = items.filter(rec => rec.status === status);
-    }
-    if (severity) {
-        items = items.filter(rec => rec.severity === severity);
-    }
-    if (type) {
-        items = items.filter(rec => rec.recommendation_type === type);
-    }
-    if (resourceType) {
-        items = items.filter(rec => rec.resource_type === resourceType);
-    }
-    
     if (items.length === 0) {
-        alert('Нет данных для экспорта после применения фильтров');
+        alert('Нет данных для экспорта после применения поиска');
         return;
     }
     
@@ -488,6 +513,20 @@ function initializeEventListeners() {
         exportCsv.addEventListener('click', exportToCSV);
     }
     
+    // Pagination
+    const prevBtn = qs('#recPagePrev');
+    const nextBtn = qs('#recPageNext');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => { state.page = Math.max(1, state.page - 1); load(); });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const maxPage = Math.ceil(state.total / state.page_size) || 1;
+            state.page = Math.min(maxPage, state.page + 1);
+            load();
+        });
+    }
+    
     // Recommendation action buttons and details toggle
     document.addEventListener('click', (e)=>{
         if(e.target.classList.contains('act')){ 
@@ -518,6 +557,8 @@ function initializeEventListeners() {
                 if (el) el.value = urlp.get(k);
             }
         });
+        const pageParam = urlp.get('page');
+        if (pageParam) state.page = Math.max(1, parseInt(pageParam, 10) || 1);
         initializeEventListeners();
         await load();
     } catch (error) {

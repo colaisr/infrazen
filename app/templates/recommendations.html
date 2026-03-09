@@ -66,6 +66,15 @@ window.INFRAZEN_DATA.enableAgentChat = {{ 'true' if enable_ai_recommendations el
 
 <div class="rec-list" id="recsList"></div>
 
+<div id="recPagination" class="rec-pagination" style="display: none; margin-top: 1rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+    <span id="recPaginationInfo" class="rec-pagination-info" style="color: #64748b; font-size: 0.875rem;"></span>
+    <div class="rec-pagination-controls" style="display: flex; gap: 0.5rem; align-items: center;">
+        <button id="recPagePrev" class="btn btn-secondary" style="padding: 0.375rem 0.75rem;">← Назад</button>
+        <span id="recPageNumbers" style="font-size: 0.875rem;"></span>
+        <button id="recPageNext" class="btn btn-secondary" style="padding: 0.375rem 0.75rem;">Вперёд →</button>
+    </div>
+</div>
+
 <div id="recModal" class="modal" style="display:none;">
   <div class="modal-content">
     <div style="display:flex; justify-content: space-between; align-items:center;">

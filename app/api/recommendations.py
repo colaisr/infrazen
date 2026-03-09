@@ -108,9 +108,35 @@ def list_recommendations():
     if severity:
         query = query.filter(OptimizationRecommendation.severity == severity)
     if rec_type:
-        query = query.filter(OptimizationRecommendation.recommendation_type == rec_type)
+        # Map UI filter values to DB: use prefix match for category filters
+        if rec_type == 'rightsizing':
+            query = query.filter(OptimizationRecommendation.recommendation_type.startswith('rightsizing'))
+        elif rec_type == 'cleanup':
+            query = query.filter(
+                OptimizationRecommendation.recommendation_type.startswith('cleanup')
+            )
+        elif rec_type == 'migrate':
+            query = query.filter(
+                OptimizationRecommendation.recommendation_type.in_(
+                    ['migrate', 'price_compare_cross_provider']
+                )
+            )
+        elif rec_type == 'shutdown':
+            query = query.filter(
+                OptimizationRecommendation.recommendation_type.in_(
+                    ['shutdown', 'cleanup_stopped']
+                )
+            )
+        else:
+            query = query.filter(OptimizationRecommendation.recommendation_type == rec_type)
     if resource_type:
-        query = query.filter(OptimizationRecommendation.resource_type == resource_type)
+        # Map UI value "VM" to DB values server/vm
+        if resource_type.upper() == 'VM':
+            query = query.filter(
+                OptimizationRecommendation.resource_type.in_(['server', 'vm'])
+            )
+        else:
+            query = query.filter(OptimizationRecommendation.resource_type == resource_type)
     if min_savings is not None:
         query = query.filter((OptimizationRecommendation.estimated_monthly_savings >= min_savings) | (OptimizationRecommendation.potential_savings >= min_savings))
     if max_savings is not None:
