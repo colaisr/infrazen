@@ -96,7 +96,18 @@ class ProductionConfig(Config):
     # Example Beget MySQL: mysql+pymysql://user:pass@mysql.beget.com:3306/infrazen_prod?charset=utf8mb4
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_ECHO = False
-    
+
+    # Beget MySQL has wait_timeout=30s; recycle connections before that to avoid
+    # "Lost connection to MySQL server during query" on long syncs
+    _db_url = os.environ.get('DATABASE_URL', '')
+    if 'beget' in _db_url.lower():
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            'pool_size': 10,
+            'pool_recycle': 25,
+            'pool_pre_ping': True,
+            'connect_args': {'charset': 'utf8mb4'},
+        }
+
     # Security settings
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
