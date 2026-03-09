@@ -2,11 +2,13 @@
 Unified sync orchestrator for all provider plugins
 """
 import logging
+import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 
+import sqlalchemy.exc
 from app.core.models import db
 from app.core.models.provider import CloudProvider
 from app.core.models.sync import SyncSnapshot
@@ -122,15 +124,31 @@ class SyncOrchestrator:
             # Release DB connection before long sync. Beget MySQL wait_timeout=30s;
             # sync can take 50+ seconds of HTTP calls, so holding a connection causes
             # "Lost connection to MySQL server during query" when we try to commit after.
+            # Invalidate the connection so the pool discards it (it will be dead after sync).
+            try:
+                conn = db.session.connection()
+                conn.invalidate()
+            except Exception:
+                pass
             db.session.remove()
 
             # Perform sync (no DB access - all HTTP)
             self.logger.info(f"Performing resource sync for provider {provider_id}")
             sync_result = plugin.sync_resources()
 
-            # Re-query with fresh session for processing
-            provider = CloudProvider.query.get(provider_id)
-            sync_snapshot = SyncSnapshot.query.get(sync_snapshot_id)
+            # Re-query with fresh session for processing (retry on stale connection)
+            provider = None
+            sync_snapshot = None
+            for attempt in range(3):
+                try:
+                    provider = CloudProvider.query.get(provider_id)
+                    sync_snapshot = SyncSnapshot.query.get(sync_snapshot_id)
+                    break
+                except sqlalchemy.exc.OperationalError as oe:
+                    if '2013' not in str(oe) or attempt == 2:
+                        raise
+                    db.session.remove()
+                    time.sleep(0.5 * (attempt + 1))
             if not provider or not sync_snapshot:
                 return {
                     'success': False,
