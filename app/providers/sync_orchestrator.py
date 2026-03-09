@@ -69,6 +69,7 @@ class SyncOrchestrator:
 
             db.session.add(sync_snapshot)
             db.session.commit()
+            sync_snapshot_id = sync_snapshot.id
 
             # Get provider credentials
             credentials = provider.get_credentials()
@@ -116,10 +117,26 @@ class SyncOrchestrator:
                 'account_info': connection_test.get('account_info', {})
             })
             db.session.add(provider)
+            db.session.commit()
 
-            # Perform sync
+            # Release DB connection before long sync. Beget MySQL wait_timeout=30s;
+            # sync can take 50+ seconds of HTTP calls, so holding a connection causes
+            # "Lost connection to MySQL server during query" when we try to commit after.
+            db.session.remove()
+
+            # Perform sync (no DB access - all HTTP)
             self.logger.info(f"Performing resource sync for provider {provider_id}")
             sync_result = plugin.sync_resources()
+
+            # Re-query with fresh session for processing
+            provider = CloudProvider.query.get(provider_id)
+            sync_snapshot = SyncSnapshot.query.get(sync_snapshot_id)
+            if not provider or not sync_snapshot:
+                return {
+                    'success': False,
+                    'error': 'Provider or snapshot not found after sync',
+                    'message': 'Database lookup failed after sync'
+                }
 
             # Process sync results
             processed_result = self._process_sync_result(sync_result, sync_snapshot, provider)
@@ -140,12 +157,13 @@ class SyncOrchestrator:
             error_msg = f'Sync failed for provider {provider_id}: {str(e)}'
             self.logger.error(error_msg, exc_info=True)
 
-            # Update sync snapshot if it exists
+            # Update sync snapshot if it exists (re-query in case session was removed)
             try:
-                if 'sync_snapshot' in locals():
-                    sync_snapshot.mark_completed('error', str(e))
+                snapshot = SyncSnapshot.query.get(sync_snapshot_id) if 'sync_snapshot_id' in locals() else None
+                if snapshot:
+                    snapshot.mark_completed('error', str(e))
                     db.session.commit()
-            except:
+            except Exception:
                 pass
 
             return {
