@@ -2,6 +2,7 @@
 Complete Sync Service for orchestrating synchronization across all organization providers
 """
 import logging
+import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from app.core.models import db
@@ -46,15 +47,16 @@ class CompleteSyncService:
         
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
-    def start_complete_sync(self, sync_type: str = 'manual') -> Dict[str, any]:
+    def start_complete_sync(self, sync_type: str = 'manual', background: bool = False) -> Dict[str, any]:
         """
         Start a complete sync operation for all auto-sync enabled providers in the organization
         
         Args:
             sync_type: Type of sync (manual, scheduled, api)
+            background: If True, run sync in background thread and return immediately (avoids nginx 504)
             
         Returns:
-            Dict containing sync results
+            Dict containing sync results (or minimal info if background=True)
         """
         try:
             self.logger.info(f"Starting complete sync for organization {self.organization_id} ({self.organization.name})")
@@ -95,7 +97,26 @@ class CompleteSyncService:
             
             self.logger.info(f"Created complete sync {complete_sync.id} for {len(providers)} providers")
             
-            # Execute sequential sync for each provider
+            if background:
+                def _run():
+                    from app import create_app
+                    app = create_app()
+                    with app.app_context():
+                        try:
+                            svc = CompleteSyncService(self.organization_id, user_id=self.user_id)
+                            svc.execute_sync_for_record(complete_sync.id)
+                        except Exception as e:
+                            app.logger.error(f"Background complete sync failed: {e}", exc_info=True)
+                thread = threading.Thread(target=_run, daemon=True)
+                thread.start()
+                return {
+                    'success': True,
+                    'complete_sync_id': complete_sync.id,
+                    'message': 'Синхронизация запущена в фоне. Обновите страницу через 1–2 минуты.',
+                    'background': True,
+                }
+            
+            # Execute sequential sync for each provider (synchronous)
             return self._execute_sequential_sync(complete_sync, providers)
             
         except Exception as e:
@@ -106,6 +127,24 @@ class CompleteSyncService:
                 'message': 'Complete sync failed due to system error'
             }
     
+    def execute_sync_for_record(self, complete_sync_id: int) -> None:
+        """Execute sync for an existing complete_sync record (used by background thread)."""
+        complete_sync = CompleteSync.query.filter_by(
+            id=complete_sync_id,
+            organization_id=self.organization_id
+        ).first()
+        if not complete_sync:
+            self.logger.error(f"CompleteSync {complete_sync_id} not found")
+            return
+        providers = self.get_organization_providers()
+        if not providers:
+            complete_sync.sync_status = 'error'
+            complete_sync.error_message = 'No providers to sync'
+            complete_sync.mark_completed('error', 'No providers to sync')
+            db.session.commit()
+            return
+        self._execute_sequential_sync(complete_sync, providers)
+
     def get_organization_providers(self) -> List[CloudProvider]:
         """
         Get all auto-sync enabled providers for the organization (excluding soft-deleted)
@@ -289,24 +328,30 @@ class CompleteSyncService:
             }
             
             self.logger.info(f"Complete sync {complete_sync.id} completed: {complete_sync.sync_status}")
-            # Post-sync: run recommendations orchestrator if enabled and sync had any success
-            try:
-                if current_app.config.get('RECOMMENDATIONS_ENABLED', True) and response['success']:
-                    self.logger.info(f"Running recommendations orchestrator for complete_sync {complete_sync.id}")
-                    reco = RecommendationOrchestrator()
-                    reco_summary = reco.run_for_sync(complete_sync.id)
-                    response['recommendations_summary'] = reco_summary
-                    # Persist recommendations summary into sync_config for later retrieval via API
-                    try:
-                        cfg = complete_sync.get_sync_config() or {}
-                        cfg['recommendations_summary'] = reco_summary
-                        complete_sync.set_sync_config(cfg)
-                        db.session.commit()
-                    except Exception as persist_err:
-                        self.logger.error(f"Failed to persist recommendations summary: {persist_err}")
-            except Exception as reco_err:
-                self.logger.error(f"Recommendations orchestrator failed: {reco_err}")
-                response['recommendations_error'] = str(reco_err)
+            # Run recommendations in background so API can return immediately (avoids client timeout)
+            if current_app.config.get('RECOMMENDATIONS_ENABLED', True) and response['success']:
+                complete_sync_id = complete_sync.id
+                org_id = self.organization_id
+
+                def _run_recommendations():
+                    from app import create_app
+                    app = create_app()
+                    with app.app_context():
+                        try:
+                            logger.info(f"Running recommendations orchestrator for complete_sync {complete_sync_id}")
+                            reco = RecommendationOrchestrator()
+                            reco_summary = reco.run_for_sync(complete_sync_id)
+                            cs = CompleteSync.query.filter_by(id=complete_sync_id, organization_id=org_id).first()
+                            if cs:
+                                cfg = cs.get_sync_config() or {}
+                                cfg['recommendations_summary'] = reco_summary
+                                cs.set_sync_config(cfg)
+                                db.session.commit()
+                        except Exception as e:
+                            logger.error(f"Recommendations orchestrator failed: {e}", exc_info=True)
+
+                t = threading.Thread(target=_run_recommendations, daemon=True)
+                t.start()
 
             return response
             

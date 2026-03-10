@@ -1,7 +1,6 @@
 """
 Cloud.ru provider routes
 """
-import threading
 from flask import Blueprint, request, jsonify, session, redirect, url_for, flash
 from app.core.database import db
 from app.core.models.provider import CloudProvider
@@ -377,12 +376,10 @@ def delete_connection(provider_id):
 
 @cloud_ru_bp.route('/<int:provider_id>/sync', methods=['POST'])
 def sync_connection(provider_id):
-    """Manually trigger resource synchronization for Cloud.ru.
-    Runs in background to avoid HTTP timeout when syncing 2500+ resources (~15s).
-    """
+    """Manually trigger resource synchronization for Cloud.ru (synchronous, like other providers)."""
     try:
         if 'user' not in session:
-            return jsonify({'success': False, 'message': 'Authentication required'}), 401
+            return jsonify({'success': False, 'error': 'Authentication required'}), 401
         
         # Check if demo user (read-only)
         from app.api.auth import check_demo_user_write_access
@@ -393,7 +390,7 @@ def sync_connection(provider_id):
         user_id = session['user']['id']
         org_id = get_current_organization_id()
         if not org_id:
-            return jsonify({'success': False, 'message': 'No active organization'}), 400
+            return jsonify({'success': False, 'error': 'No active organization'}), 400
         
         provider = CloudProvider.query.filter_by(
             id=provider_id,
@@ -403,35 +400,32 @@ def sync_connection(provider_id):
         ).first()
         
         if not provider:
-            return jsonify({'success': False, 'message': 'Provider not found'}), 404
+            return jsonify({'success': False, 'error': 'Provider not found'}), 404
         
         from app.providers import sync_orchestrator
-        from app import create_app
 
-        def background_sync():
-            app = create_app()
-            with app.app_context():
-                try:
-                    sync_orchestrator.sync_provider(provider_id, sync_type='manual')
-                except Exception as e:
-                    logger.error(f"Background Cloud.ru sync failed for provider {provider_id}: {e}", exc_info=True)
+        sync_result = sync_orchestrator.sync_provider(provider_id, sync_type='manual')
 
-        thread = threading.Thread(target=background_sync, daemon=True)
-        thread.start()
+        if sync_result['success']:
+            daily_cost = float(sync_result.get('total_cost', 0))
+            return jsonify({
+                'success': True,
+                'message': sync_result['message'],
+                'snapshot_id': sync_result.get('sync_snapshot_id'),
+                'status': 'success',
+                'resources_synced': sync_result.get('resources_synced', 0),
+                'total_resources': sync_result.get('resources_synced', 0),
+                'total_daily_cost': daily_cost,
+                'total_monthly_cost': daily_cost * 30,
+                'total_cost': daily_cost,
+                'openstack_auth_ok': True,
+                'errors': sync_result.get('errors', []),
+            })
+        else:
+            return jsonify({'success': False, 'error': sync_result.get('error', 'Sync failed')}), 500
 
-        return jsonify({
-            'success': True,
-            'message': 'Синхронизация запущена в фоне. Обновите страницу через 15–30 секунд.',
-            'resources_synced': 0,
-            'total_daily_cost': 0,
-            'total_monthly_cost': 0,
-            'background': True,
-        })
-            
     except Exception as e:
-        logger.error(f"Error starting Cloud.ru sync for provider {provider_id}: {str(e)}")
-        return jsonify({
-            'success': False,
-            'message': f'Error syncing resources: {str(e)}'
-        }), 500
+        logger.error(f"Error syncing Cloud.ru provider {provider_id}: {str(e)}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 

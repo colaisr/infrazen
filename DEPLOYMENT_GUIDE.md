@@ -289,6 +289,39 @@ sudo systemctl restart infrazen
 
 ---
 
+---
+
+## ⏱️ Nginx Timeout for Complete Sync
+
+Full sync ("Обновить все") can take 5–10+ minutes (Cloud.ru 600+ resources + recommendations). Default nginx `proxy_read_timeout` (~60s) causes 504.
+
+**Add this location block** before `location /` in `/etc/nginx/sites-available/infrazen`:
+
+```nginx
+    location /api/complete-sync {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    proxy_read_timeout 600s;
+    proxy_connect_timeout 600s;
+    proxy_send_timeout 600s;
+    }
+```
+
+Then:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Reference: `deploy/nginx-complete-sync.conf`
+
+---
+
 ## 📞 Support
 
 If you need to change email credentials:

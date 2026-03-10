@@ -316,9 +316,9 @@ function startCompleteSync(button) {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Синхронизация всех...</span>';
     button.disabled = true;
     
-    // Create AbortController for timeout (180 seconds for multiple providers with stats)
+    // Create AbortController for timeout (10 min for Cloud.ru 600+ resources + recommendations)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // 600 second timeout
     
     // Make complete sync request with extended timeout
     fetch('/api/complete-sync', {
@@ -352,25 +352,18 @@ function startCompleteSync(button) {
     })
     .then(data => {
         if (data.success) {
-            // Show success message with aggregated results
             let message = `✅ Полная синхронизация завершена!<br>`;
             message += `📊 Провайдеров: ${data.total_providers_synced}<br>`;
             message += `💰 Общая стоимость: ${data.total_daily_cost.toFixed(2)} ₽/день<br>`;
             message += `📦 Ресурсов: ${data.total_resources_found}`;
-            
             if (data.cost_by_provider && Object.keys(data.cost_by_provider).length > 0) {
                 message += `<br><br>📈 По провайдерам:<br>`;
                 for (const [provider, cost] of Object.entries(data.cost_by_provider)) {
                     message += `• ${provider}: ${cost.toFixed(2)} ₽/день<br>`;
                 }
             }
-            
             showFlashMessage(message, 'success');
-            
-            // Reload page after 2 seconds to show updated data
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
+            setTimeout(() => location.reload(), 2000);
         } else {
             showFlashMessage('❌ Ошибка полной синхронизации: ' + (data.error || data.message), 'error');
             button.innerHTML = originalText;
@@ -382,7 +375,7 @@ function startCompleteSync(button) {
         
         const isTimeout = error.name === 'AbortError';
         const errorMessage = isTimeout
-            ? 'Превышено время ожидания (>180 сек) - синхронизация может продолжаться на сервере'
+            ? 'Превышено время ожидания (>10 мин) - синхронизация может продолжаться на сервере'
             : error.message || 'Неизвестная ошибка';
         
         showFlashMessage('❌ Ошибка полной синхронизации: ' + errorMessage, 'error');
