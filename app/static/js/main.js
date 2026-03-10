@@ -183,9 +183,21 @@ function syncProvider(providerId, providerType, button, onSuccess, fullProviderI
         },
         signal: controller.signal
     })
-    .then(response => {
-        clearTimeout(timeoutId); // Clear timeout on successful response
-        return response.json();
+    .then(async response => {
+        clearTimeout(timeoutId);
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            const fallback = response.ok ? 'Неверный ответ сервера' : `Ошибка сервера (код ${response.status})`;
+            throw new Error(fallback);
+        }
+        if (!response.ok) {
+            const errMsg = data.error || data.message || `Ошибка ${response.status}`;
+            throw new Error(errMsg);
+        }
+        return data;
     })
     .then(data => {
         if (data.success) {
