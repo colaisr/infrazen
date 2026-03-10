@@ -331,9 +331,24 @@ function startCompleteSync(button) {
         }),
         signal: controller.signal
     })
-    .then(response => {
+    .then(async response => {
         clearTimeout(timeoutId); // Clear timeout on response
-        return response.json();
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            // Server returned HTML (e.g. 500 error page) instead of JSON
+            const fallback = response.ok
+                ? 'Неверный ответ сервера'
+                : `Ошибка сервера (код ${response.status})`;
+            throw new Error(fallback);
+        }
+        if (!response.ok) {
+            const errMsg = data.error || data.message || `Ошибка ${response.status}`;
+            return { success: false, error: errMsg, message: errMsg };
+        }
+        return data;
     })
     .then(data => {
         if (data.success) {
