@@ -150,22 +150,26 @@ class CompleteSyncService:
             
             # Update complete sync with provider count
             complete_sync.total_providers_synced = len(providers)
+            complete_sync_id = complete_sync.id  # Capture before sync (remove() detaches)
             
             # Sync each provider sequentially
             for order, provider in enumerate(providers, 1):
-                self.logger.info(f"Syncing provider {provider.id} ({provider.connection_name}) - {order}/{len(providers)}")
+                # Capture before sync_provider (it calls db.session.remove() which detaches provider)
+                provider_id = provider.id
+                provider_name = provider.connection_name
+                self.logger.info(f"Syncing provider {provider_id} ({provider_name}) - {order}/{len(providers)}")
                 
                 # Create provider sync reference
                 provider_ref = ProviderSyncReference(
-                    complete_sync_id=complete_sync.id,
-                    provider_id=provider.id,
+                    complete_sync_id=complete_sync_id,
+                    provider_id=provider_id,
                     sync_order=order,
                     sync_status='running'
                 )
                 
                 try:
                     # Execute individual provider sync
-                    sync_result = sync_orchestrator.sync_provider(provider.id, 'complete_sync')
+                    sync_result = sync_orchestrator.sync_provider(provider_id, 'complete_sync')
                     
                     if sync_result['success']:
                         # Store reference to generated snapshot
@@ -185,12 +189,12 @@ class CompleteSyncService:
                         
                         # Aggregate costs
                         total_cost += provider_cost
-                        cost_by_provider[provider.connection_name] = provider_cost
-                        resources_by_provider[provider.connection_name] = provider_ref.resources_synced
+                        cost_by_provider[provider_name] = provider_cost
+                        resources_by_provider[provider_name] = provider_ref.resources_synced
                         total_resources += provider_ref.resources_synced
                         successful_providers += 1
                         
-                        self.logger.info(f"Provider {provider.connection_name} synced successfully: {provider_ref.resources_synced} resources, {provider_ref.provider_cost} RUB")
+                        self.logger.info(f"Provider {provider_name} synced successfully: {provider_ref.resources_synced} resources, {provider_ref.provider_cost} RUB")
                         
                     else:
                         # Handle sync failure
@@ -205,11 +209,11 @@ class CompleteSyncService:
                         
                         failed_providers += 1
                         provider_errors.append({
-                            'provider': provider.connection_name,
+                            'provider': provider_name,
                             'error': sync_result.get('error', 'Unknown error')
                         })
                         
-                        self.logger.error(f"Provider {provider.connection_name} sync failed: {sync_result.get('error')}")
+                        self.logger.error(f"Provider {provider_name} sync failed: {sync_result.get('error')}")
                 
                 except Exception as e:
                     # Handle unexpected errors
@@ -218,21 +222,20 @@ class CompleteSyncService:
                     provider_ref.set_error_details({'exception': str(e)})
                     failed_providers += 1
                     provider_errors.append({
-                        'provider': provider.connection_name,
+                        'provider': provider_name,
                         'error': str(e)
                     })
                     
-                    self.logger.error(f"Provider {provider.connection_name} sync exception: {e}")
+                    self.logger.error(f"Provider {provider_name} sync exception: {e}")
                 
                 # Collect provider refs; add after loop (sync_provider does db.session.remove())
                 if provider_ref.sync_snapshot_id is not None:
                     provider_refs_to_add.append(provider_ref)
                 else:
-                    self.logger.warning(f"Skipping provider_sync_reference for {provider.connection_name} - no sync_snapshot_id")
+                    self.logger.warning(f"Skipping provider_sync_reference for {provider_name} - no sync_snapshot_id")
             
             # Re-query complete_sync: sync_provider calls db.session.remove() which detaches
             # all objects. We need a session-bound instance for updates and recommendations.
-            complete_sync_id = complete_sync.id
             complete_sync = CompleteSync.query.get(complete_sync_id)
             if not complete_sync:
                 raise ValueError(f"CompleteSync {complete_sync_id} not found after sync")
@@ -240,7 +243,8 @@ class CompleteSyncService:
             for ref in provider_refs_to_add:
                 db.session.add(ref)
             
-            # Update complete sync with results
+            # Update complete sync with results (re-queried instance; initial updates were lost to remove())
+            complete_sync.total_providers_synced = len(providers)
             complete_sync.successful_providers = successful_providers
             complete_sync.failed_providers = failed_providers
             complete_sync.total_resources_found = total_resources
