@@ -146,6 +146,7 @@ class CompleteSyncService:
             failed_providers = 0
             total_resources = 0
             provider_errors = []
+            provider_refs_to_add = []  # Collect refs; sync_provider does db.session.remove()
             
             # Update complete sync with provider count
             complete_sync.total_providers_synced = len(providers)
@@ -223,13 +224,21 @@ class CompleteSyncService:
                     
                     self.logger.error(f"Provider {provider.connection_name} sync exception: {e}")
                 
-                # Add provider reference to database
-                # Only add if we have a sync_snapshot_id (required field)
+                # Collect provider refs; add after loop (sync_provider does db.session.remove())
                 if provider_ref.sync_snapshot_id is not None:
-                    db.session.add(provider_ref)
+                    provider_refs_to_add.append(provider_ref)
                 else:
-                    # If no snapshot (sync failed before creating snapshot), skip this reference
                     self.logger.warning(f"Skipping provider_sync_reference for {provider.connection_name} - no sync_snapshot_id")
+            
+            # Re-query complete_sync: sync_provider calls db.session.remove() which detaches
+            # all objects. We need a session-bound instance for updates and recommendations.
+            complete_sync_id = complete_sync.id
+            complete_sync = CompleteSync.query.get(complete_sync_id)
+            if not complete_sync:
+                raise ValueError(f"CompleteSync {complete_sync_id} not found after sync")
+            
+            for ref in provider_refs_to_add:
+                db.session.add(ref)
             
             # Update complete sync with results
             complete_sync.successful_providers = successful_providers
