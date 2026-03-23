@@ -13,7 +13,7 @@ MAIL_PORT=465
 MAIL_USE_SSL=True
 MAIL_USE_TLS=False
 MAIL_USERNAME=registration@infrazen.ru
-MAIL_PASSWORD=Kok5489103!!
+MAIL_PASSWORD=your-mailbox-password
 MAIL_DEFAULT_SENDER=registration@infrazen.ru
 ```
 
@@ -53,7 +53,7 @@ MAIL_PORT=465
 MAIL_USE_SSL=True
 MAIL_USE_TLS=False
 MAIL_USERNAME=registration@infrazen.ru
-MAIL_PASSWORD=Kok5489103!!
+MAIL_PASSWORD=your-mailbox-password
 MAIL_DEFAULT_SENDER=registration@infrazen.ru
 
 # Logging

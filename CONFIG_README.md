@@ -82,11 +82,12 @@ GOOGLE_CLIENT_ID=your-dev-client-id
 ```
 
 ### config.prod.env (Production)
+Example only — use real values on the server; never commit secrets to Git.
 ```bash
 FLASK_ENV=production
-DATABASE_URL=mysql+pymysql://infrazen_prod:Kok5489103!@jufiedeycadeth.beget.app:3306/infrazen_prod?charset=utf8mb4
-GOOGLE_CLIENT_ID=421154810757-i7ssn34msfpqlf0s5fkfrucun5sgut4d.apps.googleusercontent.com
-SECRET_KEY=infrazen-finops-secret-key-2025
+DATABASE_URL=mysql+pymysql://infrazen_prod:YOUR_DB_PASSWORD@jufiedeycadeth.beget.app:3306/infrazen_prod?charset=utf8mb4
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+SECRET_KEY=<generate-with-python-secrets-token_hex>
 MAIL_USERNAME=registration@infrazen.ru
 # ... other prod settings
 ```
