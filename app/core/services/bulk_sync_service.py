@@ -102,6 +102,10 @@ class BulkSyncService:
                     'duration_seconds': 0
                 }
             
+            # Complete sync calls db.session.remove() / commits that expire or detach ORM objects.
+            # Capture ids/names now so later loop iterations never touch detached Organization rows.
+            org_jobs = [(o.id, o.name) for o in eligible_orgs]
+            
             # Initialize counters
             successful_orgs = 0
             failed_orgs = 0
@@ -109,24 +113,24 @@ class BulkSyncService:
             org_results = []
             
             # Process each organization sequentially
-            for idx, org in enumerate(eligible_orgs, 1):
+            for idx, (org_id, org_name) in enumerate(org_jobs, 1):
                 org_start_time = datetime.now()
                 
-                self.logger.info(f"Processing organization {idx}/{len(eligible_orgs)}: {org.name} (ID: {org.id})")
+                self.logger.info(f"Processing organization {idx}/{len(org_jobs)}: {org_name} (ID: {org_id})")
                 
                 try:
                     # Create sync service for organization
-                    sync_service = CompleteSyncService(org.id)
+                    sync_service = CompleteSyncService(org_id)
                     
                     # Get organization's providers to check if sync is needed
                     providers = sync_service.get_organization_providers()
                     
                     if not providers:
-                        self.logger.info(f"Organization {org.name} has no auto-sync enabled providers, skipping")
+                        self.logger.info(f"Organization {org_name} has no auto-sync enabled providers, skipping")
                         skipped_orgs += 1
                         org_results.append({
-                            'organization_id': org.id,
-                            'organization_name': org.name,
+                            'organization_id': org_id,
+                            'organization_name': org_name,
                             'status': 'skipped',
                             'reason': 'No auto-sync enabled providers',
                             'duration_seconds': 0
@@ -134,7 +138,7 @@ class BulkSyncService:
                         continue
                     
                     # Execute sync
-                    self.logger.info(f"Starting sync for organization {org.name} with {len(providers)} providers")
+                    self.logger.info(f"Starting sync for organization {org_name} with {len(providers)} providers")
                     sync_result = sync_service.start_complete_sync(sync_type=sync_type)
                     
                     org_duration = (datetime.now() - org_start_time).total_seconds()
@@ -142,8 +146,8 @@ class BulkSyncService:
                     if sync_result.get('success'):
                         successful_orgs += 1
                         org_results.append({
-                            'organization_id': org.id,
-                            'organization_name': org.name,
+                            'organization_id': org_id,
+                            'organization_name': org_name,
                             'status': 'success',
                             'complete_sync_id': sync_result.get('complete_sync_id'),
                             'sync_status': sync_result.get('sync_status'),
@@ -155,7 +159,7 @@ class BulkSyncService:
                             'duration_seconds': org_duration
                         })
                         self.logger.info(
-                            f"✓ Organization {org.name} sync completed: "
+                            f"✓ Organization {org_name} sync completed: "
                             f"{sync_result.get('successful_providers')}/{sync_result.get('total_providers_synced')} providers, "
                             f"{sync_result.get('total_resources_found')} resources, "
                             f"{org_duration:.1f}s"
@@ -163,26 +167,26 @@ class BulkSyncService:
                     else:
                         failed_orgs += 1
                         org_results.append({
-                            'organization_id': org.id,
-                            'organization_name': org.name,
+                            'organization_id': org_id,
+                            'organization_name': org_name,
                             'status': 'failed',
                             'error': sync_result.get('error', 'Unknown error'),
                             'message': sync_result.get('message'),
                             'duration_seconds': org_duration
                         })
-                        self.logger.error(f"✗ Organization {org.name} sync failed: {sync_result.get('error')}")
+                        self.logger.error(f"✗ Organization {org_name} sync failed: {sync_result.get('error')}")
                 
                 except Exception as e:
                     failed_orgs += 1
                     org_duration = (datetime.now() - org_start_time).total_seconds()
                     org_results.append({
-                        'organization_id': org.id,
-                        'organization_name': org.name,
+                        'organization_id': org_id,
+                        'organization_name': org_name,
                         'status': 'error',
                         'error': str(e),
                         'duration_seconds': org_duration
                     })
-                    self.logger.error(f"✗ Organization {org.name} sync exception: {e}", exc_info=True)
+                    self.logger.error(f"✗ Organization {org_name} sync exception: {e}", exc_info=True)
             
             # Calculate total duration
             total_duration = (datetime.now() - start_time).total_seconds()
@@ -191,7 +195,7 @@ class BulkSyncService:
             summary = {
                 'success': True,
                 'message': f'Bulk sync completed: {successful_orgs} successful, {failed_orgs} failed, {skipped_orgs} skipped',
-                'total_organizations': len(eligible_orgs),
+                'total_organizations': len(org_jobs),
                 'successful_organizations': successful_orgs,
                 'failed_organizations': failed_orgs,
                 'skipped_organizations': skipped_orgs,
@@ -205,7 +209,7 @@ class BulkSyncService:
             self.logger.info(
                 f"Bulk sync completed in {total_duration:.1f}s: "
                 f"{successful_orgs} successful, {failed_orgs} failed, {skipped_orgs} skipped "
-                f"out of {len(eligible_orgs)} organizations"
+                f"out of {len(org_jobs)} organizations"
             )
             
             return summary

@@ -177,6 +177,11 @@ class CompleteSyncService:
         Returns:
             Dict containing sync results
         """
+        # sync_provider() calls db.session.remove(), which detaches ALL loaded ORM objects — including
+        # every CloudProvider in `providers`. Capture ids/names up front so later iterations never
+        # touch detached instances.
+        complete_sync_id = complete_sync.id
+        provider_jobs = [(p.id, p.connection_name) for p in providers]
         try:
             total_cost = 0.0
             cost_by_provider = {}
@@ -188,15 +193,11 @@ class CompleteSyncService:
             provider_refs_to_add = []  # Collect refs; sync_provider does db.session.remove()
             
             # Update complete sync with provider count
-            complete_sync.total_providers_synced = len(providers)
-            complete_sync_id = complete_sync.id  # Capture before sync (remove() detaches)
+            complete_sync.total_providers_synced = len(provider_jobs)
             
             # Sync each provider sequentially
-            for order, provider in enumerate(providers, 1):
-                # Capture before sync_provider (it calls db.session.remove() which detaches provider)
-                provider_id = provider.id
-                provider_name = provider.connection_name
-                self.logger.info(f"Syncing provider {provider_id} ({provider_name}) - {order}/{len(providers)}")
+            for order, (provider_id, provider_name) in enumerate(provider_jobs, 1):
+                self.logger.info(f"Syncing provider {provider_id} ({provider_name}) - {order}/{len(provider_jobs)}")
                 
                 # Create provider sync reference
                 provider_ref = ProviderSyncReference(
@@ -275,7 +276,7 @@ class CompleteSyncService:
             
             # Re-query complete_sync: sync_provider calls db.session.remove() which detaches
             # all objects. We need a session-bound instance for updates and recommendations.
-            complete_sync = CompleteSync.query.get(complete_sync_id)
+            complete_sync = db.session.get(CompleteSync, complete_sync_id)
             if not complete_sync:
                 raise ValueError(f"CompleteSync {complete_sync_id} not found after sync")
             
@@ -283,7 +284,7 @@ class CompleteSyncService:
                 db.session.add(ref)
             
             # Update complete sync with results (re-queried instance; initial updates were lost to remove())
-            complete_sync.total_providers_synced = len(providers)
+            complete_sync.total_providers_synced = len(provider_jobs)
             complete_sync.successful_providers = successful_providers
             complete_sync.failed_providers = failed_providers
             complete_sync.total_resources_found = total_resources
@@ -356,12 +357,14 @@ class CompleteSyncService:
             return response
             
         except Exception as e:
-            self.logger.error(f"Sequential sync execution failed: {e}")
-            complete_sync.sync_status = 'error'
-            complete_sync.error_message = str(e)
-            complete_sync.set_error_details({'exception': str(e)})
-            complete_sync.mark_completed('error', str(e))
-            db.session.commit()
+            self.logger.error(f"Sequential sync execution failed: {e}", exc_info=True)
+            cs = db.session.get(CompleteSync, complete_sync_id)
+            if cs:
+                cs.sync_status = 'error'
+                cs.error_message = str(e)
+                cs.set_error_details({'exception': str(e)})
+                cs.mark_completed('error', str(e))
+                db.session.commit()
             
             return {
                 'success': False,
