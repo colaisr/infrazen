@@ -171,7 +171,7 @@ def build_recommendation_prompt(data: dict) -> str:
     rec_type = rec.get('type', '')
     
     # For cleanup recommendations, use different prompt
-    if rec_type in ['cleanup_unused_ip', 'cleanup_stopped', 'cleanup_unused_volume', 'cleanup_old_snapshot']:
+    if rec_type.startswith('cleanup_'):
         return build_cleanup_prompt(data)
     
     # Extract key data
