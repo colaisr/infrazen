@@ -909,7 +909,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # one billing line survives (e.g. shutdown DB still bills storage),
                 # the resource still groups under its DB key.
                 rid = str(resource_id)
-                m = re.match(r'^([0-9a-fA-F-]{32,36}).*\\.(volume|disk|storage|vm)$', rid)
+                m = re.match(r'^([0-9a-fA-F-]{32,36}).*\.(volume|disk|storage|vm)$', rid)
                 if m:
                     grouping_key = f"db:{m.group(1).lower()}"
 
