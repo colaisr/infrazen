@@ -152,6 +152,99 @@ def build_cleanup_prompt(data: dict) -> str:
     return prompt
 
 
+def build_rightsizing_prompt(data: dict) -> str:
+    """
+    Build prompt for rightsizing / reliability recommendation text generation.
+    """
+    rec = data.get('recommendation', {})
+    resource = data.get('resource', {})
+
+    insights = rec.get('insights', {})
+    metrics = rec.get('metrics', {})
+    rec_type = rec.get('type', '')
+
+    resource_name = resource.get('name', 'ресурс')
+    resource_type = resource.get('resource_type', 'resource')
+    estimated_savings = round(rec.get('estimated_monthly_savings', 0))
+    title = rec.get('title', '')
+    description = rec.get('description', '')
+
+    resource_type_names = {
+        'server': 'сервер',
+        'vm': 'виртуальная машина',
+        'database': 'база данных',
+        'volume': 'диск',
+        'load_balancer': 'балансировщик',
+    }
+    resource_type_ru = resource_type_names.get(resource_type.lower(), 'ресурс')
+
+    # Get resource specs
+    cpu = resource.get('cpu_cores', '')
+    ram = resource.get('ram_gb', '')
+    storage = resource.get('storage_gb', '')
+
+    specs_parts = []
+    if cpu:
+        specs_parts.append(f"{cpu} CPU")
+    if ram:
+        specs_parts.append(f"{ram} GB RAM")
+    if storage:
+        specs_parts.append(f"{storage} GB HD")
+    specs_str = ', '.join(specs_parts) if specs_parts else 'не указана'
+
+    # Determine action keyword
+    if 'reliability' in rec_type:
+        action_word = 'НАДЁЖНОСТЬ'
+        action_desc = 'для повышения надёжности'
+    elif 'oversized' in rec_type or 'underused' in rec_type:
+        action_word = 'УМЕНЬШЕНИЕ'
+        action_desc = 'при уменьшении конфигурации'
+    elif 'undersized' in rec_type:
+        action_word = 'УВЕЛИЧЕНИЕ'
+        action_desc = 'при увеличении конфигурации'
+    else:
+        action_word = 'ОПТИМИЗАЦИЯ'
+        action_desc = 'при оптимизации конфигурации'
+
+    prompt = f"""Сгенерируй два описания для рекомендации по {action_word} ресурса.
+Это НЕ миграция к другому провайдеру, это RIGHTSIZING — изменение конфигурации у текущего провайдера!
+
+ДАННЫЕ:
+- Ресурс: {resource_name} ({resource_type_ru})
+- Текущая конфигурация: {specs_str}
+- Экономия: {estimated_savings:,} ₽/мес
+- Оригинальный заголовок: {title}
+- Оригинальное описание: {description[:300]}
+
+ЗАДАЧА:
+Верни JSON с двумя полями:
+
+1. "short_description_html" (1 предложение, ~60-80 символов):
+   - Кратко суммируй суть рекомендации
+   - Выдели экономию: <strong>{estimated_savings:,} ₽/мес</strong>
+   - НЕ упоминай провайдеров или аналоги — это оптимизация конфигурации!
+
+2. "detailed_description_html" (2-3 предложения, ~200-300 символов):
+   - Передай ключевые факты из оригинального описания
+   - НАЧИНАЙ С ЭКОНОМИИ: "Экономия <strong>{estimated_savings:,} ₽/мес</strong> {action_desc}..."
+   - Название ресурса: <strong>{resource_name}</strong>
+   - Упомяни конкретные метрики (CPU%, RAM% и т.д.) если есть в описании
+
+   ПЛОХОЙ СТИЛЬ (НЕ делай так):
+   ❌ "при переносе сервера в none" — НЕТ переноса!
+   ❌ "аналог за 0 ₽/мес" — НЕТ аналога!
+   ❌ "другой провайдер предлагает" — НЕТ другого провайдера!
+
+   ОБЩИЕ ПРАВИЛА:
+   - НЕ используй слова: миграция, перенос, аналог, провайдер
+   - НЕ используй списки (ul/ol)
+   - Тон: профессиональный, конкретный
+
+Ответ (только чистый JSON, без markdown):"""
+
+    return prompt
+
+
 def build_recommendation_prompt(data: dict) -> str:
     """
     Build prompt for recommendation text generation
@@ -173,6 +266,10 @@ def build_recommendation_prompt(data: dict) -> str:
     # For cleanup recommendations, use different prompt
     if rec_type.startswith('cleanup_'):
         return build_cleanup_prompt(data)
+
+    # For rightsizing / reliability recommendations, use dedicated prompt
+    if rec_type.startswith('rightsizing_') or rec_type.startswith('reliability_'):
+        return build_rightsizing_prompt(data)
     
     # Extract key data
     resource_name = resource.get('name', 'ресурс')
