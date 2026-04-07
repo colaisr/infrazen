@@ -1086,6 +1086,21 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
                     unified_type = 'kubernetes-cluster'
                     display_type = 'kubernetes-cluster'
+                # Promote volume-only groups to server when Advanced API confirms
+                # the volumes are attached to a running VM whose billing line is absent.
+                if unified_type == 'volume' and display_type == 'volume' and (disk_to_vm or vm_name_to_id):
+                    owning_vm_id = None
+                    for comp_rid, _info, _t in components:
+                        d2v = disk_to_vm.get(comp_rid) or disk_to_vm.get(comp_rid.lower())
+                        if d2v:
+                            owning_vm_id = d2v.get('vm_id')
+                            break
+                    if not owning_vm_id and vm_name_to_id:
+                        owning_vm_id = vm_name_to_id.get(grouping_key.lower())
+                    if owning_vm_id and vm_details.get(owning_vm_id):
+                        unified_type = 'server'
+                        display_type = 'server'
+
                 # File storage / NFS: separate type for pricing comparison
                 servnames_lower = [str((info or {}).get('servname', '')).lower() for _, info, _ in components]
                 if unified_type == 'volume' and any(('nfs' in s) or ('sfs' in s) or ('файлов' in s) for s in servnames_lower):
