@@ -1208,6 +1208,7 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 # Match by billing resource_id → Advanced server UUID; fall back
                 # to billing resource_name → Advanced VM name when UUID differs.
                 if display_type == 'server' and vm_details:
+                    vd = None
                     for comp_rid, comp_info, comp_t in components:
                         if comp_t == 'server':
                             vd = vm_details.get(comp_rid) or vm_details.get(comp_rid.lower())
@@ -1217,6 +1218,20 @@ class CloudRuProviderPlugin(ProviderPlugin):
                                 if vm_uuid:
                                     vd = vm_details.get(vm_uuid)
                             if vd:
+                                break
+                    # Fallback for promoted volume-only cards: resolve VM via
+                    # disk_to_vm (volume UUID) or grouping_key (VM name).
+                    if not vd:
+                        vm_uuid = vm_name_to_id.get(grouping_key.lower()) if vm_name_to_id else None
+                        if not vm_uuid and disk_to_vm:
+                            for comp_rid, _ci, _ct in components:
+                                d2v = disk_to_vm.get(comp_rid) or disk_to_vm.get(comp_rid.lower())
+                                if d2v:
+                                    vm_uuid = d2v.get('vm_id')
+                                    break
+                        if vm_uuid:
+                            vd = vm_details.get(vm_uuid)
+                    if vd:
                                 if vd.get('cpu_cores'):
                                     provider_config['cpu_cores'] = vd['cpu_cores']
                                     provider_config['vcpus'] = vd['cpu_cores']
