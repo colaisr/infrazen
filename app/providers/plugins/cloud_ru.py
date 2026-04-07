@@ -1067,6 +1067,14 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     if t in preferred_types and (info.get('resource_name') or '').strip():
                         resource_name = info.get('resource_name').strip()
                         break
+                else:
+                    # No preferred-type component found; use first component's
+                    # friendly name instead of a raw UUID grouping key.
+                    for rid, info, t in components:
+                        cname = (info.get('resource_name') or '').strip()
+                        if cname:
+                            resource_name = cname
+                            break
                 # Strip internal prefixes from display
                 if resource_name.startswith('db:'):
                     resource_name = resource_name[3:]
@@ -1086,6 +1094,9 @@ class CloudRuProviderPlugin(ProviderPlugin):
                 if isinstance(grouping_key, str) and grouping_key.startswith('k8s:'):
                     unified_type = 'kubernetes-cluster'
                     display_type = 'kubernetes-cluster'
+                if isinstance(grouping_key, str) and grouping_key.startswith('db:'):
+                    unified_type = 'database'
+                    display_type = 'database'
                 # Promote volume-only groups to server when Advanced API confirms
                 # the volumes are attached to a running VM whose billing line is absent.
                 if unified_type == 'volume' and display_type == 'volume' and (disk_to_vm or vm_name_to_id):
