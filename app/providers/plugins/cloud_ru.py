@@ -1232,26 +1232,25 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         if vm_uuid:
                             vd = vm_details.get(vm_uuid)
                     if vd:
-                                if vd.get('cpu_cores'):
-                                    provider_config['cpu_cores'] = vd['cpu_cores']
-                                    provider_config['vcpus'] = vd['cpu_cores']
-                                if vd.get('ram_mb'):
-                                    provider_config['ram_mb'] = vd['ram_mb']
-                                    provider_config['memory_mb'] = vd['ram_mb']
-                                if vd.get('disk_gb'):
-                                    provider_config['disk_gb'] = vd['disk_gb']
-                                    provider_config['total_storage_gb'] = vd['disk_gb']
-                                if vd.get('external_ip'):
-                                    provider_config['external_ip'] = vd['external_ip']
-                                if vd.get('status'):
-                                    provider_config['status'] = vd['status']
-                                if vd.get('flavor_name'):
-                                    provider_config['flavor_name'] = vd['flavor_name']
-                                if vd.get('availability_zone'):
-                                    provider_config['availability_zone'] = vd['availability_zone']
-                                if vd.get('attached_volume_ids'):
-                                    provider_config['attached_volume_ids'] = vd['attached_volume_ids']
-                                break  # Use first matched VM
+                        if vd.get('cpu_cores'):
+                            provider_config['cpu_cores'] = vd['cpu_cores']
+                            provider_config['vcpus'] = vd['cpu_cores']
+                        if vd.get('ram_mb'):
+                            provider_config['ram_mb'] = vd['ram_mb']
+                            provider_config['memory_mb'] = vd['ram_mb']
+                        if vd.get('disk_gb'):
+                            provider_config['disk_gb'] = vd['disk_gb']
+                            provider_config['total_storage_gb'] = vd['disk_gb']
+                        if vd.get('external_ip'):
+                            provider_config['external_ip'] = vd['external_ip']
+                        if vd.get('status'):
+                            provider_config['status'] = vd['status']
+                        if vd.get('flavor_name'):
+                            provider_config['flavor_name'] = vd['flavor_name']
+                        if vd.get('availability_zone'):
+                            provider_config['availability_zone'] = vd['availability_zone']
+                        if vd.get('attached_volume_ids'):
+                            provider_config['attached_volume_ids'] = vd['attached_volume_ids']
 
                 # For k8s cluster groups: aggregate node specs from vm_details
                 if display_type == 'kubernetes-cluster' and vm_details and vm_to_cluster:
