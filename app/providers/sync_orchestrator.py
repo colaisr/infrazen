@@ -760,7 +760,8 @@ class SyncOrchestrator:
                 db.session.add(resource)
             
             db.session.flush()  # Get the resource ID
-            
+            db.session.commit()  # Persist immediately so later savepoint rollbacks cannot undo
+
             # Store resource data for later processing to avoid autoflush conflicts
             resource_data['processed_resource'] = resource
             resource_data['tags'] = tags
