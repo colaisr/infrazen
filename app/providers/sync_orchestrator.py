@@ -555,8 +555,9 @@ class SyncOrchestrator:
                     self.logger.error(f"Failed to process resource {resource_data.get('resource_name', 'unknown')}: {e}")
                     continue
             
-            # Ensure all resources are flushed before creating ResourceState records
-            db.session.flush()
+            # Commit all resources so their IDs are stable and a ResourceState
+            # savepoint rollback cannot undo a newly-inserted resource row.
+            db.session.commit()
 
             # Create ResourceState records and finish resource processing.
             # Batch commit every 100 resources to avoid 2500+ nested savepoints
