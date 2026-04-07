@@ -903,9 +903,13 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         grouping_key = 'k8s-persistent-volumes'
 
                 # 1) DB instance sub-resources often have resource_id like "<db_uuid>in03.volume"
-                # Apply regardless of mapped type (these lines are sometimes classified as 'database').
+                # or "<db_uuid>in03.vm".  Cloud.ru RDS uses dashless 32-hex-char UUIDs
+                # (e.g. 09277e44…in03.volume) while the regex must also accept the
+                # standard 36-char dashed form.  Match .vm too so that when only
+                # one billing line survives (e.g. shutdown DB still bills storage),
+                # the resource still groups under its DB key.
                 rid = str(resource_id)
-                m = re.match(r'^([0-9a-fA-F-]{36}).*\\.(volume|disk|storage)$', rid)
+                m = re.match(r'^([0-9a-fA-F-]{32,36}).*\\.(volume|disk|storage|vm)$', rid)
                 if m:
                     grouping_key = f"db:{m.group(1).lower()}"
 
