@@ -835,8 +835,12 @@ class CloudRuClient:
                             self.project_id = pids[0]  # Use first for primary; we'll query all below
                             self.logger.info(f"Discovered {len(pids)} project(s) via API, using for billing")
                     if not self.project_id:
-                        self.logger.error("Failed to extract project_id from token or discover projects")
-                        return {}
+                        # Do not abort: consumption API can be queried with agreement_id alone
+                        # (full contract / all projects). Premature return here caused 0 resources.
+                        self.logger.warning(
+                            "project_id not set from token or project discovery; "
+                            "will use agreement_id for billing if available"
+                        )
             
             # Cloud.ru billing API endpoint
             # Based on docs: https://cloud.ru/docs/billing/ug/topics/api-ref
