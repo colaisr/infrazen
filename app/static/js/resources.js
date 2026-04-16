@@ -63,60 +63,152 @@ function cardMatchesTenant(card, tenantVal) {
     return raw === tenantVal;
 }
 
+function cardMatchesEnterprise(card, enterpriseVal) {
+    if (!enterpriseVal) return true;
+    const raw = (card.getAttribute('data-enterprise-project') || '').trim();
+    if (enterpriseVal === '__empty__') return raw === '';
+    return raw === enterpriseVal;
+}
+
 function cardMatchesType(card, typeVal) {
     if (!typeVal) return true;
     const cardType = (card.getAttribute('data-resource-type') || '').toLowerCase();
     return cardType === typeVal.toLowerCase();
 }
 
-/** Union of data-resource-type from cards (same source of truth as narrowed tenant branch). */
-function collectResourceTypesFromCards(cards) {
+/** Match all active filters except those excluded (for rebuilding one axis). */
+function cardMatchesFilters(card, f, exclude) {
+    exclude = exclude || {};
+    if (!exclude.tenant && f.tenant && !cardMatchesTenant(card, f.tenant)) return false;
+    if (!exclude.enterprise && f.enterprise && !cardMatchesEnterprise(card, f.enterprise)) return false;
+    if (!exclude.type && f.type && !cardMatchesType(card, f.type)) return false;
+    return true;
+}
+
+function getProviderFilterState(providerId) {
+    const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
+    const enterpriseSelect = document.getElementById('provider-enterprise-filter-' + providerId);
+    const typeSelect = document.getElementById('provider-type-filter-' + providerId);
+    return {
+        tenant: tenantSelect ? tenantSelect.value : '',
+        enterprise: enterpriseSelect ? enterpriseSelect.value : '',
+        type: typeSelect ? typeSelect.value : ''
+    };
+}
+
+function selectHasValue(selectEl, val) {
+    if (!selectEl) return false;
+    for (let i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === val) return true;
+    }
+    return false;
+}
+
+function rebuildTenantSelect(providerId, cards, f) {
+    const sel = document.getElementById('provider-tenant-filter-' + providerId);
+    if (!sel) return;
+    const prev = sel.value;
     const set = new Set();
     cards.forEach(function (card) {
+        if (!cardMatchesFilters(card, f, { tenant: true })) return;
+        set.add(card.getAttribute('data-tenant') || '');
+    });
+    const hasEmpty = set.has('');
+    const values = Array.from(set).filter(function (x) { return x !== ''; }).sort(function (a, b) {
+        return a.localeCompare(b, 'ru');
+    });
+    sel.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = 'Все tenant';
+    sel.appendChild(o0);
+    if (hasEmpty) {
+        const oe = document.createElement('option');
+        oe.value = '__empty__';
+        oe.textContent = '— (не задан)';
+        sel.appendChild(oe);
+    }
+    values.forEach(function (t) {
+        const o = document.createElement('option');
+        o.value = t;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    if (selectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
+
+function rebuildEnterpriseSelect(providerId, cards, f) {
+    const sel = document.getElementById('provider-enterprise-filter-' + providerId);
+    if (!sel) return;
+    const prev = sel.value;
+    const set = new Set();
+    cards.forEach(function (card) {
+        if (!cardMatchesFilters(card, f, { enterprise: true })) return;
+        set.add((card.getAttribute('data-enterprise-project') || '').trim());
+    });
+    const hasEmpty = set.has('');
+    const values = Array.from(set).filter(function (x) { return x !== ''; }).sort(function (a, b) {
+        return a.localeCompare(b, 'ru');
+    });
+    sel.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = 'Все проекты';
+    sel.appendChild(o0);
+    if (hasEmpty) {
+        const oe = document.createElement('option');
+        oe.value = '__empty__';
+        oe.textContent = '— (не задан)';
+        sel.appendChild(oe);
+    }
+    values.forEach(function (ep) {
+        const o = document.createElement('option');
+        o.value = ep;
+        o.textContent = ep;
+        sel.appendChild(o);
+    });
+    if (selectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
+
+function rebuildTypeSelect(providerId, cards, f) {
+    const sel = document.getElementById('provider-type-filter-' + providerId);
+    if (!sel) return;
+    const prev = sel.value;
+    const set = new Set();
+    cards.forEach(function (card) {
+        if (!cardMatchesFilters(card, f, { type: true })) return;
         const t = (card.getAttribute('data-resource-type') || '').toLowerCase();
         if (t) set.add(t);
     });
-    return Array.from(set).sort();
-}
-
-function rebuildTypeOptionsForTenant(providerId) {
-    const grid = document.getElementById('provider-grid-' + providerId);
-    const typeSelect = document.getElementById('provider-type-filter-' + providerId);
-    const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
-    if (!grid || !typeSelect || !tenantSelect) return;
-
-    const tenantVal = tenantSelect.value;
-    const cards = grid.querySelectorAll('.resource-card');
-    const prevType = typeSelect.value;
-
-    let typesToShow;
-    if (!tenantVal) {
-        typesToShow = collectResourceTypesFromCards(cards);
-    } else {
-        const set = new Set();
-        cards.forEach(function (card) {
-            if (!cardMatchesTenant(card, tenantVal)) return;
-            const t = (card.getAttribute('data-resource-type') || '').toLowerCase();
-            if (t) set.add(t);
-        });
-        typesToShow = Array.from(set).sort();
-    }
-
-    typeSelect.innerHTML = '';
+    const typesToShow = Array.from(set).sort();
+    sel.innerHTML = '';
     const optAll = document.createElement('option');
     optAll.value = '';
     optAll.textContent = 'Все типы';
-    typeSelect.appendChild(optAll);
-
+    sel.appendChild(optAll);
     typesToShow.forEach(function (t) {
         const opt = document.createElement('option');
         opt.value = t;
         opt.textContent = formatTypeOptionLabel(t);
-        typeSelect.appendChild(opt);
+        sel.appendChild(opt);
     });
+    if (selectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
 
-    if (prevType && typesToShow.indexOf(prevType) !== -1) {
-        typeSelect.value = prevType;
+function syncProviderFilterSelects(providerId) {
+    const grid = document.getElementById('provider-grid-' + providerId);
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.resource-card');
+    for (let i = 0; i < 10; i++) {
+        const f = getProviderFilterState(providerId);
+        rebuildTenantSelect(providerId, cards, f);
+        rebuildEnterpriseSelect(providerId, cards, f);
+        rebuildTypeSelect(providerId, cards, f);
+        const f2 = getProviderFilterState(providerId);
+        if (f2.tenant === f.tenant && f2.enterprise === f.enterprise && f2.type === f.type) break;
     }
 }
 
@@ -128,10 +220,12 @@ function applyProviderFilters(providerId) {
     const countSummaryEl = document.getElementById('provider-summary-count-' + providerId);
     const section = document.getElementById('provider-section-' + providerId);
     const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
+    const enterpriseSelect = document.getElementById('provider-enterprise-filter-' + providerId);
     const typeSelect = document.getElementById('provider-type-filter-' + providerId);
     if (!grid || !countEl || !monthlyEl || !dailyEl || !countSummaryEl || !section) return;
 
     const tenantVal = tenantSelect ? tenantSelect.value : '';
+    const enterpriseVal = enterpriseSelect ? enterpriseSelect.value : '';
     const typeVal = typeSelect ? typeSelect.value : '';
 
     const cards = grid.querySelectorAll('.resource-card');
@@ -141,7 +235,9 @@ function applyProviderFilters(providerId) {
     let visible = 0;
     let sumDaily = 0;
     cards.forEach(function (card) {
-        const match = cardMatchesTenant(card, tenantVal) && cardMatchesType(card, typeVal);
+        const match = cardMatchesTenant(card, tenantVal) &&
+            cardMatchesEnterprise(card, enterpriseVal) &&
+            cardMatchesType(card, typeVal);
         card.style.display = match ? '' : 'none';
         if (match) {
             visible++;
@@ -149,7 +245,7 @@ function applyProviderFilters(providerId) {
         }
     });
 
-    const noFilters = !tenantVal && !typeVal;
+    const noFilters = !tenantVal && !enterpriseVal && !typeVal;
     if (noFilters) {
         sumDaily = baseDaily;
         visible = baseCount;
@@ -159,13 +255,17 @@ function applyProviderFilters(providerId) {
     dailyEl.textContent = formatProviderMoney(sumDaily) + ' ₽/день';
     countSummaryEl.textContent = visible + ' ресурсов';
 
-    const showFilterHint = !!(tenantVal || typeVal);
+    const showFilterHint = !!(tenantVal || enterpriseVal || typeVal);
     countEl.textContent = showFilterHint ? visible + ' из ' + cards.length : '';
 }
 
-function onProviderTenantFilterChange(providerId) {
-    rebuildTypeOptionsForTenant(providerId);
+function onProviderFilterSelectChange(providerId) {
+    syncProviderFilterSelects(providerId);
     applyProviderFilters(providerId);
+}
+
+function onProviderTenantFilterChange(providerId) {
+    onProviderFilterSelectChange(providerId);
 }
 
 /** Legacy: optional second arg sets type select then applies */
@@ -174,6 +274,7 @@ function filterProviderResources(providerId, typeValue) {
     if (typeof typeValue !== 'undefined' && typeSelect) {
         typeSelect.value = typeValue || '';
     }
+    syncProviderFilterSelects(providerId);
     applyProviderFilters(providerId);
 }
 
@@ -676,6 +777,8 @@ function exportResourcesToCSVFallback() {
 // Make functions globally available for onclick handlers
 window.filterProviderResources = filterProviderResources;
 window.applyProviderFilters = applyProviderFilters;
+window.syncProviderFilterSelects = syncProviderFilterSelects;
+window.onProviderFilterSelectChange = onProviderFilterSelectChange;
 window.onProviderTenantFilterChange = onProviderTenantFilterChange;
 window.toggleUsageSection = toggleUsageSection;
 window.toggleCostBreakdown = toggleCostBreakdown;
