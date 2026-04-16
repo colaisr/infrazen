@@ -1081,7 +1081,7 @@ All cloud resources are normalized into a unified schema regardless of provider:
 - **Beget**: Dual-endpoint integration (legacy + modern VPS API) - VPS servers, domains, databases, FTP accounts, email accounts, account information, admin credentials
 - **Yandex Cloud**: ✅ **SKU+HAR-Based Cost Tracking** (October 2025) - Service account JWT authentication, 11 service types (VMs, disks, Kubernetes, PostgreSQL, Kafka, Snapshots, Images, Load Balancers, Container Registry, DNS, IPs), 993 SKU prices synced daily, HAR-derived managed service pricing, 99.84% accuracy, multi-tenancy support (Clouds→Folders), production-tested. **Full details:** See `yandex_cloud_integration.md` for complete architecture, pricing methodology, API integration details, and implementation guide (15,000+ words).
 - **Selectel**: **Billing-First Multi-Cloud Integration** - Cloud billing API integration with OpenStack enrichment, multi-region support (ru-1 through ru-9, kz-1), dynamic region discovery, zombie resource detection, volume unification with VMs, comprehensive cost tracking across all service types
-- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025–Feb 2026) - Service account Key ID/Secret authentication, **Project ID required** (from console URL: Контроль затрат → Потребление), billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **CES (Cloud Eye) metrics**: 24h utilization (cpu_avg_usage, cpu_max_usage, memory_usage_percent, disk_util_percent, net_in/out_avg_bps, storage_used_percent) for VMs, SFS Turbo, RDS, ELB. **FinOps recommendations**: 5 Cloud.ru-specific rules (cpu_oversized &lt;5% avg, cpu_undersized &gt;85%, idle_vm, unattached_volume, idle_eip). **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
+- **Cloud.ru**: ✅ **Billing-First Resource Discovery with Unification** (December 2025–Feb 2026) - Service account Key ID/Secret authentication, **Project ID required** (from console URL: Контроль затрат → Потребление), billing-first sync from consumption API, resource unification (volumes/IPs with VMs), hardware specs extraction (CPU, RAM, disk), comprehensive cost tracking. **CES (Cloud Eye) metrics**: 24h utilization (cpu_avg_usage, cpu_max_usage, memory_usage_percent, disk_util_percent, net_in/out_avg_bps, storage_used_percent) for VMs, SFS Turbo, RDS, ELB. **FinOps recommendations**: 5 Cloud.ru-specific rules (cpu_oversized &lt;5% avg, cpu_undersized &gt;85%, idle_vm, unattached_volume, idle_eip). **April 2026:** **Enterprise project** labels from billing (`enterprise_project_name` / `enterprise_project_id` in consumption `meta`) on resource cards and per deployment component; billing client fix so consumption is still fetched via **`agreement_id`** when **`project_id`** cannot be resolved from JWT/project discovery (see §13.9.10.6–§13.9.10.7). **Full details:** See `CLOUD_RU_IMPLEMENTATION_PLAN.md` and `Docs/cloud_ru_api_research.md` for complete implementation details.
 - **AWS/Azure/GCP**: Comprehensive resource coverage including compute, storage, networking, databases
 
 ### 6.3.5. Sync Mechanics & Features
@@ -3699,6 +3699,8 @@ This Cloud.ru integration evolved from “raw resources” into **deployment-cen
   - `component_count`
   - `components` (full list for small groups; summarized for huge groups)
   - `components_truncated=true` + `components_sample` for large groups
+  - **`enterprise_project_name`**: comma-separated distinct names when components differ; **`enterprise_project_ids`**: list of UUIDs for future filtering
+  - each entry in **`components[]`** may include **`enterprise_project_name`** / **`enterprise_project_id`** (from billing `meta`, per consumption line)
 
 #### 13.9.10.2. Cloud.ru Unification Rules (implemented in `app/providers/plugins/cloud_ru.py`)
 
@@ -3754,6 +3756,7 @@ This Cloud.ru integration evolved from “raw resources” into **deployment-cen
 - UI uses `provider_config.unified_display_type` for icons/badges.
 - “Components” breakdown is shown for unified resources.
 - Large component lists are truncated (first N items + “and more”) and can show compact summaries (e.g., `volume ×813`).
+- **April 2026:** **«Проект Enterprise»** row (from `provider_config.enterprise_project_name`) and per-component EP line; see §13.9.10.6.
 
 #### 13.9.10.4. Sync snapshot persistence hardening (`app/providers/sync_orchestrator.py`)
 - Sync snapshots no longer store full plugin payloads (`resources`) inside `sync_config` to avoid DB overflow.
@@ -3762,6 +3765,26 @@ This Cloud.ru integration evolved from “raw resources” into **deployment-cen
 #### 13.9.10.5. Known limitations
 - Service-account access cannot reliably enrich relationships via Compute/VPC inventory APIs (project identifiers may be rejected by those APIs).
 - Because of this, Cloud.ru currently relies on **billing + naming conventions** for relationship inference (VM↔disk, cluster↔nodes, etc.).
+
+#### 13.9.10.6. Enterprise project name (EP) & consumption `meta` (April 2026)
+
+Cloud.ru **organization billing** (`GET https://organization.api.cloud.ru/v1/consumption`) returns per-line **`meta`** used for admin-facing tags:
+
+- **`tenant_name`** / **`tenant_id`**: shown as **Tenant** on cards (existing behavior).
+- **`iam_project_name`** / **`iam_project_id`**: IAM scope (may mirror region codes such as `ru-moscow-1` in some lines).
+- **`enterprise_project_name`** / **`enterprise_project_id`**: **Enterprise Project** — practical deploy tag used by admins; distinct from tenant.
+
+**Plugin (`app/providers/plugins/cloud_ru.py`):** values are read from `meta`, stored on billing aggregates, on unified **`provider_config`**, and on each **`components[]`** row when present. The main card shows a **single** EP line (comma-separated if components span multiple EPs); each sub-row under **«Компоненты развёртки»** shows **«Проект Enterprise»** for that line.
+
+**UI (`app/templates/resources.html`):** detail row **«Проект Enterprise»** immediately **below «Внешний IP»**, above **«Регион»**; optional `data-enterprise-project` attributes for future filtering.
+
+#### 13.9.10.7. Billing client: `agreement_id` must work without `project_id` (April 2026)
+
+**Symptom:** a sync could log **`Created 0 unified resources`** and leave **Enterprise project** empty everywhere, even though Advanced API enrichment (CES, disk maps) still ran — because **no consumption rows** were ingested.
+
+**Cause:** `CloudRuClient.get_billing_data()` (`app/providers/cloud_ru/client.py`) previously **returned `{}` immediately** when **`project_id`** could not be obtained from the JWT or **`get_projects()`**, **before** applying **`agreement_id`**. The consumption API supports **`agreement_id` alone** (full contract / all projects), so this early exit was incorrect.
+
+**Fix:** if `project_id` is missing, **log a warning and continue** so **`agreement_id`** (from stored credentials or **`discover_agreement_id()`**) can still drive **`/v1/consumption`**. Without consumption data, unified resources and EP fields cannot be produced.
 
 ### 13.9.11. CES (Cloud Eye) Metrics & FinOps Recommendations (Feb 2026)
 
