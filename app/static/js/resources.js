@@ -37,19 +37,46 @@ function toggleProviderSection(providerId) {
 // Export to window immediately for onclick handlers
 window.toggleProviderSection = toggleProviderSection;
 
+/** Match Jinja `{:,.2f}` style for provider header totals */
+function formatProviderMoney(n) {
+    const x = typeof n === 'number' && !isNaN(n) ? n : 0;
+    return x.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function filterProviderResources(providerId, typeValue) {
     const grid = document.getElementById('provider-grid-' + providerId);
     const countEl = document.getElementById('provider-filtered-count-' + providerId);
-    if (!grid || !countEl) return;
+    const monthlyEl = document.getElementById('provider-summary-monthly-' + providerId);
+    const dailyEl = document.getElementById('provider-summary-daily-' + providerId);
+    const countSummaryEl = document.getElementById('provider-summary-count-' + providerId);
+    const section = document.getElementById('provider-section-' + providerId);
+    if (!grid || !countEl || !monthlyEl || !dailyEl || !countSummaryEl || !section) return;
 
     const cards = grid.querySelectorAll('.resource-card');
+    const baseDaily = parseFloat(section.getAttribute('data-baseline-daily') || '0') || 0;
+    const baseCount = parseInt(section.getAttribute('data-baseline-count') || '0', 10) || 0;
+
     let visible = 0;
+    let sumDaily = 0;
     cards.forEach(function(card) {
         const cardType = (card.getAttribute('data-resource-type') || '').toLowerCase();
         const match = !typeValue || cardType === typeValue.toLowerCase();
         card.style.display = match ? '' : 'none';
-        if (match) visible++;
+        if (match) {
+            visible++;
+            sumDaily += parseFloat(card.getAttribute('data-daily-cost') || '0') || 0;
+        }
     });
+
+    if (!typeValue) {
+        sumDaily = baseDaily;
+        visible = baseCount;
+    }
+
+    monthlyEl.textContent = formatProviderMoney(sumDaily * 30) + ' ₽/месяц';
+    dailyEl.textContent = formatProviderMoney(sumDaily) + ' ₽/день';
+    countSummaryEl.textContent = visible + ' ресурсов';
+
     countEl.textContent = typeValue ? visible + ' из ' + cards.length : '';
 }
 
