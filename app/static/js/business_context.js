@@ -6,6 +6,15 @@
  */
 
 /**
+ * Format monthly cost label for forecast resource cards (RU locale).
+ */
+function formatForecastMonthlyLabel(monthlyCost) {
+    const n = typeof monthlyCost === 'number' && !isNaN(monthlyCost) ? monthlyCost : parseFloat(monthlyCost);
+    const x = !isNaN(n) ? n : 0;
+    return x.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽/мес';
+}
+
+/**
  * Custom Fabric.js class for Resource Cards
  * This is a monolithic object that manages all its child elements (card, text, badges)
  * Separate from fabric.Group used for business context containers
@@ -22,6 +31,7 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         // Create all child elements with relative positions
         const elements = [];
         
+        const isFc = !!(options && options.isForecast);
         // 1. Main card rectangle
         elements.push(new fabric.Rect({
             left: 0,
@@ -29,8 +39,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             width: cardWidth,
             height: cardHeight,
             fill: '#FFFFFF',
-            stroke: '#E5E7EB',
-            strokeWidth: 2,
+            stroke: isFc ? '#F59E0B' : '#E5E7EB',
+            strokeWidth: isFc ? 2 : 2,
             rx: 8,
             ry: 8
         }));
@@ -46,8 +56,11 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             originY: 'top'
         }));
         
-        // 3. Resource type/IP text
-        elements.push(new fabric.Text(`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`, {
+        // 3. Resource type / subtitle (forecast: monthly cost)
+        const subLine = isFc
+            ? (`Прогноз\n${formatForecastMonthlyLabel(resourceData.monthly_cost)}`)
+            : (`${resourceData.type || 'Resource'}\n${resourceData.ip || 'No IP'}`);
+        elements.push(new fabric.Text(subLine, {
             left: cardWidth / 2,
             top: 40,
             fontSize: 10,
@@ -81,8 +94,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             evented: false
         }));
         
-        // 6. Notes icon circle (solid green badge when has notes)
-        const hasNotes = resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0);
+        // 6. Notes icon circle (hidden for forecast resources)
+        const hasNotes = !isFc && (resourceData.has_notes || (resourceData.notes && resourceData.notes.trim().length > 0));
         elements.push(new fabric.Circle({
             left: cardWidth - 10,
             top: 10,
@@ -90,11 +103,12 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fill: hasNotes ? '#10B981' : '#9CA3AF',
             originX: 'center',
             originY: 'center',
-            evented: true,
+            visible: !isFc,
+            evented: !isFc,
             hoverCursor: 'pointer'
         }));
         
-        // 7. Notes icon text (white 'n' on colored background)
+        // 7. Notes icon text
         elements.push(new fabric.Text('n', {
             left: cardWidth - 10,
             top: 10,
@@ -103,10 +117,11 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fill: '#FFFFFF',
             originX: 'center',
             originY: 'center',
+            visible: !isFc,
             evented: false
         }));
         
-        // 8. Clone badge circle (initially hidden, solid purple badge)
+        // 8. Clone badge (hidden for forecast — clones are separate DB rows)
         elements.push(new fabric.Circle({
             left: cardWidth - 10,
             top: cardHeight - 10,
@@ -115,11 +130,10 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             originX: 'center',
             originY: 'center',
             visible: false,
-            evented: true,
+            evented: !isFc,
             hoverCursor: 'pointer'
         }));
         
-        // 9. Clone badge text (initially hidden, white 'c' on purple)
         elements.push(new fabric.Text('c', {
             left: cardWidth - 10,
             top: cardHeight - 10,
@@ -128,7 +142,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             fill: '#FFFFFF',
             originX: 'center',
             originY: 'center',
-            visible: false
+            visible: false,
+            evented: false
         }));
         
         // Call parent constructor
@@ -148,6 +163,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
         this.objectType = 'resource';
         this.resourceId = options.resourceId;
         this.boardResourceId = options.boardResourceId;
+        this.boardForecastResourceId = options.boardForecastResourceId || null;
+        this.isForecast = !!(options.isForecast);
         this.groupId = options.groupId;
         this.resourceData = resourceData;
         this.width = cardWidth;
@@ -164,6 +181,8 @@ fabric.ResourceCard = fabric.util.createClass(fabric.Group, {
             objectType: this.objectType,
             resourceId: this.resourceId,
             boardResourceId: this.boardResourceId,
+            boardForecastResourceId: this.boardForecastResourceId,
+            isForecast: this.isForecast,
             groupId: this.groupId,
             type: 'resourceCard'
         });
@@ -178,6 +197,8 @@ fabric.ResourceCard.fromObject = function(object, callback) {
         group.objectType = 'resource';
         group.resourceId = object.resourceId;
         group.boardResourceId = object.boardResourceId;
+        group.boardForecastResourceId = object.boardForecastResourceId != null ? object.boardForecastResourceId : null;
+        group.isForecast = !!object.isForecast;
         group.groupId = object.groupId;
         
         // Disable rotation completely (must be set after deserialization)
@@ -212,6 +233,8 @@ let fabricCanvas = null;
 let allResources = [];
 let currentFilter = 'all';
 let autoSaveTimer = null;
+/** Pending drop coordinates when placing a forecast resource (after modal). */
+let pendingForecastDrop = null;
 
 // Undo/Redo state
 let undoStack = [];
@@ -388,6 +411,7 @@ function setupEventListeners() {
     
     // Setup free objects tools
     setupFreeObjectsTools();
+    setupForecastResourceTool();
     
     // Setup properties panel
     setupPropertiesPanel();
@@ -481,6 +505,178 @@ function setupFreeObjectsTools() {
             e.preventDefault();
         });
     }
+}
+
+/**
+ * Draggable "forecast" resource — manual name + monthly cost (not tied to catalog sync).
+ */
+function setupForecastResourceTool() {
+    const el = document.querySelector('[data-tool="forecast"]');
+    if (!el) return;
+    el.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('tool', 'forecast');
+        e.dataTransfer.effectAllowed = 'copy';
+        this.classList.add('dragging');
+    });
+    el.addEventListener('dragend', function() {
+        this.classList.remove('dragging');
+    });
+    el.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
+}
+
+function openForecastResourceModal() {
+    const modal = document.getElementById('forecastResourceModal');
+    const nameInput = document.getElementById('forecastResourceName');
+    const costInput = document.getElementById('forecastResourceMonthly');
+    if (!modal || !nameInput || !costInput) return;
+    nameInput.value = '';
+    costInput.value = '';
+    modal.classList.add('active');
+    setTimeout(function() { nameInput.focus(); }, 100);
+}
+
+function closeForecastResourceModal() {
+    const modal = document.getElementById('forecastResourceModal');
+    if (modal) modal.classList.remove('active');
+    pendingForecastDrop = null;
+}
+
+async function confirmForecastResourceFromModal() {
+    const nameInput = document.getElementById('forecastResourceName');
+    const costInput = document.getElementById('forecastResourceMonthly');
+    if (!nameInput || !costInput || !pendingForecastDrop) {
+        closeForecastResourceModal();
+        return;
+    }
+    const name = (nameInput.value || '').trim();
+    const monthly = parseFloat(String(costInput.value).replace(',', '.'));
+    if (!name) {
+        showFlashMessage('error', 'Укажите имя');
+        return;
+    }
+    if (isNaN(monthly) || monthly < 0) {
+        showFlashMessage('error', 'Укажите корректную стоимость (мес)');
+        return;
+    }
+    const x = pendingForecastDrop.x;
+    const y = pendingForecastDrop.y;
+    closeForecastResourceModal();
+    await placeForecastResourceOnCanvas(name, monthly, x, y);
+}
+
+/**
+ * Place forecast resource after API create (same coordinate rules as catalog placement).
+ */
+async function placeForecastResourceOnCanvas(name, monthlyCost, x, y) {
+    if (!currentBoard) {
+        showFlashMessage('error', 'Откройте доску');
+        return;
+    }
+    saveToUndoStack();
+    isCreatingObjects = true;
+    const groupId = getGroupAtPosition(x, y);
+    try {
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/forecast-resources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                monthly_cost: monthlyCost,
+                position_x: x,
+                position_y: y,
+                group_id: groupId
+            })
+        });
+        const data = await response.json();
+        if (handleApiError(response, data)) {
+            isCreatingObjects = false;
+            return;
+        }
+        if (data.success && data.forecast_resource) {
+            const fr = data.forecast_resource;
+            const formattedResource = {
+                id: null,
+                name: fr.name,
+                type: 'Прогноз',
+                monthly_cost: fr.monthly_cost,
+                ip: null,
+                has_notes: false,
+                is_forecast: true
+            };
+            createResourceObject(
+                formattedResource,
+                x,
+                y,
+                null,
+                groupId,
+                false,
+                { isForecast: true, boardForecastResourceId: fr.id }
+            );
+            if (groupId) await updateGroupCost(groupId);
+            showFlashMessage('success', 'Прогноз размещён');
+        } else {
+            showFlashMessage('error', data.error || 'Не удалось разместить');
+        }
+    } catch (error) {
+        console.error('placeForecastResourceOnCanvas:', error);
+        showFlashMessage('error', 'Ошибка размещения');
+    }
+    isCreatingObjects = false;
+    scheduleAutoSave();
+}
+
+function showForecastResourceInfo(resourceCard) {
+    const rd = resourceCard.resourceData || {};
+    const monthly = rd.monthly_cost != null ? rd.monthly_cost : 0;
+    const name = rd.name || '—';
+    const modal = document.getElementById('resourceInfoModal');
+    const content = document.getElementById('resourceInfoContent');
+    if (!modal || !content) return;
+    modal.classList.add('active');
+    content.innerHTML = `
+        <div class="resource-info-section">
+            <h4>Прогноз (не из каталога)</h4>
+            <p style="color:#6b7280;font-size:0.9rem;">Не синхронизируется с облаком и не удаляется при обновлении каталога.</p>
+            <div class="resource-info-grid">
+                <div class="resource-info-label">Имя:</div>
+                <div class="resource-info-value">${escapeHtml(name)}</div>
+                <div class="resource-info-label">Стоимость (мес):</div>
+                <div class="resource-info-value">${escapeHtml(formatForecastMonthlyLabel(monthly))}</div>
+            </div>
+        </div>`;
+}
+
+function loadForecastResourcesOnCanvas(forecastRows) {
+    if (!fabricCanvas || !forecastRows || !forecastRows.length) {
+        return;
+    }
+    forecastRows.forEach(function(fr) {
+        try {
+            const formattedResource = {
+                id: null,
+                name: fr.name || 'Прогноз',
+                type: 'Прогноз',
+                monthly_cost: fr.monthly_cost,
+                ip: null,
+                has_notes: false,
+                is_forecast: true
+            };
+            createResourceObject(
+                formattedResource,
+                fr.position.x,
+                fr.position.y,
+                null,
+                fr.group_id,
+                true,
+                { isForecast: true, boardForecastResourceId: fr.id }
+            );
+        } catch (err) {
+            console.error('Error loading forecast resource:', err, fr);
+        }
+    });
+    fabricCanvas.renderAll();
 }
 
 /**
@@ -1868,6 +2064,9 @@ function initializeCanvas() {
                 if (currentBoard.resources && currentBoard.resources.length > 0) {
                     loadResourcesOnCanvas(currentBoard.resources);
                 }
+                if (currentBoard.forecast_resources && currentBoard.forecast_resources.length > 0) {
+                    loadForecastResourcesOnCanvas(currentBoard.forecast_resources);
+                }
                 
                 fabricCanvas.renderAll();
             });
@@ -1882,6 +2081,9 @@ function initializeCanvas() {
         
         if (currentBoard.resources && currentBoard.resources.length > 0) {
             loadResourcesOnCanvas(currentBoard.resources);
+        }
+        if (currentBoard.forecast_resources && currentBoard.forecast_resources.length > 0) {
+            loadForecastResourcesOnCanvas(currentBoard.forecast_resources);
         }
     }
     
@@ -2169,6 +2371,11 @@ function setupContextMenu() {
                     item.style.display = types.includes(target.objectType) ? 'flex' : 'none';
                 }
             });
+            // Forecast resources have no catalog notes
+            if (target.objectType === 'resource' && target.isForecast) {
+                const en = contextMenu.querySelector('[data-action="edit-notes"]');
+                if (en) en.style.display = 'none';
+            }
             
             // Position menu at mouse location
             contextMenu.style.left = e.clientX + 'px';
@@ -2205,15 +2412,15 @@ function setupContextMenu() {
                     break;
                 
                 case 'view-info':
-                    // Show resource info modal
-                    if (contextTarget.resourceId) {
+                    if (contextTarget.isForecast) {
+                        showForecastResourceInfo(contextTarget);
+                    } else if (contextTarget.resourceId) {
                         showResourceInfo(contextTarget.resourceId);
                     }
                     break;
                 
                 case 'edit-notes':
-                    // Show resource notes modal
-                    if (contextTarget.resourceId) {
+                    if (!contextTarget.isForecast && contextTarget.resourceId) {
                         showResourceNotes(contextTarget.resourceId);
                     }
                     break;
@@ -2828,6 +3035,10 @@ function setupCanvasDropZone() {
                 case 'rectangle':
                     createRectangleOnCanvas(pointer.x, pointer.y);
                     break;
+                case 'forecast':
+                    pendingForecastDrop = { x: pointer.x, y: pointer.y };
+                    openForecastResourceModal();
+                    break;
             }
         }
     });
@@ -2915,51 +3126,54 @@ async function placeResourceOnCanvas(resourceId, x, y) {
 
 /**
  * Create fabric.ResourceCard object on canvas (custom monolithic class)
+ * @param {object|null} forecastMeta - { isForecast: true, boardForecastResourceId: number } for manual forecast chips
  */
-function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAbsolutePosition = false) {
+function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAbsolutePosition = false, forecastMeta = null) {
+    const isFc = !!(forecastMeta && forecastMeta.isForecast);
     // Calculate final position
-    // If isAbsolutePosition is true, x/y are already the final card positions
-    // If false (default), x/y are click positions that need to be centered
     const cardLeft = isAbsolutePosition ? x : (x - 60);
     const cardTop = isAbsolutePosition ? y : (y - 40);
     
-    // Create the custom ResourceCard object
     const resourceCard = new fabric.ResourceCard(resourceData, {
         left: cardLeft,
         top: cardTop,
-        resourceId: resourceData.id,
-        boardResourceId: boardResourceId,
+        resourceId: isFc ? null : resourceData.id,
+        boardResourceId: isFc ? null : boardResourceId,
+        boardForecastResourceId: isFc ? forecastMeta.boardForecastResourceId : null,
+        isForecast: isFc,
         groupId: groupId
     });
     
-    // Get child elements for event handling
     const children = resourceCard.getObjects();
-    const infoIcon = children[3];  // Info icon circle
-    const notesIcon = children[5];  // Notes icon circle
-    const cloneBadge = children[7];  // Clone badge circle
+    const infoIcon = children[3];
+    const notesIcon = children[5];
+    const cloneBadge = children[7];
     
-    // Add to canvas
     fabricCanvas.add(resourceCard);
     
     console.log('✅ ResourceCard created:', {
         objectType: resourceCard.objectType,
-        fabricType: resourceCard.type,
         resourceId: resourceCard.resourceId,
         boardResourceId: resourceCard.boardResourceId,
+        boardForecastResourceId: resourceCard.boardForecastResourceId,
+        isForecast: resourceCard.isForecast,
         childCount: children.length,
         left: resourceCard.left,
         top: resourceCard.top
     });
     
-    // Setup event handlers for icon clicks
     if (infoIcon) {
         infoIcon.on('mousedown', function(e) {
             e.e.stopPropagation();
-            showResourceInfo(resourceCard.resourceId);
+            if (resourceCard.isForecast) {
+                showForecastResourceInfo(resourceCard);
+            } else {
+                showResourceInfo(resourceCard.resourceId);
+            }
         });
         
-        // Show tooltip on hover
         infoIcon.on('mouseover', function(e) {
+            if (resourceCard.isForecast) return;
             showResourceTooltip(resourceCard.resourceId, resourceCard, infoIcon);
         });
         
@@ -2968,13 +3182,12 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         });
     }
     
-    if (notesIcon) {
+    if (!isFc && notesIcon) {
         notesIcon.on('mousedown', function(e) {
             e.e.stopPropagation();
             showResourceNotes(resourceCard.resourceId);
         });
         
-        // Show notes tooltip on hover
         notesIcon.on('mouseover', function(e) {
             showNotesTooltip(resourceCard.resourceId, resourceCard, notesIcon);
         });
@@ -2984,8 +3197,7 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         });
     }
     
-    if (cloneBadge) {
-        // Show clone tooltip on hover
+    if (cloneBadge && !isFc) {
         cloneBadge.on('mouseover', function(e) {
             showCloneTooltip(resourceCard.resourceId, resourceCard, cloneBadge);
         });
@@ -2995,14 +3207,12 @@ function createResourceObject(resourceData, x, y, boardResourceId, groupId, isAb
         });
     }
     
-    // Modified event - check group assignment and save position (only for editors/owners)
     resourceCard.on('modified', function() {
-        if (!window.canEditBoards) return; // Skip for viewers
+        if (!window.canEditBoards) return;
         checkResourceGroupAssignment(this);
         updateResourcePosition(this);
     });
     
-    // Render
     fabricCanvas.renderAll();
 }
 
@@ -3064,8 +3274,11 @@ function checkResourceGroupAssignment(resourceObj) {
         const oldGroupId = resourceObj.groupId;
         resourceObj.groupId = newGroupId;
         
-        // Update database and group costs for ALL groups containing this resource
-        updateResourceGroupAssignment(resourceObj.boardResourceId, newGroupId, oldGroupId, resourceObj.resourceId);
+        if (resourceObj.isForecast) {
+            updateForecastResourceGroupAssignment(resourceObj.boardForecastResourceId, newGroupId, oldGroupId);
+        } else {
+            updateResourceGroupAssignment(resourceObj.boardResourceId, newGroupId, oldGroupId, resourceObj.resourceId);
+        }
     }
 }
 
@@ -3073,6 +3286,21 @@ function checkResourceGroupAssignment(resourceObj) {
  * Update resource position in database
  */
 async function updateResourcePosition(resourceObj) {
+    if (resourceObj.isForecast && resourceObj.boardForecastResourceId) {
+        try {
+            await fetch(`/api/business-context/board-forecast-resources/${resourceObj.boardForecastResourceId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    position_x: resourceObj.left,
+                    position_y: resourceObj.top
+                })
+            });
+        } catch (error) {
+            console.error('Error updating forecast resource position:', error);
+        }
+        return;
+    }
     if (!resourceObj.boardResourceId) return;
     
     try {
@@ -3086,6 +3314,21 @@ async function updateResourcePosition(resourceObj) {
         });
     } catch (error) {
         console.error('Error updating resource position:', error);
+    }
+}
+
+async function updateForecastResourceGroupAssignment(boardForecastResourceId, newGroupId, oldGroupId) {
+    if (!boardForecastResourceId) return;
+    try {
+        await fetch(`/api/business-context/board-forecast-resources/${boardForecastResourceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ group_id: newGroupId })
+        });
+        if (oldGroupId) await updateGroupCost(oldGroupId);
+        if (newGroupId) await updateGroupCost(newGroupId);
+    } catch (error) {
+        console.error('Error updating forecast group assignment:', error);
     }
 }
 
@@ -4954,6 +5197,28 @@ async function deleteGroup(businessGroup) {
  * Delete resource from board
  */
 async function deleteResourceFromBoard(resourceGroup) {
+    if (resourceGroup.isForecast && resourceGroup.boardForecastResourceId) {
+        try {
+            const response = await fetch(`/api/business-context/board-forecast-resources/${resourceGroup.boardForecastResourceId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+            if (data.success) {
+                const oldGroupId = resourceGroup.groupId;
+                fabricCanvas.remove(resourceGroup);
+                fabricCanvas.renderAll();
+                if (oldGroupId) await updateGroupCost(oldGroupId);
+                scheduleAutoSave();
+            } else {
+                showFlashMessage('error', data.error || 'Не удалось удалить');
+            }
+        } catch (error) {
+            console.error('Error deleting forecast resource:', error);
+            showFlashMessage('error', 'Не удалось удалить');
+        }
+        return;
+    }
+    
     if (!resourceGroup.boardResourceId) return;
     
     try {
@@ -5063,8 +5328,72 @@ async function updateCostsForAllGroupsWithResource(resourceId, oldGroupId = null
 /**
  * Clone resource on canvas
  */
+async function cloneForecastResource(resourceCard) {
+    if (!currentBoard) return;
+    const rd = resourceCard.resourceData || {};
+    const name = rd.name || 'Прогноз';
+    const monthly = rd.monthly_cost != null ? parseFloat(rd.monthly_cost) : 0;
+    const cloneX = resourceCard.left + 50;
+    const cloneY = resourceCard.top + 50;
+    const groupId = getGroupAtPosition(cloneX, cloneY);
+    saveToUndoStack();
+    isCreatingObjects = true;
+    try {
+        const response = await fetch(`/api/business-context/boards/${currentBoard.id}/forecast-resources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                monthly_cost: monthly,
+                position_x: cloneX,
+                position_y: cloneY,
+                group_id: groupId
+            })
+        });
+        const data = await response.json();
+        if (handleApiError(response, data)) {
+            isCreatingObjects = false;
+            return;
+        }
+        if (data.success && data.forecast_resource) {
+            const fr = data.forecast_resource;
+            const formattedResource = {
+                id: null,
+                name: fr.name,
+                type: 'Прогноз',
+                monthly_cost: fr.monthly_cost,
+                has_notes: false,
+                is_forecast: true
+            };
+            createResourceObject(
+                formattedResource,
+                cloneX,
+                cloneY,
+                null,
+                groupId,
+                false,
+                { isForecast: true, boardForecastResourceId: fr.id }
+            );
+            if (groupId) await updateGroupCost(groupId);
+            showFlashMessage('success', 'Копия прогноза создана');
+        } else {
+            showFlashMessage('error', data.error || 'Не удалось клонировать');
+        }
+    } catch (error) {
+        console.error('Error cloning forecast resource:', error);
+        showFlashMessage('error', 'Не удалось клонировать');
+    }
+    isCreatingObjects = false;
+    scheduleAutoSave();
+}
+
 async function cloneResource(resourceCard) {
-    if (!resourceCard.resourceId || !currentBoard) return;
+    if (!currentBoard) return;
+    if (resourceCard.isForecast) {
+        await cloneForecastResource(resourceCard);
+        return;
+    }
+    if (!resourceCard.resourceId) return;
     
     try {
         // Save state before cloning

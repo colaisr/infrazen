@@ -24,6 +24,7 @@ from .provider_admin_credentials import ProviderAdminCredentials
 from .provider_resource_type import ProviderResourceType
 from .business_board import BusinessBoard
 from .board_resource import BoardResource
+from .board_forecast_resource import BoardForecastResource
 from .board_group import BoardGroup
 from .user_provider_preference import UserProviderPreference
 from .chat import ChatSession, ChatMessage, ChatSessionStatus, ChatMessageRole
@@ -60,6 +61,7 @@ __all__ = [
     'ProviderResourceType',
     'BusinessBoard',
     'BoardResource',
+    'BoardForecastResource',
     'BoardGroup',
     'UserProviderPreference',
     'ChatSession',

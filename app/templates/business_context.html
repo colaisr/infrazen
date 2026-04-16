@@ -163,6 +163,12 @@
                         </div>
                         <div class="toolbox-section-content" id="objectsToolbox">
                             {% if user_role in ['editor', 'owner'] %}
+                            <div class="toolbox-item" data-tool="forecast" draggable="true" title="Прогноз: имя и стоимость в месяц (не из каталога)">
+                                <div class="tool-icon" style="background: #F59E0B;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </div>
+                                <span class="tool-name">Прогноз</span>
+                            </div>
                             <div class="toolbox-item" data-tool="text" draggable="true">
                                 <div class="tool-icon">
                                     <i class="fa-solid fa-font"></i>
@@ -330,6 +336,33 @@
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeCreateBoardModal()">Отмена</button>
             <button class="btn btn-primary" onclick="createBoard()">Создать</button>
+        </div>
+    </div>
+</div>
+
+<!-- Forecast resource (manual cost) modal -->
+<div id="forecastResourceModal" class="modal">
+    <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-header">
+            <h3>Прогноз ресурса</h3>
+            <button type="button" class="modal-close" onclick="closeForecastResourceModal()">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 0.875rem; color: #6B7280; margin-bottom: 1rem;">Ресурс не привязан к каталогу: не обновляется и не удаляется при синхронизации облака.</p>
+            <div class="form-group">
+                <label for="forecastResourceName">Имя</label>
+                <input type="text" id="forecastResourceName" class="form-control" placeholder="Например, планируемый кластер" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="forecastResourceMonthly">Стоимость (мес), ₽</label>
+                <input type="text" id="forecastResourceMonthly" class="form-control" inputmode="decimal" placeholder="0" autocomplete="off">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeForecastResourceModal()">Отмена</button>
+            <button type="button" class="btn btn-primary" onclick="confirmForecastResourceFromModal()">Разместить</button>
         </div>
     </div>
 </div>

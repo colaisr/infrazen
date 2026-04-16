@@ -107,6 +107,11 @@ class BoardGroup(BaseModel):
             
             print(f'   Resource "{board_resource.resource.resource_name}": {len(all_clones)} clones, {len(groups_with_clones)} groups → {split_cost}/day')
         
+        # Forecast / manual resources in this group (monthly cost → daily)
+        from app.core.models.board_forecast_resource import BoardForecastResource
+        for fr in BoardForecastResource.query.filter_by(board_id=self.board_id, group_id=self.id).all():
+            total += float(fr.monthly_cost or 0) / 30.0
+        
         self.calculated_cost = total
         db.session.commit()
         

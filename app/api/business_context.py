@@ -6,6 +6,7 @@ from flask import Blueprint, jsonify, request, session
 from app.core.database import db
 from app.core.models.business_board import BusinessBoard
 from app.core.models.board_resource import BoardResource
+from app.core.models.board_forecast_resource import BoardForecastResource
 from app.core.models.board_group import BoardGroup
 from app.core.models.resource import Resource
 from app.core.models.provider import CloudProvider
@@ -117,6 +118,7 @@ def get_board(board_id):
     # Include resources and groups
     board_data['resources'] = [br.to_dict(include_resource=True) for br in board.resources.all()]
     board_data['groups'] = [g.to_dict(include_resources=False) for g in board.groups.all()]
+    board_data['forecast_resources'] = [f.to_dict() for f in board.forecast_resources.all()]
     
     return jsonify({
         'success': True,
@@ -591,6 +593,173 @@ def remove_resource_from_board(board_resource_id):
         'success': True,
         'message': 'Resource removed from board'
     })
+
+
+def _get_forecast_resource_for_org(forecast_id, org_id):
+    return BoardForecastResource.query.join(
+        BusinessBoard, BoardForecastResource.board_id == BusinessBoard.id
+    ).filter(
+        BoardForecastResource.id == forecast_id,
+        BusinessBoard.organization_id == org_id
+    ).first()
+
+
+@business_context_bp.route('/boards/<int:board_id>/forecast-resources', methods=['POST'])
+@validate_session
+def place_forecast_resource(board_id):
+    """Place a manual / forecast resource (name + monthly cost) on a board — not tied to catalog sync."""
+    demo_check = check_demo_user_write_access()
+    if demo_check:
+        return demo_check
+
+    user_id = session.get('user', {}).get('db_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут размещать ресурсы на досках'}), 403
+
+    board = BusinessBoard.query.filter_by(id=board_id, organization_id=org_id).first()
+    if not board:
+        return jsonify({'success': False, 'error': 'Board not found'}), 404
+
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Имя обязательно'}), 400
+
+    try:
+        monthly_cost = float(data.get('monthly_cost', 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Некорректная стоимость'}), 400
+    if monthly_cost < 0:
+        return jsonify({'success': False, 'error': 'Стоимость не может быть отрицательной'}), 400
+
+    position_x = float(data.get('position_x', 0))
+    position_y = float(data.get('position_y', 0))
+    group_id = data.get('group_id')
+
+    if group_id:
+        group = BoardGroup.query.filter_by(id=group_id, board_id=board_id).first()
+        if not group:
+            return jsonify({'success': False, 'error': 'Group not found on this board'}), 404
+
+    row = BoardForecastResource(
+        board_id=board_id,
+        name=name,
+        monthly_cost=monthly_cost,
+        position_x=position_x,
+        position_y=position_y,
+        group_id=group_id,
+    )
+    row.save()
+
+    if group_id:
+        grp = BoardGroup.query.get(group_id)
+        if grp:
+            grp.calculate_cost()
+
+    return jsonify({
+        'success': True,
+        'forecast_resource': row.to_dict(),
+    }), 201
+
+
+@business_context_bp.route('/board-forecast-resources/<int:forecast_id>', methods=['PUT'])
+@validate_session
+def update_board_forecast_resource(forecast_id):
+    demo_check = check_demo_user_write_access()
+    if demo_check:
+        return demo_check
+
+    user_id = session.get('user', {}).get('db_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут изменять доски'}), 403
+
+    row = _get_forecast_resource_for_org(forecast_id, org_id)
+    if not row:
+        return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
+
+    data = request.get_json() or {}
+    old_group_id = row.group_id
+
+    if 'position_x' in data:
+        row.position_x = float(data['position_x'])
+    if 'position_y' in data:
+        row.position_y = float(data['position_y'])
+    if 'group_id' in data:
+        new_gid = data['group_id']
+        if new_gid is not None:
+            group = BoardGroup.query.filter_by(id=new_gid, board_id=row.board_id).first()
+            if not group:
+                return jsonify({'success': False, 'error': 'Group not found on this board'}), 404
+        row.group_id = new_gid
+    if 'name' in data and (data.get('name') or '').strip():
+        row.name = (data.get('name') or '').strip()
+    if 'monthly_cost' in data:
+        try:
+            mc = float(data.get('monthly_cost', 0) or 0)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Некорректная стоимость'}), 400
+        if mc < 0:
+            return jsonify({'success': False, 'error': 'Стоимость не может быть отрицательной'}), 400
+        row.monthly_cost = mc
+
+    db.session.commit()
+
+    for gid in {g for g in (old_group_id, row.group_id) if g}:
+        grp = BoardGroup.query.get(gid)
+        if grp:
+            grp.calculate_cost()
+
+    return jsonify({'success': True, 'forecast_resource': row.to_dict()})
+
+
+@business_context_bp.route('/board-forecast-resources/<int:forecast_id>', methods=['DELETE'])
+@validate_session
+def remove_board_forecast_resource(forecast_id):
+    demo_check = check_demo_user_write_access()
+    if demo_check:
+        return demo_check
+
+    user_id = session.get('user', {}).get('db_id')
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User not authenticated'}), 401
+
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+
+    user_role = get_user_role_in_organization(user_id, org_id)
+    if user_role not in ['editor', 'owner']:
+        return jsonify({'success': False, 'error': 'Только редакторы и владельцы могут удалять с доски'}), 403
+
+    row = _get_forecast_resource_for_org(forecast_id, org_id)
+    if not row:
+        return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
+
+    gid = row.group_id
+    row.delete()
+
+    if gid:
+        grp = BoardGroup.query.get(gid)
+        if grp:
+            grp.calculate_cost()
+
+    return jsonify({'success': True, 'message': 'Forecast resource removed'})
 
 
 @business_context_bp.route('/board-resources/<int:board_resource_id>/notes', methods=['PUT'])
