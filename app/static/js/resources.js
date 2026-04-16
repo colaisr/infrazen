@@ -43,14 +43,97 @@ function formatProviderMoney(n) {
     return x.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function filterProviderResources(providerId, typeValue) {
+/** Match Jinja `replace('-',' ')|replace('_',' ')|title` for type filter labels */
+function formatTypeOptionLabel(typeKey) {
+    if (!typeKey) return '';
+    return String(typeKey)
+        .replace(/[-_]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(function (w) {
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        })
+        .join(' ');
+}
+
+function cardMatchesTenant(card, tenantVal) {
+    if (!tenantVal) return true;
+    const raw = card.getAttribute('data-tenant') || '';
+    if (tenantVal === '__empty__') return raw === '';
+    return raw === tenantVal;
+}
+
+function cardMatchesType(card, typeVal) {
+    if (!typeVal) return true;
+    const cardType = (card.getAttribute('data-resource-type') || '').toLowerCase();
+    return cardType === typeVal.toLowerCase();
+}
+
+function parseAllTypesFromSection(section) {
+    try {
+        const raw = section.getAttribute('data-all-types') || '[]';
+        return JSON.parse(raw);
+    } catch (e) {
+        return [];
+    }
+}
+
+function rebuildTypeOptionsForTenant(providerId) {
+    const section = document.getElementById('provider-section-' + providerId);
+    const grid = document.getElementById('provider-grid-' + providerId);
+    const typeSelect = document.getElementById('provider-type-filter-' + providerId);
+    const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
+    if (!section || !grid || !typeSelect || !tenantSelect) return;
+
+    const tenantVal = tenantSelect.value;
+    const allTypes = parseAllTypesFromSection(section);
+    const cards = grid.querySelectorAll('.resource-card');
+    const prevType = typeSelect.value;
+
+    let typesToShow;
+    if (!tenantVal) {
+        typesToShow = allTypes.slice().sort();
+    } else {
+        const set = new Set();
+        cards.forEach(function (card) {
+            if (!cardMatchesTenant(card, tenantVal)) return;
+            const t = (card.getAttribute('data-resource-type') || '').toLowerCase();
+            if (t) set.add(t);
+        });
+        typesToShow = Array.from(set).sort();
+    }
+
+    typeSelect.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'Все типы';
+    typeSelect.appendChild(optAll);
+
+    typesToShow.forEach(function (t) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = formatTypeOptionLabel(t);
+        typeSelect.appendChild(opt);
+    });
+
+    if (prevType && typesToShow.indexOf(prevType) !== -1) {
+        typeSelect.value = prevType;
+    }
+}
+
+function applyProviderFilters(providerId) {
     const grid = document.getElementById('provider-grid-' + providerId);
     const countEl = document.getElementById('provider-filtered-count-' + providerId);
     const monthlyEl = document.getElementById('provider-summary-monthly-' + providerId);
     const dailyEl = document.getElementById('provider-summary-daily-' + providerId);
     const countSummaryEl = document.getElementById('provider-summary-count-' + providerId);
     const section = document.getElementById('provider-section-' + providerId);
+    const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
+    const typeSelect = document.getElementById('provider-type-filter-' + providerId);
     if (!grid || !countEl || !monthlyEl || !dailyEl || !countSummaryEl || !section) return;
+
+    const tenantVal = tenantSelect ? tenantSelect.value : '';
+    const typeVal = typeSelect ? typeSelect.value : '';
 
     const cards = grid.querySelectorAll('.resource-card');
     const baseDaily = parseFloat(section.getAttribute('data-baseline-daily') || '0') || 0;
@@ -58,9 +141,8 @@ function filterProviderResources(providerId, typeValue) {
 
     let visible = 0;
     let sumDaily = 0;
-    cards.forEach(function(card) {
-        const cardType = (card.getAttribute('data-resource-type') || '').toLowerCase();
-        const match = !typeValue || cardType === typeValue.toLowerCase();
+    cards.forEach(function (card) {
+        const match = cardMatchesTenant(card, tenantVal) && cardMatchesType(card, typeVal);
         card.style.display = match ? '' : 'none';
         if (match) {
             visible++;
@@ -68,7 +150,8 @@ function filterProviderResources(providerId, typeValue) {
         }
     });
 
-    if (!typeValue) {
+    const noFilters = !tenantVal && !typeVal;
+    if (noFilters) {
         sumDaily = baseDaily;
         visible = baseCount;
     }
@@ -77,7 +160,22 @@ function filterProviderResources(providerId, typeValue) {
     dailyEl.textContent = formatProviderMoney(sumDaily) + ' ₽/день';
     countSummaryEl.textContent = visible + ' ресурсов';
 
-    countEl.textContent = typeValue ? visible + ' из ' + cards.length : '';
+    const showFilterHint = !!(tenantVal || typeVal);
+    countEl.textContent = showFilterHint ? visible + ' из ' + cards.length : '';
+}
+
+function onProviderTenantFilterChange(providerId) {
+    rebuildTypeOptionsForTenant(providerId);
+    applyProviderFilters(providerId);
+}
+
+/** Legacy: optional second arg sets type select then applies */
+function filterProviderResources(providerId, typeValue) {
+    const typeSelect = document.getElementById('provider-type-filter-' + providerId);
+    if (typeof typeValue !== 'undefined' && typeSelect) {
+        typeSelect.value = typeValue || '';
+    }
+    applyProviderFilters(providerId);
 }
 
 function toggleUsageSection(resourceId) {
@@ -578,6 +676,8 @@ function exportResourcesToCSVFallback() {
 
 // Make functions globally available for onclick handlers
 window.filterProviderResources = filterProviderResources;
+window.applyProviderFilters = applyProviderFilters;
+window.onProviderTenantFilterChange = onProviderTenantFilterChange;
 window.toggleUsageSection = toggleUsageSection;
 window.toggleCostBreakdown = toggleCostBreakdown;
 window.toggleCSIVolumes = toggleCSIVolumes;

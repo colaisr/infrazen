@@ -118,9 +118,19 @@
     {% for provider in providers %}
     {% set provider_resources = resources_by_provider.get(provider.id, []) %}
     {% set provider_daily_total = provider_resources|sum(attribute='daily_cost') %}
+    {% set ns = namespace(types=[], tenants=[]) %}
+    {% for r in provider_resources %}
+        {% set _cfg = r.provider_config if r.provider_config is mapping else (r.provider_config | from_json if r.provider_config is string else {}) %}
+        {% set _dtype = _cfg.get('unified_display_type') if _cfg.get('unified') else r.resource_type %}
+        {% set _type_key = (_dtype or r.resource_type or 'other')|lower %}
+        {% if _type_key not in ns.types %}{% set _ = ns.types.append(_type_key) %}{% endif %}
+        {% set _tk = (r.tenant or '') %}
+        {% if _tk not in ns.tenants %}{% set _ = ns.tenants.append(_tk) %}{% endif %}
+    {% endfor %}
     <div class="provider-section" id="provider-section-{{ provider.id }}"
          data-baseline-daily="{{ provider_daily_total|float }}"
-         data-baseline-count="{{ provider_resources|length }}">
+         data-baseline-count="{{ provider_resources|length }}"
+         data-all-types="{{ ns.types|sort|tojson|e }}">
             <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
                 <div class="provider-left">
                     <div class="provider-icon">
@@ -161,16 +171,21 @@
             </div>
             
         <div class="provider-content" id="provider-content-{{ provider.id }}" style="display: none;">
-            {% set ns = namespace(types=[]) %}
-            {% for r in provider_resources %}
-                {% set _cfg = r.provider_config if r.provider_config is mapping else (r.provider_config | from_json if r.provider_config is string else {}) %}
-                {% set _dtype = _cfg.get('unified_display_type') if _cfg.get('unified') else r.resource_type %}
-                {% set _type_key = (_dtype or r.resource_type or 'other')|lower %}
-                {% if _type_key not in ns.types %}{% set _ = ns.types.append(_type_key) %}{% endif %}
-            {% endfor %}
-            <div class="provider-filter-bar" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid #e5e7eb; background: #f9fafb;">
+            <div class="provider-filter-bar" style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid #e5e7eb; background: #f9fafb;">
+                <label for="provider-tenant-filter-{{ provider.id }}" style="font-size: 0.875rem; font-weight: 500; color: #6b7280;">Tenant:</label>
+                <select id="provider-tenant-filter-{{ provider.id }}" class="input" style="max-width: 220px; padding: 0.4rem 0.6rem; font-size: 0.875rem;" onchange="onProviderTenantFilterChange('{{ provider.id }}')">
+                    <option value="">Все tenant</option>
+                    {% if '' in ns.tenants %}
+                    <option value="__empty__">— (не задан)</option>
+                    {% endif %}
+                    {% for t in ns.tenants|sort %}
+                    {% if t %}
+                    <option value="{{ t|e }}">{{ t }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
                 <label for="provider-type-filter-{{ provider.id }}" style="font-size: 0.875rem; font-weight: 500; color: #6b7280;">Тип ресурса:</label>
-                <select id="provider-type-filter-{{ provider.id }}" class="input" style="max-width: 200px; padding: 0.4rem 0.6rem; font-size: 0.875rem;" onchange="filterProviderResources('{{ provider.id }}', this.value)">
+                <select id="provider-type-filter-{{ provider.id }}" class="input" style="max-width: 200px; padding: 0.4rem 0.6rem; font-size: 0.875rem;" onchange="applyProviderFilters('{{ provider.id }}')">
                     <option value="">Все типы</option>
                     {% for t in ns.types|sort %}
                     <option value="{{ t }}">{{ t|replace('-', ' ')|replace('_', ' ')|title }}</option>
@@ -183,7 +198,7 @@
                 {% set _config = resource.provider_config if resource.provider_config is mapping else (resource.provider_config | from_json if resource.provider_config is string else {}) %}
                 {% set _display_type = _config.get('unified_display_type') if _config.get('unified') else resource.resource_type %}
                 {% set _filter_type = (_display_type or resource.resource_type or 'other')|lower %}
-                <div class="resource-card" data-resource-id="{{ resource.id }}" data-resource-type="{{ _filter_type }}" data-daily-cost="{{ (resource.daily_cost or 0)|float }}">
+                <div class="resource-card" data-resource-id="{{ resource.id }}" data-resource-type="{{ _filter_type }}" data-daily-cost="{{ (resource.daily_cost or 0)|float }}" data-tenant="{{ (resource.tenant or '')|e }}">
             <div class="resource-header">
                 <div class="resource-icon">
                     {% if _display_type == 'vps' or _display_type == 'vm' or _display_type == 'server' %}
