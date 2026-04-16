@@ -1,6 +1,7 @@
 """
 Board Group model - business context frames on boards
 """
+from sqlalchemy import or_
 from app.core.models import db
 from .base import BaseModel
 
@@ -107,10 +108,43 @@ class BoardGroup(BaseModel):
             
             print(f'   Resource "{board_resource.resource.resource_name}": {len(all_clones)} clones, {len(groups_with_clones)} groups → {split_cost}/day')
         
-        # Forecast / manual resources in this group (monthly cost → daily)
+        # Forecast placements: same split rules as catalog clones (one monthly cost / root, split by distinct groups)
         from app.core.models.board_forecast_resource import BoardForecastResource
-        for fr in BoardForecastResource.query.filter_by(board_id=self.board_id, group_id=self.id).all():
-            total += float(fr.monthly_cost or 0) / 30.0
+
+        forecast_in_group = BoardForecastResource.query.filter_by(
+            board_id=self.board_id, group_id=self.id
+        ).all()
+        processed_forecast_roots = set()
+        for fr in forecast_in_group:
+            root_id = fr.forecast_root_id
+            if root_id in processed_forecast_roots:
+                continue
+            processed_forecast_roots.add(root_id)
+
+            root = fr.root_row()
+            if not root:
+                continue
+            monthly = float(root.monthly_cost or 0)
+            daily = monthly / 30.0
+
+            all_placements = BoardForecastResource.query.filter(
+                BoardForecastResource.board_id == self.board_id,
+                or_(
+                    BoardForecastResource.id == root_id,
+                    BoardForecastResource.clone_of_id == root_id,
+                ),
+            ).all()
+            groups_with = set()
+            for p in all_placements:
+                if p.group_id is not None:
+                    groups_with.add(p.group_id)
+            if len(groups_with) == 0:
+                split_cost = 0.0
+            elif len(groups_with) == 1:
+                split_cost = daily
+            else:
+                split_cost = daily / len(groups_with)
+            total += split_cost
         
         self.calculated_cost = total
         db.session.commit()

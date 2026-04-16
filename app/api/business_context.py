@@ -3,6 +3,7 @@ Business Context API routes - Visual resource mapping
 """
 import json
 from flask import Blueprint, jsonify, request, session
+from sqlalchemy import or_
 from app.core.database import db
 from app.core.models.business_board import BusinessBoard
 from app.core.models.board_resource import BoardResource
@@ -14,6 +15,26 @@ from app.api.auth import validate_session, check_demo_user_write_access
 from app.core.organization_context import get_current_organization_id, get_user_role_in_organization
 
 business_context_bp = Blueprint('business_context', __name__)
+
+
+def _recalculate_forecast_groups_for_root(board_id, root_id, extra_group_ids=None):
+    """Recalculate costs for every group that has a placement of this forecast root."""
+    placements = BoardForecastResource.query.filter(
+        BoardForecastResource.board_id == board_id,
+        or_(
+            BoardForecastResource.id == root_id,
+            BoardForecastResource.clone_of_id == root_id,
+        ),
+    ).all()
+    group_ids = {p.group_id for p in placements if p.group_id}
+    if extra_group_ids:
+        for gid in extra_group_ids:
+            if gid:
+                group_ids.add(gid)
+    for gid in group_ids:
+        grp = BoardGroup.query.get(gid)
+        if grp:
+            grp.calculate_cost()
 
 
 def _provider_config_dict(resource):
@@ -629,6 +650,46 @@ def place_forecast_resource(board_id):
         return jsonify({'success': False, 'error': 'Board not found'}), 404
 
     data = request.get_json() or {}
+    position_x = float(data.get('position_x', 0))
+    position_y = float(data.get('position_y', 0))
+    group_id = data.get('group_id')
+
+    clone_of_raw = data.get('clone_of_id')
+    clone_of_id = None
+    if clone_of_raw is not None:
+        try:
+            clone_of_id = int(clone_of_raw)
+        except (TypeError, ValueError):
+            clone_of_id = None
+
+    if clone_of_id:
+        source = BoardForecastResource.query.filter_by(id=clone_of_id, board_id=board_id).first()
+        if not source:
+            return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
+        root = source.root_row()
+        if not root:
+            return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
+        root_id = root.id
+        if group_id:
+            group = BoardGroup.query.filter_by(id=group_id, board_id=board_id).first()
+            if not group:
+                return jsonify({'success': False, 'error': 'Group not found on this board'}), 404
+        row = BoardForecastResource(
+            board_id=board_id,
+            clone_of_id=root_id,
+            name=root.name,
+            monthly_cost=root.monthly_cost,
+            position_x=position_x,
+            position_y=position_y,
+            group_id=group_id,
+        )
+        row.save()
+        _recalculate_forecast_groups_for_root(board_id, root_id)
+        return jsonify({
+            'success': True,
+            'forecast_resource': row.to_dict(),
+        }), 201
+
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify({'success': False, 'error': 'Имя обязательно'}), 400
@@ -639,10 +700,6 @@ def place_forecast_resource(board_id):
         return jsonify({'success': False, 'error': 'Некорректная стоимость'}), 400
     if monthly_cost < 0:
         return jsonify({'success': False, 'error': 'Стоимость не может быть отрицательной'}), 400
-
-    position_x = float(data.get('position_x', 0))
-    position_y = float(data.get('position_y', 0))
-    group_id = data.get('group_id')
 
     if group_id:
         group = BoardGroup.query.filter_by(id=group_id, board_id=board_id).first()
@@ -659,10 +716,8 @@ def place_forecast_resource(board_id):
     )
     row.save()
 
-    if group_id:
-        grp = BoardGroup.query.get(group_id)
-        if grp:
-            grp.calculate_cost()
+    root_id = row.forecast_root_id
+    _recalculate_forecast_groups_for_root(board_id, root_id)
 
     return jsonify({
         'success': True,
@@ -693,6 +748,11 @@ def update_board_forecast_resource(forecast_id):
     if not row:
         return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
 
+    root = row.root_row()
+    if not root:
+        return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
+    root_id = root.id
+
     data = request.get_json() or {}
     old_group_id = row.group_id
 
@@ -708,7 +768,7 @@ def update_board_forecast_resource(forecast_id):
                 return jsonify({'success': False, 'error': 'Group not found on this board'}), 404
         row.group_id = new_gid
     if 'name' in data and (data.get('name') or '').strip():
-        row.name = (data.get('name') or '').strip()
+        root.name = (data.get('name') or '').strip()
     if 'monthly_cost' in data:
         try:
             mc = float(data.get('monthly_cost', 0) or 0)
@@ -716,14 +776,23 @@ def update_board_forecast_resource(forecast_id):
             return jsonify({'success': False, 'error': 'Некорректная стоимость'}), 400
         if mc < 0:
             return jsonify({'success': False, 'error': 'Стоимость не может быть отрицательной'}), 400
-        row.monthly_cost = mc
+        root.monthly_cost = mc
+
+    for c in BoardForecastResource.query.filter(
+        BoardForecastResource.board_id == row.board_id,
+        or_(
+            BoardForecastResource.id == root_id,
+            BoardForecastResource.clone_of_id == root_id,
+        ),
+    ).all():
+        c.name = root.name
+        c.monthly_cost = root.monthly_cost
 
     db.session.commit()
 
-    for gid in {g for g in (old_group_id, row.group_id) if g}:
-        grp = BoardGroup.query.get(gid)
-        if grp:
-            grp.calculate_cost()
+    _recalculate_forecast_groups_for_root(
+        row.board_id, root_id, extra_group_ids=[old_group_id] if old_group_id else None
+    )
 
     return jsonify({'success': True, 'forecast_resource': row.to_dict()})
 
@@ -751,15 +820,43 @@ def remove_board_forecast_resource(forecast_id):
     if not row:
         return jsonify({'success': False, 'error': 'Forecast resource not found'}), 404
 
-    gid = row.group_id
+    board_id = row.board_id
+
+    if row.clone_of_id:
+        root_id = row.clone_of_id
+        old_gid = row.group_id
+        deleted_ids = [row.id]
+        row.delete()
+        _recalculate_forecast_groups_for_root(
+            board_id, root_id, extra_group_ids=[old_gid] if old_gid else None
+        )
+        return jsonify({
+            'success': True,
+            'message': 'Forecast resource removed',
+            'deleted_forecast_ids': deleted_ids,
+        })
+
+    placements = BoardForecastResource.query.filter(
+        BoardForecastResource.board_id == board_id,
+        or_(
+            BoardForecastResource.id == row.id,
+            BoardForecastResource.clone_of_id == row.id,
+        ),
+    ).all()
+    deleted_ids = [p.id for p in placements]
+    group_ids_before = {p.group_id for p in placements if p.group_id}
     row.delete()
 
-    if gid:
+    for gid in group_ids_before:
         grp = BoardGroup.query.get(gid)
         if grp:
             grp.calculate_cost()
 
-    return jsonify({'success': True, 'message': 'Forecast resource removed'})
+    return jsonify({
+        'success': True,
+        'message': 'Forecast resource removed',
+        'deleted_forecast_ids': deleted_ids,
+    })
 
 
 @business_context_bp.route('/board-resources/<int:board_resource_id>/notes', methods=['PUT'])
