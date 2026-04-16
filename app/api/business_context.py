@@ -1,6 +1,7 @@
 """
 Business Context API routes - Visual resource mapping
 """
+import json
 from flask import Blueprint, jsonify, request, session
 from app.core.database import db
 from app.core.models.business_board import BusinessBoard
@@ -12,6 +13,33 @@ from app.api.auth import validate_session, check_demo_user_write_access
 from app.core.organization_context import get_current_organization_id, get_user_role_in_organization
 
 business_context_bp = Blueprint('business_context', __name__)
+
+
+def _provider_config_dict(resource):
+    if not resource.provider_config:
+        return {}
+    try:
+        if isinstance(resource.provider_config, dict):
+            return resource.provider_config
+        return json.loads(resource.provider_config)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _resource_toolbox_filter_fields(resource):
+    """Tenant, enterprise project label, and normalized type (aligned with resources page)."""
+    cfg = _provider_config_dict(resource)
+    if cfg.get('unified') and cfg.get('unified_display_type'):
+        filter_type = (cfg.get('unified_display_type') or resource.resource_type or 'other').lower()
+    else:
+        filter_type = (resource.resource_type or 'other').lower()
+    ep = (cfg.get('enterprise_project_name') or '').strip() if isinstance(cfg, dict) else ''
+    tenant = resource.tenant or ''
+    return {
+        'tenant': tenant,
+        'enterprise_project_name': ep,
+        'filter_type': filter_type,
+    }
 
 
 def require_editor_or_owner():
@@ -321,6 +349,7 @@ def get_available_resources():
     # Build response with placement status
     resources_data = []
     for r in resources:
+        extra = _resource_toolbox_filter_fields(r)
         resource_dict = {
             'id': r.id,
             'name': r.resource_name,
@@ -334,7 +363,10 @@ def get_available_resources():
             'currency': r.currency,
             'notes': r.notes,
             'has_notes': bool(r.notes),
-            'is_placed': r.id in placed_resource_ids
+            'is_placed': r.id in placed_resource_ids,
+            'tenant': extra['tenant'],
+            'enterprise_project_name': extra['enterprise_project_name'],
+            'filter_type': extra['filter_type'],
         }
         resources_data.append(resource_dict)
     

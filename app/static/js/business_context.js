@@ -372,6 +372,16 @@ function setupEventListeners() {
             filterResources();
         });
     }
+
+    ['bcToolboxTenantFilter', 'bcToolboxEnterpriseFilter', 'bcToolboxTypeFilter'].forEach(function (fid) {
+        const el = document.getElementById(fid);
+        if (el) {
+            el.addEventListener('change', function () {
+                syncBcToolboxFilterSelects();
+                filterResources();
+            });
+        }
+    });
     
     // Setup group tool drag
     setupGroupTool();
@@ -2496,6 +2506,9 @@ function displayResources() {
             ${provider.resources.map(resource => `
                 <div class="resource-item ${resource.is_placed ? 'placed' : ''}" 
                      data-resource-id="${resource.id}"
+                     data-tenant="${escapeHtml(String(resource.tenant != null ? resource.tenant : ''))}"
+                     data-enterprise-project="${escapeHtml(String(resource.enterprise_project_name != null ? resource.enterprise_project_name : ''))}"
+                     data-resource-type="${escapeHtml(String((resource.filter_type || resource.type || 'other')).toLowerCase())}"
                      draggable="${!resource.is_placed}">
                     <div class="resource-icon">
                         <i class="fa-solid fa-server"></i>
@@ -2522,6 +2535,8 @@ function displayResources() {
     
     // Set up drag event listeners for resources
     setupResourceDragListeners();
+    syncBcToolboxFilterSelects();
+    filterResources();
 }
 
 /**
@@ -3155,10 +3170,199 @@ async function updateGroupCost(groupDbId) {
 }
 
 /**
+ * Toolbox advanced filters (Tenant / Enterprise / Type) — same logic as resources page.
+ */
+function bcToolboxFormatTypeLabel(typeKey) {
+    if (!typeKey) return '';
+    return String(typeKey)
+        .replace(/[-_]/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(function (w) {
+            return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        })
+        .join(' ');
+}
+
+function bcToolboxGetItems() {
+    return document.querySelectorAll('#resourcesList .resource-item');
+}
+
+function bcToolboxCardMatchesTenant(el, tenantVal) {
+    if (!tenantVal) return true;
+    const raw = el.getAttribute('data-tenant') || '';
+    if (tenantVal === '__empty__') return raw === '';
+    return raw === tenantVal;
+}
+
+function bcToolboxCardMatchesEnterprise(el, enterpriseVal) {
+    if (!enterpriseVal) return true;
+    const raw = (el.getAttribute('data-enterprise-project') || '').trim();
+    if (enterpriseVal === '__empty__') return raw === '';
+    return raw === enterpriseVal;
+}
+
+function bcToolboxCardMatchesType(el, typeVal) {
+    if (!typeVal) return true;
+    const t = (el.getAttribute('data-resource-type') || '').toLowerCase();
+    return t === typeVal.toLowerCase();
+}
+
+function bcToolboxCardMatchesFilters(el, f, exclude) {
+    exclude = exclude || {};
+    if (!exclude.tenant && f.tenant && !bcToolboxCardMatchesTenant(el, f.tenant)) return false;
+    if (!exclude.enterprise && f.enterprise && !bcToolboxCardMatchesEnterprise(el, f.enterprise)) return false;
+    if (!exclude.type && f.type && !bcToolboxCardMatchesType(el, f.type)) return false;
+    return true;
+}
+
+function bcToolboxGetFilterState() {
+    const t = document.getElementById('bcToolboxTenantFilter');
+    const e = document.getElementById('bcToolboxEnterpriseFilter');
+    const y = document.getElementById('bcToolboxTypeFilter');
+    return {
+        tenant: t ? t.value : '',
+        enterprise: e ? e.value : '',
+        type: y ? y.value : ''
+    };
+}
+
+function bcToolboxSelectHasValue(sel, val) {
+    if (!sel) return false;
+    for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === val) return true;
+    }
+    return false;
+}
+
+function bcToolboxRebuildTenantSelect(cards, f) {
+    const sel = document.getElementById('bcToolboxTenantFilter');
+    if (!sel) return;
+    const prev = sel.value;
+    const set = new Set();
+    cards.forEach(function (card) {
+        if (!bcToolboxCardMatchesFilters(card, f, { tenant: true })) return;
+        set.add(card.getAttribute('data-tenant') || '');
+    });
+    const hasEmpty = set.has('');
+    const values = Array.from(set).filter(function (x) { return x !== ''; }).sort(function (a, b) {
+        return a.localeCompare(b, 'ru');
+    });
+    sel.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = 'Все tenant';
+    sel.appendChild(o0);
+    if (hasEmpty) {
+        const oe = document.createElement('option');
+        oe.value = '__empty__';
+        oe.textContent = '— (не задан)';
+        sel.appendChild(oe);
+    }
+    values.forEach(function (t) {
+        const o = document.createElement('option');
+        o.value = t;
+        o.textContent = t;
+        sel.appendChild(o);
+    });
+    if (bcToolboxSelectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
+
+function bcToolboxRebuildEnterpriseSelect(cards, f) {
+    const sel = document.getElementById('bcToolboxEnterpriseFilter');
+    if (!sel) return;
+    const prev = sel.value;
+    const set = new Set();
+    cards.forEach(function (card) {
+        if (!bcToolboxCardMatchesFilters(card, f, { enterprise: true })) return;
+        set.add((card.getAttribute('data-enterprise-project') || '').trim());
+    });
+    const hasEmpty = set.has('');
+    const values = Array.from(set).filter(function (x) { return x !== ''; }).sort(function (a, b) {
+        return a.localeCompare(b, 'ru');
+    });
+    sel.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = 'Все проекты';
+    sel.appendChild(o0);
+    if (hasEmpty) {
+        const oe = document.createElement('option');
+        oe.value = '__empty__';
+        oe.textContent = '— (не задан)';
+        sel.appendChild(oe);
+    }
+    values.forEach(function (ep) {
+        const o = document.createElement('option');
+        o.value = ep;
+        o.textContent = ep;
+        sel.appendChild(o);
+    });
+    if (bcToolboxSelectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
+
+function bcToolboxRebuildTypeSelect(cards, f) {
+    const sel = document.getElementById('bcToolboxTypeFilter');
+    if (!sel) return;
+    const prev = sel.value;
+    const set = new Set();
+    cards.forEach(function (card) {
+        if (!bcToolboxCardMatchesFilters(card, f, { type: true })) return;
+        const t = (card.getAttribute('data-resource-type') || '').toLowerCase();
+        if (t) set.add(t);
+    });
+    const typesToShow = Array.from(set).sort();
+    sel.innerHTML = '';
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'Все типы';
+    sel.appendChild(optAll);
+    typesToShow.forEach(function (t) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = bcToolboxFormatTypeLabel(t);
+        sel.appendChild(opt);
+    });
+    if (bcToolboxSelectHasValue(sel, prev)) sel.value = prev;
+    else sel.value = '';
+}
+
+function syncBcToolboxFilterSelects() {
+    const cards = bcToolboxGetItems();
+    if (!cards.length) {
+        ['bcToolboxTenantFilter', 'bcToolboxEnterpriseFilter', 'bcToolboxTypeFilter'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const label = id === 'bcToolboxTenantFilter' ? 'Все tenant' : id === 'bcToolboxEnterpriseFilter' ? 'Все проекты' : 'Все типы';
+            el.innerHTML = '';
+            const o = document.createElement('option');
+            o.value = '';
+            o.textContent = label;
+            el.appendChild(o);
+        });
+        return;
+    }
+    for (let i = 0; i < 10; i++) {
+        const f = bcToolboxGetFilterState();
+        bcToolboxRebuildTenantSelect(cards, f);
+        bcToolboxRebuildEnterpriseSelect(cards, f);
+        bcToolboxRebuildTypeSelect(cards, f);
+        const f2 = bcToolboxGetFilterState();
+        if (f2.tenant === f.tenant && f2.enterprise === f.enterprise && f2.type === f.type) break;
+    }
+}
+
+/**
  * Filter resources
  */
 function filterResources() {
-    const searchTerm = document.getElementById('resourceSearch').value.toLowerCase();
+    const searchEl = document.getElementById('resourceSearch');
+    const searchTerm = searchEl ? searchEl.value.toLowerCase() : '';
+    const tenantVal = document.getElementById('bcToolboxTenantFilter') ? document.getElementById('bcToolboxTenantFilter').value : '';
+    const enterpriseVal = document.getElementById('bcToolboxEnterpriseFilter') ? document.getElementById('bcToolboxEnterpriseFilter').value : '';
+    const typeVal = document.getElementById('bcToolboxTypeFilter') ? document.getElementById('bcToolboxTypeFilter').value : '';
     const items = document.querySelectorAll('.resource-item');
     
     items.forEach(item => {
@@ -3171,8 +3375,18 @@ function filterResources() {
         if (currentFilter === 'unplaced') showByFilter = !isPlaced;
         
         const showBySearch = resourceName.includes(searchTerm) || resourceMeta.includes(searchTerm);
+        const showByToolbox = bcToolboxCardMatchesTenant(item, tenantVal) &&
+            bcToolboxCardMatchesEnterprise(item, enterpriseVal) &&
+            bcToolboxCardMatchesType(item, typeVal);
         
-        item.style.display = (showByFilter && showBySearch) ? 'flex' : 'none';
+        item.style.display = (showByFilter && showBySearch && showByToolbox) ? 'flex' : 'none';
+    });
+
+    document.querySelectorAll('.resource-provider-group').forEach(function (group) {
+        const any = Array.from(group.querySelectorAll('.resource-item')).some(function (el) {
+            return el.style.display !== 'none';
+        });
+        group.style.display = any ? '' : 'none';
     });
 }
 

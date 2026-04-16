@@ -132,6 +132,20 @@
                                     <button class="filter-btn" data-filter="placed">Размещены</button>
                                 </div>
                                 <input type="text" class="search-input" id="resourceSearch" placeholder="Поиск...">
+                                <div class="resource-toolbox-filters" id="resourceToolboxAdvancedFilters">
+                                    <label class="bc-filter-label" for="bcToolboxTenantFilter">Tenant:</label>
+                                    <select id="bcToolboxTenantFilter" class="search-input bc-toolbox-select">
+                                        <option value="">Все tenant</option>
+                                    </select>
+                                    <label class="bc-filter-label" for="bcToolboxEnterpriseFilter">Проект Enterprise:</label>
+                                    <select id="bcToolboxEnterpriseFilter" class="search-input bc-toolbox-select">
+                                        <option value="">Все проекты</option>
+                                    </select>
+                                    <label class="bc-filter-label" for="bcToolboxTypeFilter">Тип ресурса:</label>
+                                    <select id="bcToolboxTypeFilter" class="search-input bc-toolbox-select">
+                                        <option value="">Все типы</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="resources-list" id="resourcesList">
                                 <div class="loading-spinner">

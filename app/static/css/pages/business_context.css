@@ -486,6 +486,26 @@ body:has(.business-context-container) .content-body {
     border-color: #3B82F6;
 }
 
+.resource-toolbox-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+
+.bc-filter-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #6B7280;
+    margin: 0;
+    padding-top: 0.15rem;
+}
+
+.bc-toolbox-select {
+    margin-bottom: 0;
+    font-size: 0.8125rem;
+}
+
 /* Resources List */
 .resources-list {
     max-height: 500px;
