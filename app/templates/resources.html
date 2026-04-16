@@ -129,8 +129,7 @@
     {% endfor %}
     <div class="provider-section" id="provider-section-{{ provider.id }}"
          data-baseline-daily="{{ provider_daily_total|float }}"
-         data-baseline-count="{{ provider_resources|length }}"
-         data-all-types="{{ ns.types|sort|tojson|e }}">
+         data-baseline-count="{{ provider_resources|length }}">
             <div class="provider-header" onclick="toggleProviderSection('{{ provider.id }}')">
                 <div class="provider-left">
                     <div class="provider-icon">

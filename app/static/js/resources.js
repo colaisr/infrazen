@@ -69,30 +69,29 @@ function cardMatchesType(card, typeVal) {
     return cardType === typeVal.toLowerCase();
 }
 
-function parseAllTypesFromSection(section) {
-    try {
-        const raw = section.getAttribute('data-all-types') || '[]';
-        return JSON.parse(raw);
-    } catch (e) {
-        return [];
-    }
+/** Union of data-resource-type from cards (same source of truth as narrowed tenant branch). */
+function collectResourceTypesFromCards(cards) {
+    const set = new Set();
+    cards.forEach(function (card) {
+        const t = (card.getAttribute('data-resource-type') || '').toLowerCase();
+        if (t) set.add(t);
+    });
+    return Array.from(set).sort();
 }
 
 function rebuildTypeOptionsForTenant(providerId) {
-    const section = document.getElementById('provider-section-' + providerId);
     const grid = document.getElementById('provider-grid-' + providerId);
     const typeSelect = document.getElementById('provider-type-filter-' + providerId);
     const tenantSelect = document.getElementById('provider-tenant-filter-' + providerId);
-    if (!section || !grid || !typeSelect || !tenantSelect) return;
+    if (!grid || !typeSelect || !tenantSelect) return;
 
     const tenantVal = tenantSelect.value;
-    const allTypes = parseAllTypesFromSection(section);
     const cards = grid.querySelectorAll('.resource-card');
     const prevType = typeSelect.value;
 
     let typesToShow;
     if (!tenantVal) {
-        typesToShow = allTypes.slice().sort();
+        typesToShow = collectResourceTypesFromCards(cards);
     } else {
         const set = new Set();
         cards.forEach(function (card) {
