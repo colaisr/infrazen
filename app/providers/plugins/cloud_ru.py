@@ -525,6 +525,12 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         meta.get('iam_project_name') or meta.get('iamProjectName') or meta.get('iam_project') or ''
                     )
                     tenant_name = meta.get('tenant_name') or meta.get('tenantName') or meta.get('tenant') or ''
+                    enterprise_project_name = (
+                        meta.get('enterprise_project_name') or meta.get('enterpriseProjectName') or ''
+                    ).strip()
+                    enterprise_project_id = (
+                        meta.get('enterprise_project_id') or meta.get('enterpriseProjectId') or ''
+                    ).strip()
                     
                     # Extract cost: amount_nds = with VAT (НДС, matches console "включая НДС")
                     cost = consumption.get('amount_nds') or consumption.get('amount') or consumption.get('cost') or consumption.get('price', 0)
@@ -546,6 +552,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             # Billing metadata used for UI grouping/filtering
                             'iam_project_name': iam_project_name,
                             'tenant_name': tenant_name,
+                            'enterprise_project_name': enterprise_project_name,
+                            'enterprise_project_id': enterprise_project_id,
                         }
                     
                     billing_data[resource_id]['daily_cost'] += daily_cost
@@ -555,6 +563,10 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         billing_data[resource_id]['iam_project_name'] = iam_project_name
                     if tenant_name and not billing_data[resource_id].get('tenant_name'):
                         billing_data[resource_id]['tenant_name'] = tenant_name
+                    if enterprise_project_name and not billing_data[resource_id].get('enterprise_project_name'):
+                        billing_data[resource_id]['enterprise_project_name'] = enterprise_project_name
+                    if enterprise_project_id and not billing_data[resource_id].get('enterprise_project_id'):
+                        billing_data[resource_id]['enterprise_project_id'] = enterprise_project_id
                     # Prefer resource_name from consumption when we have it (org API provides it)
                     if consumption.get('resource_name') and not billing_data[resource_id].get('resource_name'):
                         billing_data[resource_id]['resource_name'] = consumption.get('resource_name', '')
@@ -580,6 +592,12 @@ class CloudRuProviderPlugin(ProviderPlugin):
                         'platform': s3_consumptions[0].get('platform', '') if s3_consumptions else '',
                         'iam_project_name': s3_meta.get('iam_project_name') or '',
                         'tenant_name': s3_meta.get('tenant_name') or '',
+                        'enterprise_project_name': (
+                            s3_meta.get('enterprise_project_name') or s3_meta.get('enterpriseProjectName') or ''
+                        ).strip(),
+                        'enterprise_project_id': (
+                            s3_meta.get('enterprise_project_id') or s3_meta.get('enterpriseProjectId') or ''
+                        ).strip(),
                     }
                     if 's3' not in billing_resources_by_type:
                         billing_resources_by_type['s3'] = {}
@@ -611,6 +629,14 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'platform': agg.get('platform', ''),
                             'iam_project_name': (first_meta or {}).get('iam_project_name') or '',
                             'tenant_name': (first_meta or {}).get('tenant_name') or '',
+                            'enterprise_project_name': (
+                                (first_meta or {}).get('enterprise_project_name')
+                                or (first_meta or {}).get('enterpriseProjectName') or ''
+                            ).strip(),
+                            'enterprise_project_id': (
+                                (first_meta or {}).get('enterprise_project_id')
+                                or (first_meta or {}).get('enterpriseProjectId') or ''
+                            ).strip(),
                         }
                         billing_resources_by_type['logging'][agg_id] = billing_data[agg_id]
                 
@@ -1147,6 +1173,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'type': t,
                             'servname': info.get('servname', '')[:60],
                             'daily_cost': info.get('daily_cost', 0),
+                            'enterprise_project_name': (info.get('enterprise_project_name') or '').strip(),
+                            'enterprise_project_id': (info.get('enterprise_project_id') or '').strip(),
                         }
                         for rid, info, t in components[:20]
                     ]
@@ -1158,6 +1186,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
                             'type': t,
                             'servname': info.get('servname', '')[:60],
                             'daily_cost': info.get('daily_cost', 0),
+                            'enterprise_project_name': (info.get('enterprise_project_name') or '').strip(),
+                            'enterprise_project_id': (info.get('enterprise_project_id') or '').strip(),
                         }
                         for rid, info, t in components
                     ]
@@ -1206,12 +1236,24 @@ class CloudRuProviderPlugin(ProviderPlugin):
                     provider_config['components_sample'] = component_sample
                 # Add first component's details for card display
                 first_info = components[0][1]
+                _ep_names: List[str] = []
+                _ep_ids: List[str] = []
+                for _, _info, _ in components:
+                    _n = (_info.get('enterprise_project_name') or '').strip()
+                    if _n and _n not in _ep_names:
+                        _ep_names.append(_n)
+                    _pid = (_info.get('enterprise_project_id') or '').strip()
+                    if _pid and _pid not in _ep_ids:
+                        _ep_ids.append(_pid)
+                _ep_card_name = ', '.join(_ep_names) if _ep_names else (first_info.get('enterprise_project_name') or '').strip()
                 provider_config.update({
                     'servname': first_info.get('servname', ''),
                     'sku': first_info.get('sku', ''),
                     'platform': first_info.get('platform', 'Cloud.ru'),
                     'iam_project_name': first_info.get('iam_project_name', ''),
                     'tenant_name': first_info.get('tenant_name', ''),
+                    'enterprise_project_name': _ep_card_name,
+                    'enterprise_project_ids': _ep_ids,
                 })
 
                 # --- Advanced API enrichment ---
@@ -1895,6 +1937,16 @@ class CloudRuProviderPlugin(ProviderPlugin):
             meta = first_consumption.get('meta') if isinstance(first_consumption.get('meta'), dict) else {}
             tenant = meta.get('tenant_name') or meta.get('tenantName') or None
         
+        ep_name = (billing_info.get('enterprise_project_name') or '').strip()
+        ep_id = (billing_info.get('enterprise_project_id') or '').strip()
+        if (not ep_name or not ep_id) and billing_info.get('consumptions'):
+            fc = billing_info['consumptions'][0]
+            meta = fc.get('meta') if isinstance(fc.get('meta'), dict) else {}
+            if not ep_name:
+                ep_name = (meta.get('enterprise_project_name') or meta.get('enterpriseProjectName') or '').strip()
+            if not ep_id:
+                ep_id = (meta.get('enterprise_project_id') or meta.get('enterpriseProjectId') or '').strip()
+        
         # Map resource type to service name
         service_name_map = {
             'server': 'Compute',
@@ -1919,6 +1971,8 @@ class CloudRuProviderPlugin(ProviderPlugin):
             'platform': billing_info.get('platform', ''),
             'iam_project_name': billing_info.get('iam_project_name', ''),
             'tenant_name': billing_info.get('tenant_name', ''),
+            'enterprise_project_name': ep_name,
+            'enterprise_project_ids': [ep_id] if ep_id else [],
             'billing_source': 'consumption_api',
             'consumptions': billing_info.get('consumptions', [])
         }

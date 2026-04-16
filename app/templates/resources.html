@@ -239,6 +239,10 @@
                                 <span class="detail-label">Внешний IP</span>
                                 <span class="detail-value external-ip-value">{{ resource.external_ip if resource.external_ip else '—' }}</span>
                             </div>
+                            <div class="detail-row" data-enterprise-project="{{ (_config.get('enterprise_project_name') or '')|e }}">
+                                <span class="detail-label">Проект Enterprise</span>
+                                <span class="detail-value enterprise-project-value">{{ _config.get('enterprise_project_name') or '—' }}</span>
+                            </div>
                             <div class="detail-row">
                                 <span class="detail-label">Регион</span>
                                 <span class="detail-value">{{ resource.region }}</span>
@@ -271,10 +275,11 @@
                             {% set _max_components = 20 %}
                             {% for comp in _components[:_max_components] %}
                             {% if comp.get('resource_id') %}
-                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;" data-enterprise-project="{{ (comp.get('enterprise_project_name') or '')|e }}">
                                 <div style="flex: 1; min-width: 0;">
                                     <div style="font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('resource_id', '') }}">{{ comp.get('resource_name') or comp.get('resource_id', '—') }}</div>
                                     <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ comp.get('resource_id', '')[:24] }}{% if (comp.get('resource_id') or '')|length > 24 %}…{% endif %}</div>
+                                    <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('enterprise_project_name', '') }}">Проект Enterprise: {{ comp.get('enterprise_project_name') or '—' }}</div>
                                 </div>
                                 {% if comp.get('servname') %}
                                 <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e0e7ff; color: #3730a3; border-radius: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('servname', '') }}">{{ comp.get('servname', '') }}</span>
@@ -299,10 +304,11 @@
                             {% if _config.get('components_truncated') and _config.get('components_sample') %}
                             <div class="detail-label" style="margin-top: 0.5rem; margin-bottom: 0.25rem; color: var(--text-secondary);">Пример компонентов (первые {{ _config.components_sample|length }}):</div>
                             {% for comp in _config.components_sample %}
-                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                            <div class="component-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.5rem; margin-bottom: 0.35rem; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0;" data-enterprise-project="{{ (comp.get('enterprise_project_name') or '')|e }}">
                                 <div style="flex: 1; min-width: 0;">
                                     <div style="font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('resource_id', '') }}">{{ comp.get('resource_name') or comp.get('resource_id', '—') }}</div>
                                     <div style="font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ comp.get('resource_id', '')[:24] }}{% if (comp.get('resource_id') or '')|length > 24 %}…{% endif %}</div>
+                                    <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('enterprise_project_name', '') }}">Проект Enterprise: {{ comp.get('enterprise_project_name') or '—' }}</div>
                                 </div>
                                 {% if comp.get('servname') %}
                                 <span class="component-badge" style="flex-shrink: 0; padding: 0.15rem 0.4rem; font-size: 0.7rem; background: #e0e7ff; color: #3730a3; border-radius: 4px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ comp.get('servname', '') }}">{{ comp.get('servname', '') }}</span>
