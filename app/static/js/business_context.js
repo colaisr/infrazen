@@ -2501,7 +2501,7 @@ function displayResources() {
         <div class="resource-provider-group">
             <div class="resource-provider-header">
                 <i class="fa-solid fa-cloud"></i>
-                <span>${escapeHtml(provider.provider_name)} (${provider.resources.length})</span>
+                <span>${escapeHtml(provider.provider_name)} (<span class="resource-provider-visible-count">${provider.resources.length}</span>)</span>
             </div>
             ${provider.resources.map(resource => `
                 <div class="resource-item ${resource.is_placed ? 'placed' : ''}" 
@@ -3383,9 +3383,14 @@ function filterResources() {
     });
 
     document.querySelectorAll('.resource-provider-group').forEach(function (group) {
-        const any = Array.from(group.querySelectorAll('.resource-item')).some(function (el) {
-            return el.style.display !== 'none';
+        const itemsInGroup = group.querySelectorAll('.resource-item');
+        let visibleCount = 0;
+        itemsInGroup.forEach(function (el) {
+            if (el.style.display !== 'none') visibleCount++;
         });
+        const countEl = group.querySelector('.resource-provider-visible-count');
+        if (countEl) countEl.textContent = String(visibleCount);
+        const any = visibleCount > 0;
         group.style.display = any ? '' : 'none';
     });
 }
