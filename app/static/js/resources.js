@@ -654,7 +654,7 @@ function exportResourcesToCSV() {
     
     // Create resources data array
     const resourcesData = [
-        ['Провайдер', 'Ресурс', 'Тип', 'Статус', 'External IP', 'Регион', 'Tenant', 'Стоимость день (₽)', 'Стоимость месяц (₽)']
+        ['Провайдер', 'Ресурс', 'Тип', 'Статус', 'External IP', 'Регион', 'Tenant', 'Проект Enterprise', 'Стоимость день (₽)', 'Стоимость месяц (₽)']
     ];
     
     // Process each provider section
@@ -663,7 +663,7 @@ function exportResourcesToCSV() {
         const resourceCards = section.querySelectorAll('.resource-card');
         
         if (resourceCards.length === 0) {
-            resourcesData.push([providerName, 'Нет ресурсов', '', '', '', '', '', '']);
+            resourcesData.push([providerName, 'Нет ресурсов', '', '', '', '', '', '', '']);
         } else {
             resourceCards.forEach(card => {
                 const resourceName = card.querySelector('.resource-name').textContent;
@@ -672,6 +672,7 @@ function exportResourcesToCSV() {
                 const externalIp = getCardDetailValue(card, 'Внешний IP');
                 const region = getCardDetailValue(card, 'Регион');
                 const tenant = getCardDetailValue(card, 'Tenant');
+                const enterpriseProject = getCardDetailValue(card, 'Проект Enterprise');
                 const costMonthly = getCardDetailValue(card, 'Стоимость мес.');
                 const costDaily = getCardDetailValue(card, 'Стоимость день');
                 const dailyNumeric = parseCostString(costDaily);
@@ -685,6 +686,7 @@ function exportResourcesToCSV() {
                     externalIp,
                     region,
                     tenant,
+                    enterpriseProject,
                     dailyNumeric,
                     monthlyNumeric
                 ]);
@@ -704,6 +706,7 @@ function exportResourcesToCSV() {
         { wch: 15 }, // External IP
         { wch: 20 }, // Регион
         { wch: 24 }, // Tenant
+        { wch: 36 }, // Проект Enterprise
         { wch: 18 }, // Стоимость день
         { wch: 18 }  // Стоимость месяц
     ];
@@ -737,14 +740,14 @@ function exportResourcesToCSVFallback() {
     }
     
     csvContent += 'ДЕТАЛЬНЫЕ ДАННЫЕ:\n';
-    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Tenant,Стоимость день (₽),Стоимость месяц (₽)\n';
+    csvContent += 'Провайдер,Ресурс,Тип,Статус,External IP,Регион,Tenant,Проект Enterprise,Стоимость день (₽),Стоимость месяц (₽)\n';
     
     providerSections.forEach(section => {
         const providerName = section.querySelector('.provider-name').textContent;
         const resourceCards = section.querySelectorAll('.resource-card');
         
         if (resourceCards.length === 0) {
-            csvContent += `"${providerName}","Нет ресурсов","","","","","","",""\n`;
+            csvContent += `"${providerName}","Нет ресурсов","","","","","","","",""\n`;
         } else {
             resourceCards.forEach(card => {
                 const resourceName = card.querySelector('.resource-name').textContent;
@@ -753,12 +756,13 @@ function exportResourcesToCSVFallback() {
                 const externalIp = getCardDetailValue(card, 'Внешний IP');
                 const region = getCardDetailValue(card, 'Регион');
                 const tenant = getCardDetailValue(card, 'Tenant');
+                const enterpriseProject = getCardDetailValue(card, 'Проект Enterprise');
                 const costDaily = getCardDetailValue(card, 'Стоимость день');
                 const costMonthly = getCardDetailValue(card, 'Стоимость мес.');
                 const dailyNumeric = parseCostString(costDaily);
                 const monthlyNumeric = parseCostString(costMonthly);
                 
-                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${tenant}",${dailyNumeric},${monthlyNumeric}\n`;
+                csvContent += `"${providerName}","${resourceName}","${resourceType}","${status}","${externalIp}","${region}","${tenant}","${enterpriseProject}",${dailyNumeric},${monthlyNumeric}\n`;
             });
         }
     });
