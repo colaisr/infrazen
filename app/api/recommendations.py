@@ -1,9 +1,10 @@
 """
 Recommendations API: list, detail, and actions
 """
+import json
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta
-from sqlalchemy import or_, and_, desc, asc
+from sqlalchemy import or_, and_, desc, asc, func
 
 from app.core.database import db
 from app.core.models.recommendations import OptimizationRecommendation
@@ -156,6 +157,23 @@ def list_recommendations():
         except ValueError:
             pass
 
+    tenant = request.args.get('tenant')
+    enterprise_project = request.args.get('enterprise_project')
+    if tenant or enterprise_project:
+        query = query.join(Resource, OptimizationRecommendation.resource_id == Resource.id)
+        query = query.filter(Resource.organization_id == org_id)
+        if tenant:
+            query = query.filter(Resource.tenant == tenant)
+        if enterprise_project:
+            bind = db.session.get_bind()
+            dialect = (bind.dialect.name if bind else 'mysql')
+            jx = func.json_extract(Resource.provider_config, '$.enterprise_project_name')
+            if dialect == 'mysql':
+                ep_expr = func.json_unquote(jx)
+            else:
+                ep_expr = jx
+            query = query.filter(ep_expr == enterprise_project)
+
     # Sorting & pagination
     order_by = request.args.get('order_by', '-estimated_monthly_savings')
     page = int(request.args.get('page', 1))
@@ -185,6 +203,43 @@ def list_recommendations():
         'page': items.page,
         'page_size': items.per_page,
         'total': items.total
+    })
+
+
+@recommendations_bp.route('/recommendations/filter-options', methods=['GET'])
+def recommendation_filter_options():
+    """Distinct Tenant / Проект Enterprise values from resources that have recommendations."""
+    org_id = get_current_organization_id()
+    if not org_id:
+        return jsonify({'success': False, 'error': 'No active organization'}), 400
+
+    rows = (
+        db.session.query(Resource.tenant, Resource.provider_config)
+        .join(OptimizationRecommendation, OptimizationRecommendation.resource_id == Resource.id)
+        .filter(
+            OptimizationRecommendation.organization_id == org_id,
+            Resource.organization_id == org_id,
+        )
+        .distinct()
+        .all()
+    )
+    tenants = sorted({r[0] for r in rows if r[0]})
+    enterprises = set()
+    for row in rows:
+        cfg_raw = row[1]
+        if not cfg_raw:
+            continue
+        try:
+            cfg = json.loads(cfg_raw) if isinstance(cfg_raw, str) else (cfg_raw or {})
+            ep = (cfg.get('enterprise_project_name') or '').strip()
+            if ep:
+                enterprises.add(ep)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return jsonify({
+        'success': True,
+        'tenants': tenants,
+        'enterprise_projects': sorted(enterprises),
     })
 
 

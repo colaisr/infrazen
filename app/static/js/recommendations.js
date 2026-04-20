@@ -34,7 +34,7 @@ if (window.INFRAZEN_DATA && window.INFRAZEN_DATA.isDemoUser) {
 
 function buildQuery(){
     const params = new URLSearchParams();
-    ['q','provider','status','severity','type','resource_type'].forEach(k=>{
+    ['q','provider','status','severity','type','resource_type','tenant','enterprise_project'].forEach(k=>{
         const v = qs('#'+k)?.value?.trim(); 
         if(v) params.set(k, v);
     });
@@ -62,6 +62,37 @@ async function fetchProviders(){
         });
     } catch(e) {
         console.error('Error fetching providers:', e);
+    }
+}
+
+async function fetchRecommendationFilterOptions(){
+    try {
+        const res = await fetch('/api/recommendations/filter-options');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tenantSel = qs('#tenant');
+        const entSel = qs('#enterprise_project');
+        if (!tenantSel || !entSel) return;
+        const keepTenant = tenantSel.value;
+        const keepEnt = entSel.value;
+        while (tenantSel.options.length > 1) tenantSel.remove(1);
+        while (entSel.options.length > 1) entSel.remove(1);
+        (data.tenants || []).forEach(t => {
+            const o = document.createElement('option');
+            o.value = t;
+            o.textContent = t;
+            tenantSel.appendChild(o);
+        });
+        (data.enterprise_projects || []).forEach(ep => {
+            const o = document.createElement('option');
+            o.value = ep;
+            o.textContent = ep;
+            entSel.appendChild(o);
+        });
+        if (keepTenant) tenantSel.value = keepTenant;
+        if (keepEnt) entSel.value = keepEnt;
+    } catch (e) {
+        console.error('Error fetching recommendation filter options:', e);
     }
 }
 
@@ -382,7 +413,7 @@ async function exportToCSV() {
     let hasMore = true;
     while (hasMore) {
         const params = new URLSearchParams();
-        ['q','provider','status','severity','type','resource_type'].forEach(k=>{
+        ['q','provider','status','severity','type','resource_type','tenant','enterprise_project'].forEach(k=>{
             const v = qs('#'+k)?.value?.trim();
             if(v) params.set(k, v);
         });
@@ -469,7 +500,7 @@ async function exportToCSV() {
 
 function initializeEventListeners() {
     // Filter change events
-    ['#provider','#status','#severity','#type','#resource_type'].forEach(sel=>{
+    ['#provider','#status','#severity','#type','#resource_type','#tenant','#enterprise_project'].forEach(sel=>{
         const element = qs(sel);
         if (element) {
             element.addEventListener('change', ()=>{state.page=1; load();});
@@ -550,8 +581,9 @@ function initializeEventListeners() {
 (async function(){
     try {
         await fetchProviders();
+        await fetchRecommendationFilterOptions();
         const urlp = new URLSearchParams(location.search);
-        ['q','provider','status','severity','type','resource_type'].forEach(k=>{ 
+        ['q','provider','status','severity','type','resource_type','tenant','enterprise_project'].forEach(k=>{ 
             if(urlp.get(k)) {
                 const el = qs('#'+k);
                 if (el) el.value = urlp.get(k);

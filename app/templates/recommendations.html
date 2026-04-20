@@ -30,7 +30,7 @@ window.INFRAZEN_DATA.enableAgentChat = {{ 'true' if enable_ai_recommendations el
 </script>
 
 
-<div class="filters" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 0.75rem;">
+<div class="filters" style="margin-bottom: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;">
     <input id="search" class="input" placeholder="Поиск..." />
     <select id="provider" class="input">
         <option value="">Все провайдеры</option>
@@ -62,6 +62,12 @@ window.INFRAZEN_DATA.enableAgentChat = {{ 'true' if enable_ai_recommendations el
         <option value="volume">Том</option>
         <option value="bucket">Хранилище</option>
     </select>
+    <select id="tenant" class="input" title="Tenant">
+        <option value="">Все tenant</option>
+    </select>
+    <select id="enterprise_project" class="input" title="Проект Enterprise">
+        <option value="">Все проекты Enterprise</option>
+    </select>
 </div>
 
 <div class="rec-list" id="recsList"></div>
@@ -88,7 +94,7 @@ window.INFRAZEN_DATA.enableAgentChat = {{ 'true' if enable_ai_recommendations el
 
 <!-- External JavaScript -->
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script src="{{ url_for('static', filename='js/recommendations.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recommendations.js') }}?v={{ range(1000, 9999) | random }}"></script>
 
 <!-- Chat Components -->
 <script src="{{ url_for('static', filename='js/chat-drawer.js') }}"></script>
